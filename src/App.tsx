@@ -55,11 +55,19 @@ export default function App() {
   const handleSyncData = async () => {
     try {
       setIsSyncingData(true);
-      showNotification('Synchronizing data and predictions...');
+      showNotification('Resetting databases, clearing caches, and restarting from zero...');
+      
+      const currentTheme = localStorage.getItem('theme');
+      localStorage.clear();
+      sessionStorage.clear();
+      if (currentTheme) {
+        localStorage.setItem('theme', currentTheme);
+      }
+
       const res = await EngineService.syncFlashscoreData();
       if (res.success) {
         await Promise.all([fetchFixtures(), fetchSettingsAndProviders()]);
-        showNotification(res.message || 'Predictions updated from database');
+        showNotification(res.message || 'Databases and caches reset, predictions regenerated from zero!');
       } else {
         showNotification(res.message || 'Failed to sync data');
       }
