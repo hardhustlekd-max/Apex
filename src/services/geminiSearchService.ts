@@ -245,4 +245,34 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
       quotaNotice,
     };
   }
+  public static async getMatchTacticalContext(
+    homeTeam: string,
+    awayTeam: string
+  ): Promise<MatchTacticalContextInput | null> {
+    const prompt = `Analyze tactical context for the match: ${homeTeam} vs ${awayTeam}.
+    Provide injuries, suspensions, and tactical news.
+    Return ONLY a JSON object (no markdown, no other text) with this structure:
+    {
+      "information": [{ "category": "string", "value": "string" }],
+      "restDaysHome": number,
+      "restDaysAway": number
+    }`;
+
+    try {
+      const ai = this.getAIClient();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+      });
+
+      const text = response.text || '';
+      const jsonStart = text.indexOf('{');
+      const jsonEnd = text.lastIndexOf('}') + 1;
+      const jsonStr = text.substring(jsonStart, jsonEnd);
+      return JSON.parse(jsonStr);
+    } catch (err) {
+      console.error(`[GeminiSearchService] Failed to get tactical context for ${homeTeam} vs ${awayTeam}:`, err);
+      return null;
+    }
+  }
 }

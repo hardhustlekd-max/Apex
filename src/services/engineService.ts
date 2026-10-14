@@ -19,6 +19,7 @@ import { getRelativeDateStr } from '../core/seedData.js';
 import { LiveScore } from '../providers/types.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
+import { GeminiSearchService } from './geminiSearchService.js';
 
 // Default In-Memory Engine State for Universal & Client-Side execution (Vercel, Static, etc.)
 let localSettings: EngineSettings = {
@@ -513,7 +514,7 @@ export class EngineService {
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
     // Process every fixture through the Poisson prediction engine
-    const enrichedFixtures: Fixture[] = validFixtures.map((f) => {
+    const enrichedFixtures: Fixture[] = await Promise.all(validFixtures.map(async (f) => {
       const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
       const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
 
@@ -525,6 +526,13 @@ export class EngineService {
           ? f.prediction.measurements.h2h
           : null);
 
+      const tacticalInput = await GeminiSearchService.getMatchTacticalContext(f.homeTeam, f.awayTeam) || {
+        information: f.information,
+        restDaysHome: f.restDaysHome,
+        restDaysAway: f.restDaysAway,
+        stage: f.stage,
+      };
+
       const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
         f.homeTeam,
         f.awayTeam,
@@ -532,12 +540,7 @@ export class EngineService {
         settings,
         cachedH2H,
         allMatches,
-        {
-          information: f.information,
-          restDaysHome: f.restDaysHome,
-          restDaysAway: f.restDaysAway,
-          stage: f.stage,
-        }
+        tacticalInput
       );
 
       const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
@@ -580,7 +583,7 @@ export class EngineService {
         awayStats,
         measurements: prediction.measurements,
       };
-    });
+    }));
 
     // Store in the separate predictions database
     await predictionsDb.init();
@@ -629,7 +632,7 @@ export class EngineService {
     const allMatches = [...rawHist, ...scrapedAsHistorical];
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
-    const enrichedLive: Fixture[] = liveFixtures.map((f) => {
+    const enrichedLive: Fixture[] = await Promise.all(liveFixtures.map(async (f) => {
       const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
       const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
 
@@ -641,6 +644,13 @@ export class EngineService {
           ? f.prediction.measurements.h2h
           : null);
 
+      const tacticalInput = await GeminiSearchService.getMatchTacticalContext(f.homeTeam, f.awayTeam) || {
+        information: f.information,
+        restDaysHome: f.restDaysHome,
+        restDaysAway: f.restDaysAway,
+        stage: f.stage,
+      };
+
       const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
         f.homeTeam,
         f.awayTeam,
@@ -648,12 +658,7 @@ export class EngineService {
         settings,
         cachedH2H,
         allMatches,
-        {
-          information: f.information,
-          restDaysHome: f.restDaysHome,
-          restDaysAway: f.restDaysAway,
-          stage: f.stage,
-        }
+        tacticalInput
       );
 
       const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
@@ -674,7 +679,7 @@ export class EngineService {
         awayStats,
         measurements: prediction.measurements,
       };
-    });
+    }));
 
     await predictionsDb.init();
     predictionsDb.saveLivePredictions(enrichedLive);
