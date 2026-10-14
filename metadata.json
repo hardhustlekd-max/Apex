@@ -1,0 +1,6 @@
+{
+  "name": "Football Prediction & Accumulator Engine",
+  "description": "Lightweight statistical football prediction engine and accumulator generator using Poisson distribution and expected value analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
