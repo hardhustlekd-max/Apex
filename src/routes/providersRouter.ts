@@ -4,7 +4,7 @@ import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
-import { PredictionPipelineService } from '../services/predictionPipelineService.js';
+import { EngineService } from '../services/engineService.js';
 import { getRelativeDateStr } from '../core/seedData.js';
 
 export const providersRouter = Router();
@@ -79,7 +79,7 @@ providersRouter.get('/live-scores', async (req, res) => {
           under25: 1.95,
         },
       }));
-      await PredictionPipelineService.predictAndStoreLiveFixtures(liveFixtures);
+      await EngineService.predictAndStoreLiveFixtures(liveFixtures);
     }
 
     res.json({
@@ -115,7 +115,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
 
     const syncRes = await flashscoreScraperService.syncHistoricalData(7);
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-    const predRes = await PredictionPipelineService.predictAndStoreUpcomingFixtures(upcoming);
+    const predRes = await EngineService.predictAndStoreUpcomingFixtures(upcoming);
 
     // Also predict and store historical matches in predictions db
     const rawMatches = db.getAllHistoricalMatches(1500);
@@ -134,7 +134,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
         ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
       }));
     const allHist = [...rawMatches, ...scrapedAsHistorical];
-    const histPredRes = await PredictionPipelineService.predictAndStoreHistoricalMatches(allHist);
+    const histPredRes = await EngineService.predictAndStoreHistoricalMatches(allHist);
 
     // Also update live predictions if any live games are active
     const activeProvider = providerManager.getActiveProvider();
@@ -161,7 +161,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
           under25: 1.95,
         },
       }));
-      const liveRes = await PredictionPipelineService.predictAndStoreLiveFixtures(liveFixtures);
+      const liveRes = await EngineService.predictAndStoreLiveFixtures(liveFixtures);
       livePredCount = liveRes.count;
     }
 

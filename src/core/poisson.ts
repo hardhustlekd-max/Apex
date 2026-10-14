@@ -28,7 +28,7 @@ import {
  * 4. Bivariate Dixon-Coles Goal Model with low-scoring correlation correction
  * 5. Value Betting: distinguishing most likely outcome from profitable (+EV) bet
  */
-export class PoissonEngine {
+export class ApexEngine {
   /**
    * Factorial calculation with memoization
    */
@@ -1131,5 +1131,5 @@ export class PoissonEngine {
 }
 
 // Aliases for clear semantic naming
-export const EvidenceBasedPredictionEngine = PoissonEngine;
-export const PredictionEngine = PoissonEngine;
+export const EvidenceBasedPredictionEngine = ApexEngine;
+export const PredictionEngine = ApexEngine;

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, History, Calendar, Clock } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement } from '../core/types.js';
 import { PoissonMatrixView } from './PoissonMatrixView.js';
-import { PoissonEngine } from '../core/poisson.js';
+import { ApexEngine } from '../core/poisson.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
 import { LeagueStandings } from './LeagueStandings.js';
@@ -70,7 +70,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
         if (!isCancelled && data) {
           setScrapedH2H(data);
           // Recalculate prediction with all scraped H2H and recent match information
-          const { prediction: updatedPred, homeStats: updatedHome, awayStats: updatedAway } = PoissonEngine.predictMatch(
+          const { prediction: updatedPred, homeStats: updatedHome, awayStats: updatedAway } = ApexEngine.predictMatch(
             fixture.homeTeam,
             fixture.awayTeam,
             [],
@@ -85,7 +85,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             },
             data
           );
-          const { markets, bestValueMarket } = PoissonEngine.calculateMarkets(
+          const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
             updatedPred,
             fixture.odds,
             {

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { providerManager } from '../providers/providerManager.js';
-import { PoissonEngine } from '../core/poisson.js';
+import { ApexEngine } from '../core/poisson.js';
 import { AccumulatorGenerator, AccaGenerationParams, isMatchStarted } from '../core/accumulator.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 
@@ -63,7 +63,7 @@ async function handlePrebuiltGeneration(req: any, res: any) {
           cachedH2HMap.get(f.id) ||
           (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
 
-        const { prediction, homeStats, awayStats } = PoissonEngine.predictMatch(
+        const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
           f.homeTeam,
           f.awayTeam,
           historicalContext,
@@ -78,7 +78,7 @@ async function handlePrebuiltGeneration(req: any, res: any) {
           }
         );
 
-        const { markets, bestValueMarket } = PoissonEngine.calculateMarkets(
+        const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
           prediction,
           f.odds,
           settings,
@@ -224,7 +224,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
         cachedH2HMap.get(f.id) ||
         (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
 
-      const { prediction, homeStats, awayStats } = PoissonEngine.predictMatch(
+      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
         f.homeTeam,
         f.awayTeam,
         historicalContext,
@@ -239,7 +239,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
         }
       );
 
-      const { markets, bestValueMarket } = PoissonEngine.calculateMarkets(
+      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
         prediction,
         f.odds,
         settings,

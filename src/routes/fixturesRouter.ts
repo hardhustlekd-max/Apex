@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
-import { PredictionPipelineService } from '../services/predictionPipelineService.js';
+import { EngineService } from '../services/engineService.js';
 import { providerManager } from '../providers/providerManager.js';
-import { PoissonEngine } from '../core/poisson.js';
+import { ApexEngine } from '../core/poisson.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 import { getRelativeDateStr } from '../core/seedData.js';
 import { isMatchStarted } from '../core/accumulator.js';
@@ -26,12 +26,12 @@ fixturesRouter.get('/', async (req, res) => {
     if (predictionsDb.count() === 0) {
       const provider = providerManager.getActiveProvider();
       const initialUpcoming = await provider.getUpcomingFixtures();
-      await PredictionPipelineService.predictAndStoreUpcomingFixtures(initialUpcoming);
+      await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
 
       // If upcoming has live fixtures, store in live_predictions table as well
       const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
       if (liveInUpcoming.length > 0 && predictionsDb.countLivePredictions() === 0) {
-        await PredictionPipelineService.predictAndStoreLiveFixtures(liveInUpcoming);
+        await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
       }
     }
 
@@ -99,7 +99,7 @@ fixturesRouter.get('/live', async (req, res) => {
     }
 
     if (liveFixtures.length > 0) {
-      await PredictionPipelineService.predictAndStoreLiveFixtures(liveFixtures);
+      await EngineService.predictAndStoreLiveFixtures(liveFixtures);
     }
 
     const livePredictions = predictionsDb.getLivePredictions({ league, limit });
@@ -141,7 +141,7 @@ fixturesRouter.get('/history', async (req, res) => {
           ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
         }));
       const allHist = [...rawMatches, ...scrapedAsHistorical];
-      await PredictionPipelineService.predictAndStoreHistoricalMatches(allHist);
+      await EngineService.predictAndStoreHistoricalMatches(allHist);
     }
 
     // Load predictions from predictions db
@@ -269,7 +269,7 @@ fixturesRouter.get('/:id', async (req, res) => {
     const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
     // realH2H is already saved by the service
 
-    const { prediction, homeStats, awayStats } = PoissonEngine.predictMatch(
+    const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       f.homeTeam,
       f.awayTeam,
       historicalContext,
@@ -284,7 +284,7 @@ fixturesRouter.get('/:id', async (req, res) => {
       }
     );
 
-    const { markets, bestValueMarket } = PoissonEngine.calculateMarkets(
+    const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
       prediction,
       f.odds,
       settings,
