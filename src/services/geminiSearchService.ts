@@ -249,6 +249,12 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
     homeTeam: string,
     awayTeam: string
   ): Promise<MatchTacticalContextInput | null> {
+    const now = Date.now();
+    if (this.rateLimitCooldownUntil > now) {
+      console.warn('[GeminiSearchService] Quota cooldown active for tactical context — skipping.');
+      return null;
+    }
+
     const prompt = `Analyze tactical context for the match: ${homeTeam} vs ${awayTeam}.
     Provide injuries, suspensions, and tactical news.
     Return ONLY a JSON object (no markdown, no other text) with this structure:
@@ -269,9 +275,24 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
       const jsonStart = text.indexOf('{');
       const jsonEnd = text.lastIndexOf('}') + 1;
       const jsonStr = text.substring(jsonStart, jsonEnd);
+      
+      this.rateLimitCooldownUntil = 0; // Clear cooldown on success
       return JSON.parse(jsonStr);
-    } catch (err) {
-      console.error(`[GeminiSearchService] Failed to get tactical context for ${homeTeam} vs ${awayTeam}:`, err);
+    } catch (err: any) {
+      const is429 =
+        err?.status === 429 ||
+        err?.message?.includes('429') ||
+        err?.message?.includes('RESOURCE_EXHAUSTED') ||
+        err?.message?.includes('quota');
+
+      if (is429) {
+        console.warn(
+          '[GeminiSearchService] Gemini API quota limit reached (429 RESOURCE_EXHAUSTED). Entering 2-minute cooldown.'
+        );
+        this.rateLimitCooldownUntil = Date.now() + 2 * 60 * 1000;
+      } else {
+        console.error(`[GeminiSearchService] Failed to get tactical context for ${homeTeam} vs ${awayTeam}:`, err);
+      }
       return null;
     }
   }

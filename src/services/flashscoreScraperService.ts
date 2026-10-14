@@ -25,6 +25,7 @@ interface ScrapedRawMatch {
   awayScore?: number;
   homeHtScore?: number;
   awayHtScore?: number;
+  statistics?: any[];
 }
 
 export class FlashscoreScraperService {
