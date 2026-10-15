@@ -238,7 +238,18 @@ export class FootballDB {
         updated_at TEXT NOT NULL
       );
 
-      CREATE INDEX IF NOT EXISTS idx_standings_league ON league_standings(league_code);
+      CREATE TABLE IF NOT EXISTS terminal_logs (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT NOT NULL,
+        level TEXT NOT NULL,
+        category TEXT NOT NULL,
+        source TEXT NOT NULL,
+        message TEXT NOT NULL,
+        details_json TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON terminal_logs(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_logs_level ON terminal_logs(level);
     `);
 
     // Insert default settings if not exists

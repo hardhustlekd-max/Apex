@@ -56,7 +56,6 @@ tipsRouter.get('/', async (req, res) => {
       data: freshData,
     });
   } catch (err: any) {
-    console.warn('Handling /api/tips with fallback:', err?.message || err);
 
     // If DB has any existing cache, return it safely
     const cached = db.getLatestTipsCache();
@@ -109,7 +108,6 @@ tipsRouter.post('/refresh', async (req, res) => {
       data: freshData,
     });
   } catch (err: any) {
-    console.warn('Handling /api/tips/refresh with fallback:', err?.message || err);
     const fallback = await GeminiSearchService.fetchTrendingFootballAnalysis(false);
     res.json({
       success: true,

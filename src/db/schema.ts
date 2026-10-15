@@ -93,9 +93,19 @@ export interface UpcomingFixtureSchema {
   date_source?: 'LIVE_FEED' | 'CACHED_DB' | 'INITIAL_FALLBACK';
 }
 
+export interface EngineSettingsSchema {
+  activeProvider: ActiveProviderType;
+  rollingMatchWindow: number; // Optimized parameter: 15
+  minEVThreshold: number; // Optimized parameter: 1.10
+  safeWinThreshold: number; // Default: 0.72
+  homeAdvantageFactor: number; // Optimized parameter: 1.12
+  formDecayRate: number; // Optimized parameter: 0.85
+  autoSyncDaily: boolean; // Default: true
+}
+
 export interface AppSettingsSchema {
   key: string; // Primary Key e.g. 'engine_settings'
-  value: string; // JSON string of EngineSettings
+  value: string; // JSON string of EngineSettingsSchema
 }
 
 export type QuickSlipStrategy = 'TODAY_SLIP' | 'SAFE_PICKS' | 'TOP_VALUE' | 'CUSTOM_SLIP';
@@ -886,6 +896,67 @@ export const DDL_STATEMENTS = {
       source TEXT NOT NULL DEFAULT 'FLASHSCORE_SCRAPED',
       updated_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_standings_league ON league_standings(league_code);
+      CREATE INDEX IF NOT EXISTS idx_standings_league ON league_standings(league_code);
+  `,
+  createTerminalLogsTable: `
+    CREATE TABLE IF NOT EXISTS terminal_logs (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      level TEXT NOT NULL,
+      category TEXT NOT NULL,
+      source TEXT NOT NULL,
+      message TEXT NOT NULL,
+      details_json TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON terminal_logs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_logs_level ON terminal_logs(level);
+    CREATE INDEX IF NOT EXISTS idx_logs_category ON terminal_logs(category);
   `,
 };
+
+export interface TerminalLogSchema {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR';
+  category: 'DATA_FETCH' | 'PREDICTION' | 'SCRAPER' | 'ENGINE' | 'DATABASE';
+  source: string;
+  message: string;
+  details_json?: string | null;
+}
+
+export interface Unified5PillarPredictionSchema {
+  fixture_id: string;
+  pillar1_augmented_elo: {
+    home_elo: number;
+    away_elo: number;
+    home_win_expectancy: number;
+    draw_expectancy: number;
+    away_win_expectancy: number;
+  };
+  pillar2_opponent_adjusted_xg: {
+    home_adjusted_xg: number;
+    away_adjusted_xg: number;
+    rolling_matches_evaluated: number;
+  };
+  pillar3_tactical_context: {
+    rest_days_home: number;
+    rest_days_away: number;
+    fatigue_home: number;
+    fatigue_away: number;
+  };
+  pillar4_scraped_h2h: {
+    h2h_matches_count: number;
+    h2h_multiplier_home: number;
+    h2h_multiplier_away: number;
+  };
+  pillar5_dixon_coles_goal_model: {
+    home_lambda: number;
+    away_mu: number;
+    home_win_prob: number;
+    draw_prob: number;
+    away_win_prob: number;
+    over25_prob: number;
+    btts_prob: number;
+  };
+  evaluated_at: string;
+}

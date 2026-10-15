@@ -69,50 +69,19 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
         const data = await EngineService.getMatchHeadToHead(fixture.id, fixture.homeTeam, fixture.awayTeam);
         if (!isCancelled && data) {
           setScrapedH2H(data);
-          // Recalculate prediction with all scraped H2H and recent match information
-          const { prediction: updatedPred, homeStats: updatedHome, awayStats: updatedAway } = ApexEngine.predictMatch(
-            fixture.homeTeam,
-            fixture.awayTeam,
-            [],
-            {
-              activeProvider: 'FLASHSCORE',
-              rollingMatchWindow: 15,
-              minEVThreshold: 1.10,
-              safeWinThreshold: 0.72,
-              homeAdvantageFactor: 1.12,
-              formDecayRate: 0.85,
-              autoSyncDaily: true,
-            },
-            data
-          );
-          const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-            updatedPred,
-            fixture.odds,
-            {
-              activeProvider: 'FLASHSCORE',
-              rollingMatchWindow: 15,
-              minEVThreshold: 1.10,
-              safeWinThreshold: 0.72,
-              homeAdvantageFactor: 1.12,
-              formDecayRate: 0.85,
-              autoSyncDaily: true,
-            },
-            fixture.homeTeam,
-            fixture.awayTeam
-          );
           setEnrichedFixture((prev) => ({
             ...prev,
-            prediction: updatedPred,
-            homeStats: updatedHome,
-            awayStats: updatedAway,
-            markets,
-            bestValueMarket,
+            measurements: {
+              ...prev.measurements,
+              h2h: data,
+            },
+            h2hMatches: data.recentH2H,
           }));
         } else {
           const detail = await EngineService.getMatchDetail(fixture.id);
-          if (!isCancelled && detail && detail.prediction) {
+          if (!isCancelled && detail) {
             setEnrichedFixture(detail);
-            if (detail.prediction.measurements?.h2h) {
+            if (detail.prediction?.measurements?.h2h) {
               setScrapedH2H(detail.prediction.measurements.h2h);
             }
           }

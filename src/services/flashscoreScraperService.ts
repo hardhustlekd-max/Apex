@@ -3,6 +3,7 @@ import { LiveOddsUpdate, LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getCurrentSeason } from '../core/seedData.js';
+import { loggerService } from './loggerService.js';
 
 const FLASHSCORE_FEED_BASE = 'https://www.flashscore.com/x/feed';
 const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
@@ -313,6 +314,14 @@ export class FlashscoreScraperService {
       // Persist to database
       db.saveUpcomingFixtures(scrapedFixtures);
       db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATA_FETCH',
+        source: 'FlashscoreScraper',
+        message: `Fetched ${scrapedFixtures.length} upcoming fixtures from Flashscore feed`,
+        details: { count: scrapedFixtures.length, dateFilter: dateFilter || 'All' },
+      });
 
       if (dateFilter) {
         return scrapedFixtures.filter((f) => f.matchDate === dateFilter);
@@ -809,11 +818,24 @@ export class FlashscoreScraperService {
           this.cacheH2H.set(cleanId, measurement);
           db.savePredictionMeasurement(cleanId, measurement);
           db.savePredictionMeasurement(matchId, measurement); // Save original ID too
+
+          loggerService.addLog({
+            level: 'INFO',
+            category: 'SCRAPER',
+            source: 'FlashscoreScraper',
+            message: `Scraped H2H for ${homeClubName || fixtureHomeTeam} vs ${awayClubName || fixtureAwayTeam}: ${matchesCount} meetings found`,
+          });
+
           return measurement;
         }
       }
-    } catch (err) {
-      console.warn(`[FlashscoreScraper] Failed to fetch H2H feed for ${cleanId}:`, err);
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraper',
+        message: `H2H feed unavailable for match ${cleanId} (${fixtureHomeTeam || 'Home'} vs ${fixtureAwayTeam || 'Away'}) - using baseline head-to-head`,
+      });
     }
 
     // Zero encounters between teams in real records directly from Flashscore feed
@@ -892,7 +914,7 @@ export class FlashscoreScraperService {
         }
       }
     } catch (err) {
-      console.warn(`[FlashscoreScraper] Failed searching fixture for club ${clubName}:`, err);
+      // Data not available - cleanly continue without terminal log
     }
 
     // 4. Return empty if not available in Flashscore scraper feeds
@@ -1188,7 +1210,7 @@ export class FlashscoreScraperService {
         }
       }
     } catch (err) {
-      console.warn(`[FlashscoreScraper] Live HTML tournament scraping failed for ${leagueCode}:`, err);
+      // Data not available - cleanly continue without terminal log
     }
 
     // 5. If specific tournament page scraping returned 0 matches, return empty table structure

@@ -5,6 +5,8 @@ import { providerManager } from '../providers/providerManager.js';
 import { ApexEngine } from '../core/poisson.js';
 import { AccumulatorGenerator, AccaGenerationParams, isMatchStarted } from '../core/accumulator.js';
 import { EngineSettings, Fixture } from '../core/types.js';
+import { EngineService } from '../services/engineService.js';
+import { loggerService } from '../services/loggerService.js';
 
 export const accumulatorRouter = Router();
 
@@ -15,7 +17,7 @@ async function handlePrebuiltGeneration(req: any, res: any) {
     const clientFixtures = req.body?.fixtures;
 
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FOOTBALL_DATA_CO_UK',
+      activeProvider: 'FLASHSCORE',
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -34,67 +36,28 @@ async function handlePrebuiltGeneration(req: any, res: any) {
         fixturesToUse = predictionsDb.getAllPredictions();
       } else {
         const provider = providerManager.getActiveProvider();
-      const rawFixtures = await provider.getUpcomingFixtures();
-      const rawHist = db.getAllHistoricalMatches(1500);
-      const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-      const scrapedAsHistorical: any[] = scrapedMatches
-        .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-        .map((sm) => ({
-          date: sm.date || new Date().toISOString().split('T')[0],
-          div: sm.league || 'ALL',
-          homeTeam: sm.homeTeam,
-          awayTeam: sm.awayTeam,
-          fthg: sm.result.home,
-          ftag: sm.result.away,
-          ftr: sm.result.home > sm.result.away ? 'H' : sm.result.home < sm.result.away ? 'A' : 'D',
-          hs: sm.stats?.homeShots || 0,
-          as: sm.stats?.awayShots || 0,
-          hst: sm.stats?.homeShotsOnTarget || 0,
-          ast: sm.stats?.awayShotsOnTarget || 0,
-        }));
-      const allMatches = [...scrapedAsHistorical, ...rawHist];
-      const cachedH2HMap = db.getAllPredictionMeasurements();
+        const rawFixtures = await provider.getUpcomingFixtures();
+        const allMatches = EngineService.getUnifiedHistoricalUniverse();
+        const cachedH2HMap = db.getAllPredictionMeasurements();
 
-      fixturesToUse = rawFixtures.map((f) => {
-        const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
-        const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
-        const cleanId = (f.id || '').replace(/^fs_/, '');
-        const cachedH2H = cachedH2HMap.get(cleanId) ||
-          cachedH2HMap.get(f.id) ||
-          (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
+        fixturesToUse = rawFixtures.map((f) => {
+          if (f.prediction && f.markets && f.markets.length > 0) {
+            return f;
+          }
+          const cleanId = (f.id || '').replace(/^fs_/, '');
+          const cachedH2H = cachedH2HMap.get(cleanId) ||
+            cachedH2HMap.get(f.id) ||
+            (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
 
-        const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-          f.homeTeam,
-          f.awayTeam,
-          historicalContext,
-          settings,
-          cachedH2H,
-          allMatches,
-          {
+          const tacticalInput = {
             information: f.information,
             restDaysHome: f.restDaysHome,
             restDaysAway: f.restDaysAway,
             stage: f.stage,
-          }
-        );
+          };
 
-        const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-          prediction,
-          f.odds,
-          settings,
-          f.homeTeam,
-          f.awayTeam
-        );
-
-        return {
-          ...f,
-          prediction,
-          markets,
-          bestValueMarket,
-          homeStats,
-          awayStats,
-        };
-      });
+          return EngineService.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
+        });
       }
     }
 
@@ -202,7 +165,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
     const params: AccaGenerationParams = req.body || {};
     const provider = providerManager.getActiveProvider();
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FOOTBALL_DATA_CO_UK',
+      activeProvider: 'FLASHSCORE',
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -212,49 +175,34 @@ accumulatorRouter.post('/generate', async (req, res) => {
     };
 
     const rawFixtures = await provider.getUpcomingFixtures();
-    const allMatches = db.getAllHistoricalMatches(1500);
+    const allMatches = EngineService.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
-    // Enrich all fixtures with Poisson predictions & markets
+    // Enrich all fixtures with Poisson predictions & markets using the unified engine
     const enrichedFixtures: Fixture[] = rawFixtures.map((f) => {
-      const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
-      const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
+      if (f.prediction && f.markets && f.markets.length > 0) {
+        return f;
+      }
       const cleanId = (f.id || '').replace(/^fs_/, '');
       const cachedH2H = cachedH2HMap.get(cleanId) ||
         cachedH2HMap.get(f.id) ||
         (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
 
-      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-        f.homeTeam,
-        f.awayTeam,
-        historicalContext,
-        settings,
-        cachedH2H,
-        allMatches,
-        {
-          information: f.information,
-          restDaysHome: f.restDaysHome,
-          restDaysAway: f.restDaysAway,
-          stage: f.stage,
-        }
-      );
-
-      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-        prediction,
-        f.odds,
-        settings,
-        f.homeTeam,
-        f.awayTeam
-      );
-
-      return {
-        ...f,
-        prediction,
-        markets,
-        bestValueMarket,
-        homeStats,
-        awayStats,
+      const tacticalInput = {
+        information: f.information,
+        restDaysHome: f.restDaysHome,
+        restDaysAway: f.restDaysAway,
+        stage: f.stage,
       };
+
+      const predicted = EngineService.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'ENGINE',
+        source: 'AccumulatorRouter',
+        message: `Processed prediction for fixture ${predicted.homeTeam} vs ${predicted.awayTeam}`,
+      });
+      return predicted;
     });
 
     const unstartedFixtures = enrichedFixtures.filter((f) => !isMatchStarted(f));

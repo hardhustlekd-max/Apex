@@ -482,8 +482,8 @@ export class ApexEngine {
       homeTeam,
       historicalUniverse,
       eloRatingsMap,
-      settings.rollingMatchWindow || 8,
-      settings.formDecayRate || 0.88,
+      settings?.rollingMatchWindow || 15,
+      settings?.formDecayRate || 0.85,
       realScrapedH2H?.homeRecentMatches
     );
 
@@ -491,8 +491,8 @@ export class ApexEngine {
       awayTeam,
       historicalUniverse,
       eloRatingsMap,
-      settings.rollingMatchWindow || 8,
-      settings.formDecayRate || 0.88,
+      settings?.rollingMatchWindow || 15,
+      settings?.formDecayRate || 0.85,
       realScrapedH2H?.awayRecentMatches
     );
 
@@ -513,7 +513,7 @@ export class ApexEngine {
     // 4. Head to Head record directly from scraper feed or records
     const h2h = (realScrapedH2H && realScrapedH2H.matchesCount > 0)
       ? realScrapedH2H
-      : this.computeHeadToHead(homeTeam, awayTeam, leagueHistoricalMatches);
+      : this.computeHeadToHead(homeTeam, awayTeam, historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches);
 
     const measurements: PredictionEngineMeasurements = {
       h2h,
@@ -522,11 +522,12 @@ export class ApexEngine {
     // League baseline scoring averages
     let leagueHomeAvg = 1.50;
     let leagueAwayAvg = 1.20;
-    if (leagueHistoricalMatches.length > 0) {
-      const totH = leagueHistoricalMatches.reduce((acc, m) => acc + (m.fthg || 0), 0);
-      const totA = leagueHistoricalMatches.reduce((acc, m) => acc + (m.ftag || 0), 0);
-      leagueHomeAvg = totH / leagueHistoricalMatches.length || 1.50;
-      leagueAwayAvg = totA / leagueHistoricalMatches.length || 1.20;
+    const matchesForAvg = leagueHistoricalMatches.length > 0 ? leagueHistoricalMatches : historicalUniverse;
+    if (matchesForAvg.length > 0) {
+      const totH = matchesForAvg.reduce((acc, m) => acc + (m.fthg || 0), 0);
+      const totA = matchesForAvg.reduce((acc, m) => acc + (m.ftag || 0), 0);
+      leagueHomeAvg = totH / matchesForAvg.length || 1.50;
+      leagueAwayAvg = totA / matchesForAvg.length || 1.20;
     }
 
     // 5. Dixon-Coles Expected Goals (λ and μ)
@@ -540,7 +541,7 @@ export class ApexEngine {
     const eloMultiplierHome = Math.pow(10, eloExpectancy.eloDifference / 1200);
     const eloMultiplierAway = Math.pow(10, -eloExpectancy.eloDifference / 1200);
 
-    const homeAdvantageVenue = settings.homeAdvantageFactor || 1.08;
+    const homeAdvantageVenue = settings?.homeAdvantageFactor || 1.12;
 
     let homeLambda =
       leagueHomeAvg *
@@ -647,8 +648,8 @@ export class ApexEngine {
     const homeStats = this.computeTeamStats(
       homeTeam,
       historicalUniverse,
-      settings.rollingMatchWindow || 8,
-      settings.formDecayRate || 0.88,
+      settings?.rollingMatchWindow || 15,
+      settings?.formDecayRate || 0.85,
       realScrapedH2H?.homeRecentMatches
     );
     homeStats.eloRating = homeElo;
@@ -658,8 +659,8 @@ export class ApexEngine {
     const awayStats = this.computeTeamStats(
       awayTeam,
       historicalUniverse,
-      settings.rollingMatchWindow || 8,
-      settings.formDecayRate || 0.88,
+      settings?.rollingMatchWindow || 15,
+      settings?.formDecayRate || 0.85,
       realScrapedH2H?.awayRecentMatches
     );
     awayStats.eloRating = awayElo;
@@ -738,8 +739,8 @@ export class ApexEngine {
         ? Number(Math.max(0, expectedValue / (odd - 1.0)).toFixed(4))
         : 0;
 
-      // Positive EV threshold from settings
-      const minEV = settings.minEVThreshold ? (settings.minEVThreshold - 1.0) : 0.05;
+      // Positive EV threshold from settings (+EV threshold 1.10 -> 0.10 edge)
+      const minEV = settings?.minEVThreshold ? (settings.minEVThreshold - 1.0) : 0.10;
       const isPositiveEV = expectedValue >= minEV;
       const isBanker = prob >= (settings.safeWinThreshold || 0.70);
 
@@ -764,12 +765,16 @@ export class ApexEngine {
     addMarket('AWAY_WIN', `${awayTeam} to Win`, odds.awayWin, prediction.awayWinProb);
 
     // Goal Totals
-    addMarket('OVER_25', 'Over 2.5 Goals', odds.over25 || 1.85, prediction.over25Prob);
-    addMarket('UNDER_25', 'Under 2.5 Goals', odds.under25 || 1.95, Number((1 - prediction.over25Prob).toFixed(3)));
+    const over25Odd = odds.over25 && odds.over25 > 1.0 ? odds.over25 : (prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : undefined);
+    const under25Odd = odds.under25 && odds.under25 > 1.0 ? odds.under25 : (prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : undefined);
+    if (over25Odd) addMarket('OVER_25', 'Over 2.5 Goals', over25Odd, prediction.over25Prob);
+    if (under25Odd) addMarket('UNDER_25', 'Under 2.5 Goals', under25Odd, Number((1 - prediction.over25Prob).toFixed(3)));
 
     // Both Teams to Score
-    addMarket('BTTS_YES', 'Both Teams to Score', odds.bttsYes || 1.80, prediction.bttsProb);
-    addMarket('BTTS_NO', 'Both Teams to Score No', odds.bttsNo || 2.00, Number((1 - prediction.bttsProb).toFixed(3)));
+    const bttsYesOdd = odds.bttsYes && odds.bttsYes > 1.0 ? odds.bttsYes : (prediction.bttsProb > 0 ? Number((1 / prediction.bttsProb).toFixed(2)) : undefined);
+    const bttsNoOdd = odds.bttsNo && odds.bttsNo > 1.0 ? odds.bttsNo : (prediction.bttsProb < 1 ? Number((1 / (1 - prediction.bttsProb)).toFixed(2)) : undefined);
+    if (bttsYesOdd) addMarket('BTTS_YES', 'Both Teams to Score', bttsYesOdd, prediction.bttsProb);
+    if (bttsNoOdd) addMarket('BTTS_NO', 'Both Teams to Score No', bttsNoOdd, Number((1 - prediction.bttsProb).toFixed(3)));
 
     // Double Chance
     const dc1XProb = Number((prediction.homeWinProb + prediction.drawProb).toFixed(3));

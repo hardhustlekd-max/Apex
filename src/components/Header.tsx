@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, RefreshCw } from 'lucide-react';
+import { Menu, Terminal } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   providers: ProviderStatus[];
   stats: { totalMatches: number; totalTeams: number; leagues: any[] };
   onOpenSettings: () => void;
+  onOpenTerminal?: () => void;
   onOpenSeedModal: () => void;
   onSelectAccaCategory?: (cat: 'BANKER' | 'VALUE_HUNTER') => void;
   onProviderChange: (providerId: EngineSettings['activeProvider']) => void;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   providers,
   stats,
   onOpenSettings,
+  onOpenTerminal,
   onOpenSeedModal,
   onSelectAccaCategory,
   onProviderChange,
@@ -50,6 +52,19 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Terminal Logs Button */}
+          {onOpenTerminal && (
+            <button
+              id="open-terminal-modal-btn"
+              onClick={onOpenTerminal}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 transition-colors cursor-pointer shadow-xs text-xs font-semibold"
+              title="Terminal Logs"
+            >
+              <Terminal className="w-3.5 h-3.5 text-zinc-700" />
+              <span className="hidden sm:inline">Terminal</span>
+            </button>
+          )}
+
           {/* Menu Icon to open Settings & Preferences */}
           <button
             id="open-settings-modal-btn"

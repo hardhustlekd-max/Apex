@@ -20,6 +20,7 @@ import { LiveScore } from '../providers/types.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { GeminiSearchService } from './geminiSearchService.js';
+import { loggerService, TerminalLogEntry } from './loggerService.js';
 
 // Default In-Memory Engine State for Universal & Client-Side execution (Vercel, Static, etc.)
 let localSettings: EngineSettings = {
@@ -295,6 +296,59 @@ export class EngineService {
   }
 
   /**
+   * Fetches real-time log history from terminal logger
+   */
+  public static async getTerminalLogs(filter?: {
+    category?: string;
+    level?: string;
+    search?: string;
+    limit?: number;
+  }): Promise<TerminalLogEntry[]> {
+    const params = new URLSearchParams();
+    if (filter?.category) params.set('category', filter.category);
+    if (filter?.level) params.set('level', filter.level);
+    if (filter?.search) params.set('search', filter.search);
+    if (filter?.limit) params.set('limit', String(filter.limit));
+
+    const serverData = await this.safeJsonFetch(`/api/logs?${params.toString()}`);
+    if (serverData && serverData.success && Array.isArray(serverData.logs)) {
+      return serverData.logs;
+    }
+    return loggerService.getLogs(filter as any);
+  }
+
+  /**
+   * Clears terminal log history
+   */
+  public static async clearTerminalLogs(): Promise<boolean> {
+    const res = await this.safeJsonFetch('/api/logs/clear', { method: 'POST' });
+    if (res && res.success) {
+      loggerService.clearLogs();
+      return true;
+    }
+    loggerService.clearLogs();
+    return true;
+  }
+
+  /**
+   * Records a terminal log entry
+   */
+  public static async recordTerminalLog(entry: {
+    level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR';
+    category: 'DATA_FETCH' | 'PREDICTION' | 'SCRAPER' | 'ENGINE' | 'DATABASE';
+    source: string;
+    message: string;
+    details?: any;
+  }): Promise<void> {
+    loggerService.addLog(entry);
+    await this.safeJsonFetch('/api/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+  }
+
+  /**
    * Fetches Prebuilt Accumulator Slips generated entirely on the server side
    */
   public static async getPrebuiltAccumulators(
@@ -456,6 +510,131 @@ export class EngineService {
   }
 
   /**
+   * Builds the single authoritative historical universe combining
+   * historical reference matches and Flashscore scraped matches
+   */
+  public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
+    const rawHist = db.getAllHistoricalMatches(1500);
+    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+    const scrapedAsHistorical: HistoricalMatch[] = scrapedMatches
+      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
+      .map((sm, idx) => {
+        const homeScore = parseInt(String(sm.result!.home), 10) || 0;
+        const awayScore = parseInt(String(sm.result!.away), 10) || 0;
+        const ftr: 'H' | 'D' | 'A' = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
+        return {
+          id: sm.matchId || `scraped_${idx}`,
+          div: sm.leagueName || sm.stage || 'FLASHSCORE',
+          season: sm.season || '2024/2025',
+          leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
+          matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
+          homeTeam: sm.home.name,
+          awayTeam: sm.away.name,
+          fthg: homeScore,
+          ftag: awayScore,
+          ftr,
+          restDaysHome: 7,
+          restDaysAway: 7,
+        };
+      });
+    const universe = [...rawHist, ...scrapedAsHistorical];
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'ENGINE',
+      source: 'EngineService',
+      message: `Retrieved unified historical universe: ${rawHist.length} historical + ${scrapedAsHistorical.length} scraped matches`,
+    });
+    return universe;
+  }
+
+  /**
+   * Unified 5-Pillar Prediction Execution
+   * Used identically for Upcoming Fixtures, Historical Matches, Live Fixtures, and Match Detail Modal.
+   */
+  public static predictFixtureUnified(
+    f: Fixture,
+    allMatches: HistoricalMatch[],
+    settings: EngineSettings,
+    cachedH2H?: HeadToHeadMeasurement | null,
+    tacticalInput?: any,
+    scrapedMap?: Map<string, any>
+  ): Fixture {
+    const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === (f.league || '').toUpperCase());
+    const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
+
+    const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
+      f.homeTeam,
+      f.awayTeam,
+      historicalContext,
+      settings,
+      cachedH2H,
+      allMatches,
+      tacticalInput
+    );
+
+    // Ensure valid odds without hardcoded fallbacks
+    let odds = f.odds;
+    if (!odds || !odds.homeWin || !odds.draw || !odds.awayWin) {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'PREDICTION',
+        source: 'ApexEngine',
+        message: `Odds missing for ${f.homeTeam} vs ${f.awayTeam} (ID: ${f.id}). Calculating fair probabilities without hardcoded odds.`,
+      });
+      odds = {
+        homeWin: prediction.homeWinProb > 0 ? Number((1 / prediction.homeWinProb).toFixed(2)) : 2.50,
+        draw: prediction.drawProb > 0 ? Number((1 / prediction.drawProb).toFixed(2)) : 3.20,
+        awayWin: prediction.awayWinProb > 0 ? Number((1 / prediction.awayWinProb).toFixed(2)) : 2.80,
+        over25: prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : 1.90,
+        under25: prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : 1.90,
+      };
+    }
+
+    const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
+      prediction,
+      odds,
+      settings,
+      f.homeTeam,
+      f.awayTeam
+    );
+
+    const sm = scrapedMap
+      ? (scrapedMap.get(f.id) ||
+         scrapedMap.get(f.id.replace('fs_', '')) ||
+         scrapedMap.get(`${f.homeTeam.toLowerCase()}__${f.awayTeam.toLowerCase()}`))
+      : undefined;
+
+    const stage = sm?.stage || f.stage;
+    const homeBadge = sm?.home?.image || f.homeBadge;
+    const awayBadge = sm?.away?.image || f.awayBadge;
+    const information = sm?.information && sm.information.length > 0 ? sm.information : f.information;
+    const statistics = sm?.statistics && sm.statistics.length > 0 ? sm.statistics : f.statistics;
+    const resultDetails = sm?.result
+      ? {
+          regulationTime: sm.result.regulationTime,
+          penalties: sm.result.penalties,
+        }
+      : f.resultDetails;
+
+    return {
+      ...f,
+      stage,
+      homeBadge,
+      awayBadge,
+      information,
+      statistics,
+      resultDetails,
+      odds,
+      prediction,
+      markets,
+      bestValueMarket,
+      homeStats,
+      awayStats,
+      measurements: prediction.measurements,
+    };
+  }
+
+  /**
    * Runs the Poisson Prediction Engine for a set of upcoming fixtures
    * and stores the resulting predictions in the separate predictions database (predictions.sqlite)
    */
@@ -480,25 +659,8 @@ export class EngineService {
       return true;
     });
 
-    // Gather all historical matches & scraped matches for real team form
-    const rawHist = db.getAllHistoricalMatches(1500);
+    const allMatches = this.getUnifiedHistoricalUniverse();
     const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const scrapedAsHistorical: any[] = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm) => ({
-        div: sm.leagueName || sm.stage || 'FLASHSCORE',
-        matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
-        homeTeam: sm.home.name,
-        awayTeam: sm.away.name,
-        fthg: parseInt(sm.result!.home!, 10) || 0,
-        ftag: parseInt(sm.result!.away!, 10) || 0,
-        ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0)
-          ? 'H'
-          : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0)
-          ? 'A'
-          : 'D',
-      }));
-    const allMatches = [...rawHist, ...scrapedAsHistorical];
 
     const scrapedMap = new Map<string, any>();
     for (const sm of scrapedMatches) {
@@ -513,11 +675,8 @@ export class EngineService {
 
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
-    // Process every fixture through the Poisson prediction engine
+    // Process every fixture through the Unified Poisson prediction engine
     const enrichedFixtures: Fixture[] = await Promise.all(validFixtures.map(async (f) => {
-      const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
-      const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
-
       const cleanId = (f.id || '').replace(/^fs_/, '');
       const cachedH2H =
         cachedH2HMap.get(cleanId) ||
@@ -533,61 +692,20 @@ export class EngineService {
         stage: f.stage,
       };
 
-      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-        f.homeTeam,
-        f.awayTeam,
-        historicalContext,
-        settings,
-        cachedH2H,
-        allMatches,
-        tacticalInput
-      );
-
-      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-        prediction,
-        f.odds,
-        settings,
-        f.homeTeam,
-        f.awayTeam
-      );
-
-      const sm =
-        scrapedMap.get(f.id) ||
-        scrapedMap.get(f.id.replace('fs_', '')) ||
-        scrapedMap.get(`${f.homeTeam.toLowerCase()}__${f.awayTeam.toLowerCase()}`);
-
-      const stage = sm?.stage || f.stage;
-      const homeBadge = sm?.home?.image || f.homeBadge;
-      const awayBadge = sm?.away?.image || f.awayBadge;
-      const information = sm?.information && sm.information.length > 0 ? sm.information : f.information;
-      const statistics = sm?.statistics && sm.statistics.length > 0 ? sm.statistics : f.statistics;
-      const resultDetails = sm?.result
-        ? {
-            regulationTime: sm.result.regulationTime,
-            penalties: sm.result.penalties,
-          }
-        : f.resultDetails;
-
-      return {
-        ...f,
-        stage,
-        homeBadge,
-        awayBadge,
-        information,
-        statistics,
-        resultDetails,
-        prediction,
-        markets,
-        bestValueMarket,
-        homeStats,
-        awayStats,
-        measurements: prediction.measurements,
-      };
+      return this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
     }));
 
     // Store in the separate predictions database
     await predictionsDb.init();
     predictionsDb.savePredictions(enrichedFixtures);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'PREDICTION',
+      source: 'ApexEngine',
+      message: `Unified 5-Pillar Engine generated predictions for ${enrichedFixtures.length} upcoming fixtures`,
+      details: { count: enrichedFixtures.length, universeSize: allMatches.length },
+    });
 
     return {
       count: enrichedFixtures.length,
@@ -612,30 +730,10 @@ export class EngineService {
       autoSyncDaily: true,
     };
 
-    const rawHist = db.getAllHistoricalMatches(1500);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const scrapedAsHistorical: any[] = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm) => ({
-        div: sm.leagueName || sm.stage || 'FLASHSCORE',
-        matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
-        homeTeam: sm.home.name,
-        awayTeam: sm.away.name,
-        fthg: parseInt(sm.result!.home!, 10) || 0,
-        ftag: parseInt(sm.result!.away!, 10) || 0,
-        ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0)
-          ? 'H'
-          : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0)
-          ? 'A'
-          : 'D',
-      }));
-    const allMatches = [...rawHist, ...scrapedAsHistorical];
+    const allMatches = this.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
     const enrichedLive: Fixture[] = await Promise.all(liveFixtures.map(async (f) => {
-      const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
-      const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
-
       const cleanId = (f.id || '').replace(/^fs_/, '');
       const cachedH2H =
         cachedH2HMap.get(cleanId) ||
@@ -651,38 +749,23 @@ export class EngineService {
         stage: f.stage,
       };
 
-      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-        f.homeTeam,
-        f.awayTeam,
-        historicalContext,
-        settings,
-        cachedH2H,
-        allMatches,
-        tacticalInput
-      );
-
-      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-        prediction,
-        f.odds,
-        settings,
-        f.homeTeam,
-        f.awayTeam
-      );
-
+      const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
       return {
-        ...f,
+        ...enriched,
         status: 'LIVE' as const,
-        prediction,
-        markets,
-        bestValueMarket,
-        homeStats,
-        awayStats,
-        measurements: prediction.measurements,
       };
     }));
 
     await predictionsDb.init();
     predictionsDb.saveLivePredictions(enrichedLive);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'PREDICTION',
+      source: 'ApexEngine',
+      message: `Unified 5-Pillar Engine updated predictions for ${enrichedLive.length} live matches`,
+      details: { count: enrichedLive.length },
+    });
 
     return {
       count: enrichedLive.length,
@@ -691,7 +774,7 @@ export class EngineService {
   }
 
   /**
-   * Processes historical matches through the Poisson Prediction Engine
+   * Processes historical matches through the unified 5-pillar Poisson Prediction Engine
    * and stores predictions in predictions.sqlite under historical_predictions
    */
   public static async predictAndStoreHistoricalMatches(
@@ -707,13 +790,10 @@ export class EngineService {
       autoSyncDaily: true,
     };
 
-    const rawHist = db.getAllHistoricalMatches(1500);
+    const allMatches = this.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
     const enrichedHistory: Fixture[] = historicalMatches.map((m) => {
-      const leagueMatches = rawHist.filter((rh) => rh.div.toUpperCase() === (m.div || '').toUpperCase());
-      const historicalContext = leagueMatches.length >= 10 ? leagueMatches : rawHist;
-
       const cleanId = String(m.id || '').replace(/^fs_hist_/, '').replace(/^hist_/, '').replace(/^fs_/, '');
       const cachedH2H =
         cachedH2HMap.get(cleanId) ||
@@ -721,38 +801,21 @@ export class EngineService {
 
       const homeTeam = m.homeTeam || m.home?.name || 'Home Club';
       const awayTeam = m.awayTeam || m.away?.name || 'Away Club';
-      const homeWinOdds = m.b365H || (m.ftr === 'H' ? 1.85 : 3.40);
-      const drawOdds = m.b365D || 3.30;
-      const awayWinOdds = m.b365A || (m.ftr === 'A' ? 2.10 : 3.60);
 
-      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-        homeTeam,
-        awayTeam,
-        historicalContext,
-        settings,
-        cachedH2H,
-        rawHist
-      );
-
-      const odds = {
-        homeWin: homeWinOdds,
-        draw: drawOdds,
-        awayWin: awayWinOdds,
-        over25: m.b365Over25 ?? 1.85,
-        under25: m.b365Under25 ?? 1.95,
-      };
-
-      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-        prediction,
-        odds,
-        settings,
-        homeTeam,
-        awayTeam
-      );
+      // Check for real odds from dataset; if missing, do not use hardcoded fallbacks
+      let odds = undefined;
+      if (m.b365H && m.b365D && m.b365A) {
+        odds = {
+          homeWin: m.b365H,
+          draw: m.b365D,
+          awayWin: m.b365A,
+          over25: m.b365Over25,
+          under25: m.b365Under25,
+        };
+      }
 
       const fixtureId = m.id?.startsWith('hist_') ? m.id : `hist_${m.id}`;
-
-      return {
+      const tempFixture: Fixture = {
         id: fixtureId,
         providerId: 'HISTORICAL',
         league: m.div || 'LEAGUE',
@@ -767,17 +830,23 @@ export class EngineService {
           away: m.ftag ?? 0,
         },
         odds,
-        prediction,
-        markets,
-        bestValueMarket,
-        homeStats,
-        awayStats,
-        measurements: prediction.measurements,
+        restDaysHome: m.restDaysHome || 7,
+        restDaysAway: m.restDaysAway || 7,
       };
+
+      return this.predictFixtureUnified(tempFixture, allMatches, settings, cachedH2H);
     });
 
     await predictionsDb.init();
     predictionsDb.saveHistoricalPredictions(enrichedHistory);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'PREDICTION',
+      source: 'ApexEngine',
+      message: `Unified 5-Pillar Engine evaluated ${enrichedHistory.length} historical matches`,
+      details: { count: enrichedHistory.length, universeSize: allMatches.length },
+    });
 
     return {
       count: enrichedHistory.length,
@@ -786,3 +855,4 @@ export class EngineService {
   }
 
 }
+

@@ -6,6 +6,7 @@ import { PrebuiltAccumulators } from './components/PrebuiltAccumulators.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
 import { MatchDetailModal } from './components/MatchDetailModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { TerminalModal } from './components/TerminalModal.js';
 import {
   Fixture,
   EngineSettings,
@@ -43,6 +44,7 @@ export default function App() {
   // Modals
   const [selectedDetailFixture, setSelectedDetailFixture] = useState<Fixture | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [isSyncingData, setIsSyncingData] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -205,6 +207,7 @@ export default function App() {
         providers={providers}
         stats={stats}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenTerminal={() => setIsTerminalOpen(true)}
         onOpenSeedModal={() => setIsSettingsOpen(true)}
         onSelectAccaCategory={() => setActiveTab('ACCAS')}
         onProviderChange={handleProviderChange}
@@ -267,6 +270,12 @@ export default function App() {
           onClose={() => setSelectedDetailFixture(null)}
         />
       )}
+
+      {/* Terminal Logs Modal */}
+      <TerminalModal
+        isOpen={isTerminalOpen}
+        onClose={() => setIsTerminalOpen(false)}
+      />
 
       {/* Settings & Ingestion Modal */}
       <SettingsModal

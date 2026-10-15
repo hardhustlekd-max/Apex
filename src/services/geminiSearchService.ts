@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { FootballTipItem, GroundingSource, TrendingTipsData } from '../core/types.js';
+import { FootballTipItem, GroundingSource, TrendingTipsData, MatchTacticalContextInput } from '../core/types.js';
 
 export class GeminiSearchService {
   private static rateLimitCooldownUntil = 0;
@@ -98,12 +98,7 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
         err?.message?.includes('quota');
 
       if (is429) {
-        console.warn(
-          '[GeminiSearchService] Gemini API quota limit reached (429 RESOURCE_EXHAUSTED). Entering 2-minute cooldown.'
-        );
         this.rateLimitCooldownUntil = Date.now() + 2 * 60 * 1000;
-      } else {
-        console.warn('[GeminiSearchService] Gemini Search grounding issue:', err?.message || err);
       }
 
       // If we have an existing in-memory cache, return it with a notice
@@ -251,7 +246,6 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
   ): Promise<MatchTacticalContextInput | null> {
     const now = Date.now();
     if (this.rateLimitCooldownUntil > now) {
-      console.warn('[GeminiSearchService] Quota cooldown active for tactical context — skipping.');
       return null;
     }
 
@@ -286,12 +280,7 @@ Write a clean, rich, and well-structured markdown summary with bullet points, em
         err?.message?.includes('quota');
 
       if (is429) {
-        console.warn(
-          '[GeminiSearchService] Gemini API quota limit reached (429 RESOURCE_EXHAUSTED). Entering 2-minute cooldown.'
-        );
         this.rateLimitCooldownUntil = Date.now() + 2 * 60 * 1000;
-      } else {
-        console.error(`[GeminiSearchService] Failed to get tactical context for ${homeTeam} vs ${awayTeam}:`, err);
       }
       return null;
     }

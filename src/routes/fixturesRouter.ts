@@ -9,6 +9,7 @@ import { getRelativeDateStr } from '../core/seedData.js';
 import { isMatchStarted } from '../core/accumulator.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
+import { loggerService } from '../services/loggerService.js';
 
 export const fixturesRouter = Router();
 
@@ -217,21 +218,38 @@ fixturesRouter.get('/:id', async (req, res) => {
     const fixtureId = req.params.id;
     await predictionsDb.init();
     const stored = predictionsDb.getPredictionById(fixtureId);
-    if (stored && stored.prediction?.measurements?.h2h?.homeRecentMatches && stored.prediction.measurements.h2h.homeRecentMatches.length > 0) {
+
+    if (stored) {
+      // Enrich with real scraped H2H details without mutating the authoritative 5-pillar prediction
+      const cleanId = (stored.id || fixtureId).replace(/^fs_/, '');
+      const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'DATA_FETCH',
+        source: 'MatchDetail',
+        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with ${realH2H?.recentH2H?.length || 0} scraped H2H meetings`,
+      });
+
       return res.json({
         success: true,
-        fixture: stored,
+        fixture: {
+          ...stored,
+          measurements: {
+            ...stored.measurements,
+            h2h: realH2H && realH2H.matchesCount > 0 ? realH2H : stored.measurements?.h2h,
+          },
+          h2hMatches: realH2H?.recentH2H || [],
+        },
       });
     }
 
-    let f = stored;
-    if (!f) {
-      const provider = providerManager.getActiveProvider();
-      const fixtures = await provider.getUpcomingFixtures();
-      f = fixtures.find(
-        (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
-      ) || null;
-    }
+    // If fixture was not yet predicted, load from active provider and run through unified engine
+    const provider = providerManager.getActiveProvider();
+    const fixtures = await provider.getUpcomingFixtures();
+    let f = fixtures.find(
+      (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
+    ) || null;
 
     if (!f) {
       return res.status(404).json({ success: false, error: 'Fixture not found' });
@@ -247,94 +265,31 @@ fixturesRouter.get('/:id', async (req, res) => {
       autoSyncDaily: true,
     };
 
-    const rawHist = db.getAllHistoricalMatches(1500);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const scrapedAsHistorical: any[] = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm) => ({
-        div: sm.leagueName || sm.stage || 'FLASHSCORE',
-        matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
-        homeTeam: sm.home.name,
-        awayTeam: sm.away.name,
-        fthg: parseInt(sm.result!.home!, 10) || 0,
-        ftag: parseInt(sm.result!.away!, 10) || 0,
-        ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
-      }));
-    const allMatches = [...rawHist, ...scrapedAsHistorical];
-    const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === f.league.toUpperCase());
-    const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
-
-    // Scrape real head-to-head match history directly from Flashscore feed
+    const allMatches = EngineService.getUnifiedHistoricalUniverse();
     const cleanId = (f.id || fixtureId).replace(/^fs_/, '');
     const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
-    // realH2H is already saved by the service
 
-    const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
-      f.homeTeam,
-      f.awayTeam,
-      historicalContext,
-      settings,
-      realH2H,
-      allMatches,
-      {
-        information: f.information,
-        restDaysHome: f.restDaysHome,
-        restDaysAway: f.restDaysAway,
-        stage: f.stage,
-      }
-    );
-
-    const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-      prediction,
-      f.odds,
-      settings,
-      f.homeTeam,
-      f.awayTeam
-    );
-
-    // Look up scraped matches from SQLite cache
-    const scrapedMatchesDetail = db.getFlashscoreScrapedMatches(500);
-    const sm = scrapedMatchesDetail.find(
-      (item) =>
-        item.matchId === f.id ||
-        `fs_${item.matchId}` === f.id ||
-        (item.home?.name?.toLowerCase() === f.homeTeam.toLowerCase() &&
-          item.away?.name?.toLowerCase() === f.awayTeam.toLowerCase())
-    );
-
-    const stage = sm?.stage || f.stage;
-    const homeBadge = sm?.home?.image || f.homeBadge;
-    const awayBadge = sm?.away?.image || f.awayBadge;
-    const information = sm?.information && sm.information.length > 0 ? sm.information : f.information;
-    const statistics = sm?.statistics && sm.statistics.length > 0 ? sm.statistics : f.statistics;
-    const resultDetails = sm?.result
-      ? {
-          regulationTime: sm.result.regulationTime,
-          penalties: sm.result.penalties,
-        }
-      : f.resultDetails;
-
-    const enrichedFixture: Fixture = {
-      ...f,
-      stage,
-      homeBadge,
-      awayBadge,
-      information,
-      statistics,
-      resultDetails,
-      prediction,
-      markets,
-      bestValueMarket,
-      homeStats,
-      awayStats,
-      measurements: prediction.measurements,
+    const tacticalInput = {
+      information: f.information,
+      restDaysHome: f.restDaysHome,
+      restDaysAway: f.restDaysAway,
+      stage: f.stage,
     };
+
+    const enrichedFixture = EngineService.predictFixtureUnified(f, allMatches, settings, realH2H, tacticalInput);
 
     try {
       predictionsDb.savePredictions([enrichedFixture]);
     } catch {
-      // safe fallback
+      // safe persistence
     }
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'PREDICTION',
+      source: 'ApexEngine',
+      message: `Generated unified 5-pillar prediction for unpredicted match ${f.homeTeam} vs ${f.awayTeam}`,
+    });
 
     res.json({
       success: true,
@@ -344,6 +299,12 @@ fixturesRouter.get('/:id', async (req, res) => {
       },
     });
   } catch (err: any) {
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'DATA_FETCH',
+      source: 'MatchDetail',
+      message: `Error fetching fixture detail for ${req.params.id}: ${err?.message}`,
+    });
     console.error('Error fetching fixture detail:', err);
     res.status(500).json({ success: false, error: err?.message || 'Failed to fetch fixture detail' });
   }

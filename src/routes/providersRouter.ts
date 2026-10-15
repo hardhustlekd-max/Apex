@@ -6,6 +6,7 @@ import { EngineSettings, Fixture } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { EngineService } from '../services/engineService.js';
 import { getRelativeDateStr } from '../core/seedData.js';
+import { loggerService } from '../services/loggerService.js';
 
 export const providersRouter = Router();
 
@@ -109,6 +110,13 @@ providersRouter.get('/flashscore/scrape', async (req, res) => {
 
 providersRouter.post('/flashscore/sync', async (req, res) => {
   try {
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'DATABASE',
+      source: 'SyncEngine',
+      message: 'Resetting databases and clearing caches for fresh sync from zero',
+    });
+
     // Clear all cached data and predictions before syncing fresh data
     db.clearDatabase();
     predictionsDb.clearAll();
@@ -135,6 +143,13 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
       }));
     const allHist = [...rawMatches, ...scrapedAsHistorical];
     const histPredRes = await EngineService.predictAndStoreHistoricalMatches(allHist);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'DATA_FETCH',
+      source: 'SyncEngine',
+      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${allHist.length} historical matches predicted and stored`,
+    });
 
     // Also update live predictions if any live games are active
     const activeProvider = providerManager.getActiveProvider();
@@ -175,6 +190,12 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
       livePredictionsCount: livePredCount,
     });
   } catch (err: any) {
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'DATA_FETCH',
+      source: 'SyncEngine',
+      message: `Failed to sync Flashscore data: ${err?.message}`,
+    });
     res.status(500).json({ success: false, error: err?.message || 'Failed to sync Flashscore data' });
   }
 });

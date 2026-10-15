@@ -7,6 +7,7 @@ import { settingsRouter } from './routes/settingsRouter.js';
 import { providersRouter } from './routes/providersRouter.js';
 import { statsRouter } from './routes/statsRouter.js';
 import { tipsRouter } from './routes/tipsRouter.js';
+import { logsRouter } from './routes/logsRouter.js';
 import { flashscoreScraperService } from './services/flashscoreScraperService.js';
 
 export function createApp(): Express {
@@ -46,6 +47,7 @@ export function createApp(): Express {
   app.use('/api/providers', providersRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/tips', tipsRouter);
+  app.use('/api/logs', logsRouter);
 
   const standingsHandler = async (req: express.Request, res: express.Response) => {
     try {
@@ -67,6 +69,7 @@ export function createApp(): Express {
   app.use('/providers', providersRouter);
   app.use('/stats', statsRouter);
   app.use('/tips', tipsRouter);
+  app.use('/logs', logsRouter);
   app.get('/standings/:league', standingsHandler);
   app.get('/standings', standingsHandler);
 
