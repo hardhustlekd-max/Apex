@@ -99,6 +99,14 @@ export class FlashscoreScraperService {
     return null;
   }
 
+  async fetchAndPersistRawFeed(path: string): Promise<string | null> {
+    const rawText = await this.fetchFlashscoreFeed(path);
+    if (rawText) {
+      db.saveRawFeed(path, path, rawText);
+    }
+    return rawText;
+  }
+
   /**
    * Parse Flashscore delimiter format:
    * Sections begin with ~
@@ -295,6 +303,10 @@ export class FlashscoreScraperService {
             : undefined,
         };
 
+        if (m.statistics && m.statistics.length > 0) {
+          db.saveMatchStatistics(m.matchId, m.statistics);
+        }
+
         scrapedFixtures.push(fixture);
 
         scrapedMatchesForDb.push({
@@ -469,7 +481,8 @@ export class FlashscoreScraperService {
     const seenHistIds = new Set<string>();
 
     for (const offset of historyDayOffsets) {
-      const feedText = await this.fetchFlashscoreFeed(`f_1_${offset}_3_en_1`);
+      const feedPath = `f_1_${offset}_3_en_1`;
+      const feedText = await this.fetchAndPersistRawFeed(feedPath);
       if (!feedText) continue;
 
       const rawMatches = this.parseFeedText(feedText);
@@ -836,6 +849,7 @@ export class FlashscoreScraperService {
           this.cacheH2H.set(cleanId, measurement);
           db.savePredictionMeasurement(cleanId, measurement);
           db.savePredictionMeasurement(matchId, measurement); // Save original ID too
+          db.saveH2HRecord(cleanId, measurement);
 
           loggerService.addLog({
             level: 'INFO',

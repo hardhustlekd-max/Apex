@@ -960,3 +960,21 @@ export interface Unified5PillarPredictionSchema {
   };
   evaluated_at: string;
 }
+
+export interface MatchStatisticsRelationalSchema {
+  match_id: string;
+  category: string;
+  home_value: string;
+  away_value: string;
+}
+
+export interface H2HRecordRelationalSchema {
+  fixture_id: string;
+  home_team: string;
+  away_team: string;
+  matches_count: number;
+  home_wins: number;
+  draws: number;
+  away_wins: number;
+  h2h_json: string;
+}

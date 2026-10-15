@@ -4,6 +4,7 @@ import initSqlJs, { Database, SqlValue } from 'sql.js';
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, LeagueStandingTable, LeagueStandingEntry } from './types.js';
 import { getRelativeDateStr, getCurrentSeason } from './seedData.js';
 import { getCodeForSlug } from './leagueMapper.js';
+import { loggerService } from '../services/loggerService.js';
 
 function getDbPaths() {
   const localDir = path.resolve(process.cwd(), 'data');
@@ -246,6 +247,32 @@ export class FootballDB {
         source TEXT NOT NULL,
         message TEXT NOT NULL,
         details_json TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS match_statistics_relational (
+        match_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        home_value TEXT,
+        away_value TEXT,
+        PRIMARY KEY (match_id, category)
+      );
+
+      CREATE TABLE IF NOT EXISTS h2h_records_relational (
+        fixture_id TEXT PRIMARY KEY,
+        home_team TEXT NOT NULL,
+        away_team TEXT NOT NULL,
+        matches_count INTEGER NOT NULL,
+        home_wins INTEGER NOT NULL,
+        draws INTEGER NOT NULL,
+        away_wins INTEGER NOT NULL,
+        h2h_json TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS raw_feed_data (
+        fixture_id TEXT PRIMARY KEY,
+        feed_path TEXT NOT NULL,
+        raw_text TEXT NOT NULL,
+        scraped_at TEXT NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON terminal_logs(timestamp);
@@ -1116,6 +1143,96 @@ export class FootballDB {
     }
 
     return result;
+  }
+
+  saveRawFeed(fixtureId: string, feedPath: string, rawText: string): void {
+    if (!this.db || !fixtureId || !rawText) return;
+    try {
+      this.db.run(`
+        INSERT OR IGNORE INTO raw_feed_data (fixture_id, feed_path, raw_text, scraped_at)
+        VALUES (?, ?, ?, ?)
+      `, [fixtureId, feedPath, rawText, new Date().toISOString()]);
+      this.saveToDisk();
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Saved raw feed for fixture ${fixtureId}`,
+      });
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Failed to save raw feed: ${err?.message}`,
+      });
+    }
+  }
+
+  saveMatchStatistics(matchId: string, stats: Array<{ category: string; homeValue?: any; awayValue?: any }>): void {
+    if (!this.db || !matchId || !stats || stats.length === 0) return;
+    try {
+      this.db.run('BEGIN TRANSACTION;');
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO match_statistics_relational (match_id, category, home_value, away_value)
+        VALUES (?, ?, ?, ?)
+      `);
+      for (const st of stats) {
+        stmt.run([matchId, st.category, String(st.homeValue ?? ''), String(st.awayValue ?? '')]);
+      }
+      stmt.free();
+      this.db.run('COMMIT;');
+      this.saveToDisk();
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Saved ${stats.length} relational match statistics items for match ${matchId}`,
+      });
+    } catch (err: any) {
+      this.db.run('ROLLBACK;');
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Failed to save match statistics: ${err?.message}`,
+      });
+    }
+  }
+
+  saveH2HRecord(fixtureId: string, h2h: HeadToHeadMeasurement): void {
+    if (!this.db || !fixtureId || !h2h) return;
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO h2h_records_relational (fixture_id, home_team, away_team, matches_count, home_wins, draws, away_wins, h2h_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run([
+        fixtureId,
+        h2h.homeClub || 'Home',
+        h2h.awayClub || 'Away',
+        h2h.matchesCount || 0,
+        h2h.homeWins || 0,
+        h2h.draws || 0,
+        h2h.awayWins || 0,
+        JSON.stringify(h2h),
+      ]);
+      stmt.free();
+      this.saveToDisk();
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Saved relational H2H record for fixture ${fixtureId} (${h2h.homeClub} vs ${h2h.awayClub})`,
+      });
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Failed to save H2H record: ${err?.message}`,
+      });
+    }
   }
 }
 

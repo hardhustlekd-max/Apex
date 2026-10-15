@@ -290,11 +290,16 @@ export class EngineService {
    * Fetches live in-play scores
    */
   public static async getLiveScores(): Promise<LiveScore[]> {
-    const serverData = await this.safeJsonFetch('/api/providers/live-scores');
-    if (serverData && serverData.success && Array.isArray(serverData.scores) && serverData.scores.length > 0) {
-      return serverData.scores;
+    try {
+      const res = await fetch('/api/providers/live-scores');
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.scores)) {
+        return data.scores;
+      }
+    } catch {
+      // Non-blocking live scores polling fallback
     }
-
     return [];
   }
 
