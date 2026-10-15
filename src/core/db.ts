@@ -1200,6 +1200,31 @@ export class FootballDB {
     }
   }
 
+  getRawFeed(fixtureId: string): { feedPath: string; rawText: string } | null {
+    if (!this.db) return null;
+    try {
+      const stmt = this.db.prepare(`
+        SELECT feed_path, raw_text FROM raw_feed_data
+        WHERE fixture_id = ?
+      `);
+      stmt.bind([fixtureId]);
+      if (stmt.step()) {
+        const row = stmt.getAsObject();
+        stmt.free();
+        return { feedPath: String(row.feed_path), rawText: String(row.raw_text) };
+      }
+      stmt.free();
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Failed to retrieve raw feed: ${err?.message}`,
+      });
+    }
+    return null;
+  }
+
   saveH2HRecord(fixtureId: string, h2h: HeadToHeadMeasurement): void {
     if (!this.db || !fixtureId || !h2h) return;
     try {

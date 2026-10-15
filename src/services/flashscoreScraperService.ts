@@ -10,24 +10,7 @@ const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
 const FSIGN_HEADER = 'SW9D1eZo';
 const STATIC_IMAGE_BASE = 'https://static.flashscore.com/res/image/data/';
 
-interface ScrapedRawMatch {
-  matchId: string;
-  timestamp: number;
-  tournament: string;
-  country: string;
-  leagueUrl?: string;
-  homeTeam: string;
-  awayTeam: string;
-  homeBadge?: string;
-  awayBadge?: string;
-  statusCode: string;
-  periodCode?: string;
-  homeScore?: number;
-  awayScore?: number;
-  homeHtScore?: number;
-  awayHtScore?: number;
-  statistics?: any[];
-}
+import { parseFeedText, ScrapedRawMatch } from '../core/feedParser.js';
 
 export class FlashscoreScraperService {
   private cacheUpcoming: Fixture[] = [];
@@ -108,105 +91,6 @@ export class FlashscoreScraperService {
   }
 
   /**
-   * Parse Flashscore delimiter format:
-   * Sections begin with ~
-   * Within each section, pairs are separated by ¬
-   * Keys and values are separated by ÷
-   */
-  private parseFeedText(feedText: string): ScrapedRawMatch[] {
-    const matches: ScrapedRawMatch[] = [];
-    const sections = feedText.split('~');
-
-    let currentTournament = 'Football Competition';
-    let currentCountry = 'International';
-    let currentLeagueUrl = '';
-
-    for (const section of sections) {
-      if (!section) continue;
-
-      if (section.startsWith('ZA÷')) {
-        // Tournament header section
-        const parts = section.split('¬');
-        for (const p of parts) {
-          const [key, val] = p.split('÷');
-          if (key === 'ZA' && val) currentTournament = val.trim();
-          if (key === 'ZY' && val) currentCountry = val.trim();
-          if (key === 'ZL' && val) currentLeagueUrl = val.trim();
-        }
-      } else if (section.startsWith('AA÷')) {
-        // Match item
-        const parts = section.split('¬');
-        const matchData: any = {
-          tournament: currentTournament,
-          country: currentCountry,
-          leagueUrl: currentLeagueUrl,
-          statistics: [],
-        };
-
-        for (const p of parts) {
-          const [key, val] = p.split('÷');
-          if (!key || val === undefined) continue;
-
-          switch (key) {
-            case 'AA':
-              matchData.matchId = val;
-              break;
-            case 'AD':
-              matchData.timestamp = parseInt(val, 10);
-              break;
-            case 'AE':
-              matchData.homeTeam = val;
-              break;
-            case 'AF':
-              matchData.awayTeam = val;
-              break;
-            case 'AG':
-              matchData.homeScore = parseInt(val, 10);
-              break;
-            case 'AH':
-              matchData.awayScore = parseInt(val, 10);
-              break;
-            case 'BC':
-              matchData.homeHtScore = parseInt(val, 10);
-              break;
-            case 'BD':
-              matchData.awayHtScore = parseInt(val, 10);
-              break;
-            case 'AB':
-              matchData.statusCode = val;
-              break;
-            case 'AC':
-              matchData.periodCode = val;
-              break;
-            case 'OA':
-              matchData.homeBadge = val;
-              break;
-            case 'OB':
-              matchData.awayBadge = val;
-              break;
-            // Parse stats (e.g. SI: Category, SJ: Home Val, SK: Away Val)
-            case 'SI':
-              matchData.statistics.push({ category: val });
-              break;
-            case 'SJ':
-              if (matchData.statistics.length > 0) matchData.statistics[matchData.statistics.length - 1].homeValue = val;
-              break;
-            case 'SK':
-              if (matchData.statistics.length > 0) matchData.statistics[matchData.statistics.length - 1].awayValue = val;
-              break;
-          }
-        }
-
-        if (matchData.matchId && matchData.homeTeam && matchData.awayTeam) {
-          matches.push(matchData as ScrapedRawMatch);
-        }
-      }
-    }
-
-    return matches;
-  }
-
-  /**
    * Map tournament/country string to application LeagueCode
    */
   private mapToLeagueCode(tournament: string, country: string): { code: LeagueCode; name: string } {
@@ -261,7 +145,7 @@ export class FlashscoreScraperService {
       const feedText = await this.fetchFlashscoreFeed(`f_1_${offset}_3_en_1`);
       if (!feedText) continue;
 
-      const rawMatches = this.parseFeedText(feedText);
+      const rawMatches = parseFeedText(feedText);
 
       for (const m of rawMatches) {
         // Skip finished matches for upcoming fixtures view
@@ -374,7 +258,7 @@ export class FlashscoreScraperService {
       return [];
     }
 
-    const rawMatches = this.parseFeedText(feedText);
+    const rawMatches = parseFeedText(feedText);
     const seenLiveIds = new Set<string>();
     const liveMatches = rawMatches.filter((m) => {
       if (m.statusCode !== '2') return false;
@@ -485,7 +369,7 @@ export class FlashscoreScraperService {
       const feedText = await this.fetchAndPersistRawFeed(feedPath);
       if (!feedText) continue;
 
-      const rawMatches = this.parseFeedText(feedText);
+      const rawMatches = parseFeedText(feedText);
       const finished = rawMatches.filter((m) => m.statusCode === '3' && m.homeScore !== undefined && m.awayScore !== undefined);
 
       for (const m of finished) {

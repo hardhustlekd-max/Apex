@@ -6,6 +6,7 @@ import { ApexEngine } from '../core/poisson.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
 import { LeagueStandings } from './LeagueStandings.js';
+import { OnDemandParser } from '../core/onDemandParser.js';
 
 interface MatchDetailModalProps {
   fixture: Fixture | null;
@@ -29,9 +30,29 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
   const [activeTab, setActiveTab] = useState<ModalTab>('OVERVIEW');
   const [statFilterGroup, setStatFilterGroup] = useState<StatCategoryGroup>('ALL');
 
+
+
   const [enrichedFixture, setEnrichedFixture] = useState<Fixture>(fixture);
+  const [isParsing, setIsParsing] = useState<boolean>(false);
 
   useEffect(() => {
+    async function parseOnDemand() {
+      if (fixture.id && !fixture.statistics) {
+        setIsParsing(true);
+        const parsed = await OnDemandParser.getParsedMatch(fixture.id);
+        if (parsed) {
+          setEnrichedFixture(prev => ({
+             ...prev,
+             statistics: parsed.statistics || [],
+             score: (parsed.homeScore !== undefined && parsed.awayScore !== undefined)
+               ? { home: parsed.homeScore, away: parsed.awayScore }
+               : undefined,
+          }));
+        }
+        setIsParsing(false);
+      }
+    }
+    parseOnDemand();
     setEnrichedFixture(fixture);
   }, [fixture]);
 

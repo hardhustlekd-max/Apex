@@ -1,6 +1,6 @@
 {
-  "summary": "Revised implementation plan for strict Raw-Only storage architecture, including incremental sync strategy (INSERT IGNORE) to only persist non-existing raw feed data.",
-  "updatedAt": "2026-10-15T16:53:21.266264358Z",
+  "summary": "Implementation plan to migrate the entire prediction engine, services, and UI to the Raw-Only storage architecture, including on-demand parsing, skeleton loaders, and settings sync integration.",
+  "updatedAt": "2026-10-15T17:10:22.447226885Z",
   "requestFeedback": true,
   "userFacing": true
 }
