@@ -287,7 +287,7 @@ export class FootballDB {
   }
 
   /**
-   * Clears all tables in the database
+   * Clears all tables in the database and local browser storage
    */
   clearDatabase(): void {
     if (!this.db) return;
@@ -297,9 +297,18 @@ export class FootballDB {
       this.db.run('DELETE FROM upcoming_fixtures;');
       this.db.run('DELETE FROM flashscore_scraped_matches;');
       this.db.run('DELETE FROM league_standings;');
+      this.db.run('DELETE FROM raw_feed_data;');
       this.db.run('COMMIT;');
       this.saveToDisk();
-      console.log('[FootballDB] All tables cleared.');
+      
+      // Clear browser-side storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      console.log('[FootballDB] All tables and browser storage cleared.');
+      
+      // Force reload to completely fresh start
+      window.location.reload();
     } catch (err) {
       this.db.run('ROLLBACK;');
       console.error('[FootballDB] Failed to clear database:', err);

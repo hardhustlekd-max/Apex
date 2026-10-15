@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan to migrate the entire prediction engine, services, and UI to the Raw-Only storage architecture, including on-demand parsing, skeleton loaders, and settings sync integration.",
-  "updatedAt": "2026-10-15T17:10:22.447226885Z",
+  "summary": "Revised implementation plan for full-reset functionality (clearing DB, localStorage, and caches), and phased, manually-triggered synchronization workflow with step-by-step progress reporting.",
+  "updatedAt": "2026-10-15T18:42:35.531227472Z",
   "requestFeedback": true,
   "userFacing": true
 }

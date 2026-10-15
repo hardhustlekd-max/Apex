@@ -21,6 +21,7 @@ import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { GeminiSearchService } from './geminiSearchService.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
+import { flashscoreScraperService } from './flashscoreScraperService.js';
 
 // Default In-Memory Engine State for Universal & Client-Side execution (Vercel, Static, etc.)
 let localSettings: EngineSettings = {
@@ -878,5 +879,19 @@ export class EngineService {
     };
   }
 
+  public static async predictAndStoreAll(): Promise<void> {
+    const rawMatches = db.getAllHistoricalMatches(1500);
+    const upcoming = await flashscoreScraperService.getUpcomingFixtures();
+    
+    await this.predictAndStoreUpcomingFixtures(upcoming);
+    await this.predictAndStoreHistoricalMatches(rawMatches);
+    
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'ENGINE',
+      source: 'EngineService',
+      message: 'All predictions recalculated based on current historical and upcoming data.',
+    });
+  }
 }
 
