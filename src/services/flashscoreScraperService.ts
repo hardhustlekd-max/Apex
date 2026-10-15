@@ -48,6 +48,8 @@ export class FlashscoreScraperService {
       `https://www.flashscore.in/x/feed/${path}`,
     ];
 
+    let lastError: any = null;
+
     for (const url of urls) {
       try {
         const controller = new AbortController();
@@ -72,11 +74,27 @@ export class FlashscoreScraperService {
           if (text && text.length > 50) {
             return text;
           }
+          lastError = new Error(`Flashscore feed response empty or too short on ${url} (Length: ${text?.length || 0})`);
+        } else {
+          lastError = new Error(`Flashscore HTTP ${res.status} ${res.statusText} on ${url}`);
         }
-      } catch (err) {
-        // try next endpoint
+      } catch (err: any) {
+        lastError = err instanceof Error ? err : new Error(String(err));
       }
     }
+
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'SCRAPER',
+      source: 'FlashscoreScraperService',
+      message: `Flashscore scraping network constraint / failure for path "${path}": ${lastError?.message || 'All endpoints failed'}`,
+      details: {
+        path,
+        error: lastError?.message,
+        stack: lastError?.stack,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     return null;
   }

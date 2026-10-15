@@ -54,13 +54,32 @@ export class EngineService {
   private static async safeJsonFetch(url: string, options?: RequestInit): Promise<any> {
     try {
       const res = await fetch(url, options);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        const errObj = new Error(`HTTP ${res.status} ${res.statusText} for ${url} - ${errText}`);
+        loggerService.addLog({
+          level: 'ERROR',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `Data fetch HTTP error ${res.status} on ${url}`,
+          details: { url, status: res.status, statusText: res.statusText, response: errText, stack: errObj.stack },
+        });
+        return null;
+      }
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         return await res.json();
       }
       return null;
-    } catch {
+    } catch (err: any) {
+      const errObj = err instanceof Error ? err : new Error(String(err));
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATA_FETCH',
+        source: 'EngineService',
+        message: `Network fetch error on ${url}: ${errObj.message}`,
+        details: { url, error: errObj.message, stack: errObj.stack },
+      });
       return null;
     }
   }

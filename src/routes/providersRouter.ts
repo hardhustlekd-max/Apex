@@ -55,7 +55,15 @@ providersRouter.post('/switch', async (req, res) => {
 providersRouter.get('/live-scores', async (req, res) => {
   try {
     const activeProvider = providerManager.getActiveProvider();
-    const scores = await activeProvider.getLiveScores();
+    const scores = await activeProvider.getLiveScores().catch((err) => {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'SCRAPER',
+        source: 'ProvidersRouter',
+        message: `Live scores fetch failed gracefully: ${err?.message || 'Network error'}`,
+      });
+      return [];
+    });
 
     // Ensure live match predictions are calculated and kept fresh in predictionsDb
     await predictionsDb.init();
@@ -86,10 +94,17 @@ providersRouter.get('/live-scores', async (req, res) => {
     res.json({
       success: true,
       provider: 'PREDICTIONS_DB',
-      scores,
+      scores: scores || [],
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to get live scores' });
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'DATA_FETCH',
+      source: 'ProvidersRouter',
+      message: `Failed to get live scores: ${err?.message || 'Unknown error'}`,
+      details: { error: err?.message, stack: err?.stack },
+    });
+    res.json({ success: true, provider: 'PREDICTIONS_DB', scores: [] });
   }
 });
 

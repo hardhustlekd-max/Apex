@@ -3,6 +3,41 @@ import { Terminal, X, RefreshCw, Trash2, Search, AlertCircle, CheckCircle2, Aler
 import { TerminalLogEntry, LogCategory, LogLevel } from '../services/loggerService.js';
 import { EngineService } from '../services/engineService.js';
 
+interface StackFrame {
+  raw: string;
+  fn: string;
+  location: string;
+}
+
+function parseStackFrames(stackInput: any): StackFrame[] {
+  let stackStr = '';
+  if (typeof stackInput === 'string') {
+    stackStr = stackInput;
+  } else if (stackInput && typeof stackInput === 'object') {
+    stackStr = stackInput.stack || stackInput.error || JSON.stringify(stackInput);
+  }
+  if (!stackStr || typeof stackStr !== 'string') return [];
+
+  const lines = stackStr.split('\n');
+  const frames: StackFrame[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('at ')) {
+      const match = trimmed.match(/^at\s+(.*?)\s+\((.*?)\)$/) || trimmed.match(/^at\s+(.*)$/);
+      if (match) {
+        frames.push({
+          raw: trimmed,
+          fn: match[1] || 'anonymous',
+          location: match[2] || match[1] || '',
+        });
+      } else {
+        frames.push({ raw: trimmed, fn: 'anonymous', location: trimmed });
+      }
+    }
+  }
+  return frames;
+}
+
 interface TerminalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -274,10 +309,34 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                     </p>
 
                     {log.details && (
-                      <div className="mt-1 p-1.5 rounded bg-black/40 border border-zinc-800 text-[10px] text-zinc-400 overflow-x-auto">
-                        <pre className="font-mono">
-                          {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
-                        </pre>
+                      <div className="mt-1.5 p-2 rounded bg-black/60 border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto space-y-1">
+                        {(() => {
+                          const stack = typeof log.details === 'object' ? log.details?.stack : null;
+                          const frames = parseStackFrames(stack || log.details);
+                          if (frames.length > 0) {
+                            return (
+                              <div>
+                                <div className="font-semibold text-rose-400 mb-1 flex items-center gap-1">
+                                  <span>Stack Trace ({frames.length} frames):</span>
+                                </div>
+                                <div className="space-y-0.5 font-mono text-[9.5px]">
+                                  {frames.map((frame, idx) => (
+                                    <div key={idx} className="flex items-start gap-2 py-0.5 border-b border-zinc-900/50 last:border-0">
+                                      <span className="text-zinc-500 w-5 text-right shrink-0">#{idx}</span>
+                                      <span className="text-emerald-400 shrink-0 font-medium">{frame.fn}</span>
+                                      <span className="text-zinc-400 truncate" title={frame.location}>{frame.location}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <pre className="font-mono text-zinc-400">
+                              {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
+                            </pre>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
