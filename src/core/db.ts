@@ -1217,6 +1217,27 @@ export class FootballDB {
     }
   }
 
+  getMatchStatistics(matchId: string): Array<{ category: string; homeValue: string; awayValue: string }> {
+    if (!this.db || !matchId) return [];
+    const cleanId = matchId.replace(/^fs_/, '').trim();
+    const stats: Array<{ category: string; homeValue: string; awayValue: string }> = [];
+    try {
+      const stmt = this.db.prepare(`
+        SELECT category, home_value, away_value FROM match_statistics_relational
+        WHERE match_id = ? OR match_id = ?
+      `);
+      stmt.bind([matchId, cleanId]);
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as { category: string; home_value: string; away_value: string };
+        stats.push({ category: row.category, homeValue: row.home_value, awayValue: row.away_value });
+      }
+      stmt.free();
+    } catch {
+      // fallback
+    }
+    return stats;
+  }
+
   getRawFeed(identifier: string): { feedPath: string; rawText: string } | null {
     if (!this.db || !identifier) return null;
     const cleanId = identifier.replace(/^fs_/, '').trim();

@@ -119,6 +119,7 @@ export interface TeamStatsSummary {
   teamStrengthRating?: number;
   opponentAdjustedXG?: number;
   opponentAdjustedXGA?: number;
+  eloRating?: number;
 }
 
 export interface TeamStrengthBreakdown {

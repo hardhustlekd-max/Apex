@@ -149,8 +149,7 @@ export class FlashscoreScraperService {
       const rawMatches = parseFeedText(feedText);
 
       for (const m of rawMatches) {
-        // Persist raw feed reference for on-demand match parsing (INSERT OR IGNORE)
-        db.saveRawFeed(m.matchId, feedPath, feedText);
+        // Feed already persisted via fetchAndPersistRawFeed(feedPath)
 
         // Skip finished matches for upcoming fixtures view
         if (m.statusCode === '3') continue;
