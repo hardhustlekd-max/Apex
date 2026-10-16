@@ -287,9 +287,9 @@ export class FootballDB {
   }
 
   /**
-   * Clears all tables in the database and local browser storage
+   * Clears database tables and local browser storage while preserving raw historical feed data by default
    */
-  clearDatabase(): void {
+  clearDatabase(clearRaw: boolean = false): void {
     if (!this.db) return;
     this.db.run('BEGIN TRANSACTION;');
     try {
@@ -297,7 +297,9 @@ export class FootballDB {
       this.db.run('DELETE FROM upcoming_fixtures;');
       this.db.run('DELETE FROM flashscore_scraped_matches;');
       this.db.run('DELETE FROM league_standings;');
-      this.db.run('DELETE FROM raw_feed_data;');
+      if (clearRaw) {
+        this.db.run('DELETE FROM raw_feed_data;');
+      }
       this.db.run('COMMIT;');
       this.saveToDisk();
       
@@ -1215,14 +1217,16 @@ export class FootballDB {
     }
   }
 
-  getRawFeed(fixtureId: string): { feedPath: string; rawText: string } | null {
-    if (!this.db) return null;
+  getRawFeed(identifier: string): { feedPath: string; rawText: string } | null {
+    if (!this.db || !identifier) return null;
+    const cleanId = identifier.replace(/^fs_/, '').trim();
     try {
       const stmt = this.db.prepare(`
         SELECT feed_path, raw_text FROM raw_feed_data
-        WHERE fixture_id = ?
+        WHERE fixture_id = ? OR fixture_id = ? OR feed_path = ? OR feed_path LIKE ?
+        LIMIT 1
       `);
-      stmt.bind([fixtureId]);
+      stmt.bind([identifier, cleanId, identifier, `%${cleanId}%`]);
       if (stmt.step()) {
         const row = stmt.getAsObject();
         stmt.free();
@@ -1238,6 +1242,19 @@ export class FootballDB {
       });
     }
     return null;
+  }
+
+  getRawFeedsCount(): number {
+    if (!this.db) return 0;
+    try {
+      const res = this.db.exec('SELECT COUNT(*) as count FROM raw_feed_data');
+      if (res && res[0] && res[0].values && res[0].values[0]) {
+        return Number(res[0].values[0][0]) || 0;
+      }
+    } catch {
+      return 0;
+    }
+    return 0;
   }
 
   saveH2HRecord(fixtureId: string, h2h: HeadToHeadMeasurement): void {

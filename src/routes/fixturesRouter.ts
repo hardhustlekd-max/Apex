@@ -10,6 +10,7 @@ import { isMatchStarted } from '../core/accumulator.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { loggerService } from '../services/loggerService.js';
+import { OnDemandParser } from '../core/onDemandParser.js';
 
 export const fixturesRouter = Router();
 
@@ -220,21 +221,26 @@ fixturesRouter.get('/:id', async (req, res) => {
     const stored = predictionsDb.getPredictionById(fixtureId);
 
     if (stored) {
-      // Enrich with real scraped H2H details without mutating the authoritative 5-pillar prediction
+      // Enrich with real scraped H2H details and on-demand parsed raw match statistics
       const cleanId = (stored.id || fixtureId).replace(/^fs_/, '');
       const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
+      const parsedMatch = await OnDemandParser.getParsedMatch(cleanId);
 
       loggerService.addLog({
         level: 'INFO',
         category: 'DATA_FETCH',
         source: 'MatchDetail',
-        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with ${realH2H?.recentH2H?.length || 0} scraped H2H meetings`,
+        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with on-demand parsed data`,
       });
 
       return res.json({
         success: true,
         fixture: {
           ...stored,
+          statistics: parsedMatch?.statistics && parsedMatch.statistics.length > 0 ? parsedMatch.statistics : stored.statistics,
+          score: (parsedMatch?.homeScore !== undefined && parsedMatch?.awayScore !== undefined)
+            ? { home: parsedMatch.homeScore, away: parsedMatch.awayScore }
+            : stored.score,
           measurements: {
             ...stored.measurements,
             h2h: realH2H && realH2H.matchesCount > 0 ? realH2H : stored.measurements?.h2h,

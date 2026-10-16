@@ -116,9 +116,26 @@ export interface TeamStatsSummary {
   avgGoalsScored: number;
   avgGoalsConceded: number;
   recentMatches: TeamFormMatch[];
-  eloRating?: number;
+  teamStrengthRating?: number;
   opponentAdjustedXG?: number;
   opponentAdjustedXGA?: number;
+}
+
+export interface TeamStrengthBreakdown {
+  homeStrengthRating: number; // 0 - 100 overall CSF Index
+  awayStrengthRating: number;
+  formDominanceHome: number; // Decayed goal & result dominance (0-100)
+  formDominanceAway: number;
+  tableMomentumHome: number; // League standings & PPG momentum (0-100)
+  tableMomentumAway: number;
+  shotEfficiencyHome: number; // Shot on target conversion & defensive efficiency (0-100)
+  shotEfficiencyAway: number;
+  venueModifierHome: number; // Dynamic home advantage factor
+  venueModifierAway: number; // Dynamic away modifier
+  strengthDifference: number; // Net strength differential
+  homeWinExpectancy: number; // Calibrated 1X2 probabilities derived from CSF
+  drawExpectancy: number;
+  awayWinExpectancy: number;
 }
 
 export interface EloRatingBreakdown {
@@ -214,6 +231,7 @@ export interface PoissonPrediction {
   probabilityMatrix: number[][]; // 6x6 score matrix
   measurements?: PredictionEngineMeasurements;
   modelType?: 'DIXON_COLES_EVIDENCE_BASED';
+  teamStrength?: TeamStrengthBreakdown;
   eloRatings?: EloRatingBreakdown;
   xgBreakdown?: XGBreakdown;
   tacticalContext?: TacticalContextBreakdown;

@@ -385,7 +385,9 @@ export class PredictionsDB {
             try {
               const parsed = JSON.parse(row.full_fixture_json) as Fixture;
               fixtures.push(parsed);
-            } catch {}
+            } catch (parseErr) {
+              console.warn('Skipping corrupted fixture JSON row:', parseErr);
+            }
           }
         }
         stmt.free();

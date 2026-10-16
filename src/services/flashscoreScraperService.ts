@@ -82,10 +82,10 @@ export class FlashscoreScraperService {
     return null;
   }
 
-  async fetchAndPersistRawFeed(path: string): Promise<string | null> {
+  async fetchAndPersistRawFeed(path: string, fixtureId?: string): Promise<string | null> {
     const rawText = await this.fetchFlashscoreFeed(path);
     if (rawText) {
-      db.saveRawFeed(path, path, rawText);
+      db.saveRawFeed(fixtureId || path, path, rawText);
     }
     return rawText;
   }
@@ -142,12 +142,16 @@ export class FlashscoreScraperService {
     const dayOffsets = [0, 1, 2, 3];
 
     for (const offset of dayOffsets) {
-      const feedText = await this.fetchFlashscoreFeed(`f_1_${offset}_3_en_1`);
+      const feedPath = `f_1_${offset}_3_en_1`;
+      const feedText = await this.fetchAndPersistRawFeed(feedPath);
       if (!feedText) continue;
 
       const rawMatches = parseFeedText(feedText);
 
       for (const m of rawMatches) {
+        // Persist raw feed reference for on-demand match parsing (INSERT OR IGNORE)
+        db.saveRawFeed(m.matchId, feedPath, feedText);
+
         // Skip finished matches for upcoming fixtures view
         if (m.statusCode === '3') continue;
 
@@ -252,7 +256,8 @@ export class FlashscoreScraperService {
    * Scrapes live in-play scores from Flashscore
    */
   async getLiveScores(): Promise<LiveScore[]> {
-    const feedText = await this.fetchFlashscoreFeed('f_1_0_3_en_1');
+    const feedPath = 'f_1_0_3_en_1';
+    const feedText = await this.fetchAndPersistRawFeed(feedPath);
     if (!feedText) {
       // Fallback
       return [];
@@ -261,6 +266,7 @@ export class FlashscoreScraperService {
     const rawMatches = parseFeedText(feedText);
     const seenLiveIds = new Set<string>();
     const liveMatches = rawMatches.filter((m) => {
+      db.saveRawFeed(m.matchId, feedPath, feedText);
       if (m.statusCode !== '2') return false;
       if (seenLiveIds.has(m.matchId)) return false;
       seenLiveIds.add(m.matchId);
@@ -566,7 +572,21 @@ export class FlashscoreScraperService {
     }
 
     try {
-      const feedText = await this.fetchFlashscoreFeed(`df_hh_1_${cleanId}`);
+      let feedText: string | null = null;
+      const rawStored = db.getRawFeed(cleanId);
+      if (rawStored && rawStored.rawText && (rawStored.rawText.includes('KB÷') || rawStored.rawText.includes('KC÷'))) {
+        feedText = rawStored.rawText;
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'DATABASE',
+          source: 'FlashscoreScraper',
+          message: `Loaded raw H2H feed from database for match ${cleanId}`,
+        });
+      } else {
+        const feedPath = `df_hh_1_${cleanId}`;
+        feedText = await this.fetchAndPersistRawFeed(feedPath, cleanId);
+      }
+
       if (feedText) {
         const sections = feedText.split('~');
         let currentSection: 'NONE' | 'HOME_RECENT' | 'AWAY_RECENT' | 'H2H' = 'NONE';

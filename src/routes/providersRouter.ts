@@ -129,12 +129,8 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
       level: 'INFO',
       category: 'DATABASE',
       source: 'SyncEngine',
-      message: 'Resetting databases and clearing caches for fresh sync from zero',
+      message: 'Incremental sync: fetching and storing non-existing raw feeds indefinitely',
     });
-
-    // Clear all cached data and predictions before syncing fresh data
-    db.clearDatabase();
-    predictionsDb.clearAll();
 
     const syncRes = await flashscoreScraperService.syncHistoricalData(7);
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();

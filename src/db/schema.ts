@@ -518,18 +518,21 @@ export interface EvidenceBasedPredictionEngineSchema {
   model_type: 'DIXON_COLES_EVIDENCE_BASED';
   version: '2.0.0';
   pillars: {
-    pillar_1_xg_recent_performance: {
+    pillar_1_composite_team_strength_index: {
+      model_type: 'CSF_INDEX';
+      form_dominance_weight: 0.45;
+      table_momentum_weight: 0.30;
+      shot_efficiency_weight: 0.25;
+      exponential_decay_rate: 0.88;
+      dynamic_venue_split: true;
+      eliminates_legacy_elo: true;
+    };
+    pillar_2_xg_recent_performance: {
       window_size_matches: '5-10';
       chance_quality_sot_weight: 0.31;
       chance_quality_off_target_weight: 0.06;
       opponent_strength_adjustment: true;
       avoid_raw_win_loss_reliance: true;
-    };
-    pillar_2_augmented_elo: {
-      base_elo: 1500;
-      home_ground_advantage_elo: 65;
-      margin_of_victory_multiplier: true;
-      opponent_quality_weighting: true;
     };
     pillar_3_tactical_and_team_news: {
       rest_days_evaluation: true;
@@ -551,6 +554,23 @@ export interface EvidenceBasedPredictionEngineSchema {
     };
   };
   updated_at: string;
+}
+
+export interface TeamStrengthBreakdownSchema {
+  home_strength_rating: number; // 0 - 100 overall CSF Index
+  away_strength_rating: number;
+  form_dominance_home: number; // Decayed goal & result dominance (0-100)
+  form_dominance_away: number;
+  table_momentum_home: number; // Standings & PPG momentum (0-100)
+  table_momentum_away: number;
+  shot_efficiency_home: number; // SOT conversion & defensive rate (0-100)
+  shot_efficiency_away: number;
+  venue_modifier_home: number;
+  venue_modifier_away: number;
+  strength_difference: number;
+  home_win_expectancy: number;
+  draw_expectancy: number;
+  away_win_expectancy: number;
 }
 
 export interface LivePredictionRecordSchema {
@@ -912,6 +932,15 @@ export const DDL_STATEMENTS = {
     CREATE INDEX IF NOT EXISTS idx_logs_level ON terminal_logs(level);
     CREATE INDEX IF NOT EXISTS idx_logs_category ON terminal_logs(category);
   `,
+  createRawFeedDataTable: `
+    CREATE TABLE IF NOT EXISTS raw_feed_data (
+      fixture_id TEXT PRIMARY KEY,
+      feed_path TEXT NOT NULL,
+      raw_text TEXT NOT NULL,
+      scraped_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_raw_feed_path ON raw_feed_data(feed_path);
+  `,
 };
 
 export interface TerminalLogSchema {
@@ -977,4 +1006,11 @@ export interface H2HRecordRelationalSchema {
   draws: number;
   away_wins: number;
   h2h_json: string;
+}
+
+export interface RawFeedDataSchema {
+  fixture_id: string;
+  feed_path: string;
+  raw_text: string;
+  scraped_at: string;
 }

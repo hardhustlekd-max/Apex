@@ -22,6 +22,7 @@ import { getLeaguePriority } from '../core/leaguePriority.js';
 import { GeminiSearchService } from './geminiSearchService.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
+import { OnDemandParser } from '../core/onDemandParser.js';
 
 // Default In-Memory Engine State for Universal & Client-Side execution (Vercel, Static, etc.)
 let localSettings: EngineSettings = {
@@ -254,6 +255,27 @@ export class EngineService {
     }
 
     return null;
+  }
+
+  /**
+   * Parses raw match details and statistics directly from SQLite raw feed data on demand
+   */
+  public static async parseMatchOnDemand(fixtureId: string) {
+    return OnDemandParser.getParsedMatch(fixtureId);
+  }
+
+  /**
+   * Parses raw H2H measurements directly from SQLite raw feed data on demand
+   */
+  public static async parseH2HOnDemand(fixtureId: string, homeTeam?: string, awayTeam?: string) {
+    return OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
+  }
+
+  /**
+   * Returns total count of raw Flashscore feeds currently persisted in SQLite
+   */
+  public static getRawFeedsCount(): number {
+    return OnDemandParser.getRawFeedsCount();
   }
 
   /**
