@@ -601,35 +601,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 </div>
               </div>
 
-              <div className="pt-1 flex items-center justify-between text-xs">
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">View Mode</span>
-                <div className="flex items-center bg-slate-100 dark:bg-slate-900/80 rounded-xl p-0.5 border border-slate-200 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('WIREFRAME')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === 'WIREFRAME'
-                        ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Table
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('CARDS')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      viewMode === 'CARDS'
-                        ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Cards
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+               <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsFilterOpen(false)}
@@ -646,15 +618,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Match List Display (Wireframe or Cards) */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-xs space-y-3">
+        <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-xs">
           <div className="w-8 h-8 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin shrink-0 mx-auto" />
-          <p className="text-xs text-zinc-500 font-medium">
-            {activeScope === 'HISTORY'
-              ? 'Loading Historical Match Results...'
-              : activeScope === 'LIVE'
-              ? 'Fetching Live In-Play Scores...'
-              : 'Computing Poisson Match Predictions...'}
-          </p>
         </div>
       ) : displayedFixtures.length === 0 ? (
         <div className="bg-white rounded-xl sm:rounded-2xl p-8 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-sm space-y-2">
