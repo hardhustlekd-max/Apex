@@ -160,6 +160,17 @@ export function getCodeForSlug(slug: string): string {
   return REVERSE_MAPPING[norm] || slug.toUpperCase();
 }
 
+import { GLOBAL_LEAGUES_DATASET } from './globalLeaguesDataset.js';
+
+// Pre-index global leagues for fast O(1) lookup
+const DATASET_BY_CODE = new Map<string, typeof GLOBAL_LEAGUES_DATASET[0]>();
+const DATASET_BY_CLEAN_NAME = new Map<string, typeof GLOBAL_LEAGUES_DATASET[0]>();
+
+for (const l of GLOBAL_LEAGUES_DATASET) {
+  if (l.code) DATASET_BY_CODE.set(l.code.toUpperCase(), l);
+  if (l.name) DATASET_BY_CLEAN_NAME.set(cleanStr(l.name), l);
+}
+
 /**
  * Returns all uppercase string aliases and permutations for a given league code or name
  */
@@ -174,6 +185,28 @@ export function getLeagueAliases(query: string): string[] {
 
   const mappedCode = getCodeForSlug(query);
   if (mappedCode) found.add(mappedCode.toUpperCase());
+
+  // Check in Global Leagues Dataset
+  const fromCode = DATASET_BY_CODE.get(rawUp);
+  if (fromCode) {
+    found.add(fromCode.code.toUpperCase());
+    found.add(cleanStr(fromCode.name).toUpperCase());
+    if (fromCode.country) {
+      found.add(cleanStr(fromCode.country).toUpperCase());
+      found.add(cleanStr(`${fromCode.country}_${fromCode.name}`).toUpperCase());
+    }
+    if (fromCode.reep_id) found.add(fromCode.reep_id.toUpperCase());
+  }
+
+  const fromName = DATASET_BY_CLEAN_NAME.get(cleanStr(query));
+  if (fromName) {
+    found.add(fromName.code.toUpperCase());
+    found.add(cleanStr(fromName.name).toUpperCase());
+    if (fromName.country) {
+      found.add(cleanStr(fromName.country).toUpperCase());
+      found.add(cleanStr(`${fromName.country}_${fromName.name}`).toUpperCase());
+    }
+  }
 
   for (const group of ALIAS_GROUPS) {
     const matchesGroup = group.some((item) => {
@@ -207,12 +240,19 @@ export function matchesLeague(
 
   if (cleanItem === cleanTarget || cleanName === cleanTarget) return true;
 
-  const aliases = getLeagueAliases(targetQuery).map((a) => cleanStr(a));
+  const aliases = getLeagueAliases(targetQuery).map((a) => cleanStr(a)).filter(Boolean);
   for (const alias of aliases) {
     if (cleanItem === alias) return true;
     if (cleanName === alias) return true;
-    if (cleanItem.includes(alias) || alias.includes(cleanItem)) return true;
-    if (cleanName.includes(alias) || alias.includes(cleanName)) return true;
+    if (alias.length >= 3 && (cleanItem.includes(alias) || alias.includes(cleanItem))) return true;
+    if (alias.length >= 3 && (cleanName.includes(alias) || alias.includes(cleanName))) return true;
+  }
+
+  // Check if target matches global dataset reference
+  const ref = DATASET_BY_CODE.get(targetQuery.toUpperCase().trim()) || DATASET_BY_CLEAN_NAME.get(cleanTarget);
+  if (ref) {
+    const refName = cleanStr(ref.name);
+    if (refName && (cleanItem.includes(refName) || cleanName.includes(refName))) return true;
   }
 
   return false;

@@ -141,10 +141,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
   const baseToday = useMemo(() => {
     const localToday = getRelativeDateStr(0);
+    const utcToday = new Date().toISOString().slice(0, 10);
     if (fixtures.some((f) => f.matchDate === localToday)) {
       return localToday;
     }
-    return datasetDates[0] || localToday;
+    if (fixtures.some((f) => f.matchDate === utcToday)) {
+      return utcToday;
+    }
+    // Find nearest date >= localToday
+    const upcomingDate = datasetDates.find((d) => d >= localToday || d >= utcToday);
+    if (upcomingDate) return upcomingDate;
+    // Fallback to latest available date or localToday
+    return datasetDates[datasetDates.length - 1] || localToday;
   }, [fixtures, datasetDates]);
 
   // Load predictions for live games directly from predictions db
@@ -230,21 +238,26 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const filteredUpcomingFixtures = useMemo(() => {
+    const localToday = getRelativeDateStr(0);
+    const utcToday = new Date().toISOString().slice(0, 10);
     const todayStr = baseToday;
     const tomorrowStr = getOffsetDate(1);
+    const localTomorrow = getRelativeDateStr(1);
     const next3DaysStr = getOffsetDate(2);
     const thisWeekStr = getOffsetDate(6);
 
     let matches = uniqueFixtures.filter((f) => {
-      // Date filtering - defaulted to TODAY
+      // Date filtering - resilient to UTC vs local timezone offsets
       if (dateFilter === 'TODAY') {
-        if (f.matchDate !== todayStr) return false;
+        if (f.matchDate !== todayStr && f.matchDate !== localToday && f.matchDate !== utcToday) return false;
       } else if (dateFilter === 'TOMORROW') {
-        if (f.matchDate !== tomorrowStr) return false;
+        if (f.matchDate !== tomorrowStr && f.matchDate !== localTomorrow) return false;
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        if (f.matchDate < todayStr || f.matchDate > next3DaysStr) return false;
+        const minDate = todayStr < localToday ? todayStr : localToday;
+        if (f.matchDate < minDate || f.matchDate > next3DaysStr) return false;
       } else if (dateFilter === 'THIS_WEEK') {
-        if (f.matchDate < todayStr || f.matchDate > thisWeekStr) return false;
+        const minDate = todayStr < localToday ? todayStr : localToday;
+        if (f.matchDate < minDate || f.matchDate > thisWeekStr) return false;
       }
 
       // League filter

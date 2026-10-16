@@ -301,14 +301,20 @@ export class FootballDB {
       this.db.run('COMMIT;');
       this.saveToDisk();
       
-      // Clear browser-side storage
-      localStorage.clear();
-      sessionStorage.clear();
+      // Clear browser-side storage if running in browser
+      if (typeof localStorage !== 'undefined') {
+        localStorage.clear();
+      }
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.clear();
+      }
       
       console.log('[FootballDB] All tables and browser storage cleared.');
       
-      // Force reload to completely fresh start
-      window.location.reload();
+      // Force reload to completely fresh start if in browser
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.reload();
+      }
     } catch (err) {
       this.db.run('ROLLBACK;');
       console.error('[FootballDB] Failed to clear database:', err);

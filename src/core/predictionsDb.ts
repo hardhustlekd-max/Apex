@@ -314,6 +314,7 @@ export class PredictionsDB {
     dateFilter?: string;
     startDate?: string;
     endDate?: string;
+    unstartedOnly?: boolean;
   }): Fixture[] {
     const todayStr = getRelativeDateStr(0);
     const tomorrowStr = getRelativeDateStr(1);
@@ -332,13 +333,15 @@ export class PredictionsDB {
 
         if (filters?.league && filters.league !== 'ALL') {
           const aliases = getLeagueAliases(filters.league);
-          const placeholders = aliases.map(() => '?').join(', ');
-          const likeClauses = aliases.map(() => 'UPPER(league_name) LIKE ? OR UPPER(league) LIKE ?').join(' OR ');
-          conditions.push(`(UPPER(league) IN (${placeholders}) OR ${likeClauses})`);
-          params.push(...aliases);
-          aliases.forEach((a) => {
-            params.push(`%${a}%`, `%${a}%`);
-          });
+          if (aliases.length > 0) {
+            const placeholders = aliases.map(() => '?').join(', ');
+            const likeClauses = aliases.map(() => 'UPPER(league_name) LIKE ? OR UPPER(league) LIKE ?').join(' OR ');
+            conditions.push(`(UPPER(league) IN (${placeholders}) OR ${likeClauses})`);
+            params.push(...aliases);
+            aliases.forEach((a) => {
+              params.push(`%${a}%`, `%${a}%`);
+            });
+          }
         }
 
         if (filters?.date) {
@@ -394,7 +397,9 @@ export class PredictionsDB {
 
     const seen = new Set<string>();
     fixtures = fixtures.filter((f) => {
-      if (!f.id || seen.has(f.id) || isMatchStarted(f)) return false;
+      if (!f.id || seen.has(f.id)) return false;
+      if (f.status === 'FINISHED') return false;
+      if (filters?.unstartedOnly && isMatchStarted(f)) return false;
       if (filters?.league && filters.league !== 'ALL') {
         if (!matchesLeague(f.league, f.leagueName, filters.league)) return false;
       }
