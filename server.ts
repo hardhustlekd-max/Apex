@@ -12,6 +12,27 @@ async function startServer() {
   await db.init();
   await predictionsDb.init();
 
+  // Non-blocking boot seeding if predictions database is empty
+  if (predictionsDb.count() === 0) {
+    (async () => {
+      try {
+        const { providerManager } = await import('./src/providers/providerManager.js');
+        const { EngineService } = await import('./src/services/engineService.js');
+        const provider = providerManager.getActiveProvider();
+        const initialUpcoming = await provider.getUpcomingFixtures();
+        if (initialUpcoming && initialUpcoming.length > 0) {
+          await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
+          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
+          if (liveInUpcoming.length > 0) {
+            await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Boot background fixture seed notice:', err?.message);
+      }
+    })();
+  }
+
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

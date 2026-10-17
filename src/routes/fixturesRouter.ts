@@ -24,17 +24,32 @@ fixturesRouter.get('/', async (req, res) => {
 
     await predictionsDb.init();
 
-    // If predictions database has no records yet (e.g. before initial sync is run), populate it
+    // If predictions database has no records yet, seed non-blockingly in background
     if (predictionsDb.count() === 0) {
-      const provider = providerManager.getActiveProvider();
-      const initialUpcoming = await provider.getUpcomingFixtures();
-      await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
-
-      // If upcoming has live fixtures, store in live_predictions table as well
-      const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
-      if (liveInUpcoming.length > 0 && predictionsDb.countLivePredictions() === 0) {
-        await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
-      }
+      (async () => {
+        try {
+          const provider = providerManager.getActiveProvider();
+          const initialUpcoming = await provider.getUpcomingFixtures();
+          await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
+          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
+          if (liveInUpcoming.length > 0 && predictionsDb.countLivePredictions() === 0) {
+            await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
+          }
+          loggerService.addLog({
+            level: 'SUCCESS',
+            category: 'DATA_FETCH',
+            source: 'FixturesRouter',
+            message: `Background seeding completed with ${initialUpcoming.length} fixtures`,
+          });
+        } catch (bgErr: any) {
+          loggerService.addLog({
+            level: 'ERROR',
+            category: 'DATA_FETCH',
+            source: 'FixturesRouter',
+            message: `Background seeding error: ${bgErr?.message}`,
+          });
+        }
+      })().catch(() => {});
     }
 
     // Display predictions queried directly from the separate predictions db

@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import compression from 'compression';
 import { db } from './core/db.js';
 import { predictionsDb } from './core/predictionsDb.js';
 import { fixturesRouter } from './routes/fixturesRouter.js';
@@ -13,6 +14,7 @@ import { flashscoreScraperService } from './services/flashscoreScraperService.js
 export function createApp(): Express {
   const app = express();
 
+  app.use(compression());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

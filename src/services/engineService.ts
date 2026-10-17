@@ -54,8 +54,11 @@ export class EngineService {
    * Helper to check if a backend response is valid JSON
    */
   private static async safeJsonFetch(url: string, options?: RequestInit): Promise<any> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         const errObj = new Error(`HTTP ${res.status} ${res.statusText} for ${url} - ${errText}`);
@@ -68,12 +71,24 @@ export class EngineService {
         });
         return null;
       }
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return await res.json();
+      const text = await res.text();
+      if (!text || text.trim() === '') {
+        return null;
       }
-      return null;
+      try {
+        return JSON.parse(text);
+      } catch (jsonErr: any) {
+        loggerService.addLog({
+          level: 'ERROR',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `JSON parse error on ${url}: ${jsonErr.message}`,
+          details: { url, error: jsonErr.message, snippet: text.slice(0, 200) },
+        });
+        return null;
+      }
     } catch (err: any) {
+      clearTimeout(timeoutId);
       const errObj = err instanceof Error ? err : new Error(String(err));
       loggerService.addLog({
         level: 'ERROR',

@@ -384,6 +384,9 @@ export class PredictionsDB {
           if (row.full_fixture_json) {
             try {
               const parsed = JSON.parse(row.full_fixture_json) as Fixture;
+              if (parsed.prediction && parsed.prediction.probabilityMatrix) {
+                parsed.prediction.probabilityMatrix = [];
+              }
               fixtures.push(parsed);
             } catch (parseErr) {
               console.warn('Skipping corrupted fixture JSON row:', parseErr);
