@@ -196,7 +196,7 @@ export default function App() {
     <div className="min-h-screen bg-zinc-50 text-black flex flex-col font-sans">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-5 right-5 z-50 bg-black text-white font-medium text-xs px-4 py-2.5 rounded-xl shadow-lg border border-zinc-800 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-5 right-5 z-[100] bg-black text-white font-medium text-xs px-4 py-2.5 rounded-xl shadow-lg border border-zinc-800 animate-in slide-in-from-bottom-2">
           <span className="truncate max-w-[280px]">{notification.message}</span>
         </div>
       )}

@@ -55,7 +55,7 @@ export class EngineService {
    */
   private static async safeJsonFetch(url: string, options?: RequestInit): Promise<any> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
@@ -91,18 +91,18 @@ export class EngineService {
       clearTimeout(timeoutId);
       const errObj = err instanceof Error ? err : new Error(String(err));
       loggerService.addLog({
-        level: 'ERROR',
+        level: 'WARN',
         category: 'DATA_FETCH',
         source: 'EngineService',
-        message: `Network fetch error on ${url}: ${errObj.message}`,
-        details: { url, error: errObj.message, stack: errObj.stack },
+        message: `Network fetch retry/fallback on ${url}: ${errObj.message}`,
+        details: { url, error: errObj.message },
       });
       return null;
     }
   }
 
   /**
-   * Fetches fixtures - queries /api/fixtures, and transparently falls back to in-memory Poisson calculations if deployed statically (e.g. Vercel)
+   * Fetches fixtures - queries /api/fixtures, and transparently falls back to local predictions or raw DB if unreachable or timeout occurs
    */
   public static async getFixtures(
     league = 'ALL',
@@ -124,7 +124,41 @@ export class EngineService {
       return serverData.fixtures;
     }
 
-    throw new Error(serverData?.error || 'Failed to fetch fixtures from server');
+    // Graceful client fallback to predictionsDb or db if server endpoint was unreachable/timed out
+    try {
+      await predictionsDb.init();
+      const localPredictions = predictionsDb.getPredictions({
+        league: league !== 'ALL' ? league : undefined,
+        dateFilter,
+        startDate: customStartDate,
+        endDate: customEndDate,
+      });
+      if (localPredictions && localPredictions.length > 0) {
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `Falling back to local predictions database (${localPredictions.length} fixtures)`,
+        });
+        return localPredictions;
+      }
+
+      const rawUpcoming = db.getUpcomingFixtures();
+      if (rawUpcoming && rawUpcoming.length > 0) {
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `Falling back to raw upcoming database fixtures (${rawUpcoming.length} fixtures)`,
+        });
+        const res = await this.predictAndStoreUpcomingFixtures(rawUpcoming);
+        return res.fixtures;
+      }
+    } catch (fallbackErr) {
+      console.error('Fixture fallback error:', fallbackErr);
+    }
+
+    return [];
   }
 
 
