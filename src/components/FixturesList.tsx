@@ -622,7 +622,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <div className="w-8 h-8 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin shrink-0 mx-auto" />
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-white rounded-xl sm:rounded-2xl p-8 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-sm space-y-2">
+        <div className="bg-white rounded-xl sm:rounded-2xl p-8 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-sm space-y-3">
           <p className="text-sm font-bold text-zinc-700">
             {activeScope === 'UPCOMING'
               ? 'No upcoming fixtures found matching your criteria.'
@@ -635,6 +635,15 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               ? 'Try choosing All Dates or resetting your search filters.'
               : 'Try selecting a different league or clearing search.'}
           </p>
+          {activeScope === 'UPCOMING' && dateFilter !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => setDateFilter('ALL')}
+              className="mt-1 px-4 py-2 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-colors cursor-pointer shadow-xs"
+            >
+              Show All Dates
+            </button>
+          )}
         </div>
       ) : viewMode === 'WIREFRAME' ? (
         <SimplifiedPredictionsWireframe
