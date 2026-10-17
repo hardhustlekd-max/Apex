@@ -955,7 +955,23 @@ export interface TerminalLogSchema {
 
 export interface Unified5PillarPredictionSchema {
   fixture_id: string;
-  pillar1_augmented_elo: {
+  pillar1_team_strength_index: {
+    home_strength_rating: number;
+    away_strength_rating: number;
+    form_dominance_home: number;
+    form_dominance_away: number;
+    table_momentum_home: number;
+    table_momentum_away: number;
+    shot_efficiency_home: number;
+    shot_efficiency_away: number;
+    venue_modifier_home: number;
+    venue_modifier_away: number;
+    strength_difference: number;
+    home_win_expectancy: number;
+    draw_expectancy: number;
+    away_win_expectancy: number;
+  };
+  pillar1_augmented_elo?: {
     home_elo: number;
     away_elo: number;
     home_win_expectancy: number;

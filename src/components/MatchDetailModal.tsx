@@ -528,7 +528,16 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </div>
                   </div>
 
-                  {pred.eloRatings && (
+                  {pred.teamStrength ? (
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-slate-300 font-sans">Team Strength</span>
+                      <div className="font-bold text-slate-900 dark:text-white">
+                        <span className="text-slate-600 dark:text-slate-400">{pred.teamStrength.homeStrengthRating}</span>
+                        <span className="text-slate-400 px-1 font-normal">vs</span>
+                        <span className="text-cyan-600 dark:text-cyan-400">{pred.teamStrength.awayStrengthRating}</span>
+                      </div>
+                    </div>
+                  ) : pred.eloRatings ? (
                     <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
                       <span className="text-slate-600 dark:text-slate-300 font-sans">Elo Ratings</span>
                       <div className="font-bold text-slate-900 dark:text-white">
@@ -537,7 +546,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                         <span className="text-cyan-600 dark:text-cyan-400">{pred.eloRatings.awayElo}</span>
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {pred.tacticalContext && (
                     <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">

@@ -574,18 +574,62 @@ export class ApexEngine {
     settings: EngineSettings,
     realScrapedH2H?: HeadToHeadMeasurement | null,
     allHistoricalMatches?: HistoricalMatch[],
-    tacticalInput?: MatchTacticalContextInput
+    tacticalInput?: MatchTacticalContextInput,
+    standings?: LeagueStandingTable | null
   ): { prediction: PoissonPrediction; homeStats: TeamStatsSummary; awayStats: TeamStatsSummary } {
     const historicalUniverse = allHistoricalMatches && allHistoricalMatches.length > 0
       ? allHistoricalMatches
       : leagueHistoricalMatches;
 
-    // 1. Augmented Elo Ratings
+    // 1. Composite Team Strength & Form Momentum (CSF) Index & Augmented Elo Ratings
     const eloRatingsMap = this.computeAugmentedEloRatings(historicalUniverse);
     const homeElo = this.getTeamElo(homeTeam, eloRatingsMap);
     const awayElo = this.getTeamElo(awayTeam, eloRatingsMap);
     const homeAdvantageElo = 65;
     const eloExpectancy = this.getEloWinExpectancy(homeElo, awayElo, homeAdvantageElo);
+
+    const homeCSF = this.computeTeamStrengthProfile(
+      homeTeam,
+      historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches,
+      standings,
+      true,
+      settings?.rollingMatchWindow || 10,
+      settings?.formDecayRate || 0.88,
+      realScrapedH2H?.homeRecentMatches
+    );
+
+    const awayCSF = this.computeTeamStrengthProfile(
+      awayTeam,
+      historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches,
+      standings,
+      false,
+      settings?.rollingMatchWindow || 10,
+      settings?.formDecayRate || 0.88,
+      realScrapedH2H?.awayRecentMatches
+    );
+
+    const csfExpectancy = this.getTeamStrengthExpectancy(
+      homeCSF,
+      awayCSF,
+      settings?.homeAdvantageFactor || 1.12
+    );
+
+    const teamStrength: TeamStrengthBreakdown = {
+      homeStrengthRating: homeCSF.strengthRating,
+      awayStrengthRating: awayCSF.strengthRating,
+      formDominanceHome: homeCSF.formDominance,
+      formDominanceAway: awayCSF.formDominance,
+      tableMomentumHome: homeCSF.tableMomentum,
+      tableMomentumAway: awayCSF.tableMomentum,
+      shotEfficiencyHome: homeCSF.shotEfficiency,
+      shotEfficiencyAway: awayCSF.shotEfficiency,
+      venueModifierHome: homeCSF.venueModifier,
+      venueModifierAway: awayCSF.venueModifier,
+      strengthDifference: csfExpectancy.strengthDifference,
+      homeWinExpectancy: csfExpectancy.homeWinExpectancy,
+      drawExpectancy: csfExpectancy.drawExpectancy,
+      awayWinExpectancy: csfExpectancy.awayWinExpectancy,
+    };
 
     const eloBreakdown: EloRatingBreakdown = {
       homeElo,
@@ -678,9 +722,13 @@ export class ApexEngine {
       tacticalContext.fatigueAdjustmentAway *
       h2h.h2hMultiplierAway;
 
-    // Blend gently with Elo expected goals
-    homeLambda = (homeLambda * 0.70) + (leagueHomeAvg * eloMultiplierHome * 0.30);
-    awayMu = (awayMu * 0.70) + (leagueAwayAvg * eloMultiplierAway * 0.30);
+    // Blend with CSF strength difference (ΔTSR) and augmented Elo
+    const tsrDelta = csfExpectancy.strengthDifference;
+    const tsrMultiplierHome = Math.max(0.70, Math.min(1.40, 1 + (tsrDelta / 100)));
+    const tsrMultiplierAway = Math.max(0.70, Math.min(1.40, 1 - (tsrDelta / 100)));
+
+    homeLambda = (homeLambda * 0.65) + (leagueHomeAvg * tsrMultiplierHome * 0.20) + (leagueHomeAvg * eloMultiplierHome * 0.15);
+    awayMu = (awayMu * 0.65) + (leagueAwayAvg * tsrMultiplierAway * 0.20) + (leagueAwayAvg * eloMultiplierAway * 0.15);
 
     // Realistic bounds check
     homeLambda = Math.max(0.25, Math.min(4.5, homeLambda));
@@ -745,10 +793,10 @@ export class ApexEngine {
     scoresList.sort((a, b) => b.probability - a.probability);
     const topCorrectScores = scoresList.slice(0, 5);
 
-    // Blend Dixon-Coles 1X2 distribution with Elo expectancy (80% Dixon-Coles + 20% Augmented Elo)
-    let finalHomeWin = (0.80 * homeWinProbRaw) + (0.20 * eloExpectancy.homeWinProb);
-    let finalDraw = (0.80 * drawProbRaw) + (0.20 * eloExpectancy.drawProb);
-    let finalAwayWin = (0.80 * awayWinProbRaw) + (0.20 * eloExpectancy.awayWinProb);
+    // Blend Dixon-Coles 1X2 distribution with CSF win expectancy & Elo expectancy (70% Dixon-Coles + 20% CSF Index + 10% Augmented Elo)
+    let finalHomeWin = (0.70 * homeWinProbRaw) + (0.20 * csfExpectancy.homeWinExpectancy) + (0.10 * eloExpectancy.homeWinProb);
+    let finalDraw = (0.70 * drawProbRaw) + (0.20 * csfExpectancy.drawExpectancy) + (0.10 * eloExpectancy.drawProb);
+    let finalAwayWin = (0.70 * awayWinProbRaw) + (0.20 * csfExpectancy.awayWinExpectancy) + (0.10 * eloExpectancy.awayWinProb);
 
     const sum1X2 = finalHomeWin + finalDraw + finalAwayWin;
     finalHomeWin /= sum1X2;
@@ -772,6 +820,7 @@ export class ApexEngine {
       settings?.formDecayRate || 0.85,
       realScrapedH2H?.homeRecentMatches
     );
+    homeStats.teamStrengthRating = homeCSF.strengthRating;
     homeStats.eloRating = homeElo;
     homeStats.opponentAdjustedXG = homeXGProfile.adjustedXG;
     homeStats.opponentAdjustedXGA = homeXGProfile.adjustedXGA;
@@ -783,6 +832,7 @@ export class ApexEngine {
       settings?.formDecayRate || 0.85,
       realScrapedH2H?.awayRecentMatches
     );
+    awayStats.teamStrengthRating = awayCSF.strengthRating;
     awayStats.eloRating = awayElo;
     awayStats.opponentAdjustedXG = awayXGProfile.adjustedXG;
     awayStats.opponentAdjustedXGA = awayXGProfile.adjustedXGA;
@@ -807,6 +857,7 @@ export class ApexEngine {
       probabilityMatrix: matrix,
       measurements,
       modelType: 'DIXON_COLES_EVIDENCE_BASED',
+      teamStrength,
       eloRatings: eloBreakdown,
       xgBreakdown,
       tacticalContext,
