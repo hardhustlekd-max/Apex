@@ -57,7 +57,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       setError(null);
       const cleanCode = (leagueCode || 'england_premier_league').trim();
 
-      const res = await fetch(`/api/standings/${encodeURIComponent(cleanCode)}`);
+      const res = await fetch(`/api/fixtures/standings/${encodeURIComponent(cleanCode)}`);
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.standings) {

@@ -977,19 +977,17 @@ export class FlashscoreScraperService {
 
     let target = urlMap[cleanCode];
     if (!target) {
-      if (cleanCode.includes('champions_league')) target = urlMap['europe_champions_league'];
-      else if (cleanCode.includes('europa_league')) target = urlMap['europe_europa_league'];
-      else if (cleanCode.includes('conference_league')) target = urlMap['europe_uefa_conference_league'];
-      else if (cleanCode.includes('premier_league')) target = urlMap['england_premier_league'];
-      else if (cleanCode.includes('championship')) target = urlMap['england_championship'];
-      else if (cleanCode.includes('la_liga') || cleanCode.includes('laliga')) target = urlMap['spain_la_liga'];
-      else if (cleanCode.includes('bundesliga')) target = urlMap['germany_bundesliga'];
-      else if (cleanCode.includes('serie_a')) target = urlMap['italy_serie_a'];
-      else if (cleanCode.includes('ligue_1')) target = urlMap['france_ligue_1'];
-      else if (cleanCode.includes('eredivisie')) target = urlMap['netherlands_eredivisie'];
-      else if (cleanCode.includes('primeira_liga') || cleanCode.includes('liga_portugal')) target = urlMap['portugal_primeira_liga'];
-      else if (cleanCode.includes('major_league_soccer') || cleanCode.includes('mls')) target = urlMap['usa_major_league_soccer'];
-      else {
+      // Fallback: Infer path from code structure if not mapped
+      const parts = cleanCode.split('_');
+      if (parts.length >= 2) {
+        const country = parts[0];
+        const leagueName = parts.slice(1).join('-');
+        target = {
+          path: `/football/${country}/${leagueName}/standings/`,
+          name: leagueCode.replace(/_/g, ' '),
+          country: country.charAt(0).toUpperCase() + country.slice(1),
+        };
+      } else {
         target = {
           path: `/football/${cleanCode.replace(/_/g, '-')}/standings/`,
           name: cleanCode.replace(/_/g, ' ').toUpperCase(),

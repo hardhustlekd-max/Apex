@@ -88,16 +88,19 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
         setIsLoadingH2H(true);
         // Direct H2H call to fetch scraped H2H and team form records
         const data = await EngineService.getMatchHeadToHead(fixture.id, fixture.homeTeam, fixture.awayTeam);
-        if (!isCancelled && data) {
-          setScrapedH2H(data);
-          setEnrichedFixture((prev) => ({
-            ...prev,
-            measurements: {
-              ...prev.measurements,
-              h2h: data,
-            },
-            h2hMatches: data.recentH2H,
-          }));
+        if (!isCancelled) {
+          if (data) {
+            setScrapedH2H(data);
+            setEnrichedFixture((prev) => ({
+              ...prev,
+              measurements: {
+                ...prev.measurements,
+                h2h: data,
+              },
+              h2hMatches: data.recentH2H,
+            }));
+          }
+          setIsLoadingH2H(false);
         } else {
           const detail = await EngineService.getMatchDetail(fixture.id);
           if (!isCancelled && detail) {
