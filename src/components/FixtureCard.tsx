@@ -28,22 +28,18 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     >
       <div>
         {/* Top bar: League, Time, Stage / Status */}
+        {/* Top bar: League, Time, Date / Status */}
         <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-hidden">
+          <div className="flex flex-col min-w-0 flex-nowrap overflow-hidden">
             <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md sm:rounded-lg bg-slate-100 text-slate-800 shadow-2xs truncate whitespace-nowrap max-w-[150px] sm:max-w-[200px]" title={fixture.stage || fixture.leagueName}>
               {fixture.stage || fixture.leagueName}
             </span>
-            <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap shrink-0">
-              {fixture.kickOffTime}
+            <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap shrink-0 mt-1">
+              {fixture.status === 'LIVE' ? 'Live' : fixture.status === 'FINISHED' ? 'FT' : `${fixture.matchDate} ${fixture.kickOffTime}`}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-            {pred && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md sm:rounded-lg bg-emerald-600 text-white shadow-2xs whitespace-nowrap" title={`Confidence: ${Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb) * 100)}%`}>
-                {Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb))}% Conf
-              </span>
-            )}
             {fixture.status === 'LIVE' ? (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md sm:rounded-lg bg-black text-white shadow-2xs whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -53,15 +49,11 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md sm:rounded-lg bg-slate-100 text-slate-700 whitespace-nowrap">
                 FT
               </span>
-            ) : (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-md sm:rounded-lg bg-slate-50 text-slate-500 whitespace-nowrap">
-                {fixture.matchDate}
-              </span>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {/* Teams & Expected Goals Display */}
+        {/* Teams Display */}
         <div className="grid grid-cols-12 items-center gap-2 my-2">
           {/* Home Team */}
           <div className="col-span-5 flex flex-col min-w-0">
@@ -77,17 +69,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <span className="text-sm font-bold text-black tracking-tight truncate whitespace-nowrap" title={fixture.homeTeam}>
                 {fixture.homeTeam}
               </span>
-              {pred?.homeWinProb !== undefined && (
-                <span className="font-mono text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-black shadow-xs shrink-0 whitespace-nowrap" title={`${fixture.homeTeam} Win: ${Math.round(pred.homeWinProb * 100)}%`}>
-                  {Math.round(pred.homeWinProb * 100)}%
-                </span>
-              )}
             </div>
-            {pred && (
-              <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap shrink-0">
-                xG: <strong className="text-black">{pred.homeXG}</strong>
-              </span>
-            )}
           </div>
 
           {/* VS Divider or Match Score */}
@@ -99,24 +81,11 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             ) : (
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">VS</span>
             )}
-            <button
-              onClick={() => onSelectDetail(fixture)}
-              className="mt-0.5 text-[10px] text-black font-semibold hover:underline flex items-center gap-0.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              title="View Poisson probability matrix"
-            >
-              <Info className="w-3 h-3" />
-              <span>Grid</span>
-            </button>
           </div>
 
           {/* Away Team */}
           <div className="col-span-5 flex flex-col items-end text-right min-w-0">
             <div className="flex items-center justify-end gap-1.5 min-w-0 flex-nowrap w-full">
-              {pred?.awayWinProb !== undefined && (
-                <span className="font-mono text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-black shadow-xs shrink-0 whitespace-nowrap" title={`${fixture.awayTeam} Win: ${Math.round(pred.awayWinProb * 100)}%`}>
-                  {Math.round(pred.awayWinProb * 100)}%
-                </span>
-              )}
               <span className="text-sm font-bold text-black tracking-tight truncate whitespace-nowrap" title={fixture.awayTeam}>
                 {fixture.awayTeam}
               </span>
@@ -129,11 +98,6 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
                 />
               )}
             </div>
-            {pred && (
-              <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap shrink-0">
-                xG: <strong className="text-black">{pred.awayXG}</strong>
-              </span>
-            )}
           </div>
         </div>
 
@@ -173,54 +137,23 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
         )}
 
-        {/* Highest Predicted Outcome */}
+        {/* Highest Predicted Outcome & Confidence */}
         {topPredictionLabel && (
-          <div className="mt-1 mb-1 p-1.5 px-3 rounded-full bg-slate-50 border border-slate-200 flex items-center text-xs shadow-xs min-w-0">
+          <div className="mt-1 mb-1 p-1.5 px-3 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-between text-xs shadow-xs min-w-0">
             <div className="flex items-center gap-1.5 min-w-0 truncate">
               <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0 whitespace-nowrap">Prediction:</span>
               <span className="font-semibold text-black truncate whitespace-nowrap">{topPredictionLabel}</span>
             </div>
+            {pred && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-2xs whitespace-nowrap" title={`Confidence: ${Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb) * 100)}%`}>
+                {Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb))}% Conf
+              </span>
+            )}
           </div>
         )}
+
       </div>
 
-      {/* 1X2 Probabilities Selection Grid */}
-      {pred && (
-        <div className="grid grid-cols-3 gap-1 pt-1">
-          <button
-            type="button"
-            onClick={() => onSelectDetail(fixture)}
-            className="p-1 rounded-lg text-center bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs min-w-0"
-          >
-            <span className="text-[9px] text-zinc-500 uppercase font-medium truncate w-full">Home</span>
-            <span className="font-mono font-bold text-xs text-black truncate w-full">
-              {Math.round(pred.homeWinProb * 100)}%
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectDetail(fixture)}
-            className="p-1 rounded-lg text-center bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs min-w-0"
-          >
-            <span className="text-[9px] text-zinc-500 uppercase font-medium truncate w-full">Draw</span>
-            <span className="font-mono font-bold text-xs text-black truncate w-full">
-              {Math.round(pred.drawProb * 100)}%
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectDetail(fixture)}
-            className="p-1 rounded-lg text-center bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs min-w-0"
-          >
-            <span className="text-[9px] text-zinc-500 uppercase font-medium truncate w-full">Away</span>
-            <span className="font-mono font-bold text-xs text-black truncate w-full">
-              {Math.round(pred.awayWinProb * 100)}%
-            </span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };

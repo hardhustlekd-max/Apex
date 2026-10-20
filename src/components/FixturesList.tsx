@@ -272,6 +272,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         if (!matchName.includes(query)) return false;
       }
 
+      // Exclude live matches from upcoming list
+      if (f.status === 'LIVE') return false;
+
       return true;
     });
 
@@ -288,7 +291,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     // 1. Predictions loaded directly from separate predictions db
     const fromPredictionsDb = livePredictionsFixtures || [];
 
-    // 2. Fixtures present in upcoming that are marked LIVE
+      // 2. Fixtures present in upcoming that are NOT marked LIVE (handled by liveFromScores)
     const liveFromFixtures = uniqueFixtures.filter((f) => f.status === 'LIVE');
 
     // 3. Fixtures derived from active live scores
@@ -301,7 +304,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           ...matchInPredictionsDb,
           minute: s.minute,
           score: { home: s.homeScore, away: s.awayScore },
-          kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+          kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         };
       }
 
@@ -314,7 +317,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           status: 'LIVE' as const,
           minute: s.minute,
           score: { home: s.homeScore, away: s.awayScore },
-          kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+          kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         };
       }
       return {

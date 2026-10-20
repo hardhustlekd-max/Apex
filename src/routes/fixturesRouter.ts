@@ -294,10 +294,16 @@ fixturesRouter.get('/:id', async (req, res) => {
     }
 
     // If fixture was not yet predicted, load from active provider and run through unified engine
-    const fixtures = await flashscoreScraperService.getUpcomingFixtures();
-    let f = fixtures.find(
+    let f = db.getUpcomingFixtures().find(
       (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
-    ) || null;
+    ) || predictionsDb.getPredictionById(fixtureId) || null;
+
+    if (!f) {
+      const fixtures = await flashscoreScraperService.getUpcomingFixtures();
+      f = fixtures.find(
+        (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
+      ) || null;
+    }
 
     if (!f) {
       return res.status(404).json({ success: false, error: 'Fixture not found' });
