@@ -8,8 +8,8 @@ interface SettingsModalProps {
   settings: EngineSettings | null;
   providers: ProviderStatus[];
   onSaveSettings: (newSettings: Partial<EngineSettings>) => void;
-  onReSeedDatabase: (customCsv?: string, reset?: boolean) => void;
-  isSeeding: boolean;
+  onResetDatabase?: () => void;
+  isResettingDatabase?: boolean;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
@@ -23,8 +23,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   providers,
   onSaveSettings,
-  onReSeedDatabase,
-  isSeeding,
+  onResetDatabase,
+  isResettingDatabase,
   theme,
   onToggleTheme,
   onProviderChange,
@@ -190,11 +190,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Reset the entire database and all raw feeds. This action is irreversible.
                 </p>
                 <button
-                  onClick={() => onReSeedDatabase(undefined, true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors cursor-pointer text-sm"
+                  onClick={() => onResetDatabase?.()}
+                  disabled={isResettingDatabase}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors cursor-pointer text-sm disabled:opacity-50"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset Database & Raw Feeds
+                  <RotateCcw className={`w-4 h-4 ${isResettingDatabase ? 'animate-spin' : ''}`} />
+                  {isResettingDatabase ? 'Resetting...' : 'Reset Database & Raw Feeds'}
                 </button>
               </div>
             </div>

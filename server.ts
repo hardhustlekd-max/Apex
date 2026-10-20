@@ -10,21 +10,24 @@ async function startServer() {
 
   // Initialize SQLite databases and keep persistent in memory
   await db.init();
-  await predictionsDb.init();
+  try {
+    await predictionsDb.init();
+  } catch (err) {
+    console.warn('predictionsDb init notice:', err);
+  }
 
-  // Non-blocking boot seeding if predictions database is empty
-  if (predictionsDb.count() === 0) {
+  // Initial fixture ingestion if upcoming fixtures table is empty
+  if (db.getUpcomingFixturesCount() === 0) {
     (async () => {
       try {
-        const { providerManager } = await import('./src/providers/providerManager.js');
-        const { EngineService } = await import('./src/services/engineService.js');
-        const provider = providerManager.getActiveProvider();
-        const initialUpcoming = await provider.getUpcomingFixtures();
+        const { flashscoreScraperService } = await import('./src/services/flashscoreScraperService.js');
+        const { ServerEngine } = await import('./src/core/serverEngine.js');
+        const initialUpcoming = await flashscoreScraperService.getUpcomingFixtures();
         if (initialUpcoming && initialUpcoming.length > 0) {
-          await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
+          await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
           const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
           if (liveInUpcoming.length > 0) {
-            await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
+            await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
           }
         }
       } catch (err: any) {

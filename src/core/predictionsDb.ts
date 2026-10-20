@@ -4,7 +4,7 @@ import initSqlJs, { Database } from 'sql.js';
 import { Fixture } from './types.js';
 import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
-import { getRelativeDateStr } from './seedData.js';
+import { getRelativeDateStr } from './dateUtils.js';
 import { getSlugForCode, getCodeForSlug, getLeagueAliases, matchesLeague } from './leagueMapper.js';
 
 function getPredictionsDbPaths() {

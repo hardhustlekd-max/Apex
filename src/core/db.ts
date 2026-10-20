@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import initSqlJs, { Database, SqlValue } from 'sql.js';
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, LeagueStandingTable, LeagueStandingEntry } from './types.js';
-import { getRelativeDateStr, getCurrentSeason } from './seedData.js';
+import { getRelativeDateStr, getCurrentSeason } from './dateUtils.js';
 import { getCodeForSlug } from './leagueMapper.js';
 import { loggerService } from '../services/loggerService.js';
 
@@ -146,6 +146,9 @@ export class FootballDB {
         kick_off_time TEXT NOT NULL,
         home_team TEXT NOT NULL,
         away_team TEXT NOT NULL,
+        home_badge TEXT,
+        away_badge TEXT,
+        stage TEXT,
         b365_h REAL NOT NULL,
         b365_d REAL NOT NULL,
         b365_a REAL NOT NULL,
@@ -153,10 +156,56 @@ export class FootballDB {
         b365_under25 REAL,
         b365_btts_yes REAL,
         b365_btts_no REAL,
-        status TEXT NOT NULL DEFAULT 'SCHEDULED'
+        status TEXT NOT NULL DEFAULT 'SCHEDULED',
+        score_json TEXT,
+        prediction_json TEXT,
+        markets_json TEXT,
+        best_value_market_json TEXT,
+        home_stats_json TEXT,
+        away_stats_json TEXT,
+        measurements_json TEXT,
+        h2h_matches_json TEXT,
+        updated_at TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);
+    `);
+
+    // Ensure schema migrations for existing database files on disk
+    try {
+      const existingColsRes = this.db.exec('PRAGMA table_info(upcoming_fixtures);');
+      const existingCols = new Set<string>();
+      if (existingColsRes && existingColsRes[0]) {
+        for (const row of existingColsRes[0].values) {
+          existingCols.add(String(row[1]));
+        }
+      }
+
+      const desiredCols: Array<[string, string]> = [
+        ['home_badge', 'TEXT'],
+        ['away_badge', 'TEXT'],
+        ['stage', 'TEXT'],
+        ['score_json', 'TEXT'],
+        ['prediction_json', 'TEXT'],
+        ['markets_json', 'TEXT'],
+        ['best_value_market_json', 'TEXT'],
+        ['home_stats_json', 'TEXT'],
+        ['away_stats_json', 'TEXT'],
+        ['measurements_json', 'TEXT'],
+        ['h2h_matches_json', 'TEXT'],
+        ['updated_at', 'TEXT'],
+      ];
+
+      for (const [colName, colType] of desiredCols) {
+        if (!existingCols.has(colName)) {
+          try {
+            this.db.run(`ALTER TABLE upcoming_fixtures ADD COLUMN ${colName} ${colType}`);
+          } catch {}
+        }
+      }
+    } catch {}
+
+    this.db.run(`
 
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -381,64 +430,157 @@ export class FootballDB {
   }
 
   insertUpcomingFixtures(fixtures: Fixture[]): number {
-    if (fixtures.length === 0) return 0;
-    this.fallbackUpcomingFixtures = fixtures;
-
-    if (!this.db) return fixtures.length;
-
-    this.db.run('BEGIN TRANSACTION;');
-    try {
-      // Clear previous scheduled fixtures
-      this.db.run(`DELETE FROM upcoming_fixtures`);
-
-      const stmt = this.db.prepare(`
-        INSERT INTO upcoming_fixtures (
-          id, provider_id, league, league_name, match_date, kick_off_time,
-          home_team, away_team, b365_h, b365_d, b365_a,
-          b365_over25, b365_under25, b365_btts_yes, b365_btts_no, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const f of fixtures) {
-        stmt.run([
-          f.id,
-          f.providerId,
-          f.league,
-          f.leagueName,
-          f.matchDate,
-          f.kickOffTime,
-          f.homeTeam,
-          f.awayTeam,
-          f.odds.homeWin,
-          f.odds.draw,
-          f.odds.awayWin,
-          f.odds.over25 ?? 1.85,
-          f.odds.under25 ?? 1.95,
-          f.odds.bttsYes ?? 1.80,
-          f.odds.bttsNo ?? 2.00,
-          f.status,
-        ]);
-      }
-      stmt.free();
-      this.db.run('COMMIT;');
-      this.saveToDisk();
-    } catch (err) {
-      this.db.run('ROLLBACK;');
-      console.error('Failed to insert upcoming fixtures:', err);
-    }
-
+    this.saveUpcomingFixtures(fixtures);
     return fixtures.length;
   }
 
-  getUpcomingFixtures(leagueFilter?: string, dateFilter?: string): Fixture[] {
+  getUpcomingFixturesCount(): number {
+    if (!this.db) return this.fallbackUpcomingFixtures.length;
+    try {
+      const res = this.db.exec('SELECT COUNT(*) as count FROM upcoming_fixtures');
+      if (res && res[0] && res[0].values && res[0].values[0]) {
+        return Number(res[0].values[0][0]) || 0;
+      }
+      return 0;
+    } catch {
+      return this.fallbackUpcomingFixtures.length;
+    }
+  }
+
+  getFixtureById(id: string): Fixture | null {
+    if (!this.db) {
+      return this.fallbackUpcomingFixtures.find((f) => f.id === id || f.id === `fs_${id}` || f.id.replace('fs_', '') === id) || null;
+    }
+    try {
+      const cleanId = id.replace(/^fs_/, '');
+      const stmt = this.db.prepare(`
+        SELECT * FROM upcoming_fixtures 
+        WHERE id = ? OR id = ? OR id = ?
+        LIMIT 1
+      `);
+      stmt.bind([id, `fs_${cleanId}`, cleanId]);
+      if (stmt.step()) {
+        const row = stmt.getAsObject();
+        stmt.free();
+        return this.mapRowToFixture(row);
+      }
+      stmt.free();
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private mapRowToFixture(row: any): Fixture {
+    let score: any;
+    let prediction: any;
+    let markets: any;
+    let bestValueMarket: any;
+    let homeStats: any;
+    let awayStats: any;
+    let measurements: any;
+    let h2hMatches: any;
+
+    if (row.score_json) {
+      try { score = JSON.parse(String(row.score_json)); } catch {}
+    }
+    if (row.prediction_json) {
+      try { prediction = JSON.parse(String(row.prediction_json)); } catch {}
+    }
+    if (row.markets_json) {
+      try { markets = JSON.parse(String(row.markets_json)); } catch {}
+    }
+    if (row.best_value_market_json) {
+      try { bestValueMarket = JSON.parse(String(row.best_value_market_json)); } catch {}
+    }
+    if (row.home_stats_json) {
+      try { homeStats = JSON.parse(String(row.home_stats_json)); } catch {}
+    }
+    if (row.away_stats_json) {
+      try { awayStats = JSON.parse(String(row.away_stats_json)); } catch {}
+    }
+    if (row.measurements_json) {
+      try { measurements = JSON.parse(String(row.measurements_json)); } catch {}
+    }
+    if (row.h2h_matches_json) {
+      try { h2hMatches = JSON.parse(String(row.h2h_matches_json)); } catch {}
+    }
+
+    return {
+      id: String(row.id),
+      providerId: String(row.provider_id || 'FLASHSCORE'),
+      league: String(row.league),
+      leagueName: String(row.league_name),
+      matchDate: String(row.match_date),
+      kickOffTime: String(row.kick_off_time),
+      homeTeam: String(row.home_team),
+      awayTeam: String(row.away_team),
+      homeBadge: row.home_badge ? String(row.home_badge) : undefined,
+      awayBadge: row.away_badge ? String(row.away_badge) : undefined,
+      stage: row.stage ? String(row.stage) : undefined,
+      status: (row.status as any) || 'SCHEDULED',
+      odds: {
+        homeWin: Number(row.b365_h),
+        draw: Number(row.b365_d),
+        awayWin: Number(row.b365_a),
+        over25: Number(row.b365_over25 || 1.95),
+        under25: Number(row.b365_under25 || 1.85),
+        bttsYes: Number(row.b365_btts_yes || 1.90),
+        bttsNo: Number(row.b365_btts_no || 1.80),
+      },
+      score,
+      prediction,
+      markets,
+      bestValueMarket,
+      homeStats,
+      awayStats,
+      measurements,
+      h2hMatches,
+    };
+  }
+
+  getUpcomingFixtures(
+    filterOrLeague?: string | {
+      league?: string;
+      dateFilter?: string;
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+    },
+    dateFilterLegacy?: string
+  ): Fixture[] {
+    let leagueFilter: string | undefined;
+    let dateFilter: string | undefined;
+    let dateParam: string | undefined;
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+    let limit: number | undefined;
+
+    if (typeof filterOrLeague === 'object' && filterOrLeague !== null) {
+      leagueFilter = filterOrLeague.league;
+      dateFilter = filterOrLeague.dateFilter;
+      dateParam = filterOrLeague.date;
+      startDate = filterOrLeague.startDate;
+      endDate = filterOrLeague.endDate;
+      limit = filterOrLeague.limit;
+    } else {
+      leagueFilter = typeof filterOrLeague === 'string' ? filterOrLeague : undefined;
+      dateFilter = dateFilterLegacy;
+    }
+
     const todayStr = getRelativeDateStr(0);
 
     if (!this.db) {
-      let filtered = this.fallbackUpcomingFixtures.filter((f) => f.matchDate >= todayStr);
+      let filtered = [...this.fallbackUpcomingFixtures];
       if (leagueFilter && leagueFilter !== 'ALL') {
-        filtered = filtered.filter((f) => f.league.toUpperCase() === leagueFilter.toUpperCase());
+        filtered = filtered.filter((f) => (f.league || '').toUpperCase() === leagueFilter!.toUpperCase());
       }
-      if (dateFilter === 'TODAY') {
+      if (dateParam) {
+        filtered = filtered.filter((f) => f.matchDate === dateParam);
+      } else if (startDate && endDate) {
+        filtered = filtered.filter((f) => f.matchDate >= startDate! && f.matchDate <= endDate!);
+      } else if (dateFilter === 'TODAY') {
         filtered = filtered.filter((f) => f.matchDate === todayStr);
       } else if (dateFilter === 'TOMORROW') {
         filtered = filtered.filter((f) => f.matchDate === getRelativeDateStr(1));
@@ -449,36 +591,48 @@ export class FootballDB {
       } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
         filtered = filtered.filter((f) => f.matchDate === dateFilter);
       }
+      if (limit && limit > 0) {
+        filtered = filtered.slice(0, limit);
+      }
       return filtered;
     }
 
     try {
-      let query = `SELECT * FROM upcoming_fixtures WHERE match_date >= ?`;
-      const params: SqlValue[] = [todayStr];
+      let query = `SELECT * FROM upcoming_fixtures WHERE 1=1`;
+      const params: SqlValue[] = [];
 
       if (leagueFilter && leagueFilter !== 'ALL') {
-        query += ` AND league = ?`;
+        query += ` AND UPPER(league) = UPPER(?)`;
         params.push(leagueFilter);
       }
 
-      if (dateFilter === 'TODAY') {
+      if (dateParam) {
+        query += ` AND match_date = ?`;
+        params.push(dateParam);
+      } else if (startDate && endDate) {
+        query += ` AND match_date >= ? AND match_date <= ?`;
+        params.push(startDate, endDate);
+      } else if (dateFilter === 'TODAY') {
         query += ` AND match_date = ?`;
         params.push(todayStr);
       } else if (dateFilter === 'TOMORROW') {
         query += ` AND match_date = ?`;
         params.push(getRelativeDateStr(1));
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        query += ` AND match_date <= ?`;
-        params.push(getRelativeDateStr(2));
+        query += ` AND match_date >= ? AND match_date <= ?`;
+        params.push(todayStr, getRelativeDateStr(2));
       } else if (dateFilter === 'THIS_WEEK') {
-        query += ` AND match_date <= ?`;
-        params.push(getRelativeDateStr(6));
+        query += ` AND match_date >= ? AND match_date <= ?`;
+        params.push(todayStr, getRelativeDateStr(6));
       } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
         query += ` AND match_date = ?`;
         params.push(dateFilter);
       }
 
       query += ` ORDER BY match_date ASC, kick_off_time ASC`;
+      if (limit && limit > 0) {
+        query += ` LIMIT ${limit}`;
+      }
 
       const stmt = this.db.prepare(query);
       stmt.bind(params);
@@ -490,36 +644,22 @@ export class FootballDB {
         const fixtureId = String(row.id);
         if (seenIds.has(fixtureId)) continue;
         seenIds.add(fixtureId);
-
-        fixtures.push({
-          id: fixtureId,
-          providerId: String(row.provider_id),
-          league: String(row.league),
-          leagueName: String(row.league_name),
-          matchDate: String(row.match_date),
-          kickOffTime: String(row.kick_off_time),
-          homeTeam: String(row.home_team),
-          awayTeam: String(row.away_team),
-          status: (row.status as any) || 'SCHEDULED',
-          odds: {
-            homeWin: Number(row.b365_h),
-            draw: Number(row.b365_d),
-            awayWin: Number(row.b365_a),
-            over25: Number(row.b365_over25),
-            under25: Number(row.b365_under25),
-            bttsYes: Number(row.b365_btts_yes),
-            bttsNo: Number(row.b365_btts_no),
-          },
-        });
+        fixtures.push(this.mapRowToFixture(row));
       }
       stmt.free();
 
-      if (fixtures.length === 0) {
+      if (fixtures.length === 0 && this.fallbackUpcomingFixtures.length > 0) {
         return this.fallbackUpcomingFixtures;
       }
 
       return fixtures;
-    } catch {
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Query error in getUpcomingFixtures: ${err?.message}`,
+      });
       return this.fallbackUpcomingFixtures;
     }
   }
@@ -774,26 +914,32 @@ export class FootballDB {
     });
 
     this.fallbackUpcomingFixtures = unique;
-    if (!this.db) return;
+    if (!this.db || unique.length === 0) return;
     try {
-      this.db.run(`DELETE FROM upcoming_fixtures`);
       const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO upcoming_fixtures (
           id, provider_id, league, league_name, match_date, kick_off_time,
-          home_team, away_team, b365_h, b365_d, b365_a, b365_over25, b365_under25,
-          b365_btts_yes, b365_btts_no, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          home_team, away_team, home_badge, away_badge, stage,
+          b365_h, b365_d, b365_a, b365_over25, b365_under25,
+          b365_btts_yes, b365_btts_no, status, score_json,
+          prediction_json, markets_json, best_value_market_json,
+          home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+
       for (const f of unique) {
         stmt.run([
           f.id,
-          f.providerId || 'flashscore',
+          f.providerId || 'FLASHSCORE',
           String(f.league),
           f.leagueName,
           f.matchDate,
           f.kickOffTime,
           f.homeTeam,
           f.awayTeam,
+          f.homeBadge || null,
+          f.awayBadge || null,
+          f.stage || null,
           f.odds.homeWin,
           f.odds.draw,
           f.odds.awayWin,
@@ -802,12 +948,34 @@ export class FootballDB {
           f.odds.bttsYes || 1.90,
           f.odds.bttsNo || 1.80,
           f.status || 'SCHEDULED',
+          f.score ? JSON.stringify(f.score) : null,
+          f.prediction ? JSON.stringify(f.prediction) : null,
+          f.markets ? JSON.stringify(f.markets) : null,
+          f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
+          f.homeStats ? JSON.stringify(f.homeStats) : null,
+          f.awayStats ? JSON.stringify(f.awayStats) : null,
+          f.measurements ? JSON.stringify(f.measurements) : null,
+          f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
+          new Date().toISOString(),
         ]);
       }
       stmt.free();
       this.saveToDisk();
-    } catch {
-      // ignore
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Saved ${unique.length} fixtures with prediction metadata to SQLite database`,
+        details: { count: unique.length },
+      });
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Failed to save upcoming fixtures to database: ${err?.message}`,
+      });
     }
   }
 
@@ -1169,7 +1337,6 @@ export class FootballDB {
         INSERT OR IGNORE INTO raw_feed_data (fixture_id, feed_path, raw_text, scraped_at)
         VALUES (?, ?, ?, ?)
       `, [fixtureId, feedPath, rawText, new Date().toISOString()]);
-      this.saveToDisk();
       loggerService.addLog({
         level: 'SUCCESS',
         category: 'DATABASE',
@@ -1199,7 +1366,6 @@ export class FootballDB {
       }
       stmt.free();
       this.db.run('COMMIT;');
-      this.saveToDisk();
       loggerService.addLog({
         level: 'SUCCESS',
         category: 'DATABASE',

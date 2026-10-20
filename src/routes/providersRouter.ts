@@ -4,8 +4,8 @@ import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
-import { EngineService } from '../services/engineService.js';
-import { getRelativeDateStr } from '../core/seedData.js';
+import { ServerEngine } from '../core/serverEngine.js';
+import { getRelativeDateStr } from '../core/dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 
 export const providersRouter = Router();
@@ -88,7 +88,7 @@ providersRouter.get('/live-scores', async (req, res) => {
           under25: 1.95,
         },
       }));
-      await EngineService.predictAndStoreLiveFixtures(liveFixtures);
+      await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
     }
 
     res.json({
@@ -134,7 +134,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
 
     const syncRes = await flashscoreScraperService.syncHistoricalData(7);
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-    const predRes = await EngineService.predictAndStoreUpcomingFixtures(upcoming);
+    const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
 
     // Also predict and store historical matches in predictions db
     const rawMatches = db.getAllHistoricalMatches(1500);
@@ -153,7 +153,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
         ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
       }));
     const allHist = [...rawMatches, ...scrapedAsHistorical];
-    const histPredRes = await EngineService.predictAndStoreHistoricalMatches(allHist);
+    const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
 
     loggerService.addLog({
       level: 'SUCCESS',
@@ -187,7 +187,7 @@ providersRouter.post('/flashscore/sync', async (req, res) => {
           under25: 1.95,
         },
       }));
-      const liveRes = await EngineService.predictAndStoreLiveFixtures(liveFixtures);
+      const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
       livePredCount = liveRes.count;
     }
 
@@ -242,15 +242,9 @@ providersRouter.get('/flashscore/matches', (req, res) => {
 
 providersRouter.get('/flashscore/export', (req, res) => {
   try {
-    const format = (req.query.format as 'json' | 'json-array' | 'csv') || 'json';
+    const format = (req.query.format as 'json' | 'json-array') || 'json';
     const matches = db.getFlashscoreScrapedMatches(500);
     const exported = flashscoreScraperService.exportData(matches, format);
-
-    if (format === 'csv') {
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="flashscore_scraped.csv"');
-      return res.send(exported);
-    }
 
     res.setHeader('Content-Type', 'application/json');
     res.send(exported);

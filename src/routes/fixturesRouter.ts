@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
-import { EngineService } from '../services/engineService.js';
+import { ServerEngine } from '../core/serverEngine.js';
 import { providerManager } from '../providers/providerManager.js';
 import { ApexEngine } from '../core/poisson.js';
 import { EngineSettings, Fixture } from '../core/types.js';
-import { getRelativeDateStr } from '../core/seedData.js';
+import { getRelativeDateStr } from '../core/dateUtils.js';
 import { isMatchStarted } from '../core/accumulator.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
@@ -22,38 +22,27 @@ fixturesRouter.get('/', async (req, res) => {
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    await predictionsDb.init();
+    await db.init();
 
-    // If predictions database has no records yet, seed non-blockingly in background
-    if (predictionsDb.count() === 0) {
-      (async () => {
-        try {
-          const provider = providerManager.getActiveProvider();
-          const initialUpcoming = await provider.getUpcomingFixtures();
-          await EngineService.predictAndStoreUpcomingFixtures(initialUpcoming);
-          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
-          if (liveInUpcoming.length > 0 && predictionsDb.countLivePredictions() === 0) {
-            await EngineService.predictAndStoreLiveFixtures(liveInUpcoming);
-          }
-          loggerService.addLog({
-            level: 'SUCCESS',
-            category: 'DATA_FETCH',
-            source: 'FixturesRouter',
-            message: `Background seeding completed with ${initialUpcoming.length} fixtures`,
-          });
-        } catch (bgErr: any) {
-          loggerService.addLog({
-            level: 'ERROR',
-            category: 'DATA_FETCH',
-            source: 'FixturesRouter',
-            message: `Background seeding error: ${bgErr?.message}`,
-          });
+    // If upcoming fixtures database has 0 records, immediately ingest from Flashscore feed
+    if (db.getUpcomingFixturesCount() === 0) {
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'DATA_FETCH',
+        source: 'FixturesRouter',
+        message: 'No upcoming fixtures in database. Ingesting from Flashscore feed...',
+      });
+      const initialUpcoming = await flashscoreScraperService.getUpcomingFixtures();
+      if (initialUpcoming && initialUpcoming.length > 0) {
+        await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
+        const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
+        if (liveInUpcoming.length > 0) {
+          await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
         }
-      })().catch(() => {});
+      }
     }
 
-    // Display predictions queried directly from the separate predictions db
-    const resultFixtures = predictionsDb.getPredictions({
+    let resultFixtures = db.getUpcomingFixtures({
       league: leagueFilter,
       date: dateParam,
       dateFilter,
@@ -61,14 +50,45 @@ fixturesRouter.get('/', async (req, res) => {
       endDate,
     });
 
+    // Fallback to predictionsDb if db query had zero results
+    if (resultFixtures.length === 0) {
+      try {
+        await predictionsDb.init();
+        const predFixtures = predictionsDb.getPredictions({
+          league: leagueFilter,
+          date: dateParam,
+          dateFilter,
+          startDate,
+          endDate,
+        });
+        if (predFixtures.length > 0) {
+          resultFixtures = predFixtures;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'DATA_FETCH',
+      source: 'FixturesRouter',
+      message: `Returning ${resultFixtures.length} upcoming fixtures for filter (${leagueFilter || 'ALL'}, ${dateFilter || dateParam || 'ALL'})`,
+    });
+
     res.json({
       success: true,
-      provider: 'PREDICTIONS_DB',
+      provider: 'FLASHSCORE',
       count: resultFixtures.length,
       fixtures: resultFixtures,
     });
   } catch (err: any) {
-    console.error('Error fetching fixtures from predictions db:', err);
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'DATA_FETCH',
+      source: 'FixturesRouter',
+      message: `Error fetching fixtures: ${err?.message}`,
+    });
     res.status(500).json({ success: false, error: err?.message || 'Failed to fetch predictions' });
   }
 });
@@ -116,7 +136,7 @@ fixturesRouter.get('/live', async (req, res) => {
     }
 
     if (liveFixtures.length > 0) {
-      await EngineService.predictAndStoreLiveFixtures(liveFixtures);
+      await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
     }
 
     const livePredictions = predictionsDb.getLivePredictions({ league, limit });
@@ -158,7 +178,7 @@ fixturesRouter.get('/history', async (req, res) => {
           ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
         }));
       const allHist = [...rawMatches, ...scrapedAsHistorical];
-      await EngineService.predictAndStoreHistoricalMatches(allHist);
+      await ServerEngine.predictAndStoreHistoricalMatches(allHist);
     }
 
     // Load predictions from predictions db
@@ -232,8 +252,16 @@ fixturesRouter.get('/:id/h2h', async (req, res) => {
 fixturesRouter.get('/:id', async (req, res) => {
   try {
     const fixtureId = req.params.id;
-    await predictionsDb.init();
-    const stored = predictionsDb.getPredictionById(fixtureId);
+    await db.init();
+    let stored = db.getFixtureById(fixtureId);
+    if (!stored) {
+      try {
+        await predictionsDb.init();
+        stored = predictionsDb.getPredictionById(fixtureId);
+      } catch {
+        // ignore
+      }
+    }
 
     if (stored) {
       // Enrich with real scraped H2H details and on-demand parsed raw match statistics
@@ -266,8 +294,7 @@ fixturesRouter.get('/:id', async (req, res) => {
     }
 
     // If fixture was not yet predicted, load from active provider and run through unified engine
-    const provider = providerManager.getActiveProvider();
-    const fixtures = await provider.getUpcomingFixtures();
+    const fixtures = await flashscoreScraperService.getUpcomingFixtures();
     let f = fixtures.find(
       (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
     ) || null;
@@ -286,7 +313,7 @@ fixturesRouter.get('/:id', async (req, res) => {
       autoSyncDaily: true,
     };
 
-    const allMatches = EngineService.getUnifiedHistoricalUniverse();
+    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
     const cleanId = (f.id || fixtureId).replace(/^fs_/, '');
     const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
 
@@ -297,8 +324,9 @@ fixturesRouter.get('/:id', async (req, res) => {
       stage: f.stage,
     };
 
-    const enrichedFixture = EngineService.predictFixtureUnified(f, allMatches, settings, realH2H, tacticalInput);
+    const enrichedFixture = ServerEngine.predictFixtureUnified(f, allMatches, settings, realH2H, tacticalInput);
 
+    db.saveUpcomingFixtures([enrichedFixture]);
     try {
       predictionsDb.savePredictions([enrichedFixture]);
     } catch {

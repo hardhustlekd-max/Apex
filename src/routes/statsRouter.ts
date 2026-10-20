@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
-import { FootballDataCSVParser } from '../core/csvParser.js';
 
 export const statsRouter = Router();
 
@@ -16,35 +15,18 @@ statsRouter.get('/', (req, res) => {
   }
 });
 
-statsRouter.post('/seed', (req, res) => {
+statsRouter.post('/reset', (req, res) => {
   try {
-    const { customCsv, defaultSeason, reset } = req.body;
-
-    if (reset) {
-      db.clearHistoricalData();
-    }
-
-    if (!customCsv || customCsv.trim().length === 0) {
-      const stats = db.getStatsSummary();
-      return res.json({
-        success: true,
-        message: 'No CSV data provided. Database ready for dataset upload.',
-        stats,
-      });
-    }
-
-    const parsedMatches = FootballDataCSVParser.parseCSV(customCsv, defaultSeason || '2024/2025');
-    const inserted = db.insertHistoricalMatches(parsedMatches);
+    db.clearHistoricalData();
     const stats = db.getStatsSummary();
-
     res.json({
       success: true,
-      message: `Database successfully ingested ${inserted} matches from CSV dataset.`,
+      message: 'Database tables and caches successfully reset.',
       stats,
     });
   } catch (err: any) {
-    console.error('Seed error:', err);
-    res.status(500).json({ success: false, error: err?.message || 'Failed to seed database' });
+    console.error('Reset error:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Failed to reset database' });
   }
 });
 

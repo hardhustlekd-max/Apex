@@ -8,7 +8,6 @@ interface HeaderProps {
   stats: { totalMatches: number; totalTeams: number; leagues: any[] };
   onOpenSettings: () => void;
   onOpenTerminal?: () => void;
-  onOpenSeedModal: () => void;
   onSelectAccaCategory?: (cat: 'BANKER' | 'VALUE_HUNTER') => void;
   onProviderChange: (providerId: EngineSettings['activeProvider']) => void;
   isSyncing: boolean;
@@ -24,7 +23,6 @@ export const Header: React.FC<HeaderProps> = ({
   stats,
   onOpenSettings,
   onOpenTerminal,
-  onOpenSeedModal,
   onSelectAccaCategory,
   onProviderChange,
   isSyncing,

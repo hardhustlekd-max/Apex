@@ -278,6 +278,7 @@ export interface Fixture {
   }[];
   restDaysHome?: number;
   restDaysAway?: number;
+  h2hMatches?: any[];
 }
 
 export interface AccaLeg {

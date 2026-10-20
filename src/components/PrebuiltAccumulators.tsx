@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Fixture, AccumulatorSlip, EngineSettings } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
-import { getRelativeDateStr } from '../core/seedData.js';
+import { getRelativeDateStr } from '../core/dateUtils.js';
 import { isMatchStarted } from '../core/accumulator.js';
 
 interface PrebuiltAccumulatorsProps {

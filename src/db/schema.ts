@@ -71,7 +71,7 @@ export interface FlashscoreScrapedMatchSchema {
 
 export interface UpcomingFixtureSchema {
   id: string; // Primary Key
-  provider_id: ActiveProviderType | string; // Active provider e.g. 'espn' | 'ESPN'
+  provider_id: ActiveProviderType | string; // Active provider e.g. 'FLASHSCORE'
   league: string; // Division code
   league_name: string; // League label
   stage?: string | null; // Sub division or tournament stage
@@ -79,6 +79,8 @@ export interface UpcomingFixtureSchema {
   kick_off_time: string; // HH:MM
   home_team: string;
   away_team: string;
+  home_badge?: string | null;
+  away_badge?: string | null;
   b365_h: number;
   b365_d: number;
   b365_a: number;
@@ -91,6 +93,15 @@ export interface UpcomingFixtureSchema {
   away_win_prob?: number | null; // Calculated Poisson away win probability (0-1)
   status: 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED';
   date_source?: 'LIVE_FEED' | 'CACHED_DB' | 'INITIAL_FALLBACK';
+  score_json?: string | null;
+  prediction_json?: string | null;
+  markets_json?: string | null;
+  best_value_market_json?: string | null;
+  home_stats_json?: string | null;
+  away_stats_json?: string | null;
+  measurements_json?: string | null;
+  h2h_matches_json?: string | null;
+  updated_at?: string | null;
 }
 
 export interface EngineSettingsSchema {

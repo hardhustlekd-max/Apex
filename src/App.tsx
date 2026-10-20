@@ -176,17 +176,17 @@ export default function App() {
     }
   };
 
-  const handleReSeedDatabase = async (customCsv?: string, reset = false) => {
+  const handleResetDatabase = async () => {
     try {
       setIsSeeding(true);
-      const res = await EngineService.seedDatabase(customCsv, reset);
+      const res = await EngineService.resetDatabase();
       if (res.success) {
         setStats(res.stats);
         fetchFixtures();
         showNotification(res.message);
       }
     } catch (e) {
-      console.error('Failed to seed database:', e);
+      console.error('Failed to reset database:', e);
     } finally {
       setIsSeeding(false);
     }
@@ -284,8 +284,8 @@ export default function App() {
         settings={settings}
         providers={providers}
         onSaveSettings={handleSaveSettings}
-        onReSeedDatabase={handleReSeedDatabase}
-        isSeeding={isSeeding}
+        onResetDatabase={handleResetDatabase}
+        isResettingDatabase={isSeeding}
         theme={theme}
         onToggleTheme={toggleTheme}
         onProviderChange={handleProviderChange}

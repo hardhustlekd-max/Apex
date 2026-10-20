@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { providerManager } from '../providers/providerManager.js';
+import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { ApexEngine } from '../core/poisson.js';
 import { AccumulatorGenerator, AccaGenerationParams, isMatchStarted } from '../core/accumulator.js';
 import { EngineSettings, Fixture } from '../core/types.js';
-import { EngineService } from '../services/engineService.js';
+import { ServerEngine } from '../core/serverEngine.js';
 import { loggerService } from '../services/loggerService.js';
 
 export const accumulatorRouter = Router();
@@ -31,13 +32,16 @@ async function handlePrebuiltGeneration(req: any, res: any) {
     if (Array.isArray(clientFixtures) && clientFixtures.length > 0) {
       fixturesToUse = clientFixtures;
     } else {
-      await predictionsDb.init();
-      if (predictionsDb.count() > 0) {
-        fixturesToUse = predictionsDb.getAllPredictions();
-      } else {
-        const provider = providerManager.getActiveProvider();
-        const rawFixtures = await provider.getUpcomingFixtures();
-        const allMatches = EngineService.getUnifiedHistoricalUniverse();
+      fixturesToUse = db.getUpcomingFixtures();
+      if (fixturesToUse.length === 0) {
+        await predictionsDb.init();
+        if (predictionsDb.count() > 0) {
+          fixturesToUse = predictionsDb.getAllPredictions();
+        }
+      }
+      if (fixturesToUse.length === 0) {
+        const rawFixtures = await flashscoreScraperService.getUpcomingFixtures();
+        const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
         const cachedH2HMap = db.getAllPredictionMeasurements();
 
         fixturesToUse = rawFixtures.map((f) => {
@@ -56,7 +60,7 @@ async function handlePrebuiltGeneration(req: any, res: any) {
             stage: f.stage,
           };
 
-          return EngineService.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
+          return ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
         });
       }
     }
@@ -175,7 +179,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
     };
 
     const rawFixtures = await provider.getUpcomingFixtures();
-    const allMatches = EngineService.getUnifiedHistoricalUniverse();
+    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
     // Enrich all fixtures with Poisson predictions & markets using the unified engine
@@ -195,7 +199,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
         stage: f.stage,
       };
 
-      const predicted = EngineService.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
+      const predicted = ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
       loggerService.addLog({
         level: 'INFO',
         category: 'ENGINE',

@@ -5,7 +5,7 @@ import {
   EngineSettings,
   MarketOption,
 } from './types.js';
-import { getRelativeDateStr } from './seedData.js';
+import { getRelativeDateStr } from './dateUtils.js';
 
 export interface AccaGenerationParams {
   strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';

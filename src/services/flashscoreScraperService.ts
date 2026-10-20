@@ -2,7 +2,7 @@ import { Fixture, BookmakerOdds, HistoricalMatch, LeagueCode, FlashscoreScrapedM
 import { LiveOddsUpdate, LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
-import { getCurrentSeason } from '../core/seedData.js';
+import { getCurrentSeason } from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
 
 const FLASHSCORE_FEED_BASE = 'https://www.flashscore.com/x/feed';
@@ -265,7 +265,6 @@ export class FlashscoreScraperService {
     const rawMatches = parseFeedText(feedText);
     const seenLiveIds = new Set<string>();
     const liveMatches = rawMatches.filter((m) => {
-      db.saveRawFeed(m.matchId, feedPath, feedText);
       if (m.statusCode !== '2') return false;
       if (seenLiveIds.has(m.matchId)) return false;
       seenLiveIds.add(m.matchId);
@@ -532,7 +531,7 @@ export class FlashscoreScraperService {
   /**
    * Export methods matching gustavofariaa/FlashscoreScraping export formats
    */
-  exportData(data: Record<string, FlashscoreScrapedMatch> | FlashscoreScrapedMatch[], format: 'json' | 'json-array' | 'csv'): string {
+  exportData(data: Record<string, FlashscoreScrapedMatch> | FlashscoreScrapedMatch[], format: 'json' | 'json-array'): string {
     const list = Array.isArray(data) ? data : Object.values(data);
 
     if (format === 'json') {
@@ -541,24 +540,7 @@ export class FlashscoreScraperService {
       return JSON.stringify(obj, null, 2);
     }
 
-    if (format === 'json-array') {
-      return JSON.stringify(list, null, 2);
-    }
-
-    // CSV format
-    const headers = ['matchId', 'stage', 'status', 'date', 'home', 'away', 'result_home', 'result_away'];
-    const rows = list.map((m) => [
-      m.matchId,
-      m.stage || '',
-      m.status,
-      m.date,
-      `"${m.home.name.replace(/"/g, '""')}"`,
-      `"${m.away.name.replace(/"/g, '""')}"`,
-      m.result?.home || '',
-      m.result?.away || '',
-    ]);
-
-    return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    return JSON.stringify(list, null, 2);
   }
 
   /**

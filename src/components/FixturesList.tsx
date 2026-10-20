@@ -3,7 +3,7 @@ import { Filter, ChevronDown, Search, X } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { Fixture } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
-import { getRelativeDateStr } from '../core/seedData.js';
+import { getRelativeDateStr } from '../core/dateUtils.js';
 import { FixtureCard } from './FixtureCard.js';
 import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe.js';
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
