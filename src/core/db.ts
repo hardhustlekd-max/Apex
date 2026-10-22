@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import initSqlJs, { Database, SqlValue } from 'sql.js';
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, LeagueStandingTable, LeagueStandingEntry } from './types.js';
-import { getRelativeDateStr, getCurrentSeason } from './dateUtils.js';
+import { getRelativeDateStr, getCurrentSeason, getPossibleDateStrs } from './dateUtils.js';
 import { getCodeForSlug } from './leagueMapper.js';
 import { loggerService } from '../services/loggerService.js';
 
@@ -569,7 +569,10 @@ export class FootballDB {
       dateFilter = dateFilterLegacy;
     }
 
-    const todayStr = getRelativeDateStr(0);
+    const todayStrs = getPossibleDateStrs(0);
+    const tomorrowStrs = getPossibleDateStrs(1);
+    const day2Strs = getPossibleDateStrs(2);
+    const day6Strs = getPossibleDateStrs(6);
 
     if (!this.db) {
       let filtered = [...this.fallbackUpcomingFixtures];
@@ -581,13 +584,17 @@ export class FootballDB {
       } else if (startDate && endDate) {
         filtered = filtered.filter((f) => f.matchDate >= startDate! && f.matchDate <= endDate!);
       } else if (dateFilter === 'TODAY') {
-        filtered = filtered.filter((f) => f.matchDate === todayStr);
+        filtered = filtered.filter((f) => todayStrs.includes(f.matchDate));
       } else if (dateFilter === 'TOMORROW') {
-        filtered = filtered.filter((f) => f.matchDate === getRelativeDateStr(1));
+        filtered = filtered.filter((f) => tomorrowStrs.includes(f.matchDate));
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        filtered = filtered.filter((f) => f.matchDate <= getRelativeDateStr(2));
+        const minDate = todayStrs[0];
+        const maxDate = day2Strs[day2Strs.length - 1];
+        filtered = filtered.filter((f) => f.matchDate >= minDate && f.matchDate <= maxDate);
       } else if (dateFilter === 'THIS_WEEK') {
-        filtered = filtered.filter((f) => f.matchDate <= getRelativeDateStr(6));
+        const minDate = todayStrs[0];
+        const maxDate = day6Strs[day6Strs.length - 1];
+        filtered = filtered.filter((f) => f.matchDate >= minDate && f.matchDate <= maxDate);
       } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
         filtered = filtered.filter((f) => f.matchDate === dateFilter);
       }
@@ -613,17 +620,17 @@ export class FootballDB {
         query += ` AND match_date >= ? AND match_date <= ?`;
         params.push(startDate, endDate);
       } else if (dateFilter === 'TODAY') {
-        query += ` AND match_date = ?`;
-        params.push(todayStr);
+        query += ` AND match_date IN (${todayStrs.map(() => '?').join(',')})`;
+        params.push(...todayStrs);
       } else if (dateFilter === 'TOMORROW') {
-        query += ` AND match_date = ?`;
-        params.push(getRelativeDateStr(1));
+        query += ` AND match_date IN (${tomorrowStrs.map(() => '?').join(',')})`;
+        params.push(...tomorrowStrs);
       } else if (dateFilter === 'NEXT_3_DAYS') {
         query += ` AND match_date >= ? AND match_date <= ?`;
-        params.push(todayStr, getRelativeDateStr(2));
+        params.push(todayStrs[0], day2Strs[day2Strs.length - 1]);
       } else if (dateFilter === 'THIS_WEEK') {
         query += ` AND match_date >= ? AND match_date <= ?`;
-        params.push(todayStr, getRelativeDateStr(6));
+        params.push(todayStrs[0], day6Strs[day6Strs.length - 1]);
       } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
         query += ` AND match_date = ?`;
         params.push(dateFilter);

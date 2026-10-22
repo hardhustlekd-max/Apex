@@ -1,6 +1,6 @@
 {
-  "summary":  "Deep analysis of H2H and Standings loading issues, revealing API URL mismatch for standings and poor error handling for H2H data, and proposing a plan to fix these issues.",
-  "updatedAt":  "2026-10-20T15:11:56.514981073Z",
+  "summary":  "Deep heavy analysis and architectural enhancement plan for the Apex prediction engine (Poisson & Dixon-Coles model, CSF index, and dynamic multi-factor weighting).",
+  "updatedAt":  "2026-10-22T08:32:21.206629943Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

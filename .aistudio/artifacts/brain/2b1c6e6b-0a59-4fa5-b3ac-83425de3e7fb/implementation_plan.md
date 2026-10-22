@@ -1,37 +1,32 @@
-# Implementation Plan: Fix H2H and Standings Loading Issues
+# Implementation Plan: Deep Enhancement of the Apex Prediction Engine
 
-Root-cause analysis of why Head-to-Head (H2H) and Standings data are not loading correctly, and the proposed implementation plan.
+## 1. Deep Heavy Analysis of Current Prediction Engine (`src/core/poisson.ts`)
 
----
-
-## 1. Root Cause Analysis
-
-### Standings Data Loading Failure
-- **API Endpoint Mismatch**: The frontend component `src/components/LeagueStandings.tsx` is attempting to fetch standings from `/api/standings/${leagueCode}`. However, in `src/app.ts`, the `fixturesRouter` is mounted at `/api/fixtures`, and the route in `fixturesRouter.ts` is defined as `/standings/:league`. Therefore, the correct endpoint is `/api/fixtures/standings/:league`. The current frontend request is resulting in a 404 Not Found.
-- **League Mapping Deficiency**: The `flashscoreScraperService.getLeagueStandings` uses a hardcoded `urlMap`. Leagues not present in this map result in empty standings data, which the UI does not handle gracefully.
-
-### H2H Data Loading Failure (Perceived)
-- **UI State Handling**: While the API endpoint `/api/fixtures/:id/h2h` works, the frontend `MatchDetailModal.tsx` does not appear to handle cases where the API returns `h2h: null` or empty data, resulting in either a blank UI state or an unhelpful generic error.
-- **Data Availability**: For newer or minor leagues, H2H data might not be scraped yet. The current implementation relies on real-time scraping rather than robust fallback or clear UI feedback for missing data.
+### Current Architecture & Bottlenecks
+1. **Global League Baselines vs. League-Specific Dynamics**:
+   - Currently, `leagueHomeAvg` and `leagueAwayAvg` compute global averages across all historical matches without segmenting by specific league division (`m.div`), causing high-scoring leagues (e.g. Eredivisie) and low-scoring leagues (e.g. Ligue 1) to share similar baseline scoring expectations.
+2. **Static Home Advantage Factor**:
+   - `homeAdvantageFactor` is treated as a uniform multiplier (`1.12`), ignoring team-specific home/away scoring splits and league-specific venue dominance.
+3. **Hardcoded Blending Weights**:
+   - The final 1X2 distribution is rigidly blended (70% Dixon-Coles + 20% CSF + 10% Elo), which can dampen differentiation when models disagree or when match data is sparse.
+4. **Goal Matrix Truncation**:
+   - The probability matrix sums up to $MAX\_GOALS = 5$. For high-scoring matches, truncation can slightly skew tail probabilities.
 
 ---
 
-## 2. Proposed Fix Plan
+## 2. Proposed Robust Enhancements
 
-### Phase 1: Fix API Route for Standings
-- Update `src/components/LeagueStandings.tsx` to fetch from the correct path: `/api/fixtures/standings/${encodeURIComponent(cleanCode)}`.
+### Phase 1: League-Specific Baseline Scoring Calibration
+- Enhance `predictMatch` to calculate league-specific `leagueHomeAvg` and `leagueAwayAvg` filtered strictly by `leagueHistoricalMatches` (division/league matching) with fallback to global averages only if division data is insufficient.
 
-### Phase 2: Improve Standings Scraping Resilience
-- Update `getLeagueStandings` in `src/services/flashscoreScraperService.ts` to implement a fallback for leagues not in `urlMap`. The scraper will attempt to dynamically determine the standings URL path based on the league name if not explicitly mapped.
+### Phase 2: Dynamic Team Venue Splits & Venue Modifiers
+- Refine home advantage using team-specific home scoring/conceding ratios and away scoring/conceding ratios from recent form splits rather than a flat global constant.
 
-### Phase 3: Enhance H2H UI Resilience
-- Update `src/components/MatchDetailModal.tsx` to explicitly handle null/empty H2H data responses, providing a user-friendly "Head-to-Head data not available for this match" notification instead of a silent failure.
-
-### Phase 4: Full App Verification
-- Verify loading of both H2H and Standings data in the app.
-- Ensure linter and compiler pass with zero regressions.
+### Phase 3: Adaptive Blending & Variance Expansion
+- Introduce confidence-weighted blending in `ApexEngine.predictMatch`: scale blending weights based on data availability (e.g., higher weight to team-specific xG and form when 5+ recent matches exist, and higher weight to Elo/CSF when data is sparse).
+- Expand goal matrix calculation up to $MAX\_GOALS = 6$ for precision on high-scoring fixtures.
 
 ---
 
-## 3. User Review Request
-Please review this implementation plan and click **Proceed** to execute the fix.
+## 3. User Review
+Please review this deep analysis and enhancement plan. Click **Proceed** to apply the enhancements to the prediction engine.
