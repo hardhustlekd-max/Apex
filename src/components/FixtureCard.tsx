@@ -1,6 +1,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 import { Fixture } from '../core/types.js';
+import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
 
 interface FixtureCardProps {
   fixture: Fixture;
@@ -12,13 +13,9 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
   onSelectDetail,
 }) => {
   const pred = fixture.prediction;
-
-  const topPredictionLabel = pred
-    ? pred.homeWinProb >= pred.awayWinProb && pred.homeWinProb >= pred.drawProb
-      ? `${fixture.homeTeam} Win (${Math.round(pred.homeWinProb * 100)}%)`
-      : pred.awayWinProb >= pred.homeWinProb && pred.awayWinProb >= pred.drawProb
-      ? `${fixture.awayTeam} Win (${Math.round(pred.awayWinProb * 100)}%)`
-      : `Draw (${Math.round(pred.drawProb * 100)}%)`
+  const pick = pred ? getAuthoritative1X2Pick(fixture) : null;
+  const topPredictionLabel = pick
+    ? `${pick.label} (${pick.probabilityFormatted})`
     : null;
 
   return (
@@ -113,25 +110,25 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         {pred && (
           <div className="my-2.5 space-y-1">
             <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-              <span className="text-black font-bold">Home: {(pred.homeWinProb * 100).toFixed(0)}%</span>
-              <span className="text-slate-700 font-bold">Draw: {(pred.drawProb * 100).toFixed(0)}%</span>
-              <span className="text-black font-bold">Away: {(pred.awayWinProb * 100).toFixed(0)}%</span>
+              <span className="text-black font-bold">Home: {formatProb(pred.homeWinProb, 1)}</span>
+              <span className="text-slate-700 font-bold">Draw: {formatProb(pred.drawProb, 1)}</span>
+              <span className="text-black font-bold">Away: {formatProb(pred.awayWinProb, 1)}</span>
             </div>
             <div className="h-1.5 w-full bg-slate-200 rounded-full flex overflow-hidden">
               <div
                 style={{ width: `${pred.homeWinProb * 100}%` }}
                 className="bg-black transition-all duration-500"
-                title={`Home Win: ${(pred.homeWinProb * 100).toFixed(1)}%`}
+                title={`Home Win: ${formatProb(pred.homeWinProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.drawProb * 100}%` }}
                 className="bg-slate-400 transition-all duration-500"
-                title={`Draw: ${(pred.drawProb * 100).toFixed(1)}%`}
+                title={`Draw: ${formatProb(pred.drawProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.awayWinProb * 100}%` }}
                 className="bg-zinc-700 transition-all duration-500"
-                title={`Away Win: ${(pred.awayWinProb * 100).toFixed(1)}%`}
+                title={`Away Win: ${formatProb(pred.awayWinProb, 1)}`}
               />
             </div>
           </div>
@@ -144,9 +141,9 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0 whitespace-nowrap">Prediction:</span>
               <span className="font-semibold text-black truncate whitespace-nowrap">{topPredictionLabel}</span>
             </div>
-            {pred && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-2xs whitespace-nowrap" title={`Confidence: ${Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb) * 100)}%`}>
-                {Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb))}% Conf
+            {pick && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-2xs whitespace-nowrap" title={`Model Confidence: ${pick.probabilityFormatted}`}>
+                {pick.probabilityFormatted} Conf
               </span>
             )}
           </div>

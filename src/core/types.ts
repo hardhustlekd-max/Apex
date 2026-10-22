@@ -257,6 +257,8 @@ export interface Fixture {
   prediction?: PoissonPrediction;
   markets?: MarketOption[];
   bestValueMarket?: MarketOption;
+  mostLikelyOutcome?: MostLikelyOutcome;
+  profitableBet?: ProfitableBet;
   homeStats?: TeamStatsSummary;
   awayStats?: TeamStatsSummary;
   score?: { home: number; away: number };

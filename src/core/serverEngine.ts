@@ -82,7 +82,7 @@ export class ServerEngine {
       };
     }
 
-    const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
+    const { markets, bestValueMarket, mostLikelyOutcome, profitableBet } = ApexEngine.calculateMarkets(
       prediction,
       odds,
       settings,
@@ -108,6 +108,12 @@ export class ServerEngine {
         }
       : f.resultDetails;
 
+    const enrichedPrediction = {
+      ...prediction,
+      mostLikelyOutcome,
+      profitableBet,
+    };
+
     return {
       ...f,
       stage,
@@ -117,9 +123,11 @@ export class ServerEngine {
       statistics,
       resultDetails,
       odds,
-      prediction,
+      prediction: enrichedPrediction,
       markets,
       bestValueMarket,
+      mostLikelyOutcome,
+      profitableBet,
       homeStats,
       awayStats,
       measurements: prediction.measurements,

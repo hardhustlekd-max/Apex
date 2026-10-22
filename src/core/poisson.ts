@@ -631,8 +631,8 @@ export class ApexEngine {
   public static predictMatch(
     homeTeam: string,
     awayTeam: string,
-    leagueHistoricalMatches: HistoricalMatch[],
-    settings: EngineSettings,
+    leagueHistoricalMatches: HistoricalMatch[] = [],
+    settings?: EngineSettings,
     realScrapedH2H?: HeadToHeadMeasurement | null,
     allHistoricalMatches?: HistoricalMatch[],
     tacticalInput?: MatchTacticalContextInput,

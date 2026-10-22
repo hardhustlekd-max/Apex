@@ -1,6 +1,6 @@
 {
-  "summary":  "Deep heavy analysis and architectural enhancement plan for the Apex prediction engine (Poisson & Dixon-Coles model, CSF index, and dynamic multi-factor weighting).",
-  "updatedAt":  "2026-10-22T08:32:21.206629943Z",
+  "summary":  "Comprehensive architectural consistency redesign plan standardizing mathematical precision (1 decimal place everywhere), separating Highest Probability Picks from Value Bets (+EV), and establishing server-authoritative prediction state across all frontend and backend surfaces.",
+  "updatedAt":  "2026-10-22T11:24:30.072203428Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

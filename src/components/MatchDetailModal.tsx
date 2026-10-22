@@ -7,6 +7,13 @@ import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsPar
 import { EngineService } from '../services/engineService.js';
 import { LeagueStandings } from './LeagueStandings.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
+import {
+  formatProb,
+  getProbValue,
+  getAuthoritative1X2Pick,
+  getAuthoritativeValueBet,
+  formatEV,
+} from '../core/formatters.js';
 
 interface MatchDetailModalProps {
   fixture: Fixture | null;
@@ -19,8 +26,50 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
   fixture,
   onClose,
 }) => {
-  if (!fixture || !fixture.prediction) return null;
-  return <MatchDetailModalContent fixture={fixture} onClose={onClose} />;
+  if (!fixture) return null;
+
+  const safeFixture = useMemo(() => {
+    if (fixture.prediction) return fixture;
+    const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
+      fixture.homeTeam,
+      fixture.awayTeam,
+      []
+    );
+    const odds = fixture.odds || {
+      homeWin: prediction.homeWinProb > 0 ? Number((1 / prediction.homeWinProb).toFixed(2)) : 2.20,
+      draw: prediction.drawProb > 0 ? Number((1 / prediction.drawProb).toFixed(2)) : 3.30,
+      awayWin: prediction.awayWinProb > 0 ? Number((1 / prediction.awayWinProb).toFixed(2)) : 3.20,
+      over25: prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : 1.90,
+      under25: prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : 1.90,
+    };
+    const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
+      prediction,
+      odds,
+      {
+        activeProvider: 'FLASHSCORE',
+        rollingMatchWindow: 15,
+        minEVThreshold: 1.10,
+        safeWinThreshold: 0.72,
+        homeAdvantageFactor: 1.12,
+        formDecayRate: 0.85,
+        autoSyncDaily: true,
+      },
+      fixture.homeTeam,
+      fixture.awayTeam
+    );
+    return {
+      ...fixture,
+      odds,
+      prediction,
+      markets,
+      bestValueMarket,
+      homeStats,
+      awayStats,
+      measurements: prediction.measurements,
+    };
+  }, [fixture]);
+
+  return <MatchDetailModalContent fixture={safeFixture} onClose={onClose} />;
 };
 
 const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void }> = ({
@@ -190,21 +239,16 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
     return parsedStatsSummary.items.filter((item) => item.group === statFilterGroup);
   }, [parsedStatsSummary, statFilterGroup]);
 
-  // Probabilities converted to percentages
-  const homeWinPct = Math.round(pred.homeWinProb * 1000) / 10;
-  const drawPct = Math.round(pred.drawProb * 1000) / 10;
-  const awayWinPct = Math.round(pred.awayWinProb * 1000) / 10;
+  // Probabilities standardized with strictly 1 decimal place
+  const homeWinPct = getProbValue(pred.homeWinProb, 1);
+  const drawPct = getProbValue(pred.drawProb, 1);
+  const awayWinPct = getProbValue(pred.awayWinProb, 1);
 
   const topScores = pred.topCorrectScores?.slice(0, 5) || [];
 
-  // Best recommended prediction label
-  const topPredictionLabel = pred.homeWinProb >= pred.awayWinProb && pred.homeWinProb >= pred.drawProb
-    ? `${fixture.homeTeam} Win`
-    : pred.awayWinProb >= pred.homeWinProb && pred.awayWinProb >= pred.drawProb
-    ? `${fixture.awayTeam} Win`
-    : 'Draw';
-
-  const topPredictionProb = Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb);
+  // Authoritative Pick and Value Bet from unified engine
+  const authoritativePick = getAuthoritative1X2Pick(currentFixture);
+  const authoritativeValue = getAuthoritativeValueBet(currentFixture);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-150 font-sans">
@@ -478,36 +522,36 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                   </div>
                 </div>
 
-                {/* Projections List (Draw, Over under, BTTS, Top Pick) */}
+                {/* Projections List (Draw, Over under, BTTS, Model Pick, Value Bet) */}
                 <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 space-y-1.5 text-xs font-mono">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">Draw</span>
-                    <span className="font-bold text-amber-600 dark:text-amber-400">{drawPct}%</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-sans">Draw Probability</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400">{drawPct.toFixed(1)}%</span>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400 font-sans">Over 2.5 Goals</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{(pred.over25Prob * 100).toFixed(0)}%</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatProb(pred.over25Prob, 1)}</span>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">BTTS</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{(pred.bttsProb * 100).toFixed(0)}%</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-sans">BTTS (Both Teams Score)</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatProb(pred.bttsProb, 1)}</span>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">Most Likely</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-sans font-medium">Model Pick (Highest Prob)</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200 font-sans">
-                      {pred.mostLikelyOutcome?.selection || topPredictionLabel} ({Math.round((pred.mostLikelyOutcome?.probability || topPredictionProb) * 100)}%)
+                      {authoritativePick.label} ({authoritativePick.probabilityFormatted})
                     </span>
                   </div>
-                  {pred.profitableBet ? (
+                  {authoritativeValue.hasValue ? (
                     <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-500/20 shadow-xs flex items-center justify-between">
-                      <span className="text-emerald-700 dark:text-emerald-400 font-sans font-semibold">Value Bet</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-sans font-semibold">Value Bet (+EV)</span>
                       <span className="font-bold text-emerald-700 dark:text-emerald-400 font-sans">
-                        {pred.profitableBet.selection} (+{(pred.profitableBet.expectedValue * 100).toFixed(1)}% EV)
+                        {authoritativeValue.selection} ({authoritativeValue.evFormatted} @ {authoritativeValue.odds.toFixed(2)})
                       </span>
                     </div>
                   ) : (
                     <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Value Bet</span>
+                      <span className="text-slate-500 dark:text-slate-400 font-sans">Value Bet (+EV)</span>
                       <span className="font-medium text-slate-400 font-sans">
                         No Edge in Market
                       </span>

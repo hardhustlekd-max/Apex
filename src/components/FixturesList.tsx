@@ -9,6 +9,7 @@ import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
 import { FixturesFilterModal } from './FixturesFilterModal.js';
 import { EngineService } from '../services/engineService.js';
+import { ApexEngine } from '../core/poisson.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { getSlugForCode, getCodeForSlug, matchesLeague } from '../core/leagueMapper.js';
 
@@ -33,31 +34,22 @@ interface FixturesListProps {
   onSelectSortBy?: (s: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC') => void;
 }
 
+import { getAuthoritative1X2Pick, getProbValue } from '../core/formatters.js';
+
 function getTipProb(fixture: Fixture): number {
-  const p = fixture.prediction;
-  if (!p) return 45;
-  const h = p.homeWinProb ?? 0;
-  const d = p.drawProb ?? 0;
-  const a = p.awayWinProb ?? 0;
-  return Math.round(Math.max(h, d, a) * 100);
+  return getAuthoritative1X2Pick(fixture).probabilityPercent;
 }
 
 function getHomeProb(fixture: Fixture): number {
-  return fixture.prediction?.homeWinProb !== undefined
-    ? Math.round(fixture.prediction.homeWinProb * 100)
-    : 45;
+  return getProbValue(fixture.prediction?.homeWinProb, 1);
 }
 
 function getDrawProb(fixture: Fixture): number {
-  return fixture.prediction?.drawProb !== undefined
-    ? Math.round(fixture.prediction.drawProb * 100)
-    : 28;
+  return getProbValue(fixture.prediction?.drawProb, 1);
 }
 
 function getAwayProb(fixture: Fixture): number {
-  return fixture.prediction?.awayWinProb !== undefined
-    ? Math.round(fixture.prediction.awayWinProb * 100)
-    : 27;
+  return getProbValue(fixture.prediction?.awayWinProb, 1);
 }
 
 export const FixturesList: React.FC<FixturesListProps> = ({
@@ -112,7 +104,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     { key: 'TOMORROW', label: 'Tomorrow' },
     { key: 'NEXT_3_DAYS', label: 'Next 3 Days' },
     { key: 'THIS_WEEK', label: 'This Week' },
-    { key: 'ALL', label: 'All Dates' },
   ];
 
   const marketOptions = [
@@ -239,10 +230,15 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const filteredUpcomingFixtures = useMemo(() => {
-    const todayStrs = getPossibleDateStrs(0);
-    const tomorrowStrs = getPossibleDateStrs(1);
+    const todayStrs = Array.from(new Set([...getPossibleDateStrs(0), baseToday]));
+    const tomorrowStrs = Array.from(new Set([...getPossibleDateStrs(1), getOffsetDate(1)]));
     const day2Strs = getPossibleDateStrs(2);
     const day6Strs = getPossibleDateStrs(6);
+    const day2Str = getOffsetDate(2);
+    const day6Str = getOffsetDate(6);
+    const minToday = todayStrs.slice().sort()[0];
+    const maxNext3 = [day2Strs[day2Strs.length - 1], day2Str].sort().pop()!;
+    const maxWeek = [day6Strs[day6Strs.length - 1], day6Str].sort().pop()!;
 
     let matches = uniqueFixtures.filter((f) => {
       // Date filtering - resilient to UTC vs local timezone offsets
@@ -251,13 +247,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       } else if (dateFilter === 'TOMORROW') {
         if (!tomorrowStrs.includes(f.matchDate)) return false;
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        const minDate = todayStrs[0];
-        const maxDate = day2Strs[day2Strs.length - 1];
-        if (f.matchDate < minDate || f.matchDate > maxDate) return false;
+        if (f.matchDate < minToday || f.matchDate > maxNext3) return false;
       } else if (dateFilter === 'THIS_WEEK') {
-        const minDate = todayStrs[0];
-        const maxDate = day6Strs[day6Strs.length - 1];
-        if (f.matchDate < minDate || f.matchDate > maxDate) return false;
+        if (f.matchDate < minToday || f.matchDate > maxWeek) return false;
       }
 
       // League filter
@@ -320,18 +312,49 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         };
       }
+      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(s.homeTeam, s.awayTeam, []);
+      const odds = {
+        homeWin: prediction.homeWinProb > 0 ? Number((1 / prediction.homeWinProb).toFixed(2)) : 2.20,
+        draw: prediction.drawProb > 0 ? Number((1 / prediction.drawProb).toFixed(2)) : 3.30,
+        awayWin: prediction.awayWinProb > 0 ? Number((1 / prediction.awayWinProb).toFixed(2)) : 3.20,
+        over25: prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : 1.90,
+        under25: prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : 1.90,
+      };
+      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
+        prediction,
+        odds,
+        {
+          activeProvider: 'FLASHSCORE',
+          rollingMatchWindow: 15,
+          minEVThreshold: 1.10,
+          safeWinThreshold: 0.72,
+          homeAdvantageFactor: 1.12,
+          formDecayRate: 0.85,
+          autoSyncDaily: true,
+        },
+        s.homeTeam,
+        s.awayTeam
+      );
+
       return {
         id: s.fixtureId,
         providerId: 'FLASHSCORE',
         league: s.league || 'ALL',
         leagueName: s.leagueName || 'Live In-Play',
         matchDate: baseToday,
-        kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+        kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         homeTeam: s.homeTeam,
         awayTeam: s.awayTeam,
         status: 'LIVE' as const,
         minute: s.minute,
         score: { home: s.homeScore, away: s.awayScore },
+        odds,
+        prediction,
+        markets,
+        bestValueMarket,
+        homeStats,
+        awayStats,
+        measurements: prediction.measurements,
       };
     });
 
@@ -408,19 +431,43 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     return applySort(filteredUpcomingFixtures);
   }, [activeScope, filteredUpcomingFixtures, liveFixtures, historyFixtures, selectedLeague, searchQuery, sortBy]);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedLeague !== 'ALL') count++;
+    if (dateFilter !== 'TODAY') count++;
+    if (searchQuery.trim().length > 0) count++;
+    if (marketChoiceFilter !== 'BEST_VALUE') count++;
+    if (sortBy && sortBy !== 'DEFAULT') count++;
+    return count;
+  }, [selectedLeague, dateFilter, searchQuery, marketChoiceFilter, sortBy]);
+
+  const handleResetAllFilters = () => {
+    onSelectLeague('ALL');
+    setDateFilter('TODAY');
+    setMarketChoiceFilter('BEST_VALUE');
+    setSearchQuery('');
+    onSelectSortBy?.('DEFAULT');
+  };
+
+  const selectedLeagueObj = leagueOptions.find((l) => l.code === selectedLeague);
+  const selectedLeagueLabel = selectedLeagueObj ? selectedLeagueObj.name : selectedLeague;
+  const dateOptionObj = dateOptions.find((d) => d.key === dateFilter);
+  const marketOptionObj = marketOptions.find((m) => m.key === marketChoiceFilter);
+  const sortOptionObj = sortOptions.find((s) => s.key === sortBy);
+
   return (
-    <div className="space-y-1.5 font-sans flex-1 flex flex-col">
+    <div className="space-y-2 font-sans flex-1 flex flex-col">
       {/* Scope Sub-Tabs: Upcoming, Live, History placed above match list */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg shadow-inner shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-0.5">
+        <div className="flex items-center bg-zinc-100 dark:bg-slate-800/80 p-0.5 rounded-lg shadow-inner shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-0.5">
           <button
             id="subtab-upcoming-btn"
             type="button"
             onClick={() => setActiveScope('UPCOMING')}
             className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'UPCOMING'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
+                ? 'bg-white dark:bg-slate-900 text-black dark:text-white shadow-xs'
+                : 'text-zinc-600 dark:text-slate-400 hover:text-black dark:hover:text-white'
             }`}
           >
             Upcoming
@@ -432,12 +479,17 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             onClick={() => setActiveScope('LIVE')}
             className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1 ${
               activeScope === 'LIVE'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
+                ? 'bg-white dark:bg-slate-900 text-black dark:text-white shadow-xs'
+                : 'text-zinc-600 dark:text-slate-400 hover:text-black dark:hover:text-white'
             }`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">Live</span>
+            {liveScores && liveScores.length > 0 && (
+              <span className="ml-0.5 px-1 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-black">
+                {liveScores.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -446,8 +498,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             onClick={() => setActiveScope('HISTORY')}
             className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'HISTORY'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
+                ? 'bg-white dark:bg-slate-900 text-black dark:text-white shadow-xs'
+                : 'text-zinc-600 dark:text-slate-400 hover:text-black dark:hover:text-white'
             }`}
           >
             History
@@ -459,18 +511,20 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer shadow-xs ${
-              sortBy && sortBy !== 'DEFAULT'
-                ? 'bg-zinc-50 text-zinc-700 border border-zinc-300'
-                : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer shadow-xs ${
+              activeFilterCount > 0
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 ring-2 ring-slate-400/30'
+                : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-slate-800 dark:text-slate-200'
             }`}
           >
-            <Filter className="w-3 h-3 text-zinc-500" />
+            <Filter className="w-3 h-3 text-current" />
             <span>Filters</span>
-            {sortBy && sortBy !== 'DEFAULT' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" title="Percentage sort active" />
+            {activeFilterCount > 0 && (
+              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">
+                {activeFilterCount}
+              </span>
             )}
-            <ChevronDown className="w-3 h-3 text-zinc-400" />
+            <ChevronDown className="w-3 h-3 opacity-70" />
           </button>
         </div>
 
@@ -490,6 +544,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           sortBy={sortBy}
           onSelectSortBy={onSelectSortBy}
           setIsLeagueModalOpen={setIsLeagueModalOpen}
+          onResetFilters={handleResetAllFilters}
+          activeFilterCount={activeFilterCount}
           leagueOptions={leagueOptions}
           dateOptions={dateOptions}
           marketOptions={marketOptions}
@@ -497,34 +553,136 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         />
       </div>
 
+      {/* Active Filter Chips Strip */}
+      {activeFilterCount > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap py-1.5 px-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200/80 dark:border-slate-800 text-[11px]">
+          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider shrink-0">
+            Filters:
+          </span>
+
+          {selectedLeague !== 'ALL' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span className="text-slate-400">League:</span>
+              <span className="truncate max-w-[120px]">{selectedLeagueLabel}</span>
+              <button
+                type="button"
+                onClick={() => onSelectLeague('ALL')}
+                className="hover:text-rose-500 cursor-pointer p-0.5"
+                title="Remove league filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {dateFilter !== 'TODAY' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span className="text-slate-400">Date:</span>
+              <span>{dateOptionObj?.label || dateFilter}</span>
+              <button
+                type="button"
+                onClick={() => setDateFilter('TODAY')}
+                className="hover:text-rose-500 cursor-pointer p-0.5"
+                title="Reset date filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {marketChoiceFilter !== 'BEST_VALUE' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span className="text-slate-400">Market:</span>
+              <span>{marketOptionObj?.label || marketChoiceFilter}</span>
+              <button
+                type="button"
+                onClick={() => setMarketChoiceFilter('BEST_VALUE')}
+                className="hover:text-rose-500 cursor-pointer p-0.5"
+                title="Reset to Best Value"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {searchQuery.trim().length > 0 && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span className="text-slate-400">Search:</span>
+              <span className="truncate max-w-[100px]">"{searchQuery}"</span>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="hover:text-rose-500 cursor-pointer p-0.5"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {sortBy && sortBy !== 'DEFAULT' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span className="text-slate-400">Sort:</span>
+              <span>{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
+              <button
+                type="button"
+                onClick={() => onSelectSortBy?.('DEFAULT')}
+                className="hover:text-rose-500 cursor-pointer p-0.5"
+                title="Reset sort"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={handleResetAllFilters}
+            className="ml-auto text-xs font-bold text-rose-500 hover:text-rose-600 hover:underline px-2 py-0.5 cursor-pointer"
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
       {/* Match List Display (Wireframe or Cards) */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-xs">
+        <div className="bg-white dark:bg-[#0B0F17] rounded-xl sm:rounded-2xl p-8 sm:p-12 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-xs border border-slate-200/80 dark:border-slate-800">
           <div className="w-8 h-8 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin shrink-0 mx-auto" />
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-white rounded-xl sm:rounded-2xl p-8 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-sm space-y-3">
-          <p className="text-sm font-bold text-zinc-700">
+        <div className="bg-white dark:bg-[#0B0F17] rounded-xl sm:rounded-2xl p-8 flex-1 min-h-[360px] flex flex-col items-center justify-center text-center shadow-xs space-y-3 border border-slate-200/80 dark:border-slate-800">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
             {activeScope === 'UPCOMING'
               ? 'No upcoming fixtures found matching your criteria.'
               : activeScope === 'LIVE'
               ? 'No live matches currently in play.'
               : 'No historical matches found matching your criteria.'}
           </p>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            {activeScope === 'UPCOMING'
-              ? 'Try choosing All Dates or resetting your search filters.'
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            {activeFilterCount > 0
+              ? 'Some active filters or search terms may be narrowing down the results.'
+              : activeScope === 'UPCOMING'
+              ? 'Try choosing This Week or resetting your search filters.'
               : 'Try selecting a different league or clearing search.'}
           </p>
-          {activeScope === 'UPCOMING' && dateFilter !== 'ALL' && (
+          {activeFilterCount > 0 ? (
             <button
               type="button"
-              onClick={() => setDateFilter('ALL')}
-              className="mt-1 px-4 py-2 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-colors cursor-pointer shadow-xs"
+              onClick={handleResetAllFilters}
+              className="mt-1 px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
             >
-              Show All Dates
+              Reset All Filters ({activeFilterCount})
             </button>
-          )}
+          ) : activeScope === 'UPCOMING' && dateFilter !== 'THIS_WEEK' ? (
+            <button
+              type="button"
+              onClick={() => setDateFilter('THIS_WEEK')}
+              className="mt-1 px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
+            >
+              Show This Week
+            </button>
+          ) : null}
         </div>
       ) : (
         <SimplifiedPredictionsWireframe

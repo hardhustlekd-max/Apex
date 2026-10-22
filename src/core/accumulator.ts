@@ -5,7 +5,7 @@ import {
   EngineSettings,
   MarketOption,
 } from './types.js';
-import { getRelativeDateStr } from './dateUtils.js';
+import { getRelativeDateStr, getUtcDateStr } from './dateUtils.js';
 
 export interface AccaGenerationParams {
   strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';
@@ -129,7 +129,9 @@ export class AccumulatorGenerator {
     const dateFilter = params.dateFilter || 'TODAY';
 
     const todayStr = getRelativeDateStr(0);
+    const utcTodayStr = getUtcDateStr(0);
     const tomorrowStr = getRelativeDateStr(1);
+    const utcTomorrowStr = getUtcDateStr(1);
     const next3DaysStr = getRelativeDateStr(2);
     const thisWeekStr = getRelativeDateStr(6);
 
@@ -139,13 +141,15 @@ export class AccumulatorGenerator {
     // Filter candidate fixtures according to the specified date filter
     let candidateFixtures = unstartedFixtures.filter((f) => {
       if (dateFilter === 'TODAY') {
-        return f.matchDate === todayStr;
+        return f.matchDate === todayStr || f.matchDate === utcTodayStr;
       } else if (dateFilter === 'TOMORROW') {
-        return f.matchDate === tomorrowStr;
+        return f.matchDate === tomorrowStr || f.matchDate === utcTomorrowStr;
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        return f.matchDate >= todayStr && f.matchDate <= next3DaysStr;
+        const minDate = todayStr < utcTodayStr ? todayStr : utcTodayStr;
+        return f.matchDate >= minDate && f.matchDate <= next3DaysStr;
       } else if (dateFilter === 'THIS_WEEK') {
-        return f.matchDate >= todayStr && f.matchDate <= thisWeekStr;
+        const minDate = todayStr < utcTodayStr ? todayStr : utcTodayStr;
+        return f.matchDate >= minDate && f.matchDate <= thisWeekStr;
       } else if (dateFilter === 'CUSTOM') {
         if (params.customStartDate && f.matchDate < params.customStartDate) return false;
         if (params.customEndDate && f.matchDate > params.customEndDate) return false;
