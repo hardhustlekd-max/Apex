@@ -527,7 +527,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             </button>
           )}
         </div>
-      ) : viewMode === 'WIREFRAME' ? (
+      ) : (
         <SimplifiedPredictionsWireframe
           fixtures={displayedFixtures}
           onSelectDetail={onSelectDetail}
@@ -535,62 +535,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           sortBy={sortBy}
           onSelectSortBy={onSelectSortBy}
         />
-      ) : (
-        <div className="space-y-4">
-          {(() => {
-            interface LeagueGroup {
-              leagueName: string;
-              subDivision?: string;
-              headerKey: string;
-              fixtures: Fixture[];
-            }
-            const groupMap = new Map<string, LeagueGroup>();
-            for (const f of displayedFixtures) {
-              const baseLeague = f.leagueName || 'Premier League';
-              const subDivision = f.stage && f.stage.trim() !== '' && f.stage.trim().toLowerCase() !== baseLeague.trim().toLowerCase()
-                ? f.stage.trim()
-                : undefined;
-              const headerKey = subDivision ? `${baseLeague} • ${subDivision}` : baseLeague;
-              if (!groupMap.has(headerKey)) {
-                groupMap.set(headerKey, {
-                  leagueName: baseLeague,
-                  subDivision,
-                  headerKey,
-                  fixtures: [],
-                });
-              }
-              groupMap.get(headerKey)!.fixtures.push(f);
-            }
-
-            const groups = Array.from(groupMap.values());
-            groups.sort((ga, gb) => {
-              const pa = getLeaguePriority(ga.fixtures[0]?.league, ga.fixtures[0]?.leagueName, ga.fixtures[0]?.stage);
-              const pb = getLeaguePriority(gb.fixtures[0]?.league, gb.fixtures[0]?.leagueName, gb.fixtures[0]?.stage);
-              if (pa !== pb) return pa - pb;
-              return ga.headerKey.localeCompare(gb.headerKey);
-            });
-
-            return groups.map((group) => (
-              <div key={group.headerKey} className="space-y-3.5">
-                <div className="flex items-center gap-2 px-1 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
-                  <span className="text-xs font-extrabold tracking-tight text-black truncate whitespace-nowrap">
-                    {group.subDivision || group.leagueName}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {group.fixtures.map((fixture) => (
-                    <FixtureCard
-                      key={fixture.id}
-                      fixture={fixture}
-                      onSelectDetail={onSelectDetail}
-                    />
-                  ))}
-                </div>
-              </div>
-            ));
-          })()}
-        </div>
       )}
 
       <LeagueSelectorModal
