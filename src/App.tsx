@@ -16,6 +16,7 @@ import {
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
+import { getRelativeDateStr } from './core/dateUtils.js';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -108,6 +109,11 @@ export default function App() {
       setIsLoadingFixtures(true);
       const data = await EngineService.getFixtures('ALL');
       setFixtures(data);
+      const todayStr = getRelativeDateStr(0);
+      const hasTodayMatches = data.some(f => f.matchDate === todayStr && f.status !== 'LIVE');
+      if (!hasTodayMatches) {
+        setDateFilter('TOMORROW');
+      }
     } catch (e: any) {
       console.error('Failed to fetch fixtures:', e);
       showNotification('Server Error: ' + (e?.message || 'Failed to fetch fixtures from server'), 'info');
@@ -144,7 +150,7 @@ export default function App() {
 
   useEffect(() => {
     fetchSettingsAndProviders();
-    fetchFixtures('ALL');
+    fetchFixtures();
     fetchLiveScores();
 
     const interval = setInterval(fetchLiveScores, 15000);
