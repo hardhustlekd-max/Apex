@@ -30,9 +30,7 @@ export class PredictionsDB {
     if (this.isInitialized) return;
     
     if (this.useTurso) {
-        console.log('[PredictionsDB] Using Turso for predictions database.');
-        this.isInitialized = true;
-        return;
+        console.log('[PredictionsDB] Using Turso for predictions database, initializing local SQLite cache as well.');
     }
 
     const { localDir, localFile, tmpFile } = getPredictionsDbPaths();

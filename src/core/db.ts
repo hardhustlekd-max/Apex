@@ -37,9 +37,7 @@ export class FootballDB {
     if (this.isInitialized) return;
     
     if (this.useTurso) {
-        console.log('[FootballDB] Using Turso for database.');
-        this.isInitialized = true;
-        return;
+        console.log('[FootballDB] Using Turso for database, initializing local SQLite cache as well.');
     }
 
     this.fallbackHistoricalMatches = [];
