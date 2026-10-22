@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PullToRefresh from 'react-simple-pull-to-refresh';
 import { Header } from './components/Header.js';
 import { MainTabBar } from './components/MainTabBar.js';
 import { FixturesList } from './components/FixturesList.js';
@@ -192,6 +193,14 @@ export default function App() {
     }
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([
+      fetchSettingsAndProviders(),
+      fetchFixtures('ALL'),
+      fetchLiveScores()
+    ]);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 text-black flex flex-col font-sans">
       {/* Toast Notification */}
@@ -223,7 +232,8 @@ export default function App() {
       />
 
       {/* Main Content Dashboard */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 flex flex-col pb-8">
+      <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
+        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 flex flex-col pb-8">
         {activeTab === 'FIXTURES' && (
           <FixturesList
             fixtures={fixtures}
@@ -262,6 +272,7 @@ export default function App() {
           />
         )}
       </main>
+      </PullToRefresh>
 
       {/* Match Detail Modal (Poisson Heatmap & Radar) */}
       {selectedDetailFixture && (

@@ -7,6 +7,7 @@ import { getRelativeDateStr } from '../core/dateUtils.js';
 import { FixtureCard } from './FixtureCard.js';
 import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe.js';
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
+import { FixturesFilterModal } from './FixturesFilterModal.js';
 import { EngineService } from '../services/engineService.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { getSlugForCode, getCodeForSlug, matchesLeague } from '../core/leagueMapper.js';
@@ -475,148 +476,26 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         </div>
 
         {/* Filter Modal */}
-        {isFilterOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
-            <div
-              ref={filterDropdownRef}
-              className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 font-sans animate-in zoom-in-95 duration-100"
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    <Filter className="w-4 h-4" />
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 dark:text-white">Match Filters</span>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setIsFilterOpen(false)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="w-full relative min-w-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
-                    League Filter
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => { setIsLeagueModalOpen(true); setIsFilterOpen(false); }}
-                    className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
-                  >
-                    Browse All Leagues...
-                  </button>
-                </div>
-                <select
-                  value={selectedLeague}
-                  onChange={(e) => onSelectLeague(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none shadow-xs cursor-pointer"
-                >
-                  {leagueOptions.map((opt, idx) => (
-                    <option key={`${opt.code}-${idx}`} value={opt.code} className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white">
-                      {opt.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="relative min-w-0">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
-                    Date Range
-                  </label>
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value as any)}
-                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none shadow-xs cursor-pointer"
-                  >
-                    {dateOptions.map((opt) => (
-                      <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {viewMode === 'WIREFRAME' && (
-                  <div className="relative min-w-0">
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
-                      Market
-                    </label>
-                    <select
-                      value={marketChoiceFilter}
-                      onChange={(e) => setMarketChoiceFilter(e.target.value as any)}
-                      className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none shadow-xs cursor-pointer"
-                    >
-                      {marketOptions.map((opt) => (
-                        <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white">
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative min-w-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Sort by Percentage
-                  </label>
-                  {sortBy && sortBy !== 'DEFAULT' && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectSortBy?.('DEFAULT')}
-                      className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
-                    >
-                      Reset Sort
-                    </button>
-                  )}
-                </div>
-                <select
-                  id="sort-predictions-by-percentage"
-                  value={sortBy || 'DEFAULT'}
-                  onChange={(e) => onSelectSortBy?.(e.target.value as any)}
-                  className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none shadow-xs cursor-pointer"
-                >
-                  {sortOptions.map((opt) => (
-                    <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white">
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Search Team</label>
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Find team..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none shadow-xs font-medium"
-                  />
-                </div>
-              </div>
-
-               <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsFilterOpen(false)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Filter className="w-3.5 h-3.5" />
-                  <span>Apply Filter</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <FixturesFilterModal
+          isOpen={isFilterOpen}
+          onClose={() => setIsFilterOpen(false)}
+          selectedLeague={selectedLeague}
+          onSelectLeague={onSelectLeague}
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          marketChoiceFilter={marketChoiceFilter}
+          setMarketChoiceFilter={setMarketChoiceFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          viewMode={viewMode}
+          sortBy={sortBy}
+          onSelectSortBy={onSelectSortBy}
+          setIsLeagueModalOpen={setIsLeagueModalOpen}
+          leagueOptions={leagueOptions}
+          dateOptions={dateOptions}
+          marketOptions={marketOptions}
+          sortOptions={sortOptions}
+        />
       </div>
 
       {/* Match List Display (Wireframe or Cards) */}
