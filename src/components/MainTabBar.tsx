@@ -3,8 +3,8 @@ import { Filter, ChevronDown, Search } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 
 interface MainTabBarProps {
-  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'TIPS';
-  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'TIPS') => void;
+  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'TIPS' | 'HISTORY';
+  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'TIPS' | 'HISTORY') => void;
 }
 
 export const MainTabBar: React.FC<MainTabBarProps> = ({
@@ -53,6 +53,19 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
             }`}
           >
             Standings
+          </button>
+          
+          <button
+            id="tab-history-btn"
+            type="button"
+            onClick={() => onSelectTab('HISTORY')}
+            className={`px-3 py-1 rounded-lg sm:rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'HISTORY'
+                ? 'bg-white text-black shadow-xs'
+                : 'text-zinc-600 hover:text-black'
+            }`}
+          >
+            History
           </button>
         </div>
       </div>

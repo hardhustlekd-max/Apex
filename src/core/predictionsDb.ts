@@ -242,9 +242,21 @@ export class PredictionsDB {
           await predictionsTurso.execute({
             sql: `INSERT OR REPLACE INTO upcoming_predictions (
               fixture_id, league, league_name, match_date, kick_off_time,
-              home_team, away_team, status, predicted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Unknown', f.matchDate, f.kickOffTime || 'TBD', f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString()]
+              home_team, away_team, status, predicted_at,
+              b365_h, b365_d, b365_a, home_xg, away_xg,
+              home_win_prob, draw_prob, away_win_prob,
+              over15_prob, over25_prob, over35_prob, btts_prob,
+              tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+              full_fixture_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              f.id, f.league || 'ALL', f.leagueName || f.league || 'Unknown', f.matchDate, f.kickOffTime || 'TBD', f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString(),
+              f.odds.homeWin || 2.0, f.odds.draw || 3.0, f.odds.awayWin || 3.5, f.prediction?.homeXG ?? 1.35, f.prediction?.awayXG ?? 1.10,
+              f.prediction?.homeWinProb ?? 0.45, f.prediction?.drawProb ?? 0.28, f.prediction?.awayWinProb ?? 0.27,
+              f.prediction?.over15Prob ?? 0.75, f.prediction?.over25Prob ?? 0.50, f.prediction?.over35Prob ?? 0.28, f.prediction?.bttsProb ?? 0.52,
+              f.bestValueMarket?.key || 'HOME_WIN', f.bestValueMarket?.name || 'Home Win', f.bestValueMarket?.odds || f.odds.homeWin || 2.0, f.bestValueMarket?.probability || f.prediction?.homeWinProb || 0.45, f.bestValueMarket?.expectedValue || 0,
+              JSON.stringify(f)
+            ]
           });
         }
         console.log(`[PredictionsDB] Saved ${fixtures.length} predictions to Turso.`);
@@ -544,9 +556,21 @@ export class PredictionsDB {
           await predictionsTurso.execute({
             sql: `INSERT OR REPLACE INTO live_predictions (
               fixture_id, league, league_name, match_date, kick_off_time,
-              home_team, away_team, status, predicted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Live', f.matchDate, f.kickOffTime || 'LIVE', f.homeTeam, f.awayTeam, 'LIVE', new Date().toISOString()]
+              home_team, away_team, status, predicted_at,
+              b365_h, b365_d, b365_a, home_xg, away_xg,
+              home_win_prob, draw_prob, away_win_prob,
+              over15_prob, over25_prob, over35_prob, btts_prob,
+              tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+              full_fixture_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              f.id, f.league || 'ALL', f.leagueName || f.league || 'Live', f.matchDate, f.kickOffTime || 'LIVE', f.homeTeam, f.awayTeam, 'LIVE', new Date().toISOString(),
+              f.odds.homeWin || 2.0, f.odds.draw || 3.0, f.odds.awayWin || 3.5, f.prediction?.homeXG ?? 1.35, f.prediction?.awayXG ?? 1.10,
+              f.prediction?.homeWinProb ?? 0.45, f.prediction?.drawProb ?? 0.28, f.prediction?.awayWinProb ?? 0.27,
+              f.prediction?.over15Prob ?? 0.75, f.prediction?.over25Prob ?? 0.50, f.prediction?.over35Prob ?? 0.28, f.prediction?.bttsProb ?? 0.52,
+              f.bestValueMarket?.key || 'HOME_WIN', f.bestValueMarket?.name || 'Home Win', f.bestValueMarket?.odds || f.odds.homeWin || 2.0, f.bestValueMarket?.probability || f.prediction?.homeWinProb || 0.45, f.bestValueMarket?.expectedValue || 0,
+              JSON.stringify(f)
+            ]
           });
         }
         console.log(`[PredictionsDB] Saved ${fixtures.length} live predictions to Turso.`);

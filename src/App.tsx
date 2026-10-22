@@ -5,6 +5,7 @@ import { MainTabBar } from './components/MainTabBar.js';
 import { FixturesList } from './components/FixturesList.js';
 import { PrebuiltAccumulators } from './components/PrebuiltAccumulators.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
+import { PredictionHistoryView } from './components/PredictionHistoryView.js';
 import { MatchDetailModal } from './components/MatchDetailModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
@@ -22,7 +23,7 @@ export default function App() {
     if (saved === 'dark' || saved === 'light') return saved;
     return 'light';
   });
-  const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS'>('FIXTURES');
+  const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY'>('FIXTURES');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoadingFixtures, setIsLoadingFixtures] = useState<boolean>(true);
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
@@ -270,6 +271,9 @@ export default function App() {
             selectedLeague={selectedLeague}
             onSelectLeague={setSelectedLeague}
           />
+        )}
+        {activeTab === 'HISTORY' && (
+          <PredictionHistoryView />
         )}
       </main>
       </PullToRefresh>

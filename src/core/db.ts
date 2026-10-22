@@ -935,13 +935,15 @@ export class FootballDB {
     if (this.useTurso && footballTurso) {
       try {
         for (const f of unique) {
-          await footballTurso.execute({
-            sql: `INSERT OR REPLACE INTO upcoming_fixtures (
-              id, provider_id, league, league_name, match_date, kick_off_time,
-              home_team, away_team, status, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [f.id, f.providerId || 'FLASHSCORE', String(f.league), f.leagueName, f.matchDate, f.kickOffTime, f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString()]
-          });
+            const args = [f.id, f.providerId || 'FLASHSCORE', String(f.league), f.leagueName, f.matchDate, f.kickOffTime, f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString(), f.odds.homeWin || 2.0, f.odds.draw || 3.0, f.odds.awayWin || 3.5];
+            await footballTurso.execute({
+              sql: `INSERT OR REPLACE INTO upcoming_fixtures (
+                id, provider_id, league, league_name, match_date, kick_off_time,
+                home_team, away_team, status, updated_at,
+                b365_h, b365_d, b365_a
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args
+            });
         }
         console.log(`[FootballDB] Saved ${unique.length} fixtures to Turso.`);
       } catch (err: any) {

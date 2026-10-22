@@ -354,6 +354,12 @@ export class FlashscoreScraperService {
    * Scrapes completed match results from Flashscore to populate historical database
    */
   async syncHistoricalData(daysBack = 7): Promise<{ success: boolean; matchesCount: number; message: string }> {
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'SCRAPER',
+      source: 'FlashscoreScraperService',
+      message: `Starting syncHistoricalData with daysBack: ${daysBack}`,
+    });
     // Clear existing data and local caches before refilling
     db.clearDatabase();
     this.clearCaches();
@@ -371,9 +377,21 @@ export class FlashscoreScraperService {
     for (const offset of historyDayOffsets) {
       const feedPath = `f_1_${offset}_3_en_1`;
       const feedText = await this.fetchAndPersistRawFeed(feedPath);
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Fetched raw feed for offset ${offset}: ${feedText ? 'Success' : 'Failed'}`,
+      });
       if (!feedText) continue;
 
       const rawMatches = parseFeedText(feedText);
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Parsed ${rawMatches.length} matches for offset ${offset}`,
+      });
       const finished = rawMatches.filter((m) => m.statusCode === '3' && m.homeScore !== undefined && m.awayScore !== undefined);
 
       for (const m of finished) {
@@ -496,7 +514,13 @@ export class FlashscoreScraperService {
             }
           }
         }
-      } catch {
+      } catch (err) {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'SCRAPER',
+          source: 'FlashscoreScraperService',
+          message: `Failed tournament scraping for ${t.path}: ${err}`,
+        });
         // continue to next tournament
       }
     }
