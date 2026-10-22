@@ -10,6 +10,7 @@ import { ApexEngine } from './poisson.js';
 
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
+import { matchesLeague } from './leagueMapper.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -54,7 +55,10 @@ export class ServerEngine {
     tacticalInput?: any,
     scrapedMap?: Map<string, any>
   ): Fixture {
-    const leagueMatches = allMatches.filter((m) => m.div.toUpperCase() === (f.league || '').toUpperCase());
+    const leagueMatches = allMatches.filter((m) =>
+      matchesLeague(m.div, (m as any).leagueName, f.league) ||
+      matchesLeague(m.div, (m as any).leagueName, f.leagueName)
+    );
     const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
 
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
