@@ -14,10 +14,13 @@ function getDbPaths() {
   return { localDir, localFile, tmpDir, tmpFile };
 }
 
+import { footballTurso } from './tursoClient.js';
+
 export class FootballDB {
   private db: Database | null = null;
   private SQL: any = null;
   private isInitialized = false;
+  private useTurso = !!process.env.FOOTBALL_TURSO_URL;
   private fallbackHistoricalMatches: HistoricalMatch[] = [];
   private fallbackUpcomingFixtures: Fixture[] = [];
   private fallbackSettings: EngineSettings = {
@@ -31,7 +34,13 @@ export class FootballDB {
   };
 
   async init(): Promise<void> {
-    if (this.isInitialized && this.db) return;
+    if (this.isInitialized) return;
+    
+    if (this.useTurso) {
+        console.log('[FootballDB] Using Turso for database.');
+        this.isInitialized = true;
+        return;
+    }
 
     this.fallbackHistoricalMatches = [];
     this.fallbackUpcomingFixtures = [];
@@ -912,7 +921,7 @@ export class FootballDB {
     }
   }
 
-  saveUpcomingFixtures(fixtures: Fixture[]): void {
+  async saveUpcomingFixtures(fixtures: Fixture[]): Promise<void> {
     const seen = new Set<string>();
     const unique = fixtures.filter((f) => {
       if (!f.id || seen.has(f.id)) return false;
@@ -921,7 +930,27 @@ export class FootballDB {
     });
 
     this.fallbackUpcomingFixtures = unique;
-    if (!this.db || unique.length === 0) return;
+    if (unique.length === 0) return;
+
+    if (this.useTurso && footballTurso) {
+      try {
+        for (const f of unique) {
+          await footballTurso.execute({
+            sql: `INSERT OR REPLACE INTO upcoming_fixtures (
+              id, provider_id, league, league_name, match_date, kick_off_time,
+              home_team, away_team, status, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [f.id, f.providerId || 'FLASHSCORE', String(f.league), f.leagueName, f.matchDate, f.kickOffTime, f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString()]
+          });
+        }
+        console.log(`[FootballDB] Saved ${unique.length} fixtures to Turso.`);
+      } catch (err: any) {
+        console.error('[FootballDB] Failed saving to Turso:', err);
+      }
+      return;
+    }
+
+    if (!this.db) return;
     try {
       const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO upcoming_fixtures (

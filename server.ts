@@ -9,6 +9,9 @@ async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Initialize SQLite databases and keep persistent in memory
+  if (!process.env.TURSO_DATABASE_URL) {
+    console.warn('TURSO_DATABASE_URL not set, using local SQLite.');
+  }
   await db.init();
   try {
     await predictionsDb.init();

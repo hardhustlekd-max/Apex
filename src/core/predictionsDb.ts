@@ -6,6 +6,8 @@ import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
 import { getRelativeDateStr } from './dateUtils.js';
 import { getSlugForCode, getCodeForSlug, getLeagueAliases, matchesLeague } from './leagueMapper.js';
+import { predictionsTurso } from './tursoClient.js';
+
 
 function getPredictionsDbPaths() {
   const localDir = path.resolve(process.cwd(), 'data');
@@ -19,12 +21,19 @@ export class PredictionsDB {
   private db: Database | null = null;
   private SQL: any = null;
   private isInitialized = false;
+  private useTurso = !!process.env.PREDICTIONS_TURSO_URL;
   private memoryFallback: Map<string, Fixture> = new Map();
   private liveMemoryFallback: Map<string, Fixture> = new Map();
   private historyMemoryFallback: Map<string, Fixture> = new Map();
 
   async init(): Promise<void> {
-    if (this.isInitialized && this.db) return;
+    if (this.isInitialized) return;
+    
+    if (this.useTurso) {
+        console.log('[PredictionsDB] Using Turso for predictions database.');
+        this.isInitialized = true;
+        return;
+    }
 
     const { localDir, localFile, tmpFile } = getPredictionsDbPaths();
     try {
@@ -218,13 +227,31 @@ export class PredictionsDB {
     `);
   }
 
-  savePredictions(fixtures: Fixture[]): void {
+  async savePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
 
     for (const f of fixtures) {
       if (f.id) {
         this.memoryFallback.set(f.id, f);
       }
+    }
+
+    if (this.useTurso && predictionsTurso) {
+      try {
+        for (const f of fixtures) {
+          await predictionsTurso.execute({
+            sql: `INSERT OR REPLACE INTO upcoming_predictions (
+              fixture_id, league, league_name, match_date, kick_off_time,
+              home_team, away_team, status, predicted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Unknown', f.matchDate, f.kickOffTime || 'TBD', f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString()]
+          });
+        }
+        console.log(`[PredictionsDB] Saved ${fixtures.length} predictions to Turso.`);
+      } catch (err: any) {
+        console.error('[PredictionsDB] Failed saving to Turso:', err);
+      }
+      return;
     }
 
     if (!this.db) return;
@@ -502,13 +529,31 @@ export class PredictionsDB {
    * Live Match Predictions Storage & Queries
    * ------------------------------------------------------------- */
 
-  saveLivePredictions(fixtures: Fixture[]): void {
+  async saveLivePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
 
     for (const f of fixtures) {
       if (f.id) {
         this.liveMemoryFallback.set(f.id, f);
       }
+    }
+
+    if (this.useTurso && predictionsTurso) {
+      try {
+        for (const f of fixtures) {
+          await predictionsTurso.execute({
+            sql: `INSERT OR REPLACE INTO live_predictions (
+              fixture_id, league, league_name, match_date, kick_off_time,
+              home_team, away_team, status, predicted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Live', f.matchDate, f.kickOffTime || 'LIVE', f.homeTeam, f.awayTeam, 'LIVE', new Date().toISOString()]
+          });
+        }
+        console.log(`[PredictionsDB] Saved ${fixtures.length} live predictions to Turso.`);
+      } catch (err: any) {
+        console.error('[PredictionsDB] Failed saving live to Turso:', err);
+      }
+      return;
     }
 
     if (!this.db) return;
@@ -666,13 +711,31 @@ export class PredictionsDB {
    * Historical Predictions Storage & Queries
    * ------------------------------------------------------------- */
 
-  saveHistoricalPredictions(fixtures: Fixture[]): void {
+  async saveHistoricalPredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
 
     for (const f of fixtures) {
       if (f.id) {
         this.historyMemoryFallback.set(f.id, f);
       }
+    }
+
+    if (this.useTurso && predictionsTurso) {
+      try {
+        for (const f of fixtures) {
+          await predictionsTurso.execute({
+            sql: `INSERT OR REPLACE INTO historical_predictions (
+              fixture_id, league, league_name, match_date, kick_off_time,
+              home_team, away_team, status, predicted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Historical', f.matchDate, f.kickOffTime || 'FT', f.homeTeam, f.awayTeam, 'FINISHED', new Date().toISOString()]
+          });
+        }
+        console.log(`[PredictionsDB] Saved ${fixtures.length} historical predictions to Turso.`);
+      } catch (err: any) {
+        console.error('[PredictionsDB] Failed saving historical to Turso:', err);
+      }
+      return;
     }
 
     if (!this.db) return;

@@ -189,7 +189,7 @@ export class ServerEngine {
       return this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
     });
 
-    db.saveUpcomingFixtures(enrichedFixtures);
+    await db.saveUpcomingFixtures(enrichedFixtures);
     try {
       await predictionsDb.init();
       predictionsDb.savePredictions(enrichedFixtures);
@@ -250,7 +250,7 @@ export class ServerEngine {
       };
     });
 
-    db.saveUpcomingFixtures(enrichedLive);
+    await db.saveUpcomingFixtures(enrichedLive);
     try {
       await predictionsDb.init();
       predictionsDb.saveLivePredictions(enrichedLive);
