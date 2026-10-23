@@ -23,26 +23,39 @@ fixturesRouter.get('/', async (req, res) => {
     const endDate = req.query.endDate as string | undefined;
 
     await db.init();
+    await predictionsDb.init();
 
-    // If upcoming fixtures database has 0 records, immediately ingest from Flashscore feed
-    if (db.getUpcomingFixturesCount() === 0) {
+    const dbCount = db.getUpcomingFixturesCount();
+    const predCount = predictionsDb.count();
+
+    // If both upcoming fixtures database and predictions database have 0 records, trigger background ingestion
+    if (dbCount === 0 && predCount === 0) {
       loggerService.addLog({
         level: 'INFO',
         category: 'DATA_FETCH',
         source: 'FixturesRouter',
-        message: 'No upcoming fixtures in database. Ingesting from Flashscore feed...',
+        message: 'No upcoming fixtures in database. Triggering Flashscore feed ingestion...',
       });
-      const initialUpcoming = await flashscoreScraperService.getUpcomingFixtures();
-      if (initialUpcoming && initialUpcoming.length > 0) {
-        await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
-        const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
-        if (liveInUpcoming.length > 0) {
-          await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
+      try {
+        const initialUpcoming = await Promise.race([
+          flashscoreScraperService.getUpcomingFixtures(),
+          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 4000))
+        ]).catch(() => []);
+
+        if (initialUpcoming && initialUpcoming.length > 0) {
+          await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
+          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
+          if (liveInUpcoming.length > 0) {
+            await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
+          }
         }
+      } catch (err: any) {
+        console.warn('Initial ingestion notice:', err?.message);
       }
     }
 
-    let resultFixtures = db.getUpcomingFixtures({
+    // 1. First retrieve from predictionsDb (which holds complete precomputed prediction payloads)
+    let resultFixtures = predictionsDb.getPredictions({
       league: leagueFilter,
       date: dateParam,
       dateFilter,
@@ -50,23 +63,15 @@ fixturesRouter.get('/', async (req, res) => {
       endDate,
     });
 
-    // Fallback to predictionsDb if db query had zero results
+    // 2. Fallback to db.getUpcomingFixtures if predictionsDb had no results for this filter
     if (resultFixtures.length === 0) {
-      try {
-        await predictionsDb.init();
-        const predFixtures = predictionsDb.getPredictions({
-          league: leagueFilter,
-          date: dateParam,
-          dateFilter,
-          startDate,
-          endDate,
-        });
-        if (predFixtures.length > 0) {
-          resultFixtures = predFixtures;
-        }
-      } catch {
-        // ignore
-      }
+      resultFixtures = db.getUpcomingFixtures({
+        league: leagueFilter,
+        date: dateParam,
+        dateFilter,
+        startDate,
+        endDate,
+      });
     }
 
     loggerService.addLog({

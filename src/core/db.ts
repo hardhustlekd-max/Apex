@@ -75,6 +75,77 @@ export class FootballDB {
       }
 
       this.createTables();
+
+      // Hydrate local SQLite from Turso if upcoming_fixtures table is empty
+      if (this.useTurso && footballTurso) {
+        try {
+          const countRes = this.db.exec('SELECT COUNT(*) as count FROM upcoming_fixtures');
+          const currentCount = countRes[0]?.values[0]?.[0] ? Number(countRes[0].values[0][0]) : 0;
+          if (currentCount === 0) {
+            console.log('[FootballDB] Local cache empty. Hydrating upcoming_fixtures from Turso in bulk...');
+            const tursoRes = await footballTurso.execute(`
+              SELECT id, provider_id, league, league_name, match_date, kick_off_time,
+                     home_team, away_team, home_badge, away_badge, stage,
+                     b365_h, b365_d, b365_a, b365_over25, b365_under25,
+                     b365_btts_yes, b365_btts_no, status, score_json,
+                     prediction_json, markets_json, best_value_market_json,
+                     home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
+              FROM upcoming_fixtures
+            `);
+            if (tursoRes.rows && tursoRes.rows.length > 0) {
+              this.db.run('BEGIN TRANSACTION;');
+              const stmt = this.db.prepare(`
+                INSERT OR REPLACE INTO upcoming_fixtures (
+                  id, provider_id, league, league_name, match_date, kick_off_time,
+                  home_team, away_team, home_badge, away_badge, stage,
+                  b365_h, b365_d, b365_a, b365_over25, b365_under25,
+                  b365_btts_yes, b365_btts_no, status, score_json,
+                  prediction_json, markets_json, best_value_market_json,
+                  home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `);
+              for (const row of tursoRes.rows) {
+                stmt.run([
+                  row.id,
+                  row.provider_id || 'FLASHSCORE',
+                  String(row.league || 'ALL'),
+                  row.league_name || 'Unknown',
+                  row.match_date,
+                  row.kick_off_time || 'TBD',
+                  row.home_team,
+                  row.away_team,
+                  row.home_badge || null,
+                  row.away_badge || null,
+                  row.stage || null,
+                  row.b365_h || 2.0,
+                  row.b365_d || 3.0,
+                  row.b365_a || 3.5,
+                  row.b365_over25 || 1.95,
+                  row.b365_under25 || 1.85,
+                  row.b365_btts_yes || 1.90,
+                  row.b365_btts_no || 1.80,
+                  row.status || 'SCHEDULED',
+                  row.score_json || null,
+                  row.prediction_json || null,
+                  row.markets_json || null,
+                  row.best_value_market_json || null,
+                  row.home_stats_json || null,
+                  row.away_stats_json || null,
+                  row.measurements_json || null,
+                  row.h2h_matches_json || null,
+                  row.updated_at || new Date().toISOString(),
+                ] as any);
+              }
+              stmt.free();
+              this.db.run('COMMIT;');
+              console.log(`[FootballDB] Hydrated ${tursoRes.rows.length} upcoming fixtures from Turso into local SQLite.`);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[FootballDB] Hydration from Turso warning:', err?.message);
+        }
+      }
+
       this.saveToDisk();
       this.isInitialized = true;
     } catch (err) {
@@ -930,88 +1001,97 @@ export class FootballDB {
     this.fallbackUpcomingFixtures = unique;
     if (unique.length === 0) return;
 
-    if (this.useTurso && footballTurso) {
+    // 1. ALWAYS write to local SQLite database first inside a single transaction!
+    if (this.db) {
       try {
+        this.db.run('BEGIN TRANSACTION;');
+        const stmt = this.db.prepare(`
+          INSERT OR REPLACE INTO upcoming_fixtures (
+            id, provider_id, league, league_name, match_date, kick_off_time,
+            home_team, away_team, home_badge, away_badge, stage,
+            b365_h, b365_d, b365_a, b365_over25, b365_under25,
+            b365_btts_yes, b365_btts_no, status, score_json,
+            prediction_json, markets_json, best_value_market_json,
+            home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
         for (const f of unique) {
-            const args = [f.id, f.providerId || 'FLASHSCORE', String(f.league), f.leagueName, f.matchDate, f.kickOffTime, f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString(), f.odds.homeWin || 2.0, f.odds.draw || 3.0, f.odds.awayWin || 3.5];
-            await footballTurso.execute({
-              sql: `INSERT OR REPLACE INTO upcoming_fixtures (
-                id, provider_id, league, league_name, match_date, kick_off_time,
-                home_team, away_team, status, updated_at,
-                b365_h, b365_d, b365_a
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              args
-            });
+          stmt.run([
+            f.id,
+            f.providerId || 'FLASHSCORE',
+            String(f.league),
+            f.leagueName,
+            f.matchDate,
+            f.kickOffTime,
+            f.homeTeam,
+            f.awayTeam,
+            f.homeBadge || null,
+            f.awayBadge || null,
+            f.stage || null,
+            f.odds.homeWin,
+            f.odds.draw,
+            f.odds.awayWin,
+            f.odds.over25 || 1.95,
+            f.odds.under25 || 1.85,
+            f.odds.bttsYes || 1.90,
+            f.odds.bttsNo || 1.80,
+            f.status || 'SCHEDULED',
+            f.score ? JSON.stringify(f.score) : null,
+            f.prediction ? JSON.stringify(f.prediction) : null,
+            f.markets ? JSON.stringify(f.markets) : null,
+            f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
+            f.homeStats ? JSON.stringify(f.homeStats) : null,
+            f.awayStats ? JSON.stringify(f.awayStats) : null,
+            f.measurements ? JSON.stringify(f.measurements) : null,
+            f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
+            new Date().toISOString(),
+          ]);
         }
-        console.log(`[FootballDB] Saved ${unique.length} fixtures to Turso.`);
+        stmt.free();
+        this.db.run('COMMIT;');
+        this.saveToDisk();
+
+        loggerService.addLog({
+          level: 'SUCCESS',
+          category: 'DATABASE',
+          source: 'FootballDB',
+          message: `Saved ${unique.length} fixtures with prediction metadata to SQLite database`,
+          details: { count: unique.length },
+        });
       } catch (err: any) {
-        console.error('[FootballDB] Failed saving to Turso:', err);
+        try { this.db.run('ROLLBACK;'); } catch {}
+        console.error('[FootballDB] Failed saving to SQLite:', err);
       }
-      return;
     }
 
-    if (!this.db) return;
-    try {
-      const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO upcoming_fixtures (
-          id, provider_id, league, league_name, match_date, kick_off_time,
-          home_team, away_team, home_badge, away_badge, stage,
-          b365_h, b365_d, b365_a, b365_over25, b365_under25,
-          b365_btts_yes, b365_btts_no, status, score_json,
-          prediction_json, markets_json, best_value_market_json,
-          home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    // 2. Background sync to Turso in chunked batches without blocking
+    if (this.useTurso && footballTurso) {
+      (async () => {
+        try {
+          const batchStatements = unique.map((f) => ({
+            sql: `INSERT OR REPLACE INTO upcoming_fixtures (
+              id, provider_id, league, league_name, match_date, kick_off_time,
+              home_team, away_team, status, updated_at,
+              b365_h, b365_d, b365_a
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              f.id, f.providerId || 'FLASHSCORE', String(f.league), f.leagueName, f.matchDate, f.kickOffTime,
+              f.homeTeam, f.awayTeam, f.status || 'SCHEDULED', new Date().toISOString(),
+              f.odds.homeWin || 2.0, f.odds.draw || 3.0, f.odds.awayWin || 3.5
+            ]
+          }));
 
-      for (const f of unique) {
-        stmt.run([
-          f.id,
-          f.providerId || 'FLASHSCORE',
-          String(f.league),
-          f.leagueName,
-          f.matchDate,
-          f.kickOffTime,
-          f.homeTeam,
-          f.awayTeam,
-          f.homeBadge || null,
-          f.awayBadge || null,
-          f.stage || null,
-          f.odds.homeWin,
-          f.odds.draw,
-          f.odds.awayWin,
-          f.odds.over25 || 1.95,
-          f.odds.under25 || 1.85,
-          f.odds.bttsYes || 1.90,
-          f.odds.bttsNo || 1.80,
-          f.status || 'SCHEDULED',
-          f.score ? JSON.stringify(f.score) : null,
-          f.prediction ? JSON.stringify(f.prediction) : null,
-          f.markets ? JSON.stringify(f.markets) : null,
-          f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
-          f.homeStats ? JSON.stringify(f.homeStats) : null,
-          f.awayStats ? JSON.stringify(f.awayStats) : null,
-          f.measurements ? JSON.stringify(f.measurements) : null,
-          f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
-          new Date().toISOString(),
-        ]);
-      }
-      stmt.free();
-      this.saveToDisk();
-
-      loggerService.addLog({
-        level: 'SUCCESS',
-        category: 'DATABASE',
-        source: 'FootballDB',
-        message: `Saved ${unique.length} fixtures with prediction metadata to SQLite database`,
-        details: { count: unique.length },
-      });
-    } catch (err: any) {
-      loggerService.addLog({
-        level: 'ERROR',
-        category: 'DATABASE',
-        source: 'FootballDB',
-        message: `Failed to save upcoming fixtures to database: ${err?.message}`,
-      });
+          const CHUNK_SIZE = 50;
+          for (let i = 0; i < batchStatements.length; i += CHUNK_SIZE) {
+            const chunk = batchStatements.slice(i, i + CHUNK_SIZE);
+            await footballTurso.batch(chunk, 'write');
+          }
+          console.log(`[FootballDB] Background synced ${unique.length} fixtures to Turso.`);
+        } catch (err: any) {
+          console.warn('[FootballDB] Background Turso sync notice:', err?.message);
+        }
+      })();
     }
   }
 
@@ -1030,6 +1110,7 @@ export class FootballDB {
   }>): void {
     if (!this.db || matches.length === 0) return;
     try {
+      this.db.run('BEGIN TRANSACTION;');
       const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO flashscore_scraped_matches (
           match_id, stage, status, match_date, country, league_name,
@@ -1061,8 +1142,10 @@ export class FootballDB {
         ]);
       }
       stmt.free();
+      this.db.run('COMMIT;');
       this.saveToDisk();
     } catch (err) {
+      try { this.db.run('ROLLBACK;'); } catch {}
       console.warn('Error saving scraped matches to database:', err);
     }
   }

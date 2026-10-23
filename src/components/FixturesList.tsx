@@ -104,6 +104,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     { key: 'TOMORROW', label: 'Tomorrow' },
     { key: 'NEXT_3_DAYS', label: 'Next 3 Days' },
     { key: 'THIS_WEEK', label: 'This Week' },
+    { key: 'ALL', label: 'All Dates' },
   ];
 
   const marketOptions = [
@@ -666,23 +667,35 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               ? 'Try choosing This Week or resetting your search filters.'
               : 'Try selecting a different league or clearing search.'}
           </p>
-          {activeFilterCount > 0 ? (
-            <button
-              type="button"
-              onClick={handleResetAllFilters}
-              className="mt-1 px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
-            >
-              Reset All Filters ({activeFilterCount})
-            </button>
-          ) : activeScope === 'UPCOMING' && dateFilter !== 'THIS_WEEK' ? (
-            <button
-              type="button"
-              onClick={() => setDateFilter('THIS_WEEK')}
-              className="mt-1 px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
-            >
-              Show This Week
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={handleResetAllFilters}
+                className="px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
+              >
+                Reset All Filters ({activeFilterCount})
+              </button>
+            )}
+            {activeScope === 'UPCOMING' && dateFilter !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setDateFilter('ALL')}
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
+              >
+                Show All Upcoming Dates ({uniqueFixtures.length})
+              </button>
+            )}
+            {activeScope === 'UPCOMING' && dateFilter === 'TODAY' && (
+              <button
+                type="button"
+                onClick={() => setDateFilter('TOMORROW')}
+                className="px-4 py-2 bg-slate-800 text-white dark:bg-slate-700 rounded-xl text-xs font-bold hover:bg-slate-700 transition-colors cursor-pointer shadow-xs"
+              >
+                Show Tomorrow
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <SimplifiedPredictionsWireframe

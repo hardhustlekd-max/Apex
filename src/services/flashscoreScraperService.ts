@@ -36,7 +36,7 @@ export class FlashscoreScraperService {
     for (const url of urls) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), 3500);
 
         const res = await fetch(url, {
           headers: {
