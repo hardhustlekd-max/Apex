@@ -479,17 +479,17 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
   return (
     <div className="space-y-3 font-sans flex-1 flex flex-col">
-      {/* Scope Sub-Tabs: Upcoming, Live, History (GitHub Primer Subnav) */}
+      {/* Scope Sub-Tabs: Upcoming, Live, History */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center bg-[#f6f8fa] dark:bg-[#161b22] border border-[#d0d7de] dark:border-[#30363d] p-1 rounded-md shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 shadow-[0_1px_0_rgba(27,31,36,0.04)]">
+        <div className="flex items-center bg-slate-100 dark:bg-slate-900/80 border border-slate-100 dark:border-slate-800/80 p-1 rounded-2xl shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 shadow-xs">
           <button
             id="subtab-upcoming-btn"
             type="button"
             onClick={() => setActiveScope('UPCOMING')}
-            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'UPCOMING'
-                ? 'bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] shadow-xs border border-[#d0d7de] dark:border-[#30363d]'
-                : 'text-[#656d76] dark:text-[#8d96a0] hover:text-[#1f2328] dark:hover:text-[#f0f6fc] border border-transparent'
+                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Upcoming
@@ -499,16 +499,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-live-btn"
             type="button"
             onClick={() => setActiveScope('LIVE')}
-            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
               activeScope === 'LIVE'
-                ? 'bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] shadow-xs border border-[#d0d7de] dark:border-[#30363d]'
-                : 'text-[#656d76] dark:text-[#8d96a0] hover:text-[#1f2328] dark:hover:text-[#f0f6fc] border border-transparent'
+                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#cf222e] dark:bg-[#f85149] animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">Live</span>
             {liveScores && liveScores.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full bg-[#cf222e] dark:bg-[#f85149] text-white text-[10px] font-bold">
+              <span className="ml-1 px-1.5 py-0.2 rounded-md bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 text-[10px] font-bold">
                 {liveScores.length}
               </span>
             )}
@@ -518,31 +518,31 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-history-btn"
             type="button"
             onClick={() => setActiveScope('HISTORY')}
-            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'HISTORY'
-                ? 'bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] shadow-xs border border-[#d0d7de] dark:border-[#30363d]'
-                : 'text-[#656d76] dark:text-[#8d96a0] hover:text-[#1f2328] dark:hover:text-[#f0f6fc] border border-transparent'
+                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             History
           </button>
         </div>
 
-        {/* Filter Button (GitHub Primer btn-sm) */}
+        {/* Filter Button */}
         <div className="shrink-0">
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-[0_1px_0_rgba(27,31,36,0.04)] ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${
               activeFilterCount > 0
-                ? 'bg-[#1f2328] text-white dark:bg-[#f0f6fc] dark:text-[#1f2328] border-[#1f2328] dark:border-[#f0f6fc]'
-                : 'bg-[#f6f8fa] text-[#24292f] hover:bg-[#f3f4f6] dark:bg-[#21262d] dark:text-[#c9d1d9] dark:hover:bg-[#30363d] border-[#d0d7de] dark:border-[#30363d]'
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-[#0B0F17] dark:text-slate-300 dark:hover:bg-slate-900 border-slate-100 dark:border-slate-800/80'
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-[#cf222e] text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -575,21 +575,21 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         />
       </div>
 
-      {/* Active Filter Chips Strip (GitHub Primer Label bar) */}
+      {/* Active Filter Chips Strip */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-2 flex-wrap py-2 px-3 bg-[#f6f8fa] dark:bg-[#161b22] rounded-md border border-[#d0d7de] dark:border-[#30363d] text-xs">
-          <span className="text-xs font-semibold text-[#656d76] dark:text-[#8d96a0] shrink-0">
+        <div className="flex items-center gap-2 flex-wrap py-2.5 px-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-xs">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
             Active filters:
           </span>
 
           {selectedLeague !== 'ALL' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] font-medium border border-[#d0d7de] dark:border-[#30363d]">
-              <span className="text-[#656d76] dark:text-[#8d96a0]">League:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white font-medium border border-slate-200/60 dark:border-slate-800 shadow-xs">
+              <span className="text-slate-500 dark:text-slate-400">League:</span>
               <span className="truncate max-w-[140px] font-semibold">{selectedLeagueLabel}</span>
               <button
                 type="button"
                 onClick={() => onSelectLeague('ALL')}
-                className="text-[#656d76] hover:text-[#cf222e] dark:hover:text-[#f85149] cursor-pointer p-0.5"
+                className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer p-0.5"
                 title="Remove league filter"
               >
                 <X className="w-3 h-3" />
@@ -598,13 +598,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {dateFilter !== 'TODAY' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] font-medium border border-[#d0d7de] dark:border-[#30363d]">
-              <span className="text-[#656d76] dark:text-[#8d96a0]">Date:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white font-medium border border-slate-200/60 dark:border-slate-800 shadow-xs">
+              <span className="text-slate-500 dark:text-slate-400">Date:</span>
               <span className="font-semibold">{dateOptionObj?.label || dateFilter}</span>
               <button
                 type="button"
                 onClick={() => setDateFilter('TODAY')}
-                className="text-[#656d76] hover:text-[#cf222e] dark:hover:text-[#f85149] cursor-pointer p-0.5"
+                className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer p-0.5"
                 title="Reset date filter"
               >
                 <X className="w-3 h-3" />
@@ -613,13 +613,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {marketChoiceFilter !== 'BEST_VALUE' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] font-medium border border-[#d0d7de] dark:border-[#30363d]">
-              <span className="text-[#656d76] dark:text-[#8d96a0]">Market:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white font-medium border border-slate-200/60 dark:border-slate-800 shadow-xs">
+              <span className="text-slate-500 dark:text-slate-400">Market:</span>
               <span className="font-semibold">{marketOptionObj?.label || marketChoiceFilter}</span>
               <button
                 type="button"
                 onClick={() => setMarketChoiceFilter('BEST_VALUE')}
-                className="text-[#656d76] hover:text-[#cf222e] dark:hover:text-[#f85149] cursor-pointer p-0.5"
+                className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer p-0.5"
                 title="Reset to Best Value"
               >
                 <X className="w-3 h-3" />
@@ -628,13 +628,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {searchQuery.trim().length > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] font-medium border border-[#d0d7de] dark:border-[#30363d]">
-              <span className="text-[#656d76] dark:text-[#8d96a0]">Search:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white font-medium border border-slate-200/60 dark:border-slate-800 shadow-xs">
+              <span className="text-slate-500 dark:text-slate-400">Search:</span>
               <span className="truncate max-w-[120px] font-semibold">"{searchQuery}"</span>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="text-[#656d76] hover:text-[#cf222e] dark:hover:text-[#f85149] cursor-pointer p-0.5"
+                className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer p-0.5"
                 title="Clear search"
               >
                 <X className="w-3 h-3" />
@@ -643,13 +643,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {sortBy && sortBy !== 'DEFAULT' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white dark:bg-[#21262d] text-[#1f2328] dark:text-[#f0f6fc] font-medium border border-[#d0d7de] dark:border-[#30363d]">
-              <span className="text-[#656d76] dark:text-[#8d96a0]">Sort:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white font-medium border border-slate-200/60 dark:border-slate-800 shadow-xs">
+              <span className="text-slate-500 dark:text-slate-400">Sort:</span>
               <span className="font-semibold">{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
               <button
                 type="button"
                 onClick={() => onSelectSortBy?.('DEFAULT')}
-                className="text-[#656d76] hover:text-[#cf222e] dark:hover:text-[#f85149] cursor-pointer p-0.5"
+                className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer p-0.5"
                 title="Reset sort"
               >
                 <X className="w-3 h-3" />
@@ -660,32 +660,32 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={handleResetAllFilters}
-            className="ml-auto text-xs font-semibold text-[#0969da] dark:text-[#2f81f7] hover:underline px-2 py-0.5 cursor-pointer"
+            className="ml-auto text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline px-2 py-0.5 cursor-pointer"
           >
             Clear all filters
           </button>
         </div>
       )}
 
-      {/* Match List Display (Wireframe or Cards) */}
+      {/* Match List Display */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-white dark:bg-[#161b22] rounded-md p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center border border-[#d0d7de] dark:border-[#30363d]">
-          <div className="w-6 h-6 rounded-full border-2 border-[#0969da] border-t-transparent animate-spin shrink-0 mx-auto" />
-          <span className="mt-3 text-xs text-[#656d76] dark:text-[#8d96a0] font-medium">Loading match data...</span>
+        <div className="bg-white dark:bg-[#0B0F17] rounded-2xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center border border-slate-100 dark:border-slate-800/80 shadow-xs">
+          <div className="w-6 h-6 rounded-full border-2 border-slate-900 dark:border-slate-100 border-t-transparent animate-spin shrink-0 mx-auto" />
+          <span className="mt-3 text-xs text-slate-500 dark:text-slate-400 font-bold">Loading match data...</span>
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-white dark:bg-[#161b22] rounded-md p-8 sm:p-12 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 border border-[#d0d7de] dark:border-[#30363d]">
-          <div className="w-10 h-10 rounded-full bg-[#f6f8fa] dark:bg-[#21262d] border border-[#d0d7de] dark:border-[#30363d] flex items-center justify-center text-[#656d76] dark:text-[#8d96a0]">
+        <div className="bg-white dark:bg-[#0B0F17] rounded-2xl p-8 sm:p-12 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 border border-slate-100 dark:border-slate-800/80 shadow-xs">
+          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
             <Filter className="w-5 h-5" />
           </div>
-          <p className="text-sm font-semibold text-[#1f2328] dark:text-[#f0f6fc]">
+          <p className="text-sm font-extrabold text-slate-900 dark:text-white">
             {activeScope === 'UPCOMING'
               ? 'No upcoming fixtures found matching your criteria.'
               : activeScope === 'LIVE'
               ? 'No live matches currently in play.'
               : 'No historical matches found matching your criteria.'}
           </p>
-          <p className="text-xs text-[#656d76] dark:text-[#8d96a0] max-w-sm mx-auto">
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto font-medium">
             {activeFilterCount > 0
               ? 'Some active filters or search terms may be narrowing down the results.'
               : activeScope === 'UPCOMING'
@@ -697,7 +697,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={handleResetAllFilters}
-                className="px-3 py-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] dark:bg-[#21262d] dark:hover:bg-[#30363d] text-[#24292f] dark:text-[#c9d1d9] border border-[#d0d7de] dark:border-[#30363d] rounded-md text-xs font-semibold transition-colors cursor-pointer shadow-[0_1px_0_rgba(27,31,36,0.04)]"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 Reset all filters ({activeFilterCount})
               </button>
@@ -706,7 +706,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilter('ALL')}
-                className="px-3 py-1.5 bg-[#1f883d] hover:bg-[#1a7f37] text-white border border-[#1b1f2426] rounded-md text-xs font-semibold transition-colors cursor-pointer shadow-[0_1px_0_rgba(27,31,36,0.1)]"
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 Show all upcoming dates ({uniqueFixtures.length})
               </button>
@@ -715,7 +715,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilter('TOMORROW')}
-                className="px-3 py-1.5 bg-[#f6f8fa] hover:bg-[#f3f4f6] dark:bg-[#21262d] dark:hover:bg-[#30363d] text-[#24292f] dark:text-[#c9d1d9] border border-[#d0d7de] dark:border-[#30363d] rounded-md text-xs font-semibold transition-colors cursor-pointer shadow-[0_1px_0_rgba(27,31,36,0.04)]"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 Show tomorrow
               </button>

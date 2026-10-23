@@ -396,18 +396,18 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
   const isPercentageSortActive = sortBy && sortBy !== 'DEFAULT';
 
   return (
-    <div className="w-full max-w-full space-y-3 text-[#1f2328] dark:text-[#f0f6fc] font-sans">
+    <div className="w-full max-w-full space-y-3 text-slate-900 dark:text-slate-100 font-sans">
       {paginatedFixtures.length === 0 ? (
-        <div className="p-8 text-center text-[#656d76] dark:text-[#8d96a0] bg-white dark:bg-[#161b22] rounded-md border border-[#d0d7de] dark:border-[#30363d]">
+        <div className="p-8 text-center text-slate-500 dark:text-slate-400 bg-white dark:bg-[#0B0F17] rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-xs font-bold text-xs">
           No matches found.
         </div>
       ) : isPercentageSortActive ? (
-        <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-[#0B0F17] shadow-xs">
+        <div className="border border-slate-100 dark:border-slate-800/80 rounded-2xl overflow-hidden bg-white dark:bg-[#0B0F17] shadow-xs">
           {/* Header */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 grid grid-cols-12 items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 gap-2 font-bold text-xs select-none">
+          <div className="bg-slate-50 dark:bg-slate-900/60 grid grid-cols-12 items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800/80 gap-2 font-bold text-xs select-none">
             <div className="col-span-5 sm:col-span-6 flex items-center gap-2 min-w-0 pr-1">
               <span className="truncate whitespace-nowrap font-extrabold text-slate-900 dark:text-white">Match & Competition</span>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-950/80 text-slate-800 dark:text-slate-300">
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-950/80 text-slate-800 dark:text-slate-300">
                 {sortBy === 'PROB_DESC' && 'Pick % (High → Low)'}
                 {sortBy === 'PROB_ASC' && 'Pick % (Low → High)'}
                 {sortBy === 'HOME_DESC' && 'Home Win % (1)'}
@@ -422,12 +422,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   onClick={() =>
                     onSelectSortBy?.(sortBy === 'PROB_DESC' ? 'PROB_ASC' : 'PROB_DESC')
                   }
-                  className="flex items-center justify-center gap-1 font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0] hover:text-[#0969da] dark:hover:text-[#2f81f7] cursor-pointer"
+                  className="flex items-center justify-center gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer"
                   title="Sort by Model Pick Probability"
                 >
                   <span>PICK</span>
-                  {sortBy === 'PROB_DESC' && <ArrowDown className="w-3 h-3 text-[#0969da]" />}
-                  {sortBy === 'PROB_ASC' && <ArrowUp className="w-3 h-3 text-[#0969da]" />}
+                  {sortBy === 'PROB_DESC' && <ArrowDown className="w-3 h-3 text-sky-600" />}
+                  {sortBy === 'PROB_ASC' && <ArrowUp className="w-3 h-3 text-sky-600" />}
                   {sortBy !== 'PROB_DESC' && sortBy !== 'PROB_ASC' && (
                     <ArrowUpDown className="w-2.5 h-2.5 opacity-60" />
                   )}
@@ -435,13 +435,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               </div>
               <div className="w-[26%] sm:w-[24%] flex items-center justify-center shrink-0">
                 <span
-                  className="font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0]"
+                  className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400"
                   title="Identified Positive EV Bet"
                 >
                   VALUE
                 </span>
               </div>
-              <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0] shrink-0">
+              <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                 {marketFilter === 'OVER_UNDER' ? (
                   <>
                     <span className="min-w-[34px] sm:min-w-[42px] text-center">O 2.5</span>
@@ -459,8 +459,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'HOME_DESC' ? 'DEFAULT' : 'HOME_DESC')
                       }
-                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded cursor-pointer hover:text-[#0969da] ${
-                        sortBy === 'HOME_DESC' ? 'text-[#0969da] dark:text-[#2f81f7] font-bold' : ''
+                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded-lg cursor-pointer hover:text-sky-600 ${
+                        sortBy === 'HOME_DESC' ? 'text-sky-600 dark:text-sky-400 font-extrabold' : ''
                       }`}
                       title="Sort by Home Win %"
                     >
@@ -472,8 +472,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'DRAW_DESC' ? 'DEFAULT' : 'DRAW_DESC')
                       }
-                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded cursor-pointer hover:text-[#0969da] ${
-                        sortBy === 'DRAW_DESC' ? 'text-[#0969da] dark:text-[#2f81f7] font-bold' : ''
+                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded-lg cursor-pointer hover:text-sky-600 ${
+                        sortBy === 'DRAW_DESC' ? 'text-sky-600 dark:text-sky-400 font-extrabold' : ''
                       }`}
                       title="Sort by Draw %"
                     >
@@ -485,8 +485,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'AWAY_DESC' ? 'DEFAULT' : 'AWAY_DESC')
                       }
-                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded cursor-pointer hover:text-[#0969da] ${
-                        sortBy === 'AWAY_DESC' ? 'text-[#0969da] dark:text-[#2f81f7] font-bold' : ''
+                      className={`min-w-[30px] sm:min-w-[36px] h-6 flex items-center justify-center gap-0.5 rounded-lg cursor-pointer hover:text-sky-600 ${
+                        sortBy === 'AWAY_DESC' ? 'text-sky-600 dark:text-sky-400 font-extrabold' : ''
                       }`}
                       title="Sort by Away Win %"
                     >
@@ -498,7 +498,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               </div>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#161b22]">
+          <div className="bg-white dark:bg-[#0B0F17]">
             {paginatedFixtures.map((fixture) => renderFixtureRow(fixture, true))}
           </div>
         </div>
@@ -506,15 +506,15 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         groupedByLeague.map((group) => (
           <div
             key={group.headerKey}
-            className="border border-[#d0d7de] dark:border-[#30363d] rounded-md overflow-hidden bg-white dark:bg-[#161b22] shadow-[0_1px_0_rgba(27,31,36,0.04)]"
+            className="border border-slate-100 dark:border-slate-800/80 rounded-2xl overflow-hidden bg-white dark:bg-[#0B0F17] shadow-xs"
           >
-            {/* Primer Box Header per League */}
-            <div className="bg-[#f6f8fa] dark:bg-[#161b22] grid grid-cols-12 items-center px-4 py-2.5 border-b border-[#d0d7de] dark:border-[#30363d] gap-2 font-semibold text-xs select-none">
+            {/* Box Header per League */}
+            <div className="bg-slate-50 dark:bg-slate-900/60 grid grid-cols-12 items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800/80 gap-2 font-bold text-xs select-none">
               <div className="col-span-5 sm:col-span-6 flex items-center min-w-0 pr-1">
-                <span className="truncate whitespace-nowrap font-bold text-[#1f2328] dark:text-[#f0f6fc]">
+                <span className="truncate whitespace-nowrap font-extrabold text-slate-900 dark:text-white">
                   {group.subDivision || group.leagueName}
                 </span>
-                <span className="ml-2 px-2 py-0.2 rounded-full text-[11px] font-medium bg-[#afb8c1]/20 text-[#656d76] dark:text-[#8d96a0]">
+                <span className="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-950/80 text-slate-700 dark:text-slate-300">
                   {group.fixtures.length}
                 </span>
               </div>
@@ -523,7 +523,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   <button
                     type="button"
                     onClick={() => onSelectSortBy?.('PROB_DESC')}
-                    className="flex items-center justify-center gap-1 font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0] hover:text-[#0969da] cursor-pointer"
+                    className="flex items-center justify-center gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-sky-600 cursor-pointer"
                     title="Click to sort table by Model Pick %"
                   >
                     <span>PICK</span>
@@ -532,13 +532,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 </div>
                 <div className="w-[26%] sm:w-[24%] flex items-center justify-center shrink-0">
                   <span
-                    className="font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0]"
+                    className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400"
                     title="Identified Positive EV Bet"
                   >
                     VALUE
                   </span>
                 </div>
-                <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-semibold text-[#656d76] dark:text-[#8d96a0] shrink-0">
+                <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                   {marketFilter === 'OVER_UNDER' ? (
                     <>
                       <span className="min-w-[34px] sm:min-w-[42px] text-center">O 2.5</span>
@@ -554,7 +554,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('HOME_DESC')}
-                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-[#0969da] cursor-pointer"
+                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-sky-600 cursor-pointer"
                         title="Sort by Home Win %"
                       >
                         1
@@ -562,7 +562,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('DRAW_DESC')}
-                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-[#0969da] cursor-pointer"
+                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-sky-600 cursor-pointer"
                         title="Sort by Draw %"
                       >
                         X
@@ -570,7 +570,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('AWAY_DESC')}
-                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-[#0969da] cursor-pointer"
+                        className="min-w-[30px] sm:min-w-[36px] text-center shrink-0 hover:text-sky-600 cursor-pointer"
                         title="Sort by Away Win %"
                       >
                         2
@@ -580,24 +580,24 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-[#161b22]">
+            <div className="bg-white dark:bg-[#0B0F17]">
               {group.fixtures.map((fixture) => renderFixtureRow(fixture, false))}
             </div>
           </div>
         ))
       )}
 
-      {/* GitHub Primer Pagination Bar */}
+      {/* Pagination Bar */}
       {fixtures.length > 0 && (
-        <div className="px-4 py-3 bg-white dark:bg-[#161b22] border border-[#d0d7de] dark:border-[#30363d] flex flex-wrap items-center justify-between gap-3 text-xs rounded-md shadow-[0_1px_0_rgba(27,31,36,0.04)]">
+        <div className="px-4 py-3 bg-white dark:bg-[#0B0F17] border border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs rounded-2xl shadow-xs">
           <div className="flex items-center gap-3 flex-wrap min-w-0">
-            <span className="text-[#656d76] dark:text-[#8d96a0] font-normal text-xs whitespace-nowrap">
+            <span className="text-slate-500 dark:text-slate-400 font-medium text-xs whitespace-nowrap">
               Showing{' '}
-              <span className="font-semibold text-[#1f2328] dark:text-[#f0f6fc]">
+              <span className="font-bold text-slate-900 dark:text-white">
                 {startItemIndex}–{endItemIndex}
               </span>{' '}
               of{' '}
-              <span className="font-semibold text-[#1f2328] dark:text-[#f0f6fc]">
+              <span className="font-bold text-slate-900 dark:text-white">
                 {fixtures.length}
               </span>{' '}
               matches
@@ -610,23 +610,23 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="bg-[#f6f8fa] dark:bg-[#21262d] border border-[#d0d7de] dark:border-[#30363d] rounded-md px-2.5 py-1 text-xs font-medium text-[#1f2328] dark:text-[#f0f6fc] appearance-none cursor-pointer pr-7 focus:outline-none focus:border-[#0969da]"
+                className="bg-slate-50 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 dark:text-white appearance-none cursor-pointer pr-8 focus:outline-none shadow-xs"
               >
                 <option value={10}>10 per page</option>
                 <option value={25}>25 per page</option>
                 <option value={50}>50 per page</option>
                 <option value={100}>100 per page</option>
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#656d76] dark:text-[#8d96a0] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" />
             </div>
           </div>
 
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-1.5 ml-auto">
             <button
               type="button"
               disabled={safeCurrentPage <= 1}
               onClick={() => setCurrentPage(1)}
-              className="p-1.5 rounded-md border border-[#d0d7de] dark:border-[#30363d] bg-[#f6f8fa] dark:bg-[#21262d] text-[#24292f] dark:text-[#c9d1d9] hover:bg-[#f3f4f6] dark:hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-xs"
               title="First Page"
             >
               <ChevronsLeft className="w-3.5 h-3.5" />
@@ -635,7 +635,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#d0d7de] dark:border-[#30363d] bg-[#f6f8fa] dark:bg-[#21262d] text-[#24292f] dark:text-[#c9d1d9] hover:bg-[#f3f4f6] dark:hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-bold cursor-pointer shadow-xs"
               title="Previous Page"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -664,7 +664,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   typeof item === 'string' ? (
                     <span
                       key={`ellipsis-${idx}`}
-                      className="px-1.5 text-[#656d76] font-semibold text-xs select-none"
+                      className="px-1.5 text-slate-400 font-bold text-xs select-none"
                     >
                       ...
                     </span>
@@ -673,10 +673,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       key={`page-${item}`}
                       type="button"
                       onClick={() => setCurrentPage(item)}
-                      className={`min-w-7 h-7 flex items-center justify-center rounded-md text-xs font-semibold transition-colors cursor-pointer border ${
+                      className={`min-w-7 h-7 flex items-center justify-center rounded-xl text-xs font-bold transition-colors cursor-pointer border shadow-xs ${
                         item === safeCurrentPage
-                          ? 'bg-[#0969da] text-white border-[#0969da]'
-                          : 'border-[#d0d7de] dark:border-[#30363d] bg-[#f6f8fa] dark:bg-[#21262d] text-[#24292f] dark:text-[#c9d1d9] hover:bg-[#f3f4f6] dark:hover:bg-[#30363d]'
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white'
+                          : 'border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       {item}
@@ -689,7 +689,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#d0d7de] dark:border-[#30363d] bg-[#f6f8fa] dark:bg-[#21262d] text-[#24292f] dark:text-[#c9d1d9] hover:bg-[#f3f4f6] dark:hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-bold cursor-pointer shadow-xs"
               title="Next Page"
             >
               <span className="hidden sm:inline">Next</span>
@@ -699,7 +699,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setCurrentPage(totalPages)}
-              className="p-1.5 rounded-md border border-[#d0d7de] dark:border-[#30363d] bg-[#f6f8fa] dark:bg-[#21262d] text-[#24292f] dark:text-[#c9d1d9] hover:bg-[#f3f4f6] dark:hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-xs"
               title="Last Page"
             >
               <ChevronsRight className="w-3.5 h-3.5" />

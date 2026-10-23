@@ -40,9 +40,9 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
   return (
     <nav
       aria-label="Repository"
-      className="bg-white dark:bg-[#0B0F17] px-4 sm:px-6 py-3 sticky top-[53px] z-20"
+      className="bg-white dark:bg-[#0B0F17] px-2 sm:px-3 py-3 sticky top-[53px] z-20"
     >
-      <div className="max-w-6xl mx-auto p-1 bg-slate-100 dark:bg-slate-900/80 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-inner">
+      <div className="max-w-[99%] sm:max-w-[98%] mx-auto p-1 bg-white dark:bg-white text-slate-900 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs border border-slate-200/60">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;

@@ -269,7 +269,7 @@ export default function App() {
 
       {/* Main Content Dashboard */}
       <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 flex flex-col pb-12">
+        <main className="flex-1 max-w-[99%] sm:max-w-[98%] w-full mx-auto px-2 sm:px-3 py-4 space-y-4 flex flex-col pb-12">
         {activeTab === 'FIXTURES' && (
           <FixturesList
             fixtures={fixtures}
