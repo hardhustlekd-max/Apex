@@ -148,33 +148,54 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     return datasetDates[datasetDates.length - 1] || localToday;
   }, [fixtures, datasetDates]);
 
-  // Load predictions for live games directly from predictions db
+  const hasLoadedLiveRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    hasLoadedLiveRef.current = false;
+  }, [selectedLeague]);
+
+  // Load predictions for live games directly from predictions db without periodic reload flicker
   useEffect(() => {
     let isCancelled = false;
-    async function fetchLivePredictions() {
+
+    async function fetchLivePredictions(showSpinner: boolean) {
       try {
-        setIsLoadingLive(true);
+        if (showSpinner) {
+          setIsLoadingLive(true);
+        }
         const data = await EngineService.getLivePredictions(selectedLeague, 100);
         if (!isCancelled) {
           setLivePredictionsFixtures(data || []);
+          hasLoadedLiveRef.current = true;
         }
       } catch (err) {
         console.error('Failed to load live predictions from db:', err);
       } finally {
-        if (!isCancelled) {
+        if (!isCancelled && showSpinner) {
           setIsLoadingLive(false);
         }
       }
     }
 
     if (activeScope === 'LIVE') {
-      fetchLivePredictions();
+      const needsInitialSpinner = !hasLoadedLiveRef.current && livePredictionsFixtures.length === 0;
+      fetchLivePredictions(needsInitialSpinner);
+
+      // Silent background polling every 30s that never toggles isLoadingLive or flashes the UI
+      const timer = setInterval(() => {
+        fetchLivePredictions(false);
+      }, 30000);
+
+      return () => {
+        isCancelled = true;
+        clearInterval(timer);
+      };
     }
 
     return () => {
       isCancelled = true;
     };
-  }, [activeScope, selectedLeague, liveScores]);
+  }, [activeScope, selectedLeague]);
 
   // Load history predictions from predictions db when history tab is active or selected league changes
   useEffect(() => {

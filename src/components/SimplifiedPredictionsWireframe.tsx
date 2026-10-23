@@ -81,7 +81,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [fixtures.length, marketFilter, sortBy]);
+  }, [marketFilter, sortBy]);
 
   const uniqueFixtures = useMemo(() => {
     const seen = new Set<string>();
@@ -113,6 +113,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   const totalPages = Math.max(1, Math.ceil(uniqueFixtures.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
 
   const paginatedFixtures = useMemo(() => {
     const startIndex = (safeCurrentPage - 1) * pageSize;

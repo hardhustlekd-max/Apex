@@ -148,7 +148,28 @@ export default function App() {
   const fetchLiveScores = useCallback(async () => {
     try {
       const scores = await EngineService.getLiveScores();
-      setLiveScores(scores);
+      if (!scores || !Array.isArray(scores)) return;
+
+      setLiveScores((prev) => {
+        if (prev.length !== scores.length) return scores;
+        let changed = false;
+        for (let i = 0; i < scores.length; i++) {
+          const s = scores[i];
+          const p = prev[i];
+          if (
+            !p ||
+            s.fixtureId !== p.fixtureId ||
+            s.homeScore !== p.homeScore ||
+            s.awayScore !== p.awayScore ||
+            s.minute !== p.minute ||
+            s.status !== p.status
+          ) {
+            changed = true;
+            break;
+          }
+        }
+        return changed ? scores : prev;
+      });
     } catch (e) {
       // non-blocking
     }
