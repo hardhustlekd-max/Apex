@@ -2,6 +2,9 @@ import React from 'react';
 import { Info } from 'lucide-react';
 import { Fixture } from '../core/types.js';
 import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
+import { Card } from './ui/Card.js';
+import { Badge } from './ui/Badge.js';
+import { Button } from './ui/Button.js';
 
 interface FixtureCardProps {
   fixture: Fixture;
@@ -19,51 +22,50 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     : null;
 
   return (
-    <div
+    <Card
       id={`fixture-card-${fixture.id}`}
-      className="bg-white text-slate-900 rounded-xl sm:rounded-2xl p-4 transition-all shadow-xs hover:shadow-md border border-slate-200 flex flex-col justify-between group"
+      className="hover:border-slate-200 dark:hover:border-slate-700 flex flex-col justify-between group hover:shadow-sm"
     >
       <div>
         {/* Top bar: League, Time, Stage / Status */}
-        {/* Top bar: League, Time, Date / Status */}
         <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
-          <div className="flex flex-col min-w-0 flex-nowrap overflow-hidden">
-            <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md sm:rounded-lg bg-slate-100 text-slate-800 shadow-2xs truncate whitespace-nowrap max-w-[150px] sm:max-w-[200px]" title={fixture.stage || fixture.leagueName}>
+          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-hidden">
+            <Badge title={fixture.stage || fixture.leagueName} className="truncate max-w-[180px]">
               {fixture.stage || fixture.leagueName}
-            </span>
-            <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap shrink-0 mt-1">
+            </Badge>
+            <span className="text-[10px] text-slate-500 dark:text-slate-500 font-mono whitespace-nowrap shrink-0">
               {fixture.status === 'LIVE' ? 'Live' : fixture.status === 'FINISHED' ? 'FT' : `${fixture.matchDate} ${fixture.kickOffTime}`}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
             {fixture.status === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md sm:rounded-lg bg-black text-white shadow-2xs whitespace-nowrap">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <Badge variant="danger" className="font-black gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                 LIVE
-              </span>
+              </Badge>
             ) : fixture.status === 'FINISHED' ? (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md sm:rounded-lg bg-slate-100 text-slate-700 whitespace-nowrap">
+              <Badge>
                 FT
-              </span>
+              </Badge>
             ) : null}
           </div>
         </div>
 
         {/* Teams Display */}
-        <div className="grid grid-cols-12 items-center gap-2 my-2">
+        <div className="grid grid-cols-12 items-center gap-2 my-3">
           {/* Home Team */}
           <div className="col-span-5 flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
+            <div className="flex items-center gap-2 min-w-0 flex-nowrap">
               {fixture.homeBadge && (
                 <img
                   src={fixture.homeBadge}
                   alt=""
-                  className="w-4 h-4 object-contain shrink-0 rounded-full"
+                  className="w-5 h-5 object-contain shrink-0 rounded-full"
                   onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                 />
               )}
-              <span className="text-sm font-bold text-black tracking-tight truncate whitespace-nowrap" title={fixture.homeTeam}>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate whitespace-nowrap" title={fixture.homeTeam}>
                 {fixture.homeTeam}
               </span>
             </div>
@@ -72,25 +74,25 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           {/* VS Divider or Match Score */}
           <div className="col-span-2 flex flex-col items-center justify-center shrink-0">
             {fixture.score && fixture.score.home !== undefined ? (
-              <span className="text-xs sm:text-sm font-mono font-extrabold text-black whitespace-nowrap">
+              <span className="text-xs sm:text-sm font-mono font-black text-slate-900 dark:text-white whitespace-nowrap">
                 {fixture.score.home}:{fixture.score.away}
               </span>
             ) : (
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">VS</span>
+              <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-wider whitespace-nowrap">VS</span>
             )}
           </div>
 
           {/* Away Team */}
           <div className="col-span-5 flex flex-col items-end text-right min-w-0">
-            <div className="flex items-center justify-end gap-1.5 min-w-0 flex-nowrap w-full">
-              <span className="text-sm font-bold text-black tracking-tight truncate whitespace-nowrap" title={fixture.awayTeam}>
+            <div className="flex items-center justify-end gap-2 min-w-0 flex-nowrap w-full">
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate whitespace-nowrap" title={fixture.awayTeam}>
                 {fixture.awayTeam}
               </span>
               {fixture.awayBadge && (
                 <img
                   src={fixture.awayBadge}
                   alt=""
-                  className="w-4 h-4 object-contain shrink-0 rounded-full"
+                  className="w-5 h-5 object-contain shrink-0 rounded-full"
                   onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                 />
               )}
@@ -98,59 +100,56 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
         </div>
 
-        {/* Extra Result Details */}
-        {fixture.resultDetails && (fixture.resultDetails.regulationTime || fixture.resultDetails.penalties) && (
-          <div className="text-center font-mono text-[10px] text-slate-500 py-0.5">
-            {fixture.resultDetails.regulationTime && <span>Reg: {fixture.resultDetails.regulationTime} </span>}
-            {fixture.resultDetails.penalties && <span className="font-bold text-black">(Pen: {fixture.resultDetails.penalties})</span>}
-          </div>
-        )}
-
         {/* Probability Bar Indicator */}
         {pred && (
-          <div className="my-2.5 space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-              <span className="text-black font-bold">Home: {formatProb(pred.homeWinProb, 1)}</span>
-              <span className="text-slate-700 font-bold">Draw: {formatProb(pred.drawProb, 1)}</span>
-              <span className="text-black font-bold">Away: {formatProb(pred.awayWinProb, 1)}</span>
+          <div className="my-3 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-500">
+              <span className="text-slate-900 dark:text-slate-100 font-bold">1: {formatProb(pred.homeWinProb, 1)}</span>
+              <span className="font-bold">X: {formatProb(pred.drawProb, 1)}</span>
+              <span className="text-slate-900 dark:text-slate-100 font-bold">2: {formatProb(pred.awayWinProb, 1)}</span>
             </div>
-            <div className="h-1.5 w-full bg-slate-200 rounded-full flex overflow-hidden">
+            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
               <div
                 style={{ width: `${pred.homeWinProb * 100}%` }}
-                className="bg-black transition-all duration-500"
+                className="bg-slate-900 dark:bg-slate-100 transition-all duration-300"
                 title={`Home Win: ${formatProb(pred.homeWinProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.drawProb * 100}%` }}
-                className="bg-slate-400 transition-all duration-500"
+                className="bg-slate-500 dark:bg-slate-600 transition-all duration-300"
                 title={`Draw: ${formatProb(pred.drawProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.awayWinProb * 100}%` }}
-                className="bg-zinc-700 transition-all duration-500"
+                className="bg-slate-700 dark:bg-slate-400 transition-all duration-300"
                 title={`Away Win: ${formatProb(pred.awayWinProb, 1)}`}
               />
             </div>
           </div>
         )}
 
-        {/* Highest Predicted Outcome & Confidence */}
+        {/* Highest Predicted Outcome */}
         {topPredictionLabel && (
-          <div className="mt-1 mb-1 p-1.5 px-3 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-between text-xs shadow-xs min-w-0">
+          <div className="mt-3 mb-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] min-w-0">
             <div className="flex items-center gap-1.5 min-w-0 truncate">
-              <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0 whitespace-nowrap">Prediction:</span>
-              <span className="font-semibold text-black truncate whitespace-nowrap">{topPredictionLabel}</span>
+              <span className="text-slate-500 dark:text-slate-400 font-medium">Pick:</span>
+              <span className="font-bold text-slate-900 dark:text-white truncate">{topPredictionLabel}</span>
             </div>
-            {pick && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-2xs whitespace-nowrap" title={`Model Confidence: ${pick.probabilityFormatted}`}>
-                {pick.probabilityFormatted} Conf
-              </span>
-            )}
           </div>
         )}
-
       </div>
 
-    </div>
+      {/* Action Footer */}
+      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end">
+        <Button
+          type="button"
+          onClick={() => onSelectDetail(fixture)}
+        >
+          <Info className="w-3.5 h-3.5" />
+          <span>Analytics</span>
+        </Button>
+      </div>
+    </Card>
   );
 };
+

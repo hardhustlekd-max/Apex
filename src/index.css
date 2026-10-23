@@ -3,11 +3,60 @@
 @variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  :root {
+    --color-canvas-default: #ffffff;
+    --color-canvas-subtle: #f6f8fa;
+    --color-canvas-inset: #f6f8fa;
+    --color-border-default: #d0d7de;
+    --color-border-muted: #d8dee4;
+    --color-fg-default: #1f2328;
+    --color-fg-muted: #656d76;
+    --color-fg-subtle: #8c959f;
+    --color-accent-fg: #0969da;
+    --color-accent-subtle: #ddf4ff;
+    --color-success-fg: #1a7f37;
+    --color-success-subtle: #dafbe1;
+    --color-attention-fg: #9a6700;
+    --color-attention-subtle: #fff8c5;
+    --color-danger-fg: #cf222e;
+    --color-danger-subtle: #ffebe9;
+  }
+
+  .dark {
+    --color-canvas-default: #0d1117;
+    --color-canvas-subtle: #161b22;
+    --color-canvas-inset: #010409;
+    --color-border-default: #30363d;
+    --color-border-muted: #21262d;
+    --color-fg-default: #f0f6fc;
+    --color-fg-muted: #8d96a0;
+    --color-fg-subtle: #6e7681;
+    --color-accent-fg: #2f81f7;
+    --color-accent-subtle: #388bfd1a;
+    --color-success-fg: #3fb950;
+    --color-success-subtle: #23863626;
+    --color-attention-fg: #d29922;
+    --color-attention-subtle: #bb800926;
+    --color-danger-fg: #f85149;
+    --color-danger-subtle: #f8514926;
+  }
+
   html {
     font-size: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    color: #1f2328;
+    background-color: #f6f8fa;
   }
+
+  .dark html,
+  html.dark,
+  body.dark {
+    color: #f0f6fc;
+    background-color: #0d1117;
+  }
+
   html,
   body {
     max-width: 100vw;
@@ -20,5 +69,27 @@
     max-width: 100vw;
     overflow-x: hidden;
     min-height: 100vh;
+  }
+
+  /* GitHub Primer Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d0d7de;
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #30363d;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #afb8c1;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
   }
 }

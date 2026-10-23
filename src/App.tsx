@@ -180,7 +180,7 @@ export default function App() {
     fetchFixtures();
     fetchLiveScores();
 
-    const interval = setInterval(fetchLiveScores, 15000);
+    const interval = setInterval(fetchLiveScores, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -236,16 +236,18 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-black flex flex-col font-sans">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0d1117] text-[#1f2328] dark:text-[#f0f6fc] flex flex-col font-sans transition-colors">
+      {/* Toast Notification (GitHub Primer Flash Banner) */}
       {notification && (
-        <div className="fixed bottom-5 right-5 z-[100] bg-black text-white font-medium text-xs px-4 py-2.5 rounded-xl shadow-lg border border-zinc-800 animate-in slide-in-from-bottom-2">
-          <span className="truncate max-w-[280px]">{notification.message}</span>
+        <div className="fixed bottom-4 right-4 z-[100] bg-white dark:bg-[#161b22] text-[#1f2328] dark:text-[#f0f6fc] font-medium text-xs px-3.5 py-2.5 rounded-md shadow-lg border border-[#d0d7de] dark:border-[#30363d] flex items-center gap-2 animate-in slide-in-from-bottom-2">
+          <span className="w-2 h-2 rounded-full bg-[#1a7f37] dark:bg-[#3fb950] shrink-0" />
+          <span className="truncate max-w-[320px]">{notification.message}</span>
         </div>
       )}
 
       {/* Header */}
       <Header
+        liveScores={liveScores}
         settings={settings}
         providers={providers}
         stats={stats}
@@ -267,7 +269,7 @@ export default function App() {
 
       {/* Main Content Dashboard */}
       <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-        <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 flex flex-col pb-8">
+        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 space-y-4 flex flex-col pb-12">
         {activeTab === 'FIXTURES' && (
           <FixturesList
             fixtures={fixtures}

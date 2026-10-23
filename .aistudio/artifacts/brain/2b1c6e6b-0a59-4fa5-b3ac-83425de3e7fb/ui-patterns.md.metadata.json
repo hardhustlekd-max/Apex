@@ -1,0 +1,5 @@
+{
+  "summary":  "Added an explicit and exhaustive Border Style Tokens section to the design system documentation, covering every border width, direction, color, and opacity token from MatchDetailModal.tsx.",
+  "updatedAt":  "2026-10-23T13:08:09.616106279Z",
+  "userFacing":  true
+}
