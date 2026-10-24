@@ -6,7 +6,7 @@ import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
 import { getRelativeDateStr, getPossibleDateStrs } from './dateUtils.js';
 import { getSlugForCode, getCodeForSlug, getLeagueAliases, matchesLeague } from './leagueMapper.js';
-import { predictionsTurso } from './tursoClient.js';
+import { predictionsTurso, safeTursoBatch } from './tursoClient.js';
 
 
 function getPredictionsDbPaths() {
@@ -21,7 +21,7 @@ export class PredictionsDB {
   private db: Database | null = null;
   private SQL: any = null;
   private isInitialized = false;
-  private useTurso = !!process.env.PREDICTIONS_TURSO_URL;
+  private useTurso = !!process.env.predictions_turso_url;
   private memoryFallback: Map<string, Fixture> = new Map();
   private liveMemoryFallback: Map<string, Fixture> = new Map();
   private historyMemoryFallback: Map<string, Fixture> = new Map();
@@ -431,14 +431,9 @@ export class PredictionsDB {
             ]
           }));
 
-          const CHUNK_SIZE = 50;
-          for (let i = 0; i < batchStatements.length; i += CHUNK_SIZE) {
-            const chunk = batchStatements.slice(i, i + CHUNK_SIZE);
-            await predictionsTurso.batch(chunk, 'write');
-          }
-          console.log(`[PredictionsDB] Background synced ${fixtures.length} predictions to Turso.`);
-        } catch (err: any) {
-          console.warn('[PredictionsDB] Background Turso sync notice:', err?.message);
+          await safeTursoBatch(predictionsTurso, batchStatements, 25);
+        } catch {
+          // Graceful fallback for non-blocking background sync
         }
       })();
     }
@@ -758,95 +753,11 @@ export class PredictionsDB {
             ]
           }));
 
-          const CHUNK_SIZE = 50;
-          for (let i = 0; i < batchStatements.length; i += CHUNK_SIZE) {
-            const chunk = batchStatements.slice(i, i + CHUNK_SIZE);
-            await predictionsTurso.batch(chunk, 'write');
-          }
-          console.log(`[PredictionsDB] Background synced ${fixtures.length} live predictions to Turso.`);
-        } catch (err: any) {
-          console.warn('[PredictionsDB] Background Turso sync live notice:', err?.message);
+          await safeTursoBatch(predictionsTurso, batchStatements, 25);
+        } catch {
+          // Graceful fallback for non-blocking live Turso sync
         }
       })();
-    }
-
-    try {
-      this.db.run('BEGIN TRANSACTION;');
-      const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO live_predictions (
-          fixture_id, league, league_name, stage, match_date, kick_off_time,
-          home_team, away_team, home_badge, away_badge, status,
-          minute, home_score, away_score,
-          b365_h, b365_d, b365_a,
-          home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
-          over15_prob, over25_prob, over35_prob, btts_prob,
-          tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-          is_positive_ev, is_banker, full_fixture_json, predicted_at
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?
-        )
-      `);
-
-      const now = new Date().toISOString();
-
-      for (const f of fixtures) {
-        const pred = f.prediction;
-        const bestTip = f.bestValueMarket;
-
-        stmt.run([
-          f.id,
-          f.league || 'ALL',
-          f.leagueName || f.league || 'Live In-Play',
-          f.stage || null,
-          f.matchDate,
-          f.kickOffTime || `${f.minute || 0}'`,
-          f.homeTeam,
-          f.awayTeam,
-          f.homeBadge || null,
-          f.awayBadge || null,
-          'LIVE',
-          f.minute || 0,
-          f.score?.home ?? 0,
-          f.score?.away ?? 0,
-          f.odds.homeWin || 2.0,
-          f.odds.draw || 3.0,
-          f.odds.awayWin || 3.5,
-          pred?.homeXG ?? 1.35,
-          pred?.awayXG ?? 1.10,
-          pred?.homeWinProb ?? 0.45,
-          pred?.drawProb ?? 0.28,
-          pred?.awayWinProb ?? 0.27,
-          pred?.over15Prob ?? 0.75,
-          pred?.over25Prob ?? 0.50,
-          pred?.over35Prob ?? 0.28,
-          pred?.bttsProb ?? 0.52,
-          bestTip?.key || 'HOME_WIN',
-          bestTip?.name || 'Home Win',
-          bestTip?.odds || f.odds.homeWin || 2.0,
-          bestTip?.probability || pred?.homeWinProb || 0.45,
-          bestTip?.expectedValue || 0,
-          bestTip?.isPositiveEV ? 1 : 0,
-          bestTip?.isBanker ? 1 : 0,
-          JSON.stringify(f),
-          now,
-        ]);
-      }
-
-      stmt.free();
-      this.db.run('COMMIT;');
-      this.saveToDisk();
-    } catch (err) {
-      console.error('Error saving live predictions to predictions.sqlite:', err);
-      try {
-        this.db.run('ROLLBACK;');
-      } catch {}
     }
   }
 
@@ -1025,14 +936,9 @@ export class PredictionsDB {
             args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Historical', f.matchDate, f.kickOffTime || 'FT', f.homeTeam, f.awayTeam, 'FINISHED', new Date().toISOString()]
           }));
 
-          const CHUNK_SIZE = 50;
-          for (let i = 0; i < batchStatements.length; i += CHUNK_SIZE) {
-            const chunk = batchStatements.slice(i, i + CHUNK_SIZE);
-            await predictionsTurso.batch(chunk, 'write');
-          }
-          console.log(`[PredictionsDB] Background synced ${fixtures.length} historical predictions to Turso.`);
-        } catch (err: any) {
-          console.warn('[PredictionsDB] Background Turso sync historical notice:', err?.message);
+          await safeTursoBatch(predictionsTurso, batchStatements, 25);
+        } catch {
+          // Graceful fallback for non-blocking historical Turso sync
         }
       })();
     }

@@ -1,6 +1,20 @@
 import { app } from '../src/app.js';
+import { db } from '../src/core/db.js';
+import { predictionsDb } from '../src/core/predictionsDb.js';
 
-export default function handler(req: any, res: any) {
+let initialized = false;
+
+export default async function handler(req: any, res: any) {
+  if (!initialized) {
+    try {
+      await db.init();
+      await predictionsDb.init();
+      initialized = true;
+    } catch (e) {
+      console.warn('Vercel serverless DB init warning:', e);
+    }
+  }
+
   // Catch-all serverless handler for /api/* routes on Vercel
   const forwardedUri = req.headers['x-forwarded-uri'] as string | undefined;
   const matchedPath = req.headers['x-matched-path'] as string | undefined;
@@ -15,5 +29,6 @@ export default function handler(req: any, res: any) {
     req.url = `/api/${subPath}${rawQuery}`;
   }
 
+  req.originalUrl = req.url;
   return app(req, res);
 }

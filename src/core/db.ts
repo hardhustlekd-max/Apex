@@ -14,13 +14,13 @@ function getDbPaths() {
   return { localDir, localFile, tmpDir, tmpFile };
 }
 
-import { footballTurso } from './tursoClient.js';
+import { footballTurso, safeTursoBatch } from './tursoClient.js';
 
 export class FootballDB {
   private db: Database | null = null;
   private SQL: any = null;
   private isInitialized = false;
-  private useTurso = !!process.env.FOOTBALL_TURSO_URL;
+  private useTurso = !!process.env.football_turso_url;
   private fallbackHistoricalMatches: HistoricalMatch[] = [];
   private fallbackUpcomingFixtures: Fixture[] = [];
   private fallbackSettings: EngineSettings = {
@@ -1099,14 +1099,9 @@ export class FootballDB {
             ]
           }));
 
-          const CHUNK_SIZE = 50;
-          for (let i = 0; i < batchStatements.length; i += CHUNK_SIZE) {
-            const chunk = batchStatements.slice(i, i + CHUNK_SIZE);
-            await footballTurso.batch(chunk, 'write');
-          }
-          console.log(`[FootballDB] Background synced ${unique.length} fixtures to Turso.`);
-        } catch (err: any) {
-          console.warn('[FootballDB] Background Turso sync notice:', err?.message);
+          await safeTursoBatch(footballTurso, batchStatements, 25);
+        } catch {
+          // Graceful fallback for non-blocking background sync
         }
       })();
     }

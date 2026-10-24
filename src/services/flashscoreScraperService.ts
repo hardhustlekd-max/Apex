@@ -34,9 +34,10 @@ export class FlashscoreScraperService {
     let lastError: any = null;
 
     for (const url of urls) {
+      let timeout: NodeJS.Timeout | null = null;
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3500);
+        timeout = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch(url, {
           headers: {
@@ -50,31 +51,42 @@ export class FlashscoreScraperService {
           },
           signal: controller.signal,
         });
-        clearTimeout(timeout);
 
         if (res.ok) {
           const text = await res.text();
           if (text && text.length > 50) {
             return text;
           }
-          lastError = new Error(`Flashscore feed response empty or too short on ${url} (Length: ${text?.length || 0})`);
+          lastError = new Error(`Flashscore feed response empty on ${url}`);
         } else {
-          lastError = new Error(`Flashscore HTTP ${res.status} ${res.statusText} on ${url}`);
+          lastError = new Error(`Flashscore HTTP ${res.status} on ${url}`);
         }
       } catch (err: any) {
-        lastError = err instanceof Error ? err : new Error(String(err));
+        const isAbort = err?.name === 'AbortError' || err?.message?.includes('aborted');
+        lastError = isAbort
+          ? new Error(`Feed connection timed out (${url})`)
+          : (err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
       }
     }
 
+    const localCached = db.getRawFeed(path);
+    if (localCached && localCached.rawText) {
+      return localCached.rawText;
+    }
+
     loggerService.addLog({
-      level: 'ERROR',
+      level: 'WARN',
       category: 'SCRAPER',
       source: 'FlashscoreScraperService',
-      message: `Flashscore scraping network constraint / failure for path "${path}": ${lastError?.message || 'All endpoints failed'}`,
+      message: `Flashscore feed fallback for path "${path}": ${lastError?.message || 'Remote endpoint unavailable'}`,
       details: {
         path,
         error: lastError?.message,
-        stack: lastError?.stack,
         timestamp: new Date().toISOString(),
       },
     });
@@ -461,17 +473,17 @@ export class FlashscoreScraperService {
     ];
 
     for (const t of tournamentPages) {
+      let timeout: NodeJS.Timeout | null = null;
       try {
         const pageUrl = `https://www.flashscore.com${t.path}`;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
+        timeout = setTimeout(() => controller.abort(), 8000);
         const res = await fetch(pageUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           },
           signal: controller.signal,
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const html = await res.text();
           const resultsMatch = html.match(/cjs\.initialFeeds\[['"](?:summary-)?results['"]\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
@@ -522,6 +534,11 @@ export class FlashscoreScraperService {
           message: `Failed tournament scraping for ${t.path}: ${err}`,
         });
         // continue to next tournament
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
       }
     }
 
@@ -1022,11 +1039,11 @@ export class FlashscoreScraperService {
       }
     }
 
-    // 4. Scrape real live match results directly from Flashscore tournament page
+    let standingsTimeout: NodeJS.Timeout | null = null;
     try {
       const pageUrl = `https://www.flashscore.com${target.path}`;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      standingsTimeout = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(pageUrl, {
         headers: {
@@ -1036,7 +1053,6 @@ export class FlashscoreScraperService {
         },
         signal: controller.signal,
       });
-      clearTimeout(timeout);
 
       if (res.ok) {
         const html = await res.text();
@@ -1152,6 +1168,11 @@ export class FlashscoreScraperService {
       }
     } catch (err) {
       // Data not available - cleanly continue without terminal log
+    } finally {
+      if (standingsTimeout) {
+        clearTimeout(standingsTimeout);
+        standingsTimeout = null;
+      }
     }
 
     // 5. If specific tournament page scraping returned 0 matches, return empty table structure

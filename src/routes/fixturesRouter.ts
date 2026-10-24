@@ -39,7 +39,7 @@ fixturesRouter.get('/', async (req, res) => {
       try {
         const initialUpcoming = await Promise.race([
           flashscoreScraperService.getUpcomingFixtures(),
-          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 4000))
+          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 15000))
         ]).catch(() => []);
 
         if (initialUpcoming && initialUpcoming.length > 0) {
