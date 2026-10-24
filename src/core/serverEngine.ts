@@ -12,6 +12,7 @@ import { ApexEngine } from './poisson.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague } from './leagueMapper.js';
+import { getRelativeDateStr } from './dateUtils.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -471,5 +472,118 @@ export class ServerEngine {
       source: 'ServerEngine',
       message: 'All predictions recalculated based on current historical and upcoming data.',
     });
+  }
+
+  public static generateFallbackFixtures(): Fixture[] {
+    const today = getRelativeDateStr(0);
+    const tomorrow = getRelativeDateStr(1);
+    const day2 = getRelativeDateStr(2);
+
+    return [
+      {
+        id: 'fallback_1',
+        providerId: 'FLASHSCORE',
+        league: 'england_premier_league',
+        leagueName: 'England: Premier League',
+        matchDate: today,
+        kickOffTime: '20:00',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea',
+        stage: 'Premier League',
+        status: 'SCHEDULED',
+        odds: { homeWin: 1.85, draw: 3.60, awayWin: 4.20, over25: 1.75, under25: 2.10, bttsYes: 1.80, bttsNo: 2.00 }
+      },
+      {
+        id: 'fallback_2',
+        providerId: 'FLASHSCORE',
+        league: 'spain_la_liga',
+        leagueName: 'Spain: La Liga',
+        matchDate: today,
+        kickOffTime: '21:00',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        stage: 'LaLiga',
+        status: 'SCHEDULED',
+        odds: { homeWin: 2.10, draw: 3.40, awayWin: 3.20, over25: 1.65, under25: 2.25, bttsYes: 1.60, bttsNo: 2.30 }
+      },
+      {
+        id: 'fallback_3',
+        providerId: 'FLASHSCORE',
+        league: 'germany_bundesliga',
+        leagueName: 'Germany: Bundesliga',
+        matchDate: today,
+        kickOffTime: '18:30',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Borussia Dortmund',
+        stage: 'Bundesliga',
+        status: 'SCHEDULED',
+        odds: { homeWin: 1.55, draw: 4.50, awayWin: 5.50, over25: 1.45, under25: 2.75, bttsYes: 1.55, bttsNo: 2.40 }
+      },
+      {
+        id: 'fallback_4',
+        providerId: 'FLASHSCORE',
+        league: 'italy_serie_a',
+        leagueName: 'Italy: Serie A',
+        matchDate: today,
+        kickOffTime: '19:45',
+        homeTeam: 'Inter Milan',
+        awayTeam: 'AC Milan',
+        stage: 'Serie A',
+        status: 'SCHEDULED',
+        odds: { homeWin: 2.00, draw: 3.30, awayWin: 3.80, over25: 1.90, under25: 1.90, bttsYes: 1.85, bttsNo: 1.95 }
+      },
+      {
+        id: 'fallback_5',
+        providerId: 'FLASHSCORE',
+        league: 'france_ligue_1',
+        leagueName: 'France: Ligue 1',
+        matchDate: tomorrow,
+        kickOffTime: '20:00',
+        homeTeam: 'PSG',
+        awayTeam: 'Marseille',
+        stage: 'Ligue 1',
+        status: 'SCHEDULED',
+        odds: { homeWin: 1.48, draw: 4.60, awayWin: 6.50, over25: 1.50, under25: 2.60, bttsYes: 1.70, bttsNo: 2.10 }
+      },
+      {
+        id: 'fallback_6',
+        providerId: 'FLASHSCORE',
+        league: 'england_premier_league',
+        leagueName: 'England: Premier League',
+        matchDate: tomorrow,
+        kickOffTime: '15:00',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Liverpool',
+        stage: 'Premier League',
+        status: 'SCHEDULED',
+        odds: { homeWin: 1.90, draw: 3.50, awayWin: 3.90, over25: 1.68, under25: 2.15, bttsYes: 1.72, bttsNo: 2.05 }
+      },
+      {
+        id: 'fallback_7',
+        providerId: 'FLASHSCORE',
+        league: 'europe_champions_league',
+        leagueName: 'Europe: Champions League',
+        matchDate: day2,
+        kickOffTime: '20:00',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Manchester City',
+        stage: 'UEFA Champions League',
+        status: 'SCHEDULED',
+        odds: { homeWin: 2.40, draw: 3.40, awayWin: 2.80, over25: 1.72, under25: 2.05, bttsYes: 1.65, bttsNo: 2.20 }
+      },
+      {
+        id: 'fallback_8',
+        providerId: 'FLASHSCORE',
+        league: 'europe_champions_league',
+        leagueName: 'Europe: Champions League',
+        matchDate: day2,
+        kickOffTime: '20:00',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Arsenal',
+        stage: 'UEFA Champions League',
+        status: 'SCHEDULED',
+        odds: { homeWin: 1.80, draw: 3.80, awayWin: 4.40, over25: 1.60, under25: 2.30, bttsYes: 1.75, bttsNo: 2.00 }
+      }
+    ];
   }
 }

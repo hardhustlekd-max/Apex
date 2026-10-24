@@ -11,6 +11,7 @@ import { getLeaguePriority } from '../core/leaguePriority.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { loggerService } from '../services/loggerService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
+import { ServerPredictionGeneratorService } from '../services/serverPredictionGeneratorService.js';
 
 export const fixturesRouter = Router();
 
@@ -28,18 +29,18 @@ fixturesRouter.get('/', async (req, res) => {
     const dbCount = db.getUpcomingFixturesCount();
     const predCount = predictionsDb.count();
 
-    // If both upcoming fixtures database and predictions database have 0 records, trigger background ingestion
+    // If both upcoming fixtures database and predictions database have 0 records, trigger background ingestion or generate from DB
     if (dbCount === 0 && predCount === 0) {
       loggerService.addLog({
         level: 'INFO',
         category: 'DATA_FETCH',
         source: 'FixturesRouter',
-        message: 'No upcoming fixtures in database. Triggering Flashscore feed ingestion...',
+        message: 'No upcoming fixtures in database. Attempting scraper fetch or server-side prediction generation from DB...',
       });
       try {
         const initialUpcoming = await Promise.race([
           flashscoreScraperService.getUpcomingFixtures(),
-          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 15000))
+          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 8000))
         ]).catch(() => []);
 
         if (initialUpcoming && initialUpcoming.length > 0) {
@@ -48,31 +49,23 @@ fixturesRouter.get('/', async (req, res) => {
           if (liveInUpcoming.length > 0) {
             await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
           }
+        } else {
+          await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
         }
       } catch (err: any) {
         console.warn('Initial ingestion notice:', err?.message);
+        await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
       }
     }
 
-    // 1. First retrieve from predictionsDb (which holds complete precomputed prediction payloads)
-    let resultFixtures = predictionsDb.getPredictions({
+    // Retrieve predictions using ServerPredictionGeneratorService
+    let resultFixtures = await ServerPredictionGeneratorService.getPredictionsForUi({
       league: leagueFilter,
       date: dateParam,
       dateFilter,
       startDate,
       endDate,
     });
-
-    // 2. Fallback to db.getUpcomingFixtures if predictionsDb had no results for this filter
-    if (resultFixtures.length === 0) {
-      resultFixtures = db.getUpcomingFixtures({
-        league: leagueFilter,
-        date: dateParam,
-        dateFilter,
-        startDate,
-        endDate,
-      });
-    }
 
     loggerService.addLog({
       level: 'INFO',

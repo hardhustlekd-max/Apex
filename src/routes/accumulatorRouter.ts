@@ -8,6 +8,7 @@ import { AccumulatorGenerator, AccaGenerationParams, isMatchStarted } from '../c
 import { EngineSettings, Fixture } from '../core/types.js';
 import { ServerEngine } from '../core/serverEngine.js';
 import { loggerService } from '../services/loggerService.js';
+import { ServerPredictionGeneratorService } from '../services/serverPredictionGeneratorService.js';
 
 export const accumulatorRouter = Router();
 
@@ -17,145 +18,16 @@ async function handlePrebuiltGeneration(req: any, res: any) {
     const stake = Number(req.body?.stake || req.query?.stake) || 10;
     const clientFixtures = req.body?.fixtures;
 
-    const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
-      rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
-      safeWinThreshold: 0.72,
-      homeAdvantageFactor: 1.12,
-      formDecayRate: 0.85,
-      autoSyncDaily: true,
-    };
-
-    let fixturesToUse: Fixture[] = [];
-
-    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
-    const cachedH2HMap = db.getAllPredictionMeasurements();
-
-    if (Array.isArray(clientFixtures) && clientFixtures.length > 0) {
-      fixturesToUse = clientFixtures;
-    } else {
-      fixturesToUse = db.getUpcomingFixtures();
-      if (fixturesToUse.length === 0) {
-        await predictionsDb.init();
-        if (predictionsDb.count() > 0) {
-          fixturesToUse = predictionsDb.getAllPredictions();
-        }
-      }
-      if (fixturesToUse.length === 0) {
-        fixturesToUse = await flashscoreScraperService.getUpcomingFixtures();
-      }
-    }
-
-    // Ensure all fixtures are fully enriched with Poisson predictions and markets
-    fixturesToUse = fixturesToUse.map((f) => {
-      if (f.prediction && f.markets && f.markets.length > 0) {
-        return f;
-      }
-      const cleanId = (f.id || '').replace(/^fs_/, '');
-      const cachedH2H = cachedH2HMap.get(cleanId) ||
-        cachedH2HMap.get(f.id) ||
-        (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
-
-      const tacticalInput = {
-        information: f.information,
-        restDaysHome: f.restDaysHome,
-        restDaysAway: f.restDaysAway,
-        stage: f.stage,
-      };
-
-      return ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
-    });
-
-    // Exclude matches that have already started or kicked off
-    fixturesToUse = fixturesToUse.filter((f) => !isMatchStarted(f));
-
-    // Cross-check against active live matches to guarantee no in-play games are selected
-    try {
-      const activeLiveScores = await providerManager.getActiveProvider().getLiveScores();
-      if (Array.isArray(activeLiveScores) && activeLiveScores.length > 0) {
-        const liveIds = new Set<string>();
-        const liveTeams = new Set<string>();
-        for (const ls of activeLiveScores) {
-          if (ls.fixtureId) liveIds.add(ls.fixtureId.toLowerCase());
-          if (ls.homeTeam) liveTeams.add(ls.homeTeam.toLowerCase().trim());
-          if (ls.awayTeam) liveTeams.add(ls.awayTeam.toLowerCase().trim());
-        }
-        fixturesToUse = fixturesToUse.filter((f) => {
-          if (liveIds.has(f.id.toLowerCase())) return false;
-          if (liveTeams.has(f.homeTeam.toLowerCase().trim()) && liveTeams.has(f.awayTeam.toLowerCase().trim())) return false;
-          return true;
-        });
-      }
-    } catch {
-      // non-blocking
-    }
-
-    // 1. Banker Acca
-    const bankerSlip = AccumulatorGenerator.generateSlip(
-      fixturesToUse,
-      {
-        strategy: 'BANKER',
-        legCount: 3,
-        minProbability: 0.68,
-        stake,
-        dateFilter: dateScope,
-        allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'OVER_25'],
-      },
-      settings
+    // Use ServerPredictionGeneratorService to select high-value predictions directly from DB
+    const slips = await ServerPredictionGeneratorService.generateHighValueAccumulators(
+      dateScope,
+      stake,
+      clientFixtures
     );
-
-    // 2. Value Hunter Acca
-    const valueSlip = AccumulatorGenerator.generateSlip(
-      fixturesToUse,
-      {
-        strategy: 'VALUE_HUNTER',
-        legCount: 4,
-        stake,
-        dateFilter: dateScope,
-        allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'OVER_25', 'BTTS_YES', 'DRAW'],
-      },
-      settings
-    );
-
-    // 3. High Goals Acca
-    const goalsSlip = AccumulatorGenerator.generateSlip(
-      fixturesToUse,
-      {
-        strategy: 'CUSTOM',
-        legCount: 4,
-        targetOdds: 6.0,
-        stake,
-        dateFilter: dateScope,
-        allowedMarkets: ['OVER_25', 'BTTS_YES'],
-      },
-      settings
-    );
-    goalsSlip.name = dateScope === 'TODAY' ? "Today's High Goals Combo" : 'High Goals & BTTS Acca';
-
-    // 4. Mega Combo Acca
-    const megaSlip = AccumulatorGenerator.generateSlip(
-      fixturesToUse,
-      {
-        strategy: 'CUSTOM',
-        legCount: 6,
-        targetOdds: 20.0,
-        stake,
-        dateFilter: dateScope,
-        allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'OVER_25', 'BTTS_YES', 'DOUBLE_CHANCE_1X'],
-      },
-      settings
-    );
-    megaSlip.name = dateScope === 'TODAY' ? "Today's 6-Fold Mega Acca" : 'Weekend Mega Accumulator';
 
     res.json({
       success: true,
-      slips: {
-        BANKER: bankerSlip,
-        VALUE_HUNTER: valueSlip,
-        HIGH_GOALS: goalsSlip,
-        MEGA_COMBO: megaSlip,
-      },
+      slips,
     });
   } catch (err: any) {
     console.error('Error generating prebuilt accumulators on server:', err);
@@ -169,7 +41,6 @@ accumulatorRouter.get('/prebuilt', handlePrebuiltGeneration);
 accumulatorRouter.post('/generate', async (req, res) => {
   try {
     const params: AccaGenerationParams = req.body || {};
-    const provider = providerManager.getActiveProvider();
     const settings: EngineSettings = db.getSettings() || {
       activeProvider: 'FLASHSCORE',
       rollingMatchWindow: 15,
@@ -180,38 +51,12 @@ accumulatorRouter.post('/generate', async (req, res) => {
       autoSyncDaily: true,
     };
 
-    const rawFixtures = await provider.getUpcomingFixtures();
-    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
-    const cachedH2HMap = db.getAllPredictionMeasurements();
+    // Retrieve predictions directly from DB
+    const dbFixtures = await ServerPredictionGeneratorService.getPredictionsFromDb();
+    const highValueFixtures = ServerPredictionGeneratorService.selectHighValuePredictions(dbFixtures);
+    const candidateFixtures = highValueFixtures.length >= 3 ? highValueFixtures : dbFixtures;
 
-    // Enrich all fixtures with Poisson predictions & markets using the unified engine
-    const enrichedFixtures: Fixture[] = rawFixtures.map((f) => {
-      if (f.prediction && f.markets && f.markets.length > 0) {
-        return f;
-      }
-      const cleanId = (f.id || '').replace(/^fs_/, '');
-      const cachedH2H = cachedH2HMap.get(cleanId) ||
-        cachedH2HMap.get(f.id) ||
-        (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
-
-      const tacticalInput = {
-        information: f.information,
-        restDaysHome: f.restDaysHome,
-        restDaysAway: f.restDaysAway,
-        stage: f.stage,
-      };
-
-      const predicted = ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'ENGINE',
-        source: 'AccumulatorRouter',
-        message: `Processed prediction for fixture ${predicted.homeTeam} vs ${predicted.awayTeam}`,
-      });
-      return predicted;
-    });
-
-    const unstartedFixtures = enrichedFixtures.filter((f) => !isMatchStarted(f));
+    const unstartedFixtures = candidateFixtures.filter((f) => !isMatchStarted(f));
     const slip = AccumulatorGenerator.generateSlip(unstartedFixtures, params, settings);
 
     res.json({
