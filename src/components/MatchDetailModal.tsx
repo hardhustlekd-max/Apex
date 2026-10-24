@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, History, Calendar, Clock } from 'lucide-react';
-import { Fixture, HeadToHeadMeasurement } from '../core/types.js';
+import { Fixture, HeadToHeadMeasurement, MarketOption } from '../core/types.js';
 import { PoissonMatrixView } from './PoissonMatrixView.js';
 import { ApexEngine } from '../core/poisson.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -20,7 +20,7 @@ interface MatchDetailModalProps {
   onClose: () => void;
 }
 
-type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS';
+type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS';
 
 export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
   fixture,
@@ -109,6 +109,22 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
   const pred = currentFixture.prediction!;
   const homeStats = currentFixture.homeStats;
   const awayStats = currentFixture.awayStats;
+
+  const bestMarketsPerGroup = useMemo(() => {
+    if (!currentFixture.markets) return [];
+    const groups: Record<string, MarketOption> = {};
+    currentFixture.markets.forEach((market) => {
+      let group = '';
+      if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
+      else if (['OVER_25', 'UNDER_25'].includes(market.key)) group = 'GOALS';
+      else if (['BTTS_YES', 'BTTS_NO'].includes(market.key)) group = 'BTTS';
+      else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2'].includes(market.key)) group = 'DC';
+      if (group && (!groups[group] || market.probability > groups[group].probability)) {
+        groups[group] = market;
+      }
+    });
+    return Object.entries(groups).map(([groupName, market]) => ({ groupName, ...market }));
+  }, [currentFixture.markets]);
 
   // Real Scraped Head to Head synchronization
   const initialH2H = pred.measurements?.h2h && pred.measurements.h2h.homeRecentMatches && pred.measurements.h2h.homeRecentMatches.length > 0
@@ -455,6 +471,18 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             >
               <span>Standings</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('PREDICTIONS')}
+              className={`flex-1 min-w-[80px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center ${
+                activeTab === 'PREDICTIONS'
+                  ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <span>Predictions</span>
+            </button>
           </div>
         </div>
 
@@ -605,68 +633,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                       </div>
                     </div>
                   )}
-
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                    <span className="text-slate-600 dark:text-slate-300 font-sans">Over 2.5 Goals</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(pred.over25Prob * 100).toFixed(1)}%
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                    <span className="text-slate-600 dark:text-slate-300 font-sans">Both Teams Score</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(pred.bttsProb * 100).toFixed(1)}%
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                    <span className="text-slate-600 dark:text-slate-300 font-sans">Over 1.5 Goals</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(pred.over15Prob * 100).toFixed(1)}%
-                    </span>
-                  </div>
                 </div>
-              </div>
-
-              {/* Most Probable Correct Scores */}
-              {topScores.length > 0 && (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      Most Probable Scorelines
-                    </span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                      Top Exact Scores
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-5 gap-2 font-mono text-center">
-                    {topScores.map((scoreItem, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs"
-                      >
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block">
-                          {scoreItem.score}
-                        </span>
-                        <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 block mt-0.5">
-                          {(scoreItem.probability * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Poisson Heatmap Matrix */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60">
-                <PoissonMatrixView
-                  prediction={pred}
-                  homeTeam={fixture.homeTeam}
-                  awayTeam={fixture.awayTeam}
-                  showTopScores={false}
-                />
               </div>
             </div>
           )}
@@ -1200,7 +1167,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                   </div>
                 )}
 
-                {awayRecentMatchesList.length > 0 ? (
+                {awayRecentMatchesList.length > 0 && (
                   <div className="space-y-2 pt-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-sans">
@@ -1263,22 +1230,40 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                       ))}
                     </div>
                   </div>
-                ) : isLoadingH2H ? (
-                  <div className="py-6 min-h-[160px] text-center text-xs text-slate-500 font-mono flex flex-col items-center justify-center gap-2">
-                    <div className="w-5 h-5 rounded-full border-2 border-slate-500 border-t-transparent animate-spin shrink-0" />
-                    <span>Loading recent matches...</span>
-                  </div>
-                ) : (
-                  <div className="py-6 text-center text-xs text-slate-400 font-mono">
-                    No recent matches recorded
-                  </div>
                 )}
               </div>
-
             </div>
           )}
 
-          {/* TAB 5: STANDINGS */}
+          {/* TAB 5: PREDICTIONS */}
+          {activeTab === 'PREDICTIONS' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block font-sans">
+                  Market Predictions
+                </span>
+                {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
+                  <div className="space-y-2">
+                    {bestMarketsPerGroup.map((market, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-slate-300 font-sans font-bold">{market.groupName}</span>
+                        <div className="text-right">
+                          <span className="font-bold text-slate-900 dark:text-white block">{market.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono block">{(market.probability * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-400 font-mono">
+                    No market predictions available
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: STANDINGS */}
           {activeTab === 'STANDINGS' && (
             <div className="space-y-4 animate-in fade-in duration-150">
               <LeagueStandings
@@ -1288,7 +1273,6 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               />
             </div>
           )}
-
         </div>
       </div>
     </div>

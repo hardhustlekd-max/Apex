@@ -29,6 +29,9 @@ async function handlePrebuiltGeneration(req: any, res: any) {
 
     let fixturesToUse: Fixture[] = [];
 
+    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
+    const cachedH2HMap = db.getAllPredictionMeasurements();
+
     if (Array.isArray(clientFixtures) && clientFixtures.length > 0) {
       fixturesToUse = clientFixtures;
     } else {
@@ -40,30 +43,29 @@ async function handlePrebuiltGeneration(req: any, res: any) {
         }
       }
       if (fixturesToUse.length === 0) {
-        const rawFixtures = await flashscoreScraperService.getUpcomingFixtures();
-        const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
-        const cachedH2HMap = db.getAllPredictionMeasurements();
-
-        fixturesToUse = rawFixtures.map((f) => {
-          if (f.prediction && f.markets && f.markets.length > 0) {
-            return f;
-          }
-          const cleanId = (f.id || '').replace(/^fs_/, '');
-          const cachedH2H = cachedH2HMap.get(cleanId) ||
-            cachedH2HMap.get(f.id) ||
-            (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
-
-          const tacticalInput = {
-            information: f.information,
-            restDaysHome: f.restDaysHome,
-            restDaysAway: f.restDaysAway,
-            stage: f.stage,
-          };
-
-          return ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
-        });
+        fixturesToUse = await flashscoreScraperService.getUpcomingFixtures();
       }
     }
+
+    // Ensure all fixtures are fully enriched with Poisson predictions and markets
+    fixturesToUse = fixturesToUse.map((f) => {
+      if (f.prediction && f.markets && f.markets.length > 0) {
+        return f;
+      }
+      const cleanId = (f.id || '').replace(/^fs_/, '');
+      const cachedH2H = cachedH2HMap.get(cleanId) ||
+        cachedH2HMap.get(f.id) ||
+        (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0 ? f.prediction.measurements.h2h : null);
+
+      const tacticalInput = {
+        information: f.information,
+        restDaysHome: f.restDaysHome,
+        restDaysAway: f.restDaysAway,
+        stage: f.stage,
+      };
+
+      return ServerEngine.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
+    });
 
     // Exclude matches that have already started or kicked off
     fixturesToUse = fixturesToUse.filter((f) => !isMatchStarted(f));
@@ -98,7 +100,7 @@ async function handlePrebuiltGeneration(req: any, res: any) {
         minProbability: 0.68,
         stake,
         dateFilter: dateScope,
-        allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'OVER_15' as any],
+        allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'OVER_25'],
       },
       settings
     );
