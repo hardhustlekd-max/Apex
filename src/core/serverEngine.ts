@@ -5,6 +5,7 @@ import {
   EngineSettings,
   HistoricalMatch,
   HeadToHeadMeasurement,
+  TeamFormMatch,
 } from './types.js';
 import { ApexEngine } from './poisson.js';
 
@@ -47,6 +48,64 @@ export class ServerEngine {
     return universe;
   }
 
+  /**
+   * Dynamically calculates rest days from scraped match calendars & timestamps
+   */
+  public static calculateDynamicRestDays(
+    teamName: string,
+    fixtureDateStr: string,
+    allMatches: HistoricalMatch[],
+    recentFormMatches?: TeamFormMatch[]
+  ): number {
+    if (!fixtureDateStr || !teamName) return 7;
+    const fixtureDate = new Date(fixtureDateStr.length === 10 ? `${fixtureDateStr}T12:00:00Z` : fixtureDateStr);
+    const fixtureTime = fixtureDate.getTime();
+    if (isNaN(fixtureTime)) return 7;
+
+    // 1. Inspect recent matches from H2H scraped feed (most authoritative & timestamped)
+    if (recentFormMatches && recentFormMatches.length > 0) {
+      for (const rm of recentFormMatches) {
+        if (rm.date) {
+          const matchDate = new Date(rm.date.length === 10 ? `${rm.date}T12:00:00Z` : rm.date);
+          const matchTime = matchDate.getTime();
+          if (!isNaN(matchTime) && matchTime < fixtureTime) {
+            const diffDays = Math.round((fixtureTime - matchTime) / (1000 * 3600 * 24));
+            if (diffDays >= 1) {
+              return Math.min(28, diffDays);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to unified historical universe
+    const cleanTeam = teamName.toLowerCase().trim();
+    let latestPriorTime = 0;
+
+    for (const m of allMatches) {
+      const h = m.homeTeam?.toLowerCase().trim();
+      const a = m.awayTeam?.toLowerCase().trim();
+      if (h === cleanTeam || a === cleanTeam || (h && cleanTeam.includes(h)) || (a && cleanTeam.includes(a))) {
+        if (m.matchDate) {
+          const md = new Date(m.matchDate.length === 10 ? `${m.matchDate}T12:00:00Z` : m.matchDate);
+          const mt = md.getTime();
+          if (!isNaN(mt) && mt < fixtureTime && mt > latestPriorTime) {
+            latestPriorTime = mt;
+          }
+        }
+      }
+    }
+
+    if (latestPriorTime > 0) {
+      const diffDays = Math.round((fixtureTime - latestPriorTime) / (1000 * 3600 * 24));
+      if (diffDays >= 1) {
+        return Math.min(28, diffDays);
+      }
+    }
+
+    return 7;
+  }
+
   public static predictFixtureUnified(
     f: Fixture,
     allMatches: HistoricalMatch[],
@@ -61,6 +120,28 @@ export class ServerEngine {
     );
     const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
 
+    // Dynamically calculate rest days if not already provided
+    const restDaysHome = tacticalInput?.restDaysHome ?? f.restDaysHome ?? this.calculateDynamicRestDays(
+      f.homeTeam,
+      f.matchDate,
+      allMatches,
+      cachedH2H?.homeRecentMatches
+    );
+    const restDaysAway = tacticalInput?.restDaysAway ?? f.restDaysAway ?? this.calculateDynamicRestDays(
+      f.awayTeam,
+      f.matchDate,
+      allMatches,
+      cachedH2H?.awayRecentMatches
+    );
+
+    const mergedTacticalInput = {
+      ...tacticalInput,
+      restDaysHome,
+      restDaysAway,
+      information: tacticalInput?.information || f.information,
+      stage: tacticalInput?.stage || f.stage,
+    };
+
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       f.homeTeam,
       f.awayTeam,
@@ -68,17 +149,44 @@ export class ServerEngine {
       settings,
       cachedH2H,
       allMatches,
-      tacticalInput
+      mergedTacticalInput
     );
 
     let odds = f.odds;
-    if (!odds || !odds.homeWin || !odds.draw || !odds.awayWin) {
+    const isDummyPlaceholder = !odds || !odds.homeWin || !odds.draw || !odds.awayWin ||
+      (odds.homeWin === 2.10 && odds.draw === 3.30 && odds.awayWin === 3.40);
+
+    if (isDummyPlaceholder) {
+      // Calibrate realistic market consensus odds with standard bookmaker overround (~5.5% on 1X2, 6.0% on totals)
+      const margin1x2 = 1.055;
+      const marginTotals = 1.06;
+
+      const pH = Math.max(0.03, Math.min(0.92, prediction.homeWinProb));
+      const pD = Math.max(0.05, Math.min(0.40, prediction.drawProb));
+      const pA = Math.max(0.03, Math.min(0.92, prediction.awayWinProb));
+
+      const hw = Number(Math.max(1.04, Math.min(25.0, 1 / (pH * margin1x2))).toFixed(2));
+      const dr = Number(Math.max(1.50, Math.min(20.0, 1 / (pD * margin1x2))).toFixed(2));
+      const aw = Number(Math.max(1.04, Math.min(25.0, 1 / (pA * margin1x2))).toFixed(2));
+
+      const pOver = Math.max(0.05, Math.min(0.95, prediction.over25Prob));
+      const pUnder = 1 - pOver;
+      const o25 = Number(Math.max(1.10, Math.min(15.0, 1 / (pOver * marginTotals))).toFixed(2));
+      const u25 = Number(Math.max(1.10, Math.min(15.0, 1 / (pUnder * marginTotals))).toFixed(2));
+
+      const pBtts = Math.max(0.05, Math.min(0.95, prediction.bttsProb));
+      const pBttsNo = 1 - pBtts;
+      const bttsY = Number(Math.max(1.10, Math.min(15.0, 1 / (pBtts * marginTotals))).toFixed(2));
+      const bttsN = Number(Math.max(1.10, Math.min(15.0, 1 / (pBttsNo * marginTotals))).toFixed(2));
+
       odds = {
-        homeWin: prediction.homeWinProb > 0 ? Number((1 / prediction.homeWinProb).toFixed(2)) : 2.50,
-        draw: prediction.drawProb > 0 ? Number((1 / prediction.drawProb).toFixed(2)) : 3.20,
-        awayWin: prediction.awayWinProb > 0 ? Number((1 / prediction.awayWinProb).toFixed(2)) : 2.80,
-        over25: prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : 1.90,
-        under25: prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : 1.90,
+        homeWin: hw,
+        draw: dr,
+        awayWin: aw,
+        over25: o25,
+        under25: u25,
+        bttsYes: bttsY,
+        bttsNo: bttsN,
       };
     }
 
@@ -122,6 +230,8 @@ export class ServerEngine {
       information,
       statistics,
       resultDetails,
+      restDaysHome,
+      restDaysAway,
       odds,
       prediction: enrichedPrediction,
       markets,

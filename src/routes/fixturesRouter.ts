@@ -274,24 +274,72 @@ fixturesRouter.get('/:id', async (req, res) => {
       const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
       const parsedMatch = await OnDemandParser.getParsedMatch(cleanId);
 
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'DATA_FETCH',
-        source: 'MatchDetail',
-        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with on-demand parsed data`,
-      });
+      const settings: EngineSettings = db.getSettings() || {
+        activeProvider: 'FLASHSCORE',
+        rollingMatchWindow: 15,
+        minEVThreshold: 1.10,
+        safeWinThreshold: 0.72,
+        homeAdvantageFactor: 1.12,
+        formDecayRate: 0.85,
+        autoSyncDaily: true,
+      };
 
-      return res.json({
-        success: true,
-        fixture: {
+      const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
+      const restDaysHome = ServerEngine.calculateDynamicRestDays(
+        stored.homeTeam,
+        stored.matchDate,
+        allMatches,
+        realH2H?.homeRecentMatches
+      );
+      const restDaysAway = ServerEngine.calculateDynamicRestDays(
+        stored.awayTeam,
+        stored.matchDate,
+        allMatches,
+        realH2H?.awayRecentMatches
+      );
+
+      const tacticalInput = {
+        information: stored.information,
+        restDaysHome,
+        restDaysAway,
+        stage: stored.stage,
+      };
+
+      const enrichedStored = ServerEngine.predictFixtureUnified(
+        {
           ...stored,
           statistics: parsedMatch?.statistics && parsedMatch.statistics.length > 0 ? parsedMatch.statistics : stored.statistics,
           score: (parsedMatch?.homeScore !== undefined && parsedMatch?.awayScore !== undefined)
             ? { home: parsedMatch.homeScore, away: parsedMatch.awayScore }
             : stored.score,
+        },
+        allMatches,
+        settings,
+        realH2H,
+        tacticalInput
+      );
+
+      db.saveUpcomingFixtures([enrichedStored]);
+      try {
+        predictionsDb.savePredictions([enrichedStored]);
+      } catch {
+        // safe persistence
+      }
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'DATA_FETCH',
+        source: 'MatchDetail',
+        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with dynamic rest days (${restDaysHome}d vs ${restDaysAway}d)`,
+      });
+
+      return res.json({
+        success: true,
+        fixture: {
+          ...enrichedStored,
           measurements: {
-            ...stored.measurements,
-            h2h: realH2H && realH2H.matchesCount > 0 ? realH2H : stored.measurements?.h2h,
+            ...enrichedStored.measurements,
+            h2h: realH2H && realH2H.matchesCount > 0 ? realH2H : enrichedStored.measurements?.h2h,
           },
           h2hMatches: realH2H?.recentH2H || [],
         },
