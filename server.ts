@@ -19,12 +19,23 @@ async function startServer() {
     console.warn('predictionsDb init notice:', err);
   }
 
-  // Initial fixture ingestion if upcoming fixtures table is empty
-  if (db.getUpcomingFixturesCount() === 0) {
-    (async () => {
-      try {
+  // Initial fixture and historical match ingestion if tables are empty
+  (async () => {
+    try {
+      const { ServerEngine } = await import('./src/core/serverEngine.js');
+      const { DEFAULT_HISTORICAL_MATCHES } = await import('./src/core/defaultHistoricalMatches.js');
+
+      if (predictionsDb.countHistoricalPredictions() === 0) {
+        let rawHist = db.getAllHistoricalMatches(1500);
+        if (rawHist.length === 0) {
+          db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+          rawHist = DEFAULT_HISTORICAL_MATCHES;
+        }
+        await ServerEngine.predictAndStoreHistoricalMatches(rawHist);
+      }
+
+      if (db.getUpcomingFixturesCount() === 0) {
         const { flashscoreScraperService } = await import('./src/services/flashscoreScraperService.js');
-        const { ServerEngine } = await import('./src/core/serverEngine.js');
         const { ServerPredictionGeneratorService } = await import('./src/services/serverPredictionGeneratorService.js');
         const initialUpcoming = await flashscoreScraperService.getUpcomingFixtures().catch(() => []);
         if (initialUpcoming && initialUpcoming.length > 0) {
@@ -36,15 +47,11 @@ async function startServer() {
         } else {
           await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
         }
-      } catch (err: any) {
-        console.warn('Boot background fixture seed notice:', err?.message);
-        try {
-          const { ServerPredictionGeneratorService } = await import('./src/services/serverPredictionGeneratorService.js');
-          await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
-        } catch {}
       }
-    })();
-  }
+    } catch (err: any) {
+      console.warn('Boot background fixture/history seed notice:', err?.message);
+    }
+  })();
 
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {

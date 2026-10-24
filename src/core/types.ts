@@ -24,6 +24,7 @@ export interface HistoricalMatch {
   b365Under25?: number;
   restDaysHome?: number;
   restDaysAway?: number;
+  leagueName?: string;
 }
 
 export interface BookmakerOdds {

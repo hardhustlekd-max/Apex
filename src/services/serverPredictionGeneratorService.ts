@@ -68,50 +68,126 @@ export class ServerPredictionGeneratorService {
   }
 
   /**
-   * Selects high-value predictions with positive Expected Value (+EV), high probability, or banker ratings.
+   * Evaluates and extracts the maximum prediction percentage across ALL market categories
+   * (1X2, Goals Over/Under 1.5, 2.5, 3.5, Both Teams to Score Yes/No, Double Chance 1X, X2, 12).
+   */
+  public static getMaxMarketPercentage(f: Fixture): {
+    maxProb: number;
+    maxMarketKey: string;
+    maxMarketName: string;
+    maxEV: number;
+    allCategoryProbs: Record<string, number>;
+  } {
+    const pred = f.prediction;
+    const markets = f.markets || [];
+
+    let maxProb = 0;
+    let maxMarketKey = 'BEST_VALUE';
+    let maxMarketName = 'Best Value Pick';
+    let maxEV = 0;
+
+    const categoryProbs: Record<string, number> = {};
+
+    if (pred) {
+      categoryProbs['HOME_WIN'] = pred.homeWinProb || 0;
+      categoryProbs['DRAW'] = pred.drawProb || 0;
+      categoryProbs['AWAY_WIN'] = pred.awayWinProb || 0;
+      categoryProbs['OVER_15'] = pred.over15Prob || 0;
+      categoryProbs['OVER_25'] = pred.over25Prob || 0;
+      categoryProbs['UNDER_25'] = pred.over25Prob !== undefined ? 1 - pred.over25Prob : 0;
+      categoryProbs['OVER_35'] = pred.over35Prob || 0;
+      categoryProbs['BTTS_YES'] = pred.bttsProb || 0;
+      categoryProbs['BTTS_NO'] = pred.bttsProb !== undefined ? 1 - pred.bttsProb : 0;
+      categoryProbs['DOUBLE_CHANCE_1X'] = Math.min(0.99, (pred.homeWinProb || 0) + (pred.drawProb || 0));
+      categoryProbs['DOUBLE_CHANCE_X2'] = Math.min(0.99, (pred.awayWinProb || 0) + (pred.drawProb || 0));
+    }
+
+    // Evaluate markets array for highest prediction percentage across ALL market categories
+    for (const m of markets) {
+      if (m.probability > maxProb) {
+        maxProb = m.probability;
+        maxMarketKey = m.key;
+        maxMarketName = m.name;
+        maxEV = m.expectedValue || 0;
+      }
+      categoryProbs[m.key] = Math.max(categoryProbs[m.key] || 0, m.probability);
+    }
+
+    // Check all calculated category probabilities
+    for (const [key, prob] of Object.entries(categoryProbs)) {
+      if (prob > maxProb) {
+        maxProb = prob;
+        maxMarketKey = key;
+        maxMarketName = key.replace(/_/g, ' ');
+      }
+    }
+
+    return {
+      maxProb,
+      maxMarketKey,
+      maxMarketName,
+      maxEV,
+      allCategoryProbs: categoryProbs,
+    };
+  }
+
+  /**
+   * Ranks and filters stored DB predictions based on prediction percentages across ALL market categories
+   * (1X2, Over/Under Goals, Both Teams to Score, Double Chance).
    */
   public static selectHighValuePredictions(
     fixtures: Fixture[],
     options?: SelectHighValueOptions
   ): Fixture[] {
-    const minEV = options?.minEV ?? 1.02;
     const minProb = options?.minProb ?? 0.55;
+    const minEV = options?.minEV ?? 1.0;
     const bankerOnly = options?.bankerOnly ?? false;
     const limit = options?.limit ?? 50;
 
     // Filter unstarted matches
     const candidates = fixtures.filter((f) => !isMatchStarted(f));
 
-    const highValueFixtures = candidates.filter((f) => {
-      const pred = f.prediction;
-      const best = f.bestValueMarket;
+    // Calculate maximum market prediction percentage across all categories for each candidate
+    const scoredCandidates = candidates.map((f) => {
+      const marketAnalysis = this.getMaxMarketPercentage(f);
+      return {
+        fixture: f,
+        maxProb: marketAnalysis.maxProb,
+        maxMarketKey: marketAnalysis.maxMarketKey,
+        maxMarketName: marketAnalysis.maxMarketName,
+        maxEV: marketAnalysis.maxEV,
+      };
+    });
 
-      if (!pred || !best) return false;
-
+    // Filter based on all market categories prediction percentage threshold or banker status
+    const highValueList = scoredCandidates.filter((item) => {
       if (bankerOnly) {
-        return best.isBanker || best.probability >= 0.68;
+        return item.maxProb >= 0.68 || item.fixture.bestValueMarket?.isBanker;
       }
 
-      // Check Expected Value (+EV) or Banker status or high probability
-      const hasPositiveEV = best.expectedValue >= minEV || best.isPositiveEV;
-      const hasHighProbability = best.probability >= minProb || best.isBanker;
-      const hasStrongXGDiff = pred.homeXG !== undefined && pred.awayXG !== undefined && Math.abs(pred.homeXG - pred.awayXG) >= 0.7;
+      // Must meet minimum prediction percentage across any market category (e.g. >= 55%)
+      const meetsProbThreshold = item.maxProb >= minProb;
+      const possessesEVEdge = item.maxEV >= minEV || item.fixture.bestValueMarket?.isPositiveEV;
+      const isBanker = item.fixture.bestValueMarket?.isBanker;
 
-      return hasPositiveEV || hasHighProbability || hasStrongXGDiff;
+      return meetsProbThreshold || possessesEVEdge || isBanker;
     });
 
-    // Rank high-value predictions by EV and probability score
-    highValueFixtures.sort((a, b) => {
-      const scoreA = (a.bestValueMarket?.expectedValue || 0) * 0.5 + (a.bestValueMarket?.probability || 0) * 0.5;
-      const scoreB = (b.bestValueMarket?.expectedValue || 0) * 0.5 + (b.bestValueMarket?.probability || 0) * 0.5;
-      return scoreB - scoreA;
+    // Rank strictly descending by highest market category prediction percentage (and EV edge tiebreaker)
+    highValueList.sort((a, b) => {
+      if (Math.abs(b.maxProb - a.maxProb) > 0.01) {
+        return b.maxProb - a.maxProb;
+      }
+      return b.maxEV - a.maxEV;
     });
+
+    const result = highValueList.map((item) => item.fixture);
 
     if (limit && limit > 0) {
-      return highValueFixtures.slice(0, limit);
+      return result.slice(0, limit);
     }
 
-    return highValueFixtures;
+    return result;
   }
 
   /**
@@ -144,7 +220,7 @@ export class ServerPredictionGeneratorService {
       availableFixtures = await this.getPredictionsFromDb();
     }
 
-    // Select high-value predictions
+    // Select high-value predictions ranked across ALL market categories based on prediction percentage
     const highValueFixtures = this.selectHighValuePredictions(availableFixtures);
     const fixturesForAcca = highValueFixtures.length >= 3 ? highValueFixtures : availableFixtures;
 
@@ -209,7 +285,7 @@ export class ServerPredictionGeneratorService {
       level: 'SUCCESS',
       category: 'PREDICTION',
       source: 'ServerPredictionGeneratorService',
-      message: `Fed ${highValueFixtures.length} high-value DB predictions directly to Accumulator Generator UI`,
+      message: `Fed ${highValueFixtures.length} high-value DB predictions (ranked across all market categories) directly to Accumulator Generator UI`,
       details: {
         dateScope,
         highValueCount: highValueFixtures.length,

@@ -8,6 +8,7 @@ import {
   TeamFormMatch,
 } from './types.js';
 import { ApexEngine } from './poisson.js';
+import { DEFAULT_HISTORICAL_MATCHES } from './defaultHistoricalMatches.js';
 
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
@@ -16,7 +17,11 @@ import { getRelativeDateStr } from './dateUtils.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
-    const rawHist = db.getAllHistoricalMatches(1500);
+    let rawHist = db.getAllHistoricalMatches(1500);
+    if (rawHist.length === 0) {
+      db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+      rawHist = DEFAULT_HISTORICAL_MATCHES;
+    }
     const scrapedMatches = db.getFlashscoreScrapedMatches(500);
     const scrapedAsHistorical: HistoricalMatch[] = scrapedMatches
       .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)

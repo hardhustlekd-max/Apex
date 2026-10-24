@@ -12,6 +12,7 @@ import { flashscoreScraperService } from '../services/flashscoreScraperService.j
 import { loggerService } from '../services/loggerService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
 import { ServerPredictionGeneratorService } from '../services/serverPredictionGeneratorService.js';
+import { DEFAULT_HISTORICAL_MATCHES } from '../core/defaultHistoricalMatches.js';
 
 export const fixturesRouter = Router();
 
@@ -160,7 +161,11 @@ fixturesRouter.get('/history', async (req, res) => {
 
     // If historical predictions db has no records yet, populate with raw historical and scraped matches
     if (predictionsDb.countHistoricalPredictions() === 0) {
-      const rawMatches = db.getAllHistoricalMatches(1500);
+      let rawMatches = db.getAllHistoricalMatches(1500);
+      if (rawMatches.length === 0) {
+        db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+        rawMatches = DEFAULT_HISTORICAL_MATCHES;
+      }
       const scrapedMatches = db.getFlashscoreScrapedMatches(500);
       const scrapedAsHistorical: any[] = scrapedMatches
         .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
@@ -180,7 +185,13 @@ fixturesRouter.get('/history', async (req, res) => {
     }
 
     // Load predictions from predictions db
-    const matches = predictionsDb.getHistoricalPredictions({ league, limit });
+    let matches = predictionsDb.getHistoricalPredictions({ league, limit });
+
+    if (matches.length === 0) {
+      db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+      await ServerEngine.predictAndStoreHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+      matches = predictionsDb.getHistoricalPredictions({ league, limit });
+    }
 
     res.json({
       success: true,
