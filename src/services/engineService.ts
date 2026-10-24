@@ -131,14 +131,17 @@ export class EngineService {
     return localSettings;
   }
 
-  public static async syncFlashscoreData(): Promise<{
+  public static async resetAndSyncDatabase(): Promise<{
     success: boolean;
     message: string;
     matchesCount?: number;
     upcomingCount?: number;
     predictionsCount?: number;
+    historicalPredictionsCount?: number;
+    livePredictionsCount?: number;
+    stats?: any;
   }> {
-    const res = await this.safeJsonFetch('/api/providers/flashscore/sync', {
+    const res = await this.safeJsonFetch('/api/providers/flashscore/reset-and-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -146,13 +149,35 @@ export class EngineService {
       return res;
     }
 
+    const fallbackRes = await this.safeJsonFetch('/api/providers/flashscore/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resetDatabase: true, resetRawFeeds: true }),
+    });
+    if (fallbackRes && fallbackRes.success) {
+      return fallbackRes;
+    }
+
     return {
       success: false,
-      message: res?.error || 'Failed to sync with Flashscore scraper service',
+      message: res?.error || fallbackRes?.error || 'Failed to reset and sync database',
       matchesCount: 0,
       upcomingCount: 0,
       predictionsCount: 0,
     };
+  }
+
+  public static async syncFlashscoreData(): Promise<{
+    success: boolean;
+    message: string;
+    matchesCount?: number;
+    upcomingCount?: number;
+    predictionsCount?: number;
+    historicalPredictionsCount?: number;
+    livePredictionsCount?: number;
+    stats?: any;
+  }> {
+    return this.resetAndSyncDatabase();
   }
 
   public static async getProviders(): Promise<ProviderStatus[]> {

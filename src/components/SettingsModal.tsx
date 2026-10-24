@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Cpu, Check, Sun, Database, RefreshCw, RotateCcw, HardDrive } from 'lucide-react';
+import { X, Settings, Cpu, Check, Sun, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 
 interface SettingsModalProps {
@@ -8,13 +8,23 @@ interface SettingsModalProps {
   settings: EngineSettings | null;
   providers: ProviderStatus[];
   onSaveSettings: (newSettings: Partial<EngineSettings>) => void;
+  onResetAndSync?: () => void | Promise<void>;
+  isResettingAndSyncing?: boolean;
   onResetDatabase?: () => void;
   isResettingDatabase?: boolean;
+  onSyncData?: () => void;
+  isSyncingData?: boolean;
+  stats?: {
+    totalMatches: number;
+    totalTeams: number;
+    leagues: any[];
+    rawFeedsCount?: number;
+    upcomingCount?: number;
+    predictionsCount?: number;
+  };
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
-  onSyncData?: () => void;
-  isSyncingData?: boolean;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -23,13 +33,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   providers,
   onSaveSettings,
+  onResetAndSync,
+  isResettingAndSyncing,
   onResetDatabase,
   isResettingDatabase,
+  onSyncData,
+  isSyncingData,
+  stats,
   theme,
   onToggleTheme,
   onProviderChange,
-  onSyncData,
-  isSyncingData,
 }) => {
   if (!isOpen || !settings) return null;
 
@@ -38,6 +51,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     settings.activeProvider
   );
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+
+  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isResettingDatabase);
+
+  const handleExecuteResetAndSync = () => {
+    setIsConfirmingReset(false);
+    if (onResetAndSync) {
+      onResetAndSync();
+    } else if (onSyncData) {
+      onSyncData();
+    } else if (onResetDatabase) {
+      onResetDatabase();
+    }
+  };
 
   const handleProviderSelect = (providerId: EngineSettings['activeProvider']) => {
     setActiveProvider(providerId);
@@ -157,46 +184,126 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {activeTab === 'DATA' && (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+              {/* Live Database Metrics Overview */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Data Synchronization</h3>
-                  {isSyncingData && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                      Syncing...
-                    </div>
-                  )}
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Live Database & Feed Metrics
+                  </h3>
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    SQLite Active
+                  </span>
                 </div>
-                
-                {isSyncingData && (
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-slate-900 dark:bg-slate-100 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Upcoming Fixtures</span>
+                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {stats?.upcomingCount !== undefined ? stats.upcomingCount : '—'}
+                    </span>
                   </div>
-                )}
-                
-                <button
-                  onClick={onSyncData}
-                  disabled={isSyncingData}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold transition-colors cursor-pointer disabled:opacity-50 text-sm"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isSyncingData ? 'animate-spin' : ''}`} />
-                  {isSyncingData ? 'Syncing...' : 'Trigger Full Data Sync'}
-                </button>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Model Predictions</span>
+                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {stats?.predictionsCount !== undefined ? stats.predictionsCount : '—'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Stored Raw Feeds</span>
+                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Historical Matches</span>
+                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                      {stats?.totalMatches !== undefined ? stats.totalMatches : '—'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-3">
-                <h3 className="text-sm font-bold text-rose-900 dark:text-rose-400">Danger Zone</h3>
-                <p className="text-xs text-rose-800 dark:text-rose-300">
-                  Reset the entire database and all raw feeds. This action is irreversible.
-                </p>
-                <button
-                  onClick={() => onResetDatabase?.()}
-                  disabled={isResettingDatabase}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors cursor-pointer text-sm disabled:opacity-50"
-                >
-                  <RotateCcw className={`w-4 h-4 ${isResettingDatabase ? 'animate-spin' : ''}`} />
-                  {isResettingDatabase ? 'Resetting...' : 'Reset Database & Raw Feeds'}
-                </button>
+              {/* Merged Reset Database & Trigger Full Data Sync Card */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                        <RotateCcw className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                        Reset Database, Raw Feeds & Trigger Full Sync
+                      </h3>
+                    </div>
+                    {isOperating && (
+                      <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        In Progress...
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
+                    Purges all local SQLite database tables, relational statistics, cached raw Flashscore feeds, and prediction models, then immediately executes a complete end-to-end sync to fetch fresh feeds and regenerate Poisson predictions from zero.
+                  </p>
+                </div>
+
+                {isOperating && (
+                  <div className="space-y-2 p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <RefreshCw className="w-3 h-3 animate-spin text-rose-600 dark:text-rose-400" />
+                        Purging database & raw feeds, rebuilding Poisson predictions...
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500">Executing...</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-700/80 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-500 h-2 rounded-full animate-pulse w-full"></div>
+                    </div>
+                  </div>
+                )}
+
+                {!isOperating && !isConfirmingReset && (
+                  <button
+                    onClick={() => setIsConfirmingReset(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold transition-all cursor-pointer text-sm shadow-xs hover:shadow-sm"
+                  >
+                    <RotateCcw className="w-4 h-4 text-rose-400 dark:text-rose-600" />
+                    <span>Reset Database & Trigger Full Data Sync</span>
+                  </button>
+                )}
+
+                {!isOperating && isConfirmingReset && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-rose-900 dark:text-rose-300">
+                          Are you sure you want to proceed?
+                        </p>
+                        <p className="text-[11px] text-rose-700 dark:text-rose-400">
+                          This will permanently purge all database records and raw feed cache, then re-sync all live fixtures from Flashscore.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={handleExecuteResetAndSync}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Confirm Reset & Full Sync</span>
+                      </button>
+                      <button
+                        onClick={() => setIsConfirmingReset(false)}
+                        className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

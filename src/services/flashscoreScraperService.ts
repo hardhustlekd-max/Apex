@@ -341,9 +341,9 @@ export class FlashscoreScraperService {
   }
 
   /**
-   * Scrapes completed match results from Flashscore to populate historical database
+   * Clears in-memory caches for fresh scraping
    */
-  private clearCaches(): void {
+  public clearCaches(): void {
     this.cacheUpcoming = [];
     this.cacheH2H.clear();
     this.cacheStandings.clear();

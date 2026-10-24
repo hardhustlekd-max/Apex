@@ -417,36 +417,53 @@ export class FootballDB {
    * Clears database tables and local browser storage while preserving raw historical feed data by default
    */
   clearDatabase(clearRaw: boolean = false): void {
-    if (!this.db) return;
+    this.clearAllData(clearRaw);
+  }
+
+  /**
+   * Completely purges all database tables, caches, relational records, and optionally raw feeds
+   */
+  clearAllData(clearRaw: boolean = true): void {
+    this.fallbackHistoricalMatches = [];
+    this.fallbackUpcomingFixtures = [];
+    if (!this.db) {
+      return;
+    }
     this.db.run('BEGIN TRANSACTION;');
     try {
       this.db.run('DELETE FROM historical_matches;');
       this.db.run('DELETE FROM upcoming_fixtures;');
       this.db.run('DELETE FROM flashscore_scraped_matches;');
       this.db.run('DELETE FROM league_standings;');
+      this.db.run('DELETE FROM prebuilt_accumulators_cache;');
+      this.db.run('DELETE FROM prediction_measurements_cache;');
+      this.db.run('DELETE FROM match_statistics_relational;');
+      this.db.run('DELETE FROM h2h_records_relational;');
       if (clearRaw) {
         this.db.run('DELETE FROM raw_feed_data;');
       }
       this.db.run('COMMIT;');
       this.saveToDisk();
-      
+
       // Clear browser-side storage if running in browser
       if (typeof localStorage !== 'undefined') {
+        const theme = localStorage.getItem('theme');
         localStorage.clear();
+        if (theme) localStorage.setItem('theme', theme);
       }
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.clear();
       }
-      
-      console.log('[FootballDB] All tables and browser storage cleared.');
-      
-      // Force reload to completely fresh start if in browser
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.reload();
-      }
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Database tables ${clearRaw ? 'and raw feeds ' : ''}cleared successfully`,
+      });
     } catch (err) {
-      this.db.run('ROLLBACK;');
-      console.error('[FootballDB] Failed to clear database:', err);
+      try { this.db.run('ROLLBACK;'); } catch {}
+      console.error('[FootballDB] Failed to clear database tables:', err);
     }
   }
 

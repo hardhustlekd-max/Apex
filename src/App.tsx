@@ -57,10 +57,10 @@ export default function App() {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  const handleSyncData = async () => {
+  const handleResetAndSyncData = async () => {
     try {
       setIsSyncingData(true);
-      showNotification('Resetting databases, clearing caches, and restarting from zero...');
+      showNotification('Purging database & raw feeds, restarting sync from zero...', 'info');
       
       const currentTheme = localStorage.getItem('theme');
       localStorage.clear();
@@ -69,19 +69,27 @@ export default function App() {
         localStorage.setItem('theme', currentTheme);
       }
 
-      const res = await EngineService.syncFlashscoreData();
+      const res = await EngineService.resetAndSyncDatabase();
       if (res.success) {
-        await Promise.all([fetchFixtures(), fetchSettingsAndProviders()]);
-        showNotification(res.message || 'Databases and caches reset, predictions regenerated from zero!');
+        await Promise.all([
+          fetchFixtures(),
+          fetchSettingsAndProviders(),
+          fetchLiveScores(),
+        ]);
+        showNotification(res.message || 'Database and raw feeds reset! Fresh predictions synchronized.', 'success');
       } else {
-        showNotification(res.message || 'Failed to sync data');
+        showNotification(res.message || 'Failed to sync data', 'info');
       }
     } catch (err: any) {
-      showNotification('Error syncing data');
+      console.error('Error resetting and syncing:', err);
+      showNotification('Error resetting database and syncing data', 'info');
     } finally {
       setIsSyncingData(false);
     }
   };
+
+  const handleSyncData = handleResetAndSyncData;
+  const handleResetDatabase = handleResetAndSyncData;
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -211,21 +219,7 @@ export default function App() {
     }
   };
 
-  const handleResetDatabase = async () => {
-    try {
-      setIsSeeding(true);
-      const res = await EngineService.resetDatabase();
-      if (res.success) {
-        setStats(res.stats);
-        fetchFixtures();
-        showNotification(res.message);
-      }
-    } catch (e) {
-      console.error('Failed to reset database:', e);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
+
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -333,13 +327,16 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         providers={providers}
+        stats={stats}
         onSaveSettings={handleSaveSettings}
-        onResetDatabase={handleResetDatabase}
-        isResettingDatabase={isSeeding}
+        onResetAndSync={handleResetAndSyncData}
+        isResettingAndSyncing={isSyncingData || isSeeding}
+        onResetDatabase={handleResetAndSyncData}
+        isResettingDatabase={isSyncingData || isSeeding}
         theme={theme}
         onToggleTheme={toggleTheme}
         onProviderChange={handleProviderChange}
-        onSyncData={handleSyncData}
+        onSyncData={handleResetAndSyncData}
         isSyncingData={isSyncingData}
       />
     </div>

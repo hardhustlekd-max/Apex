@@ -123,83 +123,129 @@ providersRouter.get('/flashscore/scrape', async (req, res) => {
   }
 });
 
-providersRouter.post('/flashscore/sync', async (req, res) => {
-  try {
+async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds: boolean }) {
+  if (options.resetDatabase || options.resetRawFeeds) {
     loggerService.addLog({
       level: 'INFO',
       category: 'DATABASE',
       source: 'SyncEngine',
-      message: 'Incremental sync: fetching and storing non-existing raw feeds indefinitely',
+      message: 'Purging database tables, raw feeds, and cached predictions...',
     });
+    db.clearAllData(options.resetRawFeeds);
+    predictionsDb.clearAll();
+    flashscoreScraperService.clearCaches();
+  }
 
-    const syncRes = await flashscoreScraperService.syncHistoricalData(7);
-    const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-    const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
+  loggerService.addLog({
+    level: 'INFO',
+    category: 'DATABASE',
+    source: 'SyncEngine',
+    message: 'Starting Flashscore historical & upcoming feeds synchronization...',
+  });
 
-    // Also predict and store historical matches in predictions db
-    const rawMatches = db.getAllHistoricalMatches(1500);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const scrapedAsHistorical: any[] = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm, idx) => ({
-        id: sm.matchId || `scraped_${idx}`,
-        div: sm.leagueName || sm.stage || 'FLASHSCORE',
-        leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-        matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
-        homeTeam: sm.home.name,
-        awayTeam: sm.away.name,
-        fthg: parseInt(sm.result!.home!, 10) || 0,
-        ftag: parseInt(sm.result!.away!, 10) || 0,
-        ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
-      }));
-    const allHist = [...rawMatches, ...scrapedAsHistorical];
-    const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
+  const syncRes = await flashscoreScraperService.syncHistoricalData(7);
+  const upcoming = await flashscoreScraperService.getUpcomingFixtures();
+  const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
 
+  // Predict and store historical matches in predictions db
+  const rawMatches = db.getAllHistoricalMatches(1500);
+  const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+  const scrapedAsHistorical: any[] = scrapedMatches
+    .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
+    .map((sm, idx) => ({
+      id: sm.matchId || `scraped_${idx}`,
+      div: sm.leagueName || sm.stage || 'FLASHSCORE',
+      leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
+      matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
+      homeTeam: sm.home.name,
+      awayTeam: sm.away.name,
+      fthg: parseInt(sm.result!.home!, 10) || 0,
+      ftag: parseInt(sm.result!.away!, 10) || 0,
+      ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
+    }));
+  const allHist = [...rawMatches, ...scrapedAsHistorical];
+  const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
+
+  // Update live predictions if any live games are active
+  const activeProvider = providerManager.getActiveProvider();
+  const liveScores = await activeProvider.getLiveScores().catch(() => []);
+  let livePredCount = 0;
+  if (liveScores && liveScores.length > 0) {
+    const liveFixtures: Fixture[] = liveScores.map((s) => ({
+      id: s.fixtureId,
+      providerId: 'FLASHSCORE',
+      league: s.league || 'ALL',
+      leagueName: s.leagueName || 'Live In-Play',
+      matchDate: getRelativeDateStr(0),
+      kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+      homeTeam: s.homeTeam,
+      awayTeam: s.awayTeam,
+      status: 'LIVE' as const,
+      minute: s.minute,
+      score: { home: s.homeScore, away: s.awayScore },
+      odds: {
+        homeWin: 2.10,
+        draw: 3.30,
+        awayWin: 3.40,
+        over25: 1.85,
+        under25: 1.95,
+      },
+    }));
+    const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
+    livePredCount = liveRes.count;
+  }
+
+  const updatedStats = {
+    ...db.getStatsSummary(),
+    rawFeedsCount: db.getRawFeedsCount(),
+    upcomingCount: db.getUpcomingFixturesCount(),
+    predictionsCount: predictionsDb.count(),
+  };
+
+  loggerService.addLog({
+    level: 'SUCCESS',
+    category: 'DATA_FETCH',
+    source: 'SyncEngine',
+    message: `Sync completed: ${upcoming.length} upcoming fixtures, ${allHist.length} historical, ${livePredCount} live predicted`,
+  });
+
+  return {
+    success: true,
+    message: options.resetDatabase || options.resetRawFeeds
+      ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical predictions)`
+      : `Predictions updated in database (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical)`,
+    matchesCount: syncRes.matchesCount,
+    upcomingCount: upcoming.length,
+    predictionsCount: predRes.count,
+    historicalPredictionsCount: histPredRes.count,
+    livePredictionsCount: livePredCount,
+    stats: updatedStats,
+  };
+}
+
+// Unified Reset Database, Raw Feeds & Full Data Sync
+providersRouter.post('/flashscore/reset-and-sync', async (req, res) => {
+  try {
+    const result = await runSyncWorkflow({ resetDatabase: true, resetRawFeeds: true });
+    res.json(result);
+  } catch (err: any) {
     loggerService.addLog({
-      level: 'SUCCESS',
+      level: 'ERROR',
       category: 'DATA_FETCH',
       source: 'SyncEngine',
-      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${allHist.length} historical matches predicted and stored`,
+      message: `Failed to reset and sync Flashscore data: ${err?.message}`,
     });
+    res.status(500).json({ success: false, error: err?.message || 'Failed to reset and sync Flashscore data' });
+  }
+});
 
-    // Also update live predictions if any live games are active
-    const activeProvider = providerManager.getActiveProvider();
-    const liveScores = await activeProvider.getLiveScores();
-    let livePredCount = 0;
-    if (liveScores && liveScores.length > 0) {
-      const liveFixtures: Fixture[] = liveScores.map((s) => ({
-        id: s.fixtureId,
-        providerId: 'FLASHSCORE',
-        league: s.league || 'ALL',
-        leagueName: s.leagueName || 'Live In-Play',
-        matchDate: getRelativeDateStr(0),
-        kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
-        homeTeam: s.homeTeam,
-        awayTeam: s.awayTeam,
-        status: 'LIVE' as const,
-        minute: s.minute,
-        score: { home: s.homeScore, away: s.awayScore },
-        odds: {
-          homeWin: 2.10,
-          draw: 3.30,
-          awayWin: 3.40,
-          over25: 1.85,
-          under25: 1.95,
-        },
-      }));
-      const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
-      livePredCount = liveRes.count;
-    }
-
-    res.json({
-      success: true,
-      message: `Predictions updated in database (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical)`,
-      matchesCount: syncRes.matchesCount,
-      upcomingCount: upcoming.length,
-      predictionsCount: predRes.count,
-      historicalPredictionsCount: histPredRes.count,
-      livePredictionsCount: livePredCount,
-    });
+// Standard sync route with optional reset support
+providersRouter.post('/flashscore/sync', async (req, res) => {
+  try {
+    const resetDatabase = req.body?.resetDatabase ?? true;
+    const resetRawFeeds = req.body?.resetRawFeeds ?? true;
+    const result = await runSyncWorkflow({ resetDatabase, resetRawFeeds });
+    res.json(result);
   } catch (err: any) {
     loggerService.addLog({
       level: 'ERROR',
