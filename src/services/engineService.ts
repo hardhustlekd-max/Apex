@@ -115,6 +115,33 @@ export class EngineService {
     return localSettings;
   }
 
+  public static async getTursoStatus(): Promise<{
+    footballDb: {
+      configured: boolean;
+      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+      url: string | null;
+      latencyMs?: number;
+      error?: string;
+    };
+    predictionsDb: {
+      configured: boolean;
+      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+      url: string | null;
+      latencyMs?: number;
+      error?: string;
+    };
+    localSqlite: {
+      status: 'ONLINE';
+      mode: string;
+    };
+  } | null> {
+    const serverData = await this.safeJsonFetch('/api/settings/turso-status');
+    if (serverData && serverData.success && serverData.turso) {
+      return serverData.turso;
+    }
+    return null;
+  }
+
   public static async updateSettings(newSettings: Partial<EngineSettings>): Promise<EngineSettings> {
     const serverData = await this.safeJsonFetch('/api/settings', {
       method: 'PUT',

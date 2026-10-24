@@ -56,3 +56,94 @@ export async function safeTursoBatch(
   return { success: true, executedCount };
 }
 
+export interface TursoDbStatus {
+  footballDb: {
+    configured: boolean;
+    status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+    url: string | null;
+    latencyMs?: number;
+    error?: string;
+  };
+  predictionsDb: {
+    configured: boolean;
+    status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+    url: string | null;
+    latencyMs?: number;
+    error?: string;
+  };
+  localSqlite: {
+    status: 'ONLINE';
+    mode: string;
+  };
+}
+
+export async function getTursoConnectionStatus(): Promise<TursoDbStatus> {
+  const footballConfigured = Boolean(process.env.football_turso_url);
+  const predictionsConfigured = Boolean(process.env.predictions_turso_url);
+
+  let footballStatus: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' = footballConfigured ? 'DISCONNECTED' : 'NOT_CONFIGURED';
+  let footballLatency: number | undefined;
+  let footballError: string | undefined;
+
+  let predictionsStatus: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' = predictionsConfigured ? 'DISCONNECTED' : 'NOT_CONFIGURED';
+  let predictionsLatency: number | undefined;
+  let predictionsError: string | undefined;
+
+  if (footballTurso) {
+    const start = Date.now();
+    try {
+      await footballTurso.execute('SELECT 1 as ping');
+      footballLatency = Date.now() - start;
+      footballStatus = 'CONNECTED';
+    } catch (err: any) {
+      footballError = err?.message || 'Turso query failed';
+      footballStatus = 'DISCONNECTED';
+    }
+  }
+
+  if (predictionsTurso) {
+    const start = Date.now();
+    try {
+      await predictionsTurso.execute('SELECT 1 as ping');
+      predictionsLatency = Date.now() - start;
+      predictionsStatus = 'CONNECTED';
+    } catch (err: any) {
+      predictionsError = err?.message || 'Turso query failed';
+      predictionsStatus = 'DISCONNECTED';
+    }
+  }
+
+  const maskUrl = (rawUrl?: string) => {
+    if (!rawUrl) return null;
+    try {
+      const sanitized = rawUrl.startsWith('libsql://') ? rawUrl.replace('libsql://', 'https://') : rawUrl;
+      const parsed = new URL(sanitized);
+      return `libsql://${parsed.hostname}`;
+    } catch {
+      return rawUrl.slice(0, 20) + '...';
+    }
+  };
+
+  return {
+    footballDb: {
+      configured: footballConfigured,
+      status: footballStatus,
+      url: maskUrl(process.env.football_turso_url),
+      latencyMs: footballLatency,
+      error: footballError,
+    },
+    predictionsDb: {
+      configured: predictionsConfigured,
+      status: predictionsStatus,
+      url: maskUrl(process.env.predictions_turso_url),
+      latencyMs: predictionsLatency,
+      error: predictionsError,
+    },
+    localSqlite: {
+      status: 'ONLINE',
+      mode: 'PERSISTENT_WASM_SQLITE',
+    },
+  };
+}
+
+

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Settings, Cpu, Check, Sun, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Settings, Cpu, Check, Sun, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
+import { EngineService } from '../services/engineService.js';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,14 +45,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleTheme,
   onProviderChange,
 }) => {
-  if (!isOpen || !settings) return null;
-
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'UI'>('ENGINE');
   const [activeProvider, setActiveProvider] = useState<EngineSettings['activeProvider']>(
-    settings.activeProvider
+    settings?.activeProvider || 'FLASHSCORE'
   );
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [tursoStatus, setTursoStatus] = useState<any>(null);
+  const [isCheckingTurso, setIsCheckingTurso] = useState<boolean>(false);
+
+  const fetchTursoStatus = async () => {
+    setIsCheckingTurso(true);
+    try {
+      const data = await EngineService.getTursoStatus();
+      setTursoStatus(data);
+    } catch (err) {
+      console.error('Error checking Turso DB status:', err);
+    } finally {
+      setIsCheckingTurso(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'DATA') {
+      fetchTursoStatus();
+    }
+  }, [isOpen, activeTab]);
+
+  if (!isOpen || !settings) return null;
 
   const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isResettingDatabase);
 
@@ -220,6 +241,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
                       {stats?.totalMatches !== undefined ? stats.totalMatches : '—'}
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Turso DBs Connection Status Section */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Server className="w-4 h-4 text-sky-500" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Turso Cloud DBs Connection Status
+                    </h3>
+                  </div>
+                  <button
+                    onClick={fetchTursoStatus}
+                    disabled={isCheckingTurso}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isCheckingTurso ? 'animate-spin' : ''}`} />
+                    <span>Test Connection</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Football Turso DB */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-indigo-500" />
+                        Football Turso DB
+                      </span>
+                      {tursoStatus?.footballDb?.status === 'CONNECTED' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          CONNECTED ({tursoStatus.footballDb.latencyMs}ms)
+                        </span>
+                      ) : tursoStatus?.footballDb?.status === 'DISCONNECTED' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 flex items-center gap-1">
+                          <XCircle className="w-3 h-3" />
+                          DISCONNECTED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          LOCAL SQLite ONLY
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 space-y-0.5">
+                      <div className="truncate">
+                        Endpoint: <span className="text-slate-700 dark:text-slate-300 font-semibold">{tursoStatus?.footballDb?.url || 'Local Memory/Disk SQLite'}</span>
+                      </div>
+                      {tursoStatus?.footballDb?.error && (
+                        <p className="text-[10px] text-rose-600 dark:text-rose-400 truncate">
+                          Err: {tursoStatus.footballDb.error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Predictions Turso DB */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-sky-500" />
+                        Predictions Turso DB
+                      </span>
+                      {tursoStatus?.predictionsDb?.status === 'CONNECTED' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          CONNECTED ({tursoStatus.predictionsDb.latencyMs}ms)
+                        </span>
+                      ) : tursoStatus?.predictionsDb?.status === 'DISCONNECTED' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 flex items-center gap-1">
+                          <XCircle className="w-3 h-3" />
+                          DISCONNECTED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          LOCAL SQLite ONLY
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 space-y-0.5">
+                      <div className="truncate">
+                        Endpoint: <span className="text-slate-700 dark:text-slate-300 font-semibold">{tursoStatus?.predictionsDb?.url || 'Local Memory/Disk SQLite'}</span>
+                      </div>
+                      {tursoStatus?.predictionsDb?.error && (
+                        <p className="text-[10px] text-rose-600 dark:text-rose-400 truncate">
+                          Err: {tursoStatus.predictionsDb.error}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -276,10 +276,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         </div>
 
         {/* Prediction Data Columns */}
-        <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-1 sm:gap-2 shrink-0">
+        <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-2 shrink-0">
           {/* Section 1: Highest Probability Pick */}
           <div
-            className="w-[30%] sm:w-[28%] flex items-center justify-center shrink-0"
+            className="w-[35%] sm:w-[35%] flex items-center justify-center shrink-0"
             title={`Model Pick: ${pick.label} (${pick.probabilityFormatted})`}
           >
             <div className="flex items-center gap-1">
@@ -292,24 +292,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             </div>
           </div>
 
-          {/* Section 2: Value Bet (+EV) */}
-          <div className="w-[26%] sm:w-[24%] flex items-center justify-center shrink-0">
-            {valueBet.hasValue ? (
-              <span
-                className="px-2 h-5 flex items-center justify-center rounded-md bg-[#dafbe1] dark:bg-[#23863626] text-[#1a7f37] dark:text-[#3fb950] border border-[#4ac26b66] text-[10px] sm:text-[11px] font-mono font-bold whitespace-nowrap shadow-[0_1px_0_rgba(27,31,36,0.04)]"
-                title={`Value Bet: ${valueBet.selection} (${valueBet.evFormatted} @ ${valueBet.odds.toFixed(2)})`}
-              >
-                +{valueBet.edgePercent.toFixed(1)}%
-              </span>
-            ) : (
-              <span className="text-xs font-mono text-[#8c959f] dark:text-[#6e7681] select-none">
-                —
-              </span>
-            )}
-          </div>
-
-          {/* Section 3: Probabilities */}
-          <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0 whitespace-nowrap">
+          {/* Section 2: Probabilities */}
+          <div className="w-[65%] sm:w-[65%] flex items-center justify-end gap-1.5 font-mono text-[10px] sm:text-[11px] font-bold shrink-0 whitespace-nowrap">
             {marketFilter === 'OVER_UNDER' ? (
               <>
                 <span
@@ -415,8 +399,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 {sortBy === 'AWAY_DESC' && 'Away Win % (2)'}
               </span>
             </div>
-            <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-1 sm:gap-2 shrink-0">
-              <div className="w-[30%] sm:w-[28%] flex items-center justify-center shrink-0">
+            <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-2 shrink-0">
+              <div className="w-[35%] sm:w-[35%] flex items-center justify-center shrink-0">
                 <button
                   type="button"
                   onClick={() =>
@@ -433,15 +417,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   )}
                 </button>
               </div>
-              <div className="w-[26%] sm:w-[24%] flex items-center justify-center shrink-0">
-                <span
-                  className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400"
-                  title="Identified Positive EV Bet"
-                >
-                  VALUE
-                </span>
-              </div>
-              <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+              <div className="w-[65%] sm:w-[65%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                 {marketFilter === 'OVER_UNDER' ? (
                   <>
                     <span className="min-w-[34px] sm:min-w-[42px] text-center">O 2.5</span>
@@ -518,8 +494,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   {group.fixtures.length}
                 </span>
               </div>
-              <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-1 sm:gap-2 shrink-0">
-                <div className="w-[30%] sm:w-[28%] flex items-center justify-center shrink-0">
+              <div className="col-span-7 sm:col-span-6 flex items-center justify-end gap-2 shrink-0">
+                <div className="w-[35%] sm:w-[35%] flex items-center justify-center shrink-0">
                   <button
                     type="button"
                     onClick={() => onSelectSortBy?.('PROB_DESC')}
@@ -530,15 +506,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     <ArrowUpDown className="w-2.5 h-2.5 opacity-60" />
                   </button>
                 </div>
-                <div className="w-[26%] sm:w-[24%] flex items-center justify-center shrink-0">
-                  <span
-                    className="font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400"
-                    title="Identified Positive EV Bet"
-                  >
-                    VALUE
-                  </span>
-                </div>
-                <div className="w-[44%] sm:w-[48%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                <div className="w-[65%] sm:w-[65%] flex items-center justify-end gap-1 font-mono text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                   {marketFilter === 'OVER_UNDER' ? (
                     <>
                       <span className="min-w-[34px] sm:min-w-[42px] text-center">O 2.5</span>

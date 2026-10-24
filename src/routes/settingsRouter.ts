@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { providerManager } from '../providers/providerManager.js';
 import { EngineSettings } from '../core/types.js';
+import { getTursoConnectionStatus } from '../core/tursoClient.js';
 
 export const settingsRouter = Router();
 
@@ -22,6 +23,18 @@ settingsRouter.get('/', (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to get settings' });
+  }
+});
+
+settingsRouter.get('/turso-status', async (req, res) => {
+  try {
+    const tursoStatus = await getTursoConnectionStatus();
+    res.json({
+      success: true,
+      turso: tursoStatus,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to check Turso connection status' });
   }
 });
 
@@ -58,3 +71,4 @@ settingsRouter.put('/', (req, res) => {
     res.status(500).json({ success: false, error: err?.message || 'Failed to update settings' });
   }
 });
+

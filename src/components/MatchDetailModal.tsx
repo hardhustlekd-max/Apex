@@ -26,9 +26,8 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
   fixture,
   onClose,
 }) => {
-  if (!fixture) return null;
-
   const safeFixture = useMemo(() => {
+    if (!fixture) return null;
     if (fixture.prediction) return fixture;
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       fixture.homeTeam,
@@ -68,6 +67,8 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
       measurements: prediction.measurements,
     };
   }, [fixture]);
+
+  if (!fixture || !safeFixture) return null;
 
   return <MatchDetailModalContent fixture={safeFixture} onClose={onClose} />;
 };
