@@ -4,6 +4,7 @@ import { db } from '../core/db.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getCurrentSeason } from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
+import { DEFAULT_HISTORICAL_MATCHES } from '../core/defaultHistoricalMatches.js';
 
 const FLASHSCORE_FEED_BASE = 'https://www.flashscore.com/x/feed';
 const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
@@ -37,7 +38,7 @@ export class FlashscoreScraperService {
       let timeout: NodeJS.Timeout | null = null;
       try {
         const controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), 8000);
+        timeout = setTimeout(() => controller.abort(), 2000);
 
         const res = await fetch(url, {
           headers: {
@@ -544,6 +545,16 @@ export class FlashscoreScraperService {
 
     if (historicalMatches.length > 0) {
       inserted = db.insertHistoricalMatches(historicalMatches);
+    }
+    const currentHistCount = db.getAllHistoricalMatches(1500).length;
+    if (currentHistCount === 0) {
+      inserted = db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Seeded ${inserted} default historical matches into database fallback`,
+      });
     }
 
     // Refresh upcoming fixtures as well

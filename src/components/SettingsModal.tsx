@@ -108,12 +108,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl shadow-slate-900/10 dark:shadow-black/70 border border-slate-100 dark:border-slate-800/80 flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.8)] flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white/95 dark:bg-[#0B0F17]/95 backdrop-blur-md px-5 sm:px-6 py-4 flex items-center justify-between z-10 shadow-xs border-b border-slate-100 dark:border-slate-800/60">
+        <div className="sticky top-0 bg-white/95 dark:bg-[#101728]/95 backdrop-blur-xl px-5 sm:px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-xs">
+            <div className="p-2 rounded-2xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300">
               <Settings className="w-5 h-5" />
             </div>
             <div>
@@ -124,47 +124,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-xs"
+            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162038] dark:hover:bg-[#1e2b48] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Navigation Tabs: Engine, Data Management, UI */}
-        <div className="px-5 sm:px-6 py-2.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800/60 flex items-center gap-2 text-xs overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setActiveTab('ENGINE')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'ENGINE'
-                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>Engine</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('DATA')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'DATA'
-                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Data Management</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('UI')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'UI'
-                ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Sun className="w-3.5 h-3.5" />
-            <span>UI Settings</span>
-          </button>
+        <div className="px-5 sm:px-6 pb-2">
+          <div className="p-1 bg-slate-100 dark:bg-[#070c14] rounded-2xl flex items-center gap-1 text-xs overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setActiveTab('ENGINE')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'ENGINE'
+                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>Engine</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('DATA')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'DATA'
+                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Data Management</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('UI')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'UI'
+                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5" />
+              <span>UI Settings</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Body */}
@@ -179,23 +181,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div
                       key={p.id}
                       onClick={() => handleProviderSelect(p.id)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      className={`p-4 rounded-2xl transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs ${
                         isSelected
-                          ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-900 dark:border-slate-500 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          ? 'bg-slate-100 dark:bg-[#1a253c] text-slate-900 dark:text-white ring-2 ring-[#A3FF12]'
+                          : 'bg-slate-50 dark:bg-[#141d33] hover:bg-slate-100 dark:hover:bg-[#162038]'
                       }`}
                     >
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-slate-900 dark:text-white">{p.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-300">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-200/70 dark:bg-[#0d1424] text-slate-800 dark:text-slate-300">
                             v{p.version || '1.0'}
                           </span>
-                          <span className="text-xs font-mono text-slate-600 dark:text-slate-400 font-semibold">{p.latencyMs}ms</span>
+                          <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">{p.latencyMs}ms</span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{p.description}</p>
                       </div>
-                      {isSelected && <Check className="w-5 h-5 text-slate-900 dark:text-white" />}
+                      {isSelected && <Check className="w-5 h-5 text-[#A3FF12] shrink-0" />}
                     </div>
                   );
                 })}
@@ -206,39 +208,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'DATA' && (
             <div className="space-y-4">
               {/* Live Database Metrics Overview */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Live Database & Feed Metrics
                   </h3>
-                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     SQLite Active
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Upcoming Fixtures</span>
-                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
                       {stats?.upcomingCount !== undefined ? stats.upcomingCount : '—'}
                     </span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Model Predictions</span>
-                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
                       {stats?.predictionsCount !== undefined ? stats.predictionsCount : '—'}
                     </span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Stored Raw Feeds</span>
-                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
                       {stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—'}
                     </span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Historical Matches</span>
-                    <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
                       {stats?.totalMatches !== undefined ? stats.totalMatches : '—'}
                     </span>
                   </div>
@@ -246,7 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Turso DBs Connection Status Section */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Server className="w-4 h-4 text-sky-500" />
@@ -257,7 +259,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     onClick={fetchTursoStatus}
                     disabled={isCheckingTurso}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white dark:bg-[#101728] hover:bg-slate-100 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 shadow-xs transition-all cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3 h-3 ${isCheckingTurso ? 'animate-spin' : ''}`} />
                     <span>Test Connection</span>
@@ -266,24 +268,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   {/* Football Turso DB */}
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                         <Database className="w-3.5 h-3.5 text-indigo-500" />
                         Football Turso DB
                       </span>
                       {tursoStatus?.footballDb?.status === 'CONNECTED' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                           CONNECTED ({tursoStatus.footballDb.latencyMs}ms)
                         </span>
                       ) : tursoStatus?.footballDb?.status === 'DISCONNECTED' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
                           <XCircle className="w-3 h-3" />
                           DISCONNECTED
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
                           LOCAL SQLite ONLY
                         </span>
@@ -303,24 +305,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Predictions Turso DB */}
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                         <Database className="w-3.5 h-3.5 text-sky-500" />
                         Predictions Turso DB
                       </span>
                       {tursoStatus?.predictionsDb?.status === 'CONNECTED' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                           CONNECTED ({tursoStatus.predictionsDb.latencyMs}ms)
                         </span>
                       ) : tursoStatus?.predictionsDb?.status === 'DISCONNECTED' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
                           <XCircle className="w-3 h-3" />
                           DISCONNECTED
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
                           LOCAL SQLite ONLY
                         </span>
@@ -342,11 +344,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Merged Reset Database & Trigger Full Data Sync Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-4">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-4">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                      <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
                         <RotateCcw className="w-4 h-4" />
                       </div>
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -366,7 +368,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {isOperating && (
-                  <div className="space-y-2 p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                         <RefreshCw className="w-3 h-3 animate-spin text-rose-600 dark:text-rose-400" />
@@ -374,8 +376,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                       <span className="text-[11px] font-mono text-slate-500">Executing...</span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-700/80 rounded-full h-2 overflow-hidden">
-                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-500 h-2 rounded-full animate-pulse w-full"></div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#A3FF12] h-2 rounded-full animate-pulse w-full"></div>
                     </div>
                   </div>
                 )}
@@ -383,7 +385,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {!isOperating && !isConfirmingReset && (
                   <button
                     onClick={() => setIsConfirmingReset(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold transition-all cursor-pointer text-sm shadow-xs hover:shadow-sm"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold transition-all cursor-pointer text-sm shadow-xs hover:scale-[1.01] active:scale-[0.99]"
                   >
                     <RotateCcw className="w-4 h-4 text-rose-400 dark:text-rose-600" />
                     <span>Reset Database & Trigger Full Data Sync</span>
@@ -391,7 +393,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
 
                 {!isOperating && isConfirmingReset && (
-                  <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 space-y-3">
+                  <div className="p-4 rounded-2xl bg-rose-500/10 space-y-3">
                     <div className="flex items-start gap-2.5">
                       <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
@@ -407,14 +409,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleExecuteResetAndSync}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                        className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs active:scale-95"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Confirm Reset & Full Sync</span>
                       </button>
                       <button
                         onClick={() => setIsConfirmingReset(false)}
-                        className="px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                        className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#101728] hover:bg-slate-100 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-xs transition-colors cursor-pointer active:scale-95"
                       >
                         Cancel
                       </button>
@@ -427,16 +429,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {activeTab === 'UI' && (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Appearance</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Toggle light/dark mode</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Toggle light / dark mode</p>
                 </div>
                 <button
                   onClick={onToggleTheme}
-                  className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-colors cursor-pointer"
+                  className="p-3 rounded-2xl bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 shadow-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
                 >
-                  {theme === 'light' ? <Sun className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+                  {theme === 'light' ? <Sun className="w-5 h-5 text-amber-500" /> : <Settings className="w-5 h-5 text-sky-400" />}
                 </button>
               </div>
             </div>
@@ -444,23 +446,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           
           {/* Toast Notification */}
           {showSavedToast && (
-            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500" />
+            <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Settings saved successfully</span>
             </div>
           )}
 
           {/* Footer Save Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 pt-4">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+              className="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-[#141d33] hover:bg-slate-200 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all cursor-pointer active:scale-95"
             >
               Close
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-bold shadow-sm hover:shadow-md transition-all cursor-pointer"
+              className="px-5 py-2.5 rounded-2xl bg-[#A3FF12] hover:bg-[#92e610] text-black text-xs font-extrabold shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-95"
             >
               Save Settings
             </button>

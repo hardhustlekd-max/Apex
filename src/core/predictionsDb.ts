@@ -928,12 +928,63 @@ export class PredictionsDB {
     if (this.useTurso && predictionsTurso) {
       (async () => {
         try {
+          const now = new Date().toISOString();
           const batchStatements = fixtures.map((f) => ({
             sql: `INSERT OR REPLACE INTO historical_predictions (
-              fixture_id, league, league_name, match_date, kick_off_time,
-              home_team, away_team, status, predicted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [f.id, f.league || 'ALL', f.leagueName || f.league || 'Historical', f.matchDate, f.kickOffTime || 'FT', f.homeTeam, f.awayTeam, 'FINISHED', new Date().toISOString()]
+              fixture_id, league, league_name, stage, match_date, kick_off_time,
+              home_team, away_team, home_badge, away_badge, status,
+              home_score, away_score,
+              b365_h, b365_d, b365_a,
+              home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
+              over15_prob, over25_prob, over35_prob, btts_prob,
+              tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+              is_positive_ev, is_banker, full_fixture_json, predicted_at
+            ) VALUES (
+              ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?,
+              ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?, ?, ?
+            )`,
+            args: [
+              f.id,
+              f.league || 'ALL',
+              f.leagueName || f.league || 'Historical Match',
+              f.stage || null,
+              f.matchDate,
+              f.kickOffTime || 'FT',
+              f.homeTeam,
+              f.awayTeam,
+              f.homeBadge || null,
+              f.awayBadge || null,
+              'FINISHED',
+              f.score?.home ?? 0,
+              f.score?.away ?? 0,
+              f.odds.homeWin || 2.0,
+              f.odds.draw || 3.0,
+              f.odds.awayWin || 3.5,
+              f.prediction?.homeXG ?? 1.35,
+              f.prediction?.awayXG ?? 1.10,
+              f.prediction?.homeWinProb ?? 0.45,
+              f.prediction?.drawProb ?? 0.28,
+              f.prediction?.awayWinProb ?? 0.27,
+              f.prediction?.over15Prob ?? 0.75,
+              f.prediction?.over25Prob ?? 0.50,
+              f.prediction?.over35Prob ?? 0.28,
+              f.prediction?.bttsProb ?? 0.52,
+              f.bestValueMarket?.key || 'HOME_WIN',
+              f.bestValueMarket?.name || 'Home Win',
+              f.bestValueMarket?.odds || f.odds.homeWin || 2.0,
+              f.bestValueMarket?.probability || f.prediction?.homeWinProb || 0.45,
+              f.bestValueMarket?.expectedValue || 0,
+              f.bestValueMarket?.isPositiveEV ? 1 : 0,
+              f.bestValueMarket?.isBanker ? 1 : 0,
+              JSON.stringify(f),
+              now,
+            ]
           }));
 
           await safeTursoBatch(predictionsTurso, batchStatements, 25);

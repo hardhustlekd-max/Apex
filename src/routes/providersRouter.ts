@@ -148,22 +148,7 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
   const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
 
   // Predict and store historical matches in predictions db
-  const rawMatches = db.getAllHistoricalMatches(1500);
-  const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-  const scrapedAsHistorical: any[] = scrapedMatches
-    .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-    .map((sm, idx) => ({
-      id: sm.matchId || `scraped_${idx}`,
-      div: sm.leagueName || sm.stage || 'FLASHSCORE',
-      leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-      matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
-      homeTeam: sm.home.name,
-      awayTeam: sm.away.name,
-      fthg: parseInt(sm.result!.home!, 10) || 0,
-      ftag: parseInt(sm.result!.away!, 10) || 0,
-      ftr: (parseInt(sm.result!.home!, 10) || 0) > (parseInt(sm.result!.away!, 10) || 0) ? 'H' : (parseInt(sm.result!.home!, 10) || 0) < (parseInt(sm.result!.away!, 10) || 0) ? 'A' : 'D',
-    }));
-  const allHist = [...rawMatches, ...scrapedAsHistorical];
+  const allHist = ServerEngine.getUnifiedHistoricalUniverse();
   const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
 
   // Update live predictions if any live games are active

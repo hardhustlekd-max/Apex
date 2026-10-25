@@ -118,18 +118,18 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-slate-900/10 dark:shadow-black/70 border border-slate-100 dark:border-slate-800/80 overflow-hidden font-mono text-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 dark:bg-black/85 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-[#0B0F17] text-slate-100 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-[0_24px_64px_rgba(0,0,0,0.8)] overflow-hidden font-mono text-xs">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-white dark:bg-[#0B0F17]">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-[#101728]">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-100">
-              <Terminal className="w-4 h-4 text-emerald-400" />
+            <div className="p-2 rounded-2xl bg-[#162038] text-zinc-100">
+              <Terminal className="w-4 h-4 text-[#A3FF12]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-zinc-100 text-sm tracking-wide">Terminal Logs</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">
+                <span className="font-extrabold text-white text-sm tracking-wide">Terminal Logs</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#162038] text-zinc-300 font-bold">
                   {filteredLogs.length} events
                 </span>
               </div>
@@ -139,25 +139,25 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={fetchLogs}
               disabled={isLoading}
-              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+              className="p-2 rounded-2xl bg-[#162038] hover:bg-[#1f2d4d] text-zinc-300 transition-all cursor-pointer hover:scale-105 active:scale-95"
               title="Refresh"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-emerald-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#A3FF12]' : ''}`} />
             </button>
             <button
               onClick={handleClear}
-              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-red-400 transition-colors cursor-pointer"
+              className="p-2 rounded-2xl bg-[#162038] hover:bg-[#1f2d4d] text-zinc-300 hover:text-rose-400 transition-all cursor-pointer hover:scale-105 active:scale-95"
               title="Clear Terminal"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-2xl bg-[#162038] hover:bg-[#1f2d4d] text-zinc-300 hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95"
               title="Close"
             >
               <X className="w-4 h-4" />
@@ -166,17 +166,17 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Filter bar */}
-        <div className="p-3 border-b border-zinc-800/80 bg-zinc-900/40 flex flex-wrap items-center justify-between gap-2 font-sans">
+        <div className="px-5 py-3 bg-[#0d1424] flex flex-wrap items-center justify-between gap-2.5 font-sans">
           {/* Category Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
             {['ALL', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                   selectedCategory === cat
-                    ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                    : 'bg-zinc-800/70 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                    ? 'bg-[#A3FF12] text-black font-extrabold shadow-xs'
+                    : 'bg-[#162038] text-zinc-400 hover:text-white'
                 }`}
               >
                 {cat === 'ALL'
@@ -197,7 +197,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700/80 rounded-md px-2 py-1 text-[11px] text-zinc-300 focus:outline-hidden focus:border-zinc-500 cursor-pointer"
+              className="bg-[#162038] rounded-xl px-3 py-1.5 text-[11px] text-zinc-200 outline-none cursor-pointer focus:ring-1 focus:ring-[#A3FF12]"
             >
               <option value="ALL">All Levels</option>
               <option value="ERROR">Errors Only</option>
@@ -206,21 +206,21 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
               <option value="INFO">Info Only</option>
             </select>
 
-            <div className="relative flex-1 sm:w-44">
-              <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-zinc-500" />
+            <div className="relative flex-1 sm:w-48">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filter terminal..."
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-md pl-7 pr-2 py-1 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-hidden focus:border-zinc-500"
+                className="w-full bg-[#162038] rounded-xl pl-8 pr-3 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 outline-none focus:ring-1 focus:ring-[#A3FF12]"
               />
             </div>
           </div>
         </div>
 
         {/* Quick summary stats banner */}
-        <div className="px-4 py-1.5 border-b border-zinc-800/60 bg-zinc-950 text-[11px] font-sans flex items-center justify-between text-zinc-400">
+        <div className="px-5 py-2 bg-[#070c14] text-[11px] font-sans flex items-center justify-between text-zinc-400">
           <div className="flex items-center gap-3">
             <span>
               Total: <strong className="text-zinc-200">{stats.total}</strong>
@@ -240,7 +240,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
               type="checkbox"
               checked={autoScroll}
               onChange={(e) => setAutoScroll(e.target.checked)}
-              className="rounded bg-zinc-800 border-zinc-700 text-emerald-500 focus:ring-0"
+              className="rounded-md bg-[#162038] border-none text-[#A3FF12] focus:ring-0"
             />
             <span>Auto scroll</span>
           </label>
@@ -249,7 +249,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         {/* Terminal Console Output */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-3.5 space-y-1.5 bg-zinc-950 select-text min-h-[350px] max-h-[55vh]"
+          className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#070c14] select-text min-h-[350px] max-h-[55vh]"
         >
           {filteredLogs.length === 0 ? (
             <div className="py-12 text-center text-zinc-500 font-sans">
@@ -261,42 +261,42 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
               return (
                 <div
                   key={log.id}
-                  className={`p-2 rounded-md border flex items-start gap-2.5 transition-colors ${
+                  className={`p-3 rounded-2xl flex items-start gap-3 transition-colors ${
                     log.level === 'ERROR'
-                      ? 'bg-rose-950/20 border-rose-900/40 text-rose-300'
+                      ? 'bg-rose-500/10 text-rose-300'
                       : log.level === 'WARN'
-                      ? 'bg-amber-950/20 border-amber-900/40 text-amber-300'
+                      ? 'bg-amber-500/10 text-amber-300'
                       : log.level === 'SUCCESS'
-                      ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300'
-                      : 'bg-zinc-900/40 border-zinc-800/60 text-zinc-300'
+                      ? 'bg-emerald-500/10 text-emerald-300'
+                      : 'bg-[#101728] text-zinc-300'
                   }`}
                 >
                   {/* Level Icon */}
                   <div className="shrink-0 mt-0.5">
-                    {log.level === 'ERROR' && <AlertCircle className="w-3.5 h-3.5 text-rose-400" />}
-                    {log.level === 'WARN' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
-                    {log.level === 'SUCCESS' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                    {log.level === 'INFO' && <Info className="w-3.5 h-3.5 text-cyan-400" />}
+                    {log.level === 'ERROR' && <AlertCircle className="w-4 h-4 text-rose-400" />}
+                    {log.level === 'WARN' && <AlertTriangle className="w-4 h-4 text-amber-400" />}
+                    {log.level === 'SUCCESS' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                    {log.level === 'INFO' && <Info className="w-4 h-4 text-sky-400" />}
                   </div>
 
                   {/* Log Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                    <div className="flex items-center gap-2 mb-1">
                       <span className="text-zinc-500 text-[10px]">{time}</span>
                       <span
-                        className={`px-1 rounded text-[9px] font-bold ${
+                        className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold ${
                           log.level === 'ERROR'
-                            ? 'bg-rose-900/60 text-rose-200'
+                            ? 'bg-rose-500/20 text-rose-200'
                             : log.level === 'WARN'
-                            ? 'bg-amber-900/60 text-amber-200'
+                            ? 'bg-amber-500/20 text-amber-200'
                             : log.level === 'SUCCESS'
-                            ? 'bg-emerald-900/60 text-emerald-200'
+                            ? 'bg-emerald-500/20 text-emerald-200'
                             : 'bg-zinc-800 text-zinc-300'
                         }`}
                       >
                         {log.level}
                       </span>
-                      <span className="px-1 rounded text-[9px] bg-zinc-800/80 text-zinc-400">
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-[#162038] text-zinc-400 font-bold">
                         {log.category}
                       </span>
                       <span className="text-zinc-400 font-semibold text-[11px]">
@@ -309,7 +309,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                     </p>
 
                     {log.details && (
-                      <div className="mt-1.5 p-2 rounded bg-black/60 border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto space-y-1">
+                      <div className="mt-2 p-3 rounded-xl bg-black/40 text-[10px] text-zinc-300 overflow-x-auto space-y-1">
                         {(() => {
                           const stack = typeof log.details === 'object' ? log.details?.stack : null;
                           const frames = parseStackFrames(stack || log.details);
@@ -321,7 +321,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                                 </div>
                                 <div className="space-y-0.5 font-mono text-[9.5px]">
                                   {frames.map((frame, idx) => (
-                                    <div key={idx} className="flex items-start gap-2 py-0.5 border-b border-zinc-900/50 last:border-0">
+                                    <div key={idx} className="flex items-start gap-2 py-0.5">
                                       <span className="text-zinc-500 w-5 text-right shrink-0">#{idx}</span>
                                       <span className="text-emerald-400 shrink-0 font-medium">{frame.fn}</span>
                                       <span className="text-zinc-400 truncate" title={frame.location}>{frame.location}</span>
@@ -347,13 +347,13 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-zinc-800 bg-zinc-900/90 flex items-center justify-between font-sans text-xs">
+        <div className="px-5 py-3 bg-[#101728] flex items-center justify-between font-sans text-xs">
           <span className="text-zinc-400">
             Unified Apex Engine active • 5-Pillar Dixon-Coles model
           </span>
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-2xl bg-[#A3FF12] hover:bg-[#92e610] text-black font-extrabold transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             Close
           </button>

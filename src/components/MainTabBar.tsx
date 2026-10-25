@@ -40,9 +40,9 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
   return (
     <nav
       aria-label="Repository"
-      className="bg-white dark:bg-[#0B0F17] px-2 sm:px-3 py-3 sticky top-[53px] z-20"
+      className="bg-[#f4f6fa] dark:bg-[#070c14] px-2 sm:px-3 py-2.5 sticky top-[53px] z-20"
     >
-      <div className="max-w-[99%] sm:max-w-[98%] mx-auto p-1 bg-white dark:bg-white text-slate-900 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs border border-slate-200/60">
+      <div className="max-w-[99%] sm:max-w-[98%] mx-auto p-1 bg-white dark:bg-[#101728] text-slate-900 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs border border-slate-200 dark:border-[#1e293b]">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -55,8 +55,8 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
               onClick={() => onSelectTab(tab.id)}
               className={`flex-1 min-w-[80px] sm:min-w-0 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 ${
                 isActive
-                  ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
             >
               <Icon className="w-4 h-4" />

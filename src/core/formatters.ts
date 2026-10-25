@@ -117,6 +117,44 @@ export function getAuthoritative1X2Pick(fixture: Fixture): PickInfo {
   };
 }
 
+/**
+ * Computes the highest prediction percentage across ALL market categories (1X2, Over/Under 2.5, BTTS).
+ */
+export function getHighestPredictionAcrossAllMarkets(fixture: Fixture): PickInfo {
+  const p = fixture.prediction;
+  if (!p) return getAuthoritative1X2Pick(fixture);
+
+  const h = p.homeWinProb ?? 0;
+  const d = p.drawProb ?? 0;
+  const a = p.awayWinProb ?? 0;
+  const o25 = p.over25Prob ?? 0;
+  const u25 = 1 - o25;
+  const bttsY = p.bttsProb ?? 0;
+  const bttsN = 1 - bttsY;
+
+  const candidates: Array<{ type: PickInfo['type']; label: string; shortLabel: string; probability: number }> = [
+    { type: '1', label: `${fixture.homeTeam} Win`, shortLabel: '1', probability: h },
+    { type: 'X', label: 'Draw', shortLabel: 'X', probability: d },
+    { type: '2', label: `${fixture.awayTeam} Win`, shortLabel: '2', probability: a },
+    { type: 'O2.5', label: 'Over 2.5 Goals', shortLabel: 'O 2.5', probability: o25 },
+    { type: 'U2.5', label: 'Under 2.5 Goals', shortLabel: 'U 2.5', probability: u25 },
+    { type: 'BTTS_Y', label: 'Both Teams To Score (Yes)', shortLabel: 'BTTS Y', probability: bttsY },
+    { type: 'BTTS_N', label: 'Both Teams To Score (No)', shortLabel: 'BTTS N', probability: bttsN },
+  ];
+
+  candidates.sort((x, y) => y.probability - x.probability);
+  const best = candidates[0];
+
+  return {
+    type: best.type,
+    label: best.label,
+    shortLabel: best.shortLabel,
+    probability: best.probability,
+    probabilityPercent: getProbValue(best.probability, 1),
+    probabilityFormatted: formatProb(best.probability, 1),
+  };
+}
+
 export interface ValueBetInfo {
   hasValue: boolean;
   marketKey?: MarketOption['key'];

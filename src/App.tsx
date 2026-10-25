@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { Header } from './components/Header.js';
-import { MainTabBar } from './components/MainTabBar.js';
 import { FixturesList } from './components/FixturesList.js';
 import { PrebuiltAccumulators } from './components/PrebuiltAccumulators.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
@@ -9,6 +8,7 @@ import { PredictionHistoryView } from './components/PredictionHistoryView.js';
 import { MatchDetailModal } from './components/MatchDetailModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
+import { BottomNavDock } from './components/BottomNavDock.js';
 import {
   Fixture,
   EngineSettings,
@@ -230,7 +230,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] dark:bg-[#0d1117] text-[#1f2328] dark:text-[#f0f6fc] flex flex-col font-sans transition-colors">
+    <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#070c14] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
       {/* Toast Notification (GitHub Primer Flash Banner) */}
       {notification && (
         <div className="fixed bottom-4 right-4 z-[100] bg-white dark:bg-[#161b22] text-[#1f2328] dark:text-[#f0f6fc] font-medium text-xs px-3.5 py-2.5 rounded-md shadow-lg border border-[#d0d7de] dark:border-[#30363d] flex items-center gap-2 animate-in slide-in-from-bottom-2">
@@ -253,17 +253,13 @@ export default function App() {
         isSyncing={isLoadingFixtures}
         theme={theme}
         onToggleTheme={toggleTheme}
-      />
-
-      {/* Main Tab Bar */}
-      <MainTabBar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
 
       {/* Main Content Dashboard */}
       <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-        <main className="flex-1 max-w-[99%] sm:max-w-[98%] w-full mx-auto px-2 sm:px-3 py-4 space-y-4 flex flex-col pb-12">
+        <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3.5 flex flex-col pb-24 sm:pb-28">
         {activeTab === 'FIXTURES' && (
           <FixturesList
             fixtures={fixtures}
@@ -338,6 +334,15 @@ export default function App() {
         onProviderChange={handleProviderChange}
         onSyncData={handleResetAndSyncData}
         isSyncingData={isSyncingData}
+      />
+
+      {/* Floating Bottom Navigation Dock (Wireframe design) */}
+      <BottomNavDock
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onQuickSync={handleResetAndSyncData}
+        isSyncing={isSyncingData}
       />
     </div>
   );

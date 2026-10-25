@@ -1,8 +1,7 @@
 import React from 'react';
-import { Menu, Terminal, Sun, Moon } from 'lucide-react';
+import { Menu, Terminal, Sun, Moon, ChevronLeft, Search } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
-import { LiveScoresTicker } from './LiveScoresTicker.js';
 
 interface HeaderProps {
   settings: EngineSettings | null;
@@ -10,6 +9,7 @@ interface HeaderProps {
   stats: { totalMatches: number; totalTeams: number; leagues: any[] };
   onOpenSettings: () => void;
   onOpenTerminal?: () => void;
+  onOpenSeedModal?: () => void;
   onSelectAccaCategory?: (cat: 'BANKER' | 'VALUE_HUNTER') => void;
   onProviderChange: (providerId: EngineSettings['activeProvider']) => void;
   isSyncing: boolean;
@@ -18,6 +18,8 @@ interface HeaderProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   liveScores: LiveScore[];
+  searchQuery?: string;
+  setSearchQuery?: (s: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,61 +31,86 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   onToggleTheme,
   liveScores,
+  searchQuery,
+  setSearchQuery,
 }) => {
   return (
-    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0B0F17]/80 backdrop-blur-md px-2 sm:px-3 py-2.5 transition-colors border-b border-slate-200 dark:border-slate-800">
-      <div className="max-w-[99%] sm:max-w-[98%] mx-auto flex items-center justify-between gap-3">
-        {/* Brand */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center shrink-0 shadow-xs">
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
-            </svg>
-          </div>
+    <header className="sticky top-0 z-30 bg-white/85 dark:bg-[#070c14]/85 backdrop-blur-xl transition-colors shadow-xs dark:shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+      <div className="max-w-6xl w-full mx-auto px-3 sm:px-4 lg:px-6 py-2.5 flex items-center justify-between gap-3">
+        {/* Left: Wireframe Back Chevron & Brand */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={() => {
+              if (searchQuery && setSearchQuery) {
+                setSearchQuery('');
+              }
+            }}
+            className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer hover:scale-105 active:scale-95"
+            title="Back / Clear"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
 
-          <div className="flex items-center gap-1.5 min-w-0 text-sm">
-            <span className="font-semibold text-slate-900 dark:text-white truncate">
-              predictions-engine
-            </span>
-            <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900">
-              PROD
-            </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-slate-900 dark:bg-[#A3FF12] text-white dark:text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+              P
+            </div>
+            <div className="hidden sm:flex flex-col min-w-0">
+              <span className="font-extrabold text-xs tracking-tight text-slate-900 dark:text-white truncate">
+                Predictions Engine
+              </span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-tight truncate">
+                Apex AI Analytics
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Center: Live Scores Wireframe Header */}
+        <div className="flex items-center gap-2 font-black text-xs sm:text-sm tracking-wider text-slate-900 dark:text-white uppercase select-none">
+          <span>Live Scores</span>
+          {liveScores && liveScores.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              {liveScores.length} LIVE
+            </span>
+          )}
+        </div>
+
+        {/* Right: Action Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={onToggleTheme}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs font-bold shadow-xs"
+            className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1c2947] transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs"
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-500" />}
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
           </button>
 
           {onOpenTerminal && (
             <button
               id="open-terminal-modal-btn"
               onClick={onOpenTerminal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs font-bold shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1c2947] transition-all cursor-pointer text-xs font-bold shadow-xs hover:scale-105 active:scale-95"
               title="Terminal Logs"
             >
               <Terminal className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Terminal</span>
+              <span className="hidden md:inline">Terminal</span>
             </button>
           )}
 
           <button
             id="open-settings-modal-btn"
             onClick={onOpenSettings}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer text-xs font-bold shadow-xs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1c2947] transition-all cursor-pointer text-xs font-bold shadow-xs hover:scale-105 active:scale-95"
             title="Settings & Preferences"
           >
             <Menu className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Settings</span>
+            <span className="hidden md:inline">Settings</span>
           </button>
         </div>
       </div>
     </header>
   );
 };
+
