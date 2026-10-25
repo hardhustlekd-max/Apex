@@ -21,6 +21,7 @@ import {
   MatchTacticalContextInput,
 } from './types.js';
 import { loggerService } from '../services/loggerService.js';
+import { getCurrentSeason } from './dateUtils.js';
 
 /**
  * Evidence-Based Prediction Engine
@@ -118,8 +119,10 @@ export class ApexEngine {
       recentMatchesList = scrapedRecent.slice(0, Math.min(10, Math.max(5, windowSize)));
     } else {
       const cleanTarget = teamName.toLowerCase().trim();
-      const currentSeason = '2025/2026';
-      const prevSeason = '2024/2025';
+      const currentSeason = getCurrentSeason();
+      const now = new Date();
+      const prevYear = now.getFullYear() - (now.getMonth() < 6 ? 2 : 1);
+      const prevSeason = `${prevYear}/${prevYear + 1}`;
       const clubMatches = allMatches
         .filter((m) => {
           const h = m.homeTeam.toLowerCase().trim();

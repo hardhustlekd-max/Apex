@@ -1003,11 +1003,11 @@ export class PredictionsDB {
     } else {
       try {
         let sql = `
-          SELECT full_fixture_json, match_date, kick_off_time, league, status 
+          SELECT full_fixture_json, match_date, kick_off_time 
           FROM (
-            SELECT full_fixture_json, match_date, kick_off_time, league, status FROM historical_predictions
+            SELECT full_fixture_json, match_date, kick_off_time, league_name as league_display FROM historical_predictions
             UNION ALL
-            SELECT full_fixture_json, match_date, kick_off_time, league, status FROM upcoming_predictions WHERE status = 'FINISHED'
+            SELECT full_fixture_json, match_date, kick_off_time, league_name as league_display FROM upcoming_predictions WHERE status = 'FINISHED'
           )
         `;
         const conditions: string[] = [];
@@ -1015,13 +1015,13 @@ export class PredictionsDB {
 
         if (filters?.league && filters.league !== 'ALL') {
           const aliases = getLeagueAliases(filters.league);
-          const placeholders = aliases.map(() => '?').join(', ');
-          const likeClauses = aliases.map(() => 'UPPER(league_name) LIKE ? OR UPPER(league) LIKE ?').join(' OR ');
-          conditions.push(`(UPPER(league) IN (${placeholders}) OR ${likeClauses})`);
-          params.push(...aliases);
-          aliases.forEach((a) => {
-            params.push(`%${a}%`, `%${a}%`);
-          });
+          if (aliases.length > 0) {
+            const placeholders = aliases.map(() => '?').join(', ');
+            const likeClauses = aliases.map(() => 'UPPER(league_display) LIKE ?').join(' OR ');
+            conditions.push(`(UPPER(league_display) IN (${placeholders}) OR ${likeClauses})`);
+            params.push(...aliases);
+            aliases.forEach((a) => params.push(`%${a}%`));
+          }
         }
 
         const now = new Date();
@@ -1035,7 +1035,16 @@ export class PredictionsDB {
           sql += ` WHERE ` + conditions.join(' AND ');
         }
 
-        sql += ` ORDER BY match_date DESC, kick_off_time DESC`;
+        // Extremely robust sorting: Ensure 'YYYY-MM-DD' sort works even if some are 'DD-MM-YYYY' or 'DD/MM/YYYY'
+        // We force YYYY to the front if we detect DD-MM-YYYY or DD/MM/YYYY
+        sql += ` ORDER BY 
+          CASE 
+            WHEN match_date LIKE '____-%' OR match_date LIKE '____/%' THEN match_date 
+            WHEN match_date LIKE '__-__-____' OR match_date LIKE '__/__/____' THEN SUBSTR(match_date, 7, 4) || '-' || SUBSTR(match_date, 4, 2) || '-' || SUBSTR(match_date, 1, 2)
+            ELSE match_date 
+          END DESC, 
+          kick_off_time DESC`;
+
         if (filters?.limit) {
           sql += ` LIMIT ?`;
           params.push(filters.limit);
@@ -1064,6 +1073,19 @@ export class PredictionsDB {
     if (filters?.league && filters.league !== 'ALL') {
       fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league));
     }
+
+    fixtures.sort((a, b) => {
+      // Primary: Date Descending (Newest first)
+      if (a.matchDate !== b.matchDate) return b.matchDate.localeCompare(a.matchDate);
+      
+      // Secondary: League Priority (Major leagues top within the day)
+      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
+      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      
+      // Tertiary: Time Descending
+      return (b.kickOffTime || '').localeCompare(a.kickOffTime || '');
+    });
 
     return fixtures;
   }

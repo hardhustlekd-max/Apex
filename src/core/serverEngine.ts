@@ -13,7 +13,7 @@ import { DEFAULT_HISTORICAL_MATCHES } from './defaultHistoricalMatches.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague } from './leagueMapper.js';
-import { getRelativeDateStr } from './dateUtils.js';
+import { getRelativeDateStr, getCurrentSeason } from './dateUtils.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -32,9 +32,9 @@ export class ServerEngine {
         return {
           id: sm.matchId || `scraped_${idx}`,
           div: sm.leagueName || sm.stage || 'FLASHSCORE',
-          season: sm.season || '2024/2025',
+          season: sm.season || getCurrentSeason(),
           leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-          matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
+          matchDate: sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30),
           homeTeam: sm.home.name,
           awayTeam: sm.away.name,
           fthg: homeScore,
@@ -441,7 +441,7 @@ export class ServerEngine {
         providerId: 'HISTORICAL',
         league: m.div || 'LEAGUE',
         leagueName: m.leagueName || m.div || 'Historical Match',
-        matchDate: m.matchDate || '2024-01-01',
+        matchDate: m.matchDate || getRelativeDateStr(-30),
         kickOffTime: 'FT',
         homeTeam,
         awayTeam,
