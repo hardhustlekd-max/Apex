@@ -36,18 +36,25 @@ export const PredictionHistoryView: React.FC = () => {
     const totalGoals = hG + aG;
     const isBtts = hG > 0 && aG > 0;
 
-    // Use stored pick (bestValueMarket) or fallback to most likely outcome
-    const pick = f.bestValueMarket || f.mostLikelyOutcome || {
-      key: 'HOME_WIN',
-      name: `${f.homeTeam} Win`,
-      probability: f.prediction?.homeWinProb ?? 0,
-    };
-
+    const pick = f.bestValueMarket || f.mostLikelyOutcome;
+    
     let isCorrect = false;
-    let predictedLabel = pick.name;
-    const topProb = pick.probability;
+    let predictedLabel = 'Unknown';
+    let topProb = 0;
+    let marketKey = '';
 
-    switch (pick.key) {
+    if (pick) {
+      predictedLabel = (pick as any).name || (pick as any).selection || 'Pick';
+      topProb = (pick as any).probability || 0;
+      marketKey = (pick as any).key || (pick as any).marketKey || '';
+    } else {
+      // Manual fallback
+      predictedLabel = `${f.homeTeam} Win`;
+      topProb = f.prediction?.homeWinProb || 0.45;
+      marketKey = 'HOME_WIN';
+    }
+
+    switch (marketKey) {
       case 'HOME_WIN':
         isCorrect = hG > aG;
         break;
@@ -78,7 +85,7 @@ export const PredictionHistoryView: React.FC = () => {
       default:
         // Fallback for 1X2 if market key is unknown
         const predictedWinner = hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';
-        isCorrect = pick.key === predictedWinner;
+        isCorrect = marketKey === predictedWinner;
     }
 
     return {

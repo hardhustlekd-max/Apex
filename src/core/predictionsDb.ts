@@ -1002,7 +1002,14 @@ export class PredictionsDB {
       fixtures = Array.from(this.historyMemoryFallback.values());
     } else {
       try {
-        let sql = `SELECT full_fixture_json, league, league_name FROM historical_predictions`;
+        let sql = `
+          SELECT full_fixture_json, match_date, kick_off_time, league, status 
+          FROM (
+            SELECT full_fixture_json, match_date, kick_off_time, league, status FROM historical_predictions
+            UNION ALL
+            SELECT full_fixture_json, match_date, kick_off_time, league, status FROM upcoming_predictions WHERE status = 'FINISHED'
+          )
+        `;
         const conditions: string[] = [];
         const params: any[] = [];
 
@@ -1017,9 +1024,12 @@ export class PredictionsDB {
           });
         }
 
-        const currentTs = getCurrentDateTimeStr();
-        conditions.push(`(match_date || ' ' || kick_off_time) < ?`);
-        params.push(currentTs);
+        const now = new Date();
+        const today = getRelativeDateStr(0);
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+        conditions.push(`(match_date < ? OR (match_date = ? AND (kick_off_time <= ? OR kick_off_time = 'FT')))`);
+        params.push(today, today, currentTime);
         
         if (conditions.length > 0) {
           sql += ` WHERE ` + conditions.join(' AND ');

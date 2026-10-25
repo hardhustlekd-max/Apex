@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Trophy, Layers, Settings, Play, RefreshCw, Zap } from 'lucide-react';
+import { Home, Trophy, Layers, Settings } from 'lucide-react';
 
 interface BottomNavDockProps {
   activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY';
@@ -47,22 +47,7 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
           <span className="text-xs tracking-tight">Schedule</span>
         </button>
 
-        {/* Center Floating Fast Resync Button */}
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={onQuickSync}
-            disabled={isSyncing}
-            className="w-11 h-11 rounded-full bg-[#CCFF00] text-slate-950 font-black flex items-center justify-center shadow-[0_4px_20px_rgba(204,255,0,0.45)] hover:shadow-[0_6px_28px_rgba(204,255,0,0.65)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-            title="Trigger Fast Resync"
-          >
-            {isSyncing ? (
-              <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
-            ) : (
-              <Play className="w-5 h-5 fill-slate-950 ml-0.5 text-slate-950" />
-            )}
-          </button>
-        </div>
+
 
         {/* Standings Tab */}
         <button
