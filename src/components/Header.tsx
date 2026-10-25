@@ -45,14 +45,14 @@ export const Header: React.FC<HeaderProps> = ({
                 setSearchQuery('');
               }
             }}
-            className="w-9 h-9 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95"
+            className="w-11 h-11 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 border border-transparent dark:border-white/10"
             title="Back / Clear"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
               A
             </div>
             <div className="hidden sm:flex flex-col min-w-0">
@@ -76,10 +76,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="open-settings-modal-btn"
             onClick={onOpenSettings}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-xs font-bold shadow-xs active:scale-95"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-xs font-black shadow-xs active:scale-95 border border-transparent dark:border-white/10"
             title="Settings & Preferences"
           >
-            <Menu className="w-3.5 h-3.5" />
+            <Menu className="w-4 h-4" />
             <span className="hidden md:inline">Settings</span>
           </button>
         </div>

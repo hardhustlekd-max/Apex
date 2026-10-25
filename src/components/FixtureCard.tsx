@@ -156,7 +156,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             e.stopPropagation();
             onSelectDetail(fixture);
           }}
-          className="w-9 h-9 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black transition-all hover:scale-110 active:scale-95 shadow-xs"
+          className="w-14 h-14 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black transition-all hover:scale-110 active:scale-95 shadow-xs"
           title="View Match Analytics"
         >
           <ArrowRight className="w-4 h-4 stroke-[2.5]" />

@@ -76,3 +76,17 @@ Key Tenets:
 - **Shell**: Pitch Black floating shell (`bg-[#161616]/95 backdrop-blur-md rounded-full p-2 border border-slate-800 shadow-2xl`).
 - **Active Nav Item**: Electric Lime capsule (`bg-[#CCFF00] text-slate-950 font-bold rounded-full px-4 py-2.5 flex items-center gap-2`).
 - **Inactive Nav Item**: Muted gray icon with sub-label (`text-slate-400 hover:text-white px-3 py-2`).
+
+---
+
+## 6. Mobile & Touch-Friendly Scaling (Apex UI Mobile)
+
+- **Minimum Touch Targets**: All interactive elements (buttons, nav items, pills, filter selects) MUST maintain a minimum clickable area of `44px x 44px` to ensure comfortable interaction on touchscreens.
+- **Padding & Spacing Strategy**:
+  - **Major Containers**: Use `p-4` or `p-5` for cards/modals on mobile to ensure content isn't flush with edges.
+  - **Button Padding**: Use `px-5 py-2.5` or `px-6 py-3` for primary action buttons.
+  - **Gutter Spacing**: Maintain `gap-3` or `gap-4` between sibling elements to avoid accidental taps.
+- **Responsive Font Scaling**:
+  - **Headings**: `text-base` for sub-sections, `text-sm` for compact lists.
+  - **Metadata/Pills**: Strictly `text-xs` (12px) to ensure no overflow on narrow devices.
+- **Viewport Constraints**: Ensure horizontal padding is `px-3` or `px-4` on all screen widths to prevent content from touching device bezels. Use `max-w-6xl mx-auto` to contain content on tablet/desktop.
