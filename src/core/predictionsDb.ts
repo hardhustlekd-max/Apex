@@ -149,8 +149,8 @@ export class PredictionsDB {
               console.log(`[PredictionsDB] Hydrated ${tursoRes.rows.length} upcoming predictions from Turso into local SQLite.`);
             }
           }
-        } catch (err: any) {
-          console.warn('[PredictionsDB] Hydration from Turso warning:', err?.message);
+        } catch {
+          // Turso remote replica unavailable; seamlessly use persistent local SQLite
         }
       }
 

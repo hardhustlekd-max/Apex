@@ -492,9 +492,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, []);
 
   return (
-    <div className="space-y-2.5 font-sans flex-1 flex flex-col">
-      {/* Calendar Date Pills (Image Token #2563EB) */}
-      <div className="grid grid-cols-6 gap-1 sm:gap-1.5 w-full py-0.5">
+    <div className="space-y-3 font-sans flex-1 flex flex-col">
+      {/* Calendar Date Pills (Apex UI Geometry & Contrast) */}
+      <div className="grid grid-cols-6 gap-1.5 sm:gap-2 w-full py-0.5">
         {calendarDays.map((cd) => {
           const isToday = cd.index === 0 && dateFilter === 'TODAY';
           const isTomorrow = cd.index === 1 && dateFilter === 'TOMORROW';
@@ -509,10 +509,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 else if (cd.index === 1) setDateFilter('TOMORROW');
                 else setDateFilter(cd.dateStr);
               }}
-              className={`w-full flex flex-col items-center justify-center py-1.5 px-1 sm:px-2 rounded-xl transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${
+              className={`w-full flex flex-col items-center justify-center py-2 px-1 sm:px-2 rounded-2xl sm:rounded-full transition-all cursor-pointer active:scale-95 ${
                 isSelected
-                  ? 'bg-[#2563EB] text-white shadow-[0_3px_12px_rgba(37,99,235,0.35)] font-black'
-                  : 'bg-slate-100 dark:bg-[#101728] text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-[#162038] font-bold'
+                  ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 shadow-md font-black scale-[1.03]'
+                  : 'bg-white dark:bg-neutral-800/80 text-slate-800 dark:text-neutral-200 border border-slate-200/80 dark:border-neutral-700/80 hover:bg-slate-50 dark:hover:bg-neutral-700/80 font-bold'
               }`}
             >
               <span className="text-[9px] opacity-80 uppercase tracking-wider font-semibold truncate max-w-full">
@@ -526,15 +526,15 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* 3. Scope Sub-Tabs: Upcoming, Live, History & Filters */}
       <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
-        <div className="flex items-center bg-slate-100 dark:bg-[#101728] p-1 rounded-xl shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 shadow-xs">
+        <div className="flex items-center bg-white dark:bg-[#121212] p-1.5 rounded-full shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 border border-slate-200/80 dark:border-neutral-800 shadow-xs">
           <button
             id="subtab-upcoming-btn"
             type="button"
             onClick={() => setActiveScope('UPCOMING')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'UPCOMING'
-                ? 'bg-white dark:bg-[#162038] text-slate-950 dark:text-white shadow-xs font-black'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             Upcoming
@@ -544,16 +544,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-live-btn"
             type="button"
             onClick={() => setActiveScope('LIVE')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
               activeScope === 'LIVE'
-                ? 'bg-white dark:bg-[#162038] text-slate-950 dark:text-white shadow-xs font-black'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">Live</span>
             {liveScores && liveScores.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-md bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 text-[10px] font-bold">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-[#CCFF00] text-slate-950 text-[10px] font-black">
                 {liveScores.length}
               </span>
             )}
@@ -563,10 +563,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-history-btn"
             type="button"
             onClick={() => setActiveScope('HISTORY')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeScope === 'HISTORY'
-                ? 'bg-white dark:bg-[#162038] text-slate-950 dark:text-white shadow-xs font-black'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
+                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
             History
@@ -578,16 +578,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95 ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
               activeFilterCount > 0
-                ? 'bg-slate-900 text-white dark:bg-[#A3FF12] dark:text-slate-950 font-black'
-                : 'bg-slate-100 hover:bg-slate-200 dark:bg-[#101728] dark:hover:bg-[#162038] text-slate-800 dark:text-slate-200'
+                ? 'bg-[#CCFF00] text-slate-950 font-black'
+                : 'bg-white dark:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700 text-slate-800 dark:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-700'
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="min-w-4 h-4 px-1 rounded-full bg-slate-950 text-[#CCFF00] text-[10px] font-black flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}

@@ -14,8 +14,12 @@ export const predictionsTurso = process.env.predictions_turso_url
     }) 
   : null;
 
+// Circuit breaker tracking: stops repetitive network attempts when remote Turso is unreachable
+const brokenClientsUntil = new WeakMap<Client, number>();
+const CIRCUIT_BREAKER_COOLDOWN_MS = 5 * 60_000; // 5 minutes pause on connection failures
+
 /**
- * Resilient batch executor with chunking, retry on transient fetch errors, and gentle pacing
+ * Resilient batch executor with chunking, circuit-breaker on network failures, and graceful local SQLite fallback
  */
 export async function safeTursoBatch(
   client: Client | null,
@@ -24,6 +28,12 @@ export async function safeTursoBatch(
 ): Promise<{ success: boolean; executedCount: number }> {
   if (!client || !statements || statements.length === 0) {
     return { success: true, executedCount: 0 };
+  }
+
+  // If client recently encountered a network failure (fetch failed / offline), skip remote sync
+  const circuitUntil = brokenClientsUntil.get(client) || 0;
+  if (Date.now() < circuitUntil) {
+    return { success: false, executedCount: 0 };
   }
 
   let executedCount = 0;
@@ -39,13 +49,31 @@ export async function safeTursoBatch(
         succeeded = true;
         executedCount += chunk.length;
       } catch (err: any) {
+        const errMsg = String(err?.message || '');
+        const isNetworkOrFetchError =
+          errMsg.includes('fetch failed') ||
+          errMsg.includes('Failed to fetch') ||
+          errMsg.includes('ECONNREFUSED') ||
+          errMsg.includes('ENOTFOUND') ||
+          errMsg.includes('ETIMEDOUT') ||
+          errMsg.includes('network error');
+
+        if (isNetworkOrFetchError) {
+          // Trip circuit breaker silently and exit immediately so remaining chunks are not attempted
+          brokenClientsUntil.set(client, Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS);
+          return { success: false, executedCount };
+        }
+
         if (attempts >= 2) {
-          // Graceful fallback without crashing
-          console.warn(`[TursoClient] Batch chunk (${i}-${i + chunk.length}) sync notice: ${err?.message || 'transient network error'}`);
           break;
         }
         await new Promise((r) => setTimeout(r, 150));
       }
+    }
+
+    if (!succeeded) {
+      // Stop executing further chunks if this chunk could not be written
+      break;
     }
 
     if (i + chunkSize < statements.length) {

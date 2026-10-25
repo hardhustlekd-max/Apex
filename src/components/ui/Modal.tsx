@@ -23,30 +23,30 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
       <div
-        className={`bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 rounded-3xl w-full ${maxWidth} max-h-[92vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.8)] flex flex-col animate-in zoom-in-95 duration-100`}
+        className={`bg-white dark:bg-[#121212] text-slate-900 dark:text-neutral-100 rounded-3xl w-full ${maxWidth} max-h-[92vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.4)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.9)] border border-slate-200/80 dark:border-neutral-800 flex flex-col animate-in zoom-in-95 duration-100`}
       >
         {/* Header */}
-        <div className="px-5 sm:px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="px-5 sm:px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-100 dark:border-neutral-800/80">
           <div className="flex items-center gap-3 min-w-0">
             {icon && (
-              <div className="p-2 rounded-2xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="p-2.5 rounded-full bg-[#CCFF00] text-slate-950 shrink-0 font-bold">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white truncate">{title}</h3>
-              {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>}
+              <h3 className="font-extrabold text-base text-slate-950 dark:text-white truncate">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-500 dark:text-neutral-400 truncate">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162038] dark:hover:bg-[#1e2b48] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-neutral-800 dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
             aria-label="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 

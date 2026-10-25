@@ -268,32 +268,32 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
   const authoritativeValue = getAuthoritativeValueBet(currentFixture);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.8)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-white dark:bg-[#121212] text-slate-950 dark:text-neutral-100 rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/80 dark:border-neutral-800 shadow-[0_24px_64px_rgba(0,0,0,0.8)]">
         
         {/* Modal Top Bar */}
-        <div className="bg-white dark:bg-[#101728] px-4 sm:px-6 pt-4 pb-3 border-b border-slate-100/60 dark:border-[#18233a]/50 shrink-0">
+        <div className="bg-white dark:bg-[#121212] px-4 sm:px-6 pt-4 pb-3 border-b border-slate-100 dark:border-neutral-800 shrink-0">
           <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
             {/* Competition & Timing Metadata */}
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-slate-400 dark:text-slate-500">
-              <span className="font-extrabold text-slate-800 dark:text-slate-200 truncate whitespace-nowrap text-[11px] sm:text-xs">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-slate-500 dark:text-neutral-400">
+              <span className="font-extrabold text-slate-950 dark:text-white truncate whitespace-nowrap text-[11px] sm:text-xs">
                 {fixture.stage || fixture.leagueName}
               </span>
-              <span aria-hidden="true" className="text-slate-300 dark:text-slate-700 shrink-0">·</span>
-              <span className="flex items-center gap-1 font-mono text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
+              <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
+              <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
                 <Calendar className="w-3 h-3 text-slate-400" />
                 <span>{fixture.matchDate}</span>
               </span>
-              <span aria-hidden="true" className="text-slate-300 dark:text-slate-700 shrink-0">·</span>
-              <span className="flex items-center gap-1 font-mono text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
+              <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
+              <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
                 <Clock className="w-3 h-3 text-slate-400" />
                 <span>{fixture.kickOffTime}</span>
               </span>
               {fixture.status === 'LIVE' && (
                 <>
-                  <span aria-hidden="true" className="text-slate-300 dark:text-slate-700 shrink-0">·</span>
-                  <span className="text-rose-600 dark:text-rose-400 font-black flex items-center gap-1 text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
+                  <span className="text-slate-950 dark:text-[#CCFF00] font-black flex items-center gap-1 text-[10px] sm:text-[11px] whitespace-nowrap shrink-0 bg-[#CCFF00] text-slate-950 dark:bg-[#CCFF00] px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
                     Live In Play
                   </span>
                 </>
@@ -304,15 +304,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={onClose}
-              className="p-2 sm:p-2 rounded-2xl bg-slate-100/80 hover:bg-slate-200 dark:bg-[#162038] dark:hover:bg-[#1e2a4a] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-neutral-800 dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
               aria-label="Close match details"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
 
           {/* Hero Scoreboard Banner */}
-          <div className="mt-3 p-3 sm:p-5 rounded-2xl bg-slate-100/70 dark:bg-[#141d33] min-w-0 shadow-xs">
+          <div className="mt-3 p-4 sm:p-5 rounded-3xl bg-slate-100/90 dark:bg-[#161616] border border-slate-200/60 dark:border-neutral-800 min-w-0 shadow-xs">
             <div className="grid grid-cols-12 items-center gap-1 sm:gap-4">
               
               {/* Home Team */}

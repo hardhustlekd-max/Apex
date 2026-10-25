@@ -230,12 +230,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#070c14] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
-      {/* Toast Notification (GitHub Primer Flash Banner) */}
+    <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#121212] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+      {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-4 right-4 z-[100] bg-white dark:bg-[#161b22] text-[#1f2328] dark:text-[#f0f6fc] font-medium text-xs px-3.5 py-2.5 rounded-md shadow-lg border border-[#d0d7de] dark:border-[#30363d] flex items-center gap-2 animate-in slide-in-from-bottom-2">
-          <span className="w-2 h-2 rounded-full bg-[#1a7f37] dark:bg-[#3fb950] shrink-0" />
-          <span className="truncate max-w-[320px]">{notification.message}</span>
+        <div className="fixed bottom-20 sm:bottom-6 right-4 z-[100] bg-white dark:bg-[#121212] text-slate-900 dark:text-white font-mono text-xs px-4 py-3 rounded-full shadow-2xl border border-slate-200 dark:border-white/10 flex items-center gap-2.5 animate-in slide-in-from-bottom-2">
+          <span className="w-2 h-2 rounded-full bg-[#CCFF00] shrink-0 animate-pulse" />
+          <span className="truncate max-w-[320px] font-bold">{notification.message}</span>
         </div>
       )}
 
@@ -334,6 +334,10 @@ export default function App() {
         onProviderChange={handleProviderChange}
         onSyncData={handleResetAndSyncData}
         isSyncingData={isSyncingData}
+        onOpenTerminal={() => {
+          setIsSettingsOpen(false);
+          setIsTerminalOpen(true);
+        }}
       />
 
       {/* Floating Bottom Navigation Dock (Wireframe design) */}

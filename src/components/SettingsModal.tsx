@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Cpu, Check, Sun, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle } from 'lucide-react';
+import { X, Settings, Cpu, Check, Sun, Moon, Terminal, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 
@@ -26,6 +26,7 @@ interface SettingsModalProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
+  onOpenTerminal?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -44,6 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   theme,
   onToggleTheme,
   onProviderChange,
+  onOpenTerminal,
 }) => {
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'UI'>('ENGINE');
   const [activeProvider, setActiveProvider] = useState<EngineSettings['activeProvider']>(
@@ -108,36 +110,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/60 dark:bg-black/85 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.3)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.8)] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-white dark:bg-[#121212] text-slate-900 dark:text-slate-100 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white/95 dark:bg-[#101728]/95 backdrop-blur-xl px-5 sm:px-6 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white/95 dark:bg-[#121212]/95 backdrop-blur-xl px-5 sm:px-6 py-4 flex items-center justify-between border-b border-slate-100 dark:border-white/10 z-10">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300">
+            <div className="p-2.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-700 dark:text-slate-200">
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white">Settings</h2>
+              <h2 className="text-base font-black uppercase tracking-wider text-slate-900 dark:text-white">Settings</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">Configure engine, data, and UI</p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162038] dark:hover:bg-[#1e2b48] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Quick Theme Toggle Button */}
+            <button
+              onClick={onToggleTheme}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-700 dark:text-neutral-200 hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer active:scale-95 border border-transparent dark:border-white/10"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            </button>
+
+            {/* Quick Terminal Button */}
+            {onOpenTerminal && (
+              <button
+                id="settings-open-terminal-btn"
+                onClick={onOpenTerminal}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-xs font-black border border-transparent dark:border-white/10 active:scale-95"
+                title="Terminal Logs"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Terminal</span>
+              </button>
+            )}
+
+            {/* Close Modal Button */}
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95 ml-1 border border-transparent dark:border-white/10"
+              aria-label="Close settings"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Navigation Tabs: Engine, Data Management, UI */}
-        <div className="px-5 sm:px-6 pb-2">
-          <div className="p-1 bg-slate-100 dark:bg-[#070c14] rounded-2xl flex items-center gap-1 text-xs overflow-x-auto no-scrollbar">
+        <div className="px-5 sm:px-6 pb-2 pt-3">
+          <div className="p-1 bg-slate-100 dark:bg-[#1E1E1E] rounded-full flex items-center gap-1 text-xs overflow-x-auto no-scrollbar border border-transparent dark:border-white/10">
             <button
               onClick={() => setActiveTab('ENGINE')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'ENGINE'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
@@ -146,9 +174,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('DATA')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'DATA'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
@@ -157,9 +185,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('UI')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'UI'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
@@ -181,23 +209,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div
                       key={p.id}
                       onClick={() => handleProviderSelect(p.id)}
-                      className={`p-4 rounded-2xl transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs ${
+                      className={`p-4 rounded-2xl transition-all cursor-pointer flex items-center justify-between gap-3 border ${
                         isSelected
-                          ? 'bg-slate-100 dark:bg-[#1a253c] text-slate-900 dark:text-white ring-2 ring-[#A3FF12]'
-                          : 'bg-slate-50 dark:bg-[#141d33] hover:bg-slate-100 dark:hover:bg-[#162038]'
+                          ? 'bg-slate-100 dark:bg-[#1E1E1E] text-slate-900 dark:text-white border-[#CCFF00] ring-1 ring-[#CCFF00]'
+                          : 'bg-slate-50 dark:bg-[#1A1A1A] border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-[#1E1E1E]'
                       }`}
                     >
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-slate-900 dark:text-white">{p.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-200/70 dark:bg-[#0d1424] text-slate-800 dark:text-slate-300">
+                          <span className="font-extrabold text-sm text-slate-900 dark:text-white">{p.name}</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200 dark:bg-[#121212] text-slate-800 dark:text-slate-300 border border-transparent dark:border-white/10">
                             v{p.version || '1.0'}
                           </span>
-                          <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">{p.latencyMs}ms</span>
+                          <span className="text-xs font-mono text-slate-500 dark:text-[#CCFF00] font-bold">{p.latencyMs}ms</span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{p.description}</p>
                       </div>
-                      {isSelected && <Check className="w-5 h-5 text-[#A3FF12] shrink-0" />}
+                      {isSelected && <Check className="w-5 h-5 text-[#CCFF00] shrink-0" />}
                     </div>
                   );
                 })}
@@ -208,39 +236,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'DATA' && (
             <div className="space-y-4">
               {/* Live Database Metrics Overview */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-3">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Live Database & Feed Metrics
                   </h3>
-                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-[#CCFF00] font-bold flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10 border border-emerald-500/20 dark:border-[#CCFF00]/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
                     SQLite Active
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Upcoming Fixtures</span>
-                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
                       {stats?.upcomingCount !== undefined ? stats.upcomingCount : '—'}
                     </span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Model Predictions</span>
-                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
                       {stats?.predictionsCount !== undefined ? stats.predictionsCount : '—'}
                     </span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Stored Raw Feeds</span>
-                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
                       {stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—'}
                     </span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Historical Matches</span>
-                    <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
                       {stats?.totalMatches !== undefined ? stats.totalMatches : '—'}
                     </span>
                   </div>
@@ -248,18 +276,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Turso DBs Connection Status Section */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-3">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Server className="w-4 h-4 text-sky-500" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <Server className="w-4 h-4 text-[#CCFF00]" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
                       Turso Cloud DBs Connection Status
                     </h3>
                   </div>
                   <button
                     onClick={fetchTursoStatus}
                     disabled={isCheckingTurso}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white dark:bg-[#101728] hover:bg-slate-100 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3 h-3 ${isCheckingTurso ? 'animate-spin' : ''}`} />
                     <span>Test Connection</span>
@@ -268,26 +296,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   {/* Football Turso DB */}
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Database className="w-3.5 h-3.5 text-indigo-500" />
+                        <Database className="w-3.5 h-3.5 text-indigo-400" />
                         Football Turso DB
                       </span>
                       {tursoStatus?.footballDb?.status === 'CONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
                           CONNECTED ({tursoStatus.footballDb.latencyMs}ms)
                         </span>
                       ) : tursoStatus?.footballDb?.status === 'DISCONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
                           <XCircle className="w-3 h-3" />
                           DISCONNECTED
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
-                          LOCAL SQLite ONLY
+                          LOCAL SQLite
                         </span>
                       )}
                     </div>
@@ -305,26 +333,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Predictions Turso DB */}
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Database className="w-3.5 h-3.5 text-sky-500" />
+                        <Database className="w-3.5 h-3.5 text-sky-400" />
                         Predictions Turso DB
                       </span>
                       {tursoStatus?.predictionsDb?.status === 'CONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
                           CONNECTED ({tursoStatus.predictionsDb.latencyMs}ms)
                         </span>
                       ) : tursoStatus?.predictionsDb?.status === 'DISCONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-1">
                           <XCircle className="w-3 h-3" />
                           DISCONNECTED
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
-                          LOCAL SQLite ONLY
+                          LOCAL SQLite
                         </span>
                       )}
                     </div>
@@ -344,11 +372,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Merged Reset Database & Trigger Full Data Sync Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs space-y-4">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 space-y-4">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                      <div className="p-2 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
                         <RotateCcw className="w-4 h-4" />
                       </div>
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -368,16 +396,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {isOperating && (
-                  <div className="space-y-2 p-3.5 rounded-2xl bg-white dark:bg-[#101728] shadow-xs">
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <RefreshCw className="w-3 h-3 animate-spin text-rose-600 dark:text-rose-400" />
+                        <RefreshCw className="w-3 h-3 animate-spin text-rose-600 dark:text-[#CCFF00]" />
                         Purging database & raw feeds, rebuilding Poisson predictions...
                       </span>
                       <span className="text-[11px] font-mono text-slate-500">Executing...</span>
                     </div>
                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#A3FF12] h-2 rounded-full animate-pulse w-full"></div>
+                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#CCFF00] h-2 rounded-full animate-pulse w-full"></div>
                     </div>
                   </div>
                 )}
@@ -385,7 +413,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {!isOperating && !isConfirmingReset && (
                   <button
                     onClick={() => setIsConfirmingReset(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold transition-all cursor-pointer text-sm shadow-xs hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 font-black transition-all cursor-pointer text-xs uppercase tracking-wide active:scale-[0.99]"
                   >
                     <RotateCcw className="w-4 h-4 text-rose-400 dark:text-rose-600" />
                     <span>Reset Database & Trigger Full Data Sync</span>
@@ -393,7 +421,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
 
                 {!isOperating && isConfirmingReset && (
-                  <div className="p-4 rounded-2xl bg-rose-500/10 space-y-3">
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-3">
                     <div className="flex items-start gap-2.5">
                       <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
@@ -409,14 +437,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleExecuteResetAndSync}
-                        className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs active:scale-95"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs transition-colors cursor-pointer active:scale-95"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Confirm Reset & Full Sync</span>
                       </button>
                       <button
                         onClick={() => setIsConfirmingReset(false)}
-                        className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#101728] hover:bg-slate-100 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-xs transition-colors cursor-pointer active:scale-95"
+                        className="px-4 py-2.5 rounded-full bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 font-bold text-xs transition-colors cursor-pointer active:scale-95"
                       >
                         Cancel
                       </button>
@@ -429,40 +457,105 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {activeTab === 'UI' && (
             <div className="space-y-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#141d33] shadow-xs flex items-center justify-between">
+              {/* Appearance / Theme Selector */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 space-y-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Appearance</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Toggle light / dark mode</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Theme & Appearance</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Choose between light and dark modes</p>
                 </div>
-                <button
-                  onClick={onToggleTheme}
-                  className="p-3 rounded-2xl bg-white dark:bg-[#101728] text-slate-900 dark:text-slate-100 shadow-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                >
-                  {theme === 'light' ? <Sun className="w-5 h-5 text-amber-500" /> : <Settings className="w-5 h-5 text-sky-400" />}
-                </button>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => theme !== 'light' && onToggleTheme()}
+                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border ${
+                      theme === 'light'
+                        ? 'bg-white text-slate-950 border-[#CCFF00] shadow-md ring-2 ring-[#CCFF00]'
+                        : 'bg-white/60 dark:bg-[#121212] text-slate-600 dark:text-slate-400 border-transparent hover:bg-white dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-full bg-amber-100 text-amber-600">
+                        <Sun className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold block text-slate-900 dark:text-white">Light Mode</span>
+                        <span className="text-[10px] text-slate-500">Day visual mode</span>
+                      </div>
+                    </div>
+                    {theme === 'light' && <Check className="w-4 h-4 text-slate-950" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => theme !== 'dark' && onToggleTheme()}
+                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border ${
+                      theme === 'dark'
+                        ? 'bg-[#121212] text-white border-[#CCFF00] shadow-md ring-2 ring-[#CCFF00]'
+                        : 'bg-white/60 dark:bg-[#121212] text-slate-600 dark:text-slate-400 border-transparent hover:bg-white dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-full bg-[#1E1E1E] text-amber-400">
+                        <Moon className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-bold block text-slate-900 dark:text-white">Dark Mode</span>
+                        <span className="text-[10px] text-slate-400">Night visual mode</span>
+                      </div>
+                    </div>
+                    {theme === 'dark' && <Check className="w-4 h-4 text-[#CCFF00]" />}
+                  </button>
+                </div>
               </div>
+
+              {/* Terminal Logs & Console Section */}
+              {onOpenTerminal && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-full bg-slate-900 dark:bg-[#CCFF00] text-white dark:text-slate-950 font-bold">
+                        <Terminal className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">System Terminal & Logs</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      View live background logs, scraper events, and Poisson engine calculations
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onOpenTerminal}
+                    className="px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] dark:text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                  >
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span>Open Terminal</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
           
           {/* Toast Notification */}
           {showSavedToast && (
-            <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2 shadow-xs">
-              <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-3 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10 border border-emerald-500/20 dark:border-[#CCFF00]/20 text-emerald-800 dark:text-[#CCFF00] text-xs font-black flex items-center gap-2 shadow-xs font-mono">
+              <Check className="w-4 h-4 text-emerald-600 dark:text-[#CCFF00]" />
               <span>Settings saved successfully</span>
             </div>
           )}
 
           {/* Footer Save Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4">
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-white/10">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-[#141d33] hover:bg-slate-200 dark:hover:bg-[#162038] text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all cursor-pointer active:scale-95"
+              className="px-5 py-2.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-transparent dark:border-white/10 text-xs font-bold transition-all cursor-pointer active:scale-95"
             >
               Close
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2.5 rounded-2xl bg-[#A3FF12] hover:bg-[#92e610] text-black text-xs font-extrabold shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-95"
+              className="px-6 py-2.5 rounded-full bg-[#CCFF00] hover:bg-[#b5ff00] text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
             >
               Save Settings
             </button>

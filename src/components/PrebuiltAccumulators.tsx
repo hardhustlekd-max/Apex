@@ -198,16 +198,16 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               key={cat.id}
               type="button"
               onClick={() => setSelectedCategory(cat.id)}
-              className={`flex-1 min-w-[90px] px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+              className={`flex-1 min-w-[100px] px-4 py-2.5 rounded-full text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
                 isSelected
-                  ? 'bg-slate-900 text-white dark:bg-[#A3FF12] dark:text-slate-950 font-black shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-md scale-[1.02]'
+                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
               }`}
             >
               <span>{cat.title}</span>
               {slip && (
-                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg ${
-                  isSelected ? 'bg-white/20 dark:bg-black/20' : 'bg-slate-200/60 dark:bg-[#101728] text-slate-600 dark:text-slate-400'
+                <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-full ${
+                  isSelected ? 'bg-[#CCFF00] text-slate-950 dark:bg-slate-950 dark:text-[#CCFF00]' : 'bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300'
                 }`}>
                   {slip.combinedOdds.toFixed(1)}x
                 </span>
@@ -219,22 +219,22 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
 
       {/* Slip Details & Stats Bar */}
       {activeSlip && (
-        <div className="space-y-3.5">
+        <div className="space-y-4">
           {/* Key Metrics Bar */}
-          <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar flex-nowrap bg-slate-100/50 dark:bg-[#141d33]/80 p-3 rounded-2xl">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar flex-nowrap bg-white dark:bg-[#121212] p-3 rounded-3xl border border-slate-200/80 dark:border-neutral-800 shadow-xs">
             <div className="flex items-center gap-2 text-xs flex-nowrap shrink-0 overflow-x-auto no-scrollbar">
-              <span className="bg-white dark:bg-[#1a2542] px-3.5 py-1.5 rounded-xl font-mono font-black text-slate-900 dark:text-white whitespace-nowrap shrink-0 shadow-xs">
+              <span className="bg-[#121212] text-white dark:bg-[#CCFF00] dark:text-slate-950 px-3.5 py-1.5 rounded-full font-mono font-black text-xs whitespace-nowrap shrink-0 shadow-xs">
                 {activeSlip.combinedOdds.toFixed(2)}x Odds
               </span>
-              <span className="bg-white dark:bg-[#1a2542] px-3.5 py-1.5 rounded-xl font-mono font-black text-slate-900 dark:text-white whitespace-nowrap shrink-0 shadow-xs">
+              <span className="bg-slate-100 dark:bg-neutral-800 px-3.5 py-1.5 rounded-full font-mono font-black text-slate-900 dark:text-white whitespace-nowrap shrink-0">
                 {(activeSlip.combinedProb * 100).toFixed(0)}% Prob
               </span>
               {risk && (
-                <span className={`px-3.5 py-1.5 rounded-xl font-black text-xs ${risk.badgeBg} ${risk.textColor} whitespace-nowrap shrink-0 shadow-xs`}>
+                <span className={`px-3.5 py-1.5 rounded-full font-black text-xs ${risk.badgeBg} ${risk.textColor} whitespace-nowrap shrink-0`}>
                   {risk.label}
                 </span>
               )}
-              <span className="bg-white dark:bg-[#1a2542] px-3.5 py-1.5 rounded-xl font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap shrink-0 shadow-xs">
+              <span className="bg-slate-100 dark:bg-neutral-800 px-3.5 py-1.5 rounded-full font-mono font-extrabold text-slate-900 dark:text-white whitespace-nowrap shrink-0">
                 Est. Return: £{potentialPayout}
               </span>
             </div>
@@ -243,16 +243,16 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
             <button
               type="button"
               onClick={() => handleCopySlip(activeSlip, activeSlip.id)}
-              className="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#A3FF12] dark:text-slate-950 dark:hover:bg-[#b5ff36] shadow-xs whitespace-nowrap hover:scale-105 active:scale-95"
+              className="px-4 py-2 rounded-full text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 shadow-md whitespace-nowrap active:scale-95"
             >
               {copiedId === activeSlip.id ? (
                 <>
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Copied</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Copy Slip</span>
                 </>
               )}

@@ -10,7 +10,7 @@ async function startServer() {
 
   // Initialize SQLite databases and keep persistent in memory
   if (!process.env.TURSO_DATABASE_URL) {
-    console.warn('TURSO_DATABASE_URL not set, using local SQLite.');
+    console.log('TURSO_DATABASE_URL not set, using local SQLite.');
   }
   await db.init();
   try {

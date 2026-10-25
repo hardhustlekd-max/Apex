@@ -141,8 +141,8 @@ export class FootballDB {
               console.log(`[FootballDB] Hydrated ${tursoRes.rows.length} upcoming fixtures from Turso into local SQLite.`);
             }
           }
-        } catch (err: any) {
-          console.warn('[FootballDB] Hydration from Turso warning:', err?.message);
+        } catch {
+          // Turso remote replica unavailable; seamlessly use persistent local SQLite
         }
       }
 

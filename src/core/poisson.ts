@@ -118,11 +118,15 @@ export class ApexEngine {
       recentMatchesList = scrapedRecent.slice(0, Math.min(10, Math.max(5, windowSize)));
     } else {
       const cleanTarget = teamName.toLowerCase().trim();
+      const currentSeason = '2025/2026';
+      const prevSeason = '2024/2025';
       const clubMatches = allMatches
         .filter((m) => {
           const h = m.homeTeam.toLowerCase().trim();
           const a = m.awayTeam.toLowerCase().trim();
-          return h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantTeam = h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantSeason = m.season === currentSeason || m.season === prevSeason;
+          return isRelevantTeam && isRelevantSeason;
         })
         .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
         .slice(0, Math.min(10, Math.max(5, windowSize)));
@@ -150,7 +154,7 @@ export class ApexEngine {
       }
     }
 
-    // 1. Decayed Form & Goal Dominance (45%)
+    // 1. Decayed Form & Goal Dominance (55% now)
     let weightedFormSum = 0;
     let formWeightTotal = 0;
     let venueMatchesCount = 0;
@@ -192,7 +196,7 @@ export class ApexEngine {
       ? Number((weightedFormSum / formWeightTotal).toFixed(1))
       : syntheticBase;
 
-    // 2. League Standings & Table Momentum (30%)
+    // 2. League Standings & Table Momentum (20%)
     let tableMomentum = formDominance;
     if (standings && Array.isArray(standings.table) && standings.table.length > 0) {
       const cleanTarget = teamName.toLowerCase().trim();
@@ -256,7 +260,7 @@ export class ApexEngine {
     }
 
     // 5. Composite Team Strength Rating (TSR)
-    const rawStrength = (0.45 * formDominance) + (0.30 * tableMomentum) + (0.25 * shotEfficiency);
+    const rawStrength = (0.55 * formDominance) + (0.20 * tableMomentum) + (0.25 * shotEfficiency);
     const strengthRating = Number(Math.max(10.0, Math.min(95.0, rawStrength)).toFixed(1));
 
     loggerService.addLog({
@@ -420,11 +424,15 @@ export class ApexEngine {
       recentMatchesList = scrapedRecent.slice(0, Math.min(10, Math.max(5, windowSize)));
     } else {
       const cleanTarget = teamName.toLowerCase().trim();
+      const currentSeason = '2025/2026';
+      const prevSeason = '2024/2025';
       const clubMatches = allMatches
         .filter((m) => {
           const h = m.homeTeam.toLowerCase().trim();
           const a = m.awayTeam.toLowerCase().trim();
-          return h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantTeam = h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantSeason = m.season === currentSeason || m.season === prevSeason;
+          return isRelevantTeam && isRelevantSeason;
         })
         .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
         .slice(0, Math.min(10, Math.max(5, windowSize)));
