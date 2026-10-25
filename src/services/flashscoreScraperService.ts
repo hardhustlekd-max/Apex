@@ -81,7 +81,7 @@ export class FlashscoreScraperService {
     }
 
     loggerService.addLog({
-      level: 'WARN',
+      level: 'INFO',
       category: 'SCRAPER',
       source: 'FlashscoreScraperService',
       message: `Flashscore feed fallback for path "${path}": ${lastError?.message || 'Remote endpoint unavailable'}`,

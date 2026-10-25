@@ -185,13 +185,7 @@ fixturesRouter.get('/history', async (req, res) => {
     }
 
     // Load predictions from predictions db
-    let matches = predictionsDb.getHistoricalPredictions({ league, limit });
-
-    if (matches.length === 0) {
-      db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
-      await ServerEngine.predictAndStoreHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
-      matches = predictionsDb.getHistoricalPredictions({ league, limit });
-    }
+    const matches = predictionsDb.getHistoricalPredictions({ league, limit });
 
     res.json({
       success: true,

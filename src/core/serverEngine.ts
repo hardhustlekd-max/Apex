@@ -404,7 +404,18 @@ export class ServerEngine {
     const allMatches = this.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
 
-    const enrichedHistory: Fixture[] = historicalMatches.map((m) => {
+    const enrichedHistory: Fixture[] = [];
+    
+    for (const m of historicalMatches) {
+      const fixtureId = m.id?.startsWith('hist_') ? m.id : `hist_${m.id}`;
+      
+      // Skip if already in predictionsDb to remove reproduction
+      const existing = predictionsDb.getPredictionById(fixtureId);
+      if (existing && existing.prediction && (existing.bestValueMarket || existing.mostLikelyOutcome)) {
+        enrichedHistory.push(existing);
+        continue;
+      }
+
       const cleanId = String(m.id || '').replace(/^fs_hist_/, '').replace(/^hist_/, '').replace(/^fs_/, '');
       const cachedH2H =
         cachedH2HMap.get(cleanId) ||
@@ -424,7 +435,7 @@ export class ServerEngine {
         };
       }
 
-      const fixtureId = m.id?.startsWith('hist_') ? m.id : `hist_${m.id}`;
+
       const tempFixture: Fixture = {
         id: fixtureId,
         providerId: 'HISTORICAL',
@@ -444,8 +455,9 @@ export class ServerEngine {
         restDaysAway: m.restDaysAway || 7,
       };
 
-      return this.predictFixtureUnified(tempFixture, allMatches, settings, cachedH2H);
-    });
+      const result = this.predictFixtureUnified(tempFixture, allMatches, settings, cachedH2H);
+      enrichedHistory.push(result);
+    }
 
     await predictionsDb.init();
     predictionsDb.saveHistoricalPredictions(enrichedHistory);

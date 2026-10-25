@@ -4,7 +4,7 @@ import initSqlJs, { Database } from 'sql.js';
 import { Fixture } from './types.js';
 import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
-import { getRelativeDateStr, getPossibleDateStrs } from './dateUtils.js';
+import { getRelativeDateStr, getPossibleDateStrs, getCurrentDateTimeStr } from './dateUtils.js';
 import { getSlugForCode, getCodeForSlug, getLeagueAliases, matchesLeague } from './leagueMapper.js';
 import { predictionsTurso, safeTursoBatch } from './tursoClient.js';
 
@@ -1017,11 +1017,15 @@ export class PredictionsDB {
           });
         }
 
+        const currentTs = getCurrentDateTimeStr();
+        conditions.push(`(match_date || ' ' || kick_off_time) < ?`);
+        params.push(currentTs);
+        
         if (conditions.length > 0) {
           sql += ` WHERE ` + conditions.join(' AND ');
         }
 
-        sql += ` ORDER BY match_date DESC`;
+        sql += ` ORDER BY match_date DESC, kick_off_time DESC`;
         if (filters?.limit) {
           sql += ` LIMIT ?`;
           params.push(filters.limit);

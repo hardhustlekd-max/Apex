@@ -33,31 +33,58 @@ export const PredictionHistoryView: React.FC = () => {
   const evaluatePrediction = (f: Fixture) => {
     const hG = f.score?.home ?? 0;
     const aG = f.score?.away ?? 0;
-    const hProb = f.prediction?.homeWinProb ?? 0;
-    const dProb = f.prediction?.drawProb ?? 0;
-    const aProb = f.prediction?.awayWinProb ?? 0;
+    const totalGoals = hG + aG;
+    const isBtts = hG > 0 && aG > 0;
 
-    let predictedWinner: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
-    let topProb = hProb;
+    // Use stored pick (bestValueMarket) or fallback to most likely outcome
+    const pick = f.bestValueMarket || f.mostLikelyOutcome || {
+      key: 'HOME_WIN',
+      name: `${f.homeTeam} Win`,
+      probability: f.prediction?.homeWinProb ?? 0,
+    };
 
-    if (dProb > hProb && dProb > aProb) {
-      predictedWinner = 'DRAW';
-      topProb = dProb;
-    } else if (aProb > hProb && aProb > dProb) {
-      predictedWinner = 'AWAY_WIN';
-      topProb = aProb;
+    let isCorrect = false;
+    let predictedLabel = pick.name;
+    const topProb = pick.probability;
+
+    switch (pick.key) {
+      case 'HOME_WIN':
+        isCorrect = hG > aG;
+        break;
+      case 'DRAW':
+        isCorrect = hG === aG;
+        break;
+      case 'AWAY_WIN':
+        isCorrect = hG < aG;
+        break;
+      case 'OVER_25':
+        isCorrect = totalGoals > 2.5;
+        break;
+      case 'UNDER_25':
+        isCorrect = totalGoals < 2.5;
+        break;
+      case 'BTTS_YES':
+        isCorrect = isBtts;
+        break;
+      case 'BTTS_NO':
+        isCorrect = !isBtts;
+        break;
+      case 'DOUBLE_CHANCE_1X':
+        isCorrect = hG >= aG;
+        break;
+      case 'DOUBLE_CHANCE_X2':
+        isCorrect = aG >= hG;
+        break;
+      default:
+        // Fallback for 1X2 if market key is unknown
+        const predictedWinner = hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';
+        isCorrect = pick.key === predictedWinner;
     }
-
-    const actualWinner: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' =
-      hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';
-
-    const isCorrect = predictedWinner === actualWinner;
 
     return {
       hG,
       aG,
-      predictedWinner,
-      actualWinner,
+      predictedLabel,
       topProb,
       isCorrect,
     };
@@ -164,11 +191,6 @@ export const PredictionHistoryView: React.FC = () => {
         <div className="rounded-3xl overflow-hidden bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800 shadow-sm">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
-            const labelMap = {
-              HOME_WIN: `${f.homeTeam} Win`,
-              DRAW: 'Draw',
-              AWAY_WIN: `${f.awayTeam} Win`,
-            };
 
             return (
               <div
@@ -194,7 +216,7 @@ export const PredictionHistoryView: React.FC = () => {
                     </span>
                     <span className="text-slate-300 dark:text-neutral-700">•</span>
                     <span>
-                      Predicted Top Pick: <strong className="text-slate-950 dark:text-white font-black">{labelMap[evalResult.predictedWinner]}</strong> ({(evalResult.topProb * 100).toFixed(0)}%)
+                      Model Pick: <strong className="text-slate-950 dark:text-white font-black">{evalResult.predictedLabel}</strong> ({(evalResult.topProb * 100).toFixed(0)}%)
                     </span>
                   </div>
                 </div>
