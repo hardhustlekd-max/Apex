@@ -8,10 +8,8 @@ import { app } from './src/app.js';
 async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Initialize SQLite databases and keep persistent in memory
-  if (!process.env.TURSO_DATABASE_URL) {
-    console.log('TURSO_DATABASE_URL not set, using local SQLite.');
-  }
+  // Initialize Turso cloud database
+  console.log('Initializing Turso LibSQL Cloud Database engine...');
   await db.init();
   try {
     await predictionsDb.init();

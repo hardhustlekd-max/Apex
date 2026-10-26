@@ -35,7 +35,7 @@ export function createApp(): Express {
       status: 'ok',
       engine: 'Poisson Football Prediction & Accumulator Engine',
       timestamp: new Date().toISOString(),
-      database: 'SQLite (sql.js WASM)',
+      database: 'Turso (LibSQL Cloud DB)',
     });
   };
 

@@ -1,17 +1,23 @@
 import { createClient, Client, InStatement } from '@libsql/client';
 
-export const footballTurso = process.env.football_turso_url 
+const footballUrl = process.env.football_turso_url || process.env.TURSO_DATABASE_URL || process.env.TURSO_URL;
+const footballToken = process.env.football_turso_token || process.env.TURSO_AUTH_TOKEN || process.env.TURSO_TOKEN || '';
+
+const predictionsUrl = process.env.predictions_turso_url || process.env.TURSO_DATABASE_URL || process.env.TURSO_URL || footballUrl;
+const predictionsToken = process.env.predictions_turso_token || process.env.TURSO_AUTH_TOKEN || process.env.TURSO_TOKEN || footballToken;
+
+export const footballTurso = footballUrl
   ? createClient({
-      url: process.env.football_turso_url,
-      authToken: process.env.football_turso_token || '',
-    }) 
+      url: footballUrl,
+      authToken: footballToken,
+    })
   : null;
 
-export const predictionsTurso = process.env.predictions_turso_url 
+export const predictionsTurso = predictionsUrl
   ? createClient({
-      url: process.env.predictions_turso_url,
-      authToken: process.env.predictions_turso_token || '',
-    }) 
+      url: predictionsUrl,
+      authToken: predictionsToken,
+    })
   : null;
 
 // Circuit breaker tracking: stops repetitive network attempts when remote Turso is unreachable
@@ -19,7 +25,7 @@ const brokenClientsUntil = new WeakMap<Client, number>();
 const CIRCUIT_BREAKER_COOLDOWN_MS = 5 * 60_000; // 5 minutes pause on connection failures
 
 /**
- * Resilient batch executor with chunking, circuit-breaker on network failures, and graceful local SQLite fallback
+ * Resilient batch executor with chunking and circuit-breaker for Turso
  */
 export async function safeTursoBatch(
   client: Client | null,
@@ -30,7 +36,7 @@ export async function safeTursoBatch(
     return { success: true, executedCount: 0 };
   }
 
-  // If client recently encountered a network failure (fetch failed / offline), skip remote sync
+  // If client recently encountered a network failure, skip remote sync until cooldown expires
   const circuitUntil = brokenClientsUntil.get(client) || 0;
   if (Date.now() < circuitUntil) {
     return { success: false, executedCount: 0 };
@@ -59,7 +65,6 @@ export async function safeTursoBatch(
           errMsg.includes('network error');
 
         if (isNetworkOrFetchError) {
-          // Trip circuit breaker silently and exit immediately so remaining chunks are not attempted
           brokenClientsUntil.set(client, Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS);
           return { success: false, executedCount };
         }
@@ -72,7 +77,6 @@ export async function safeTursoBatch(
     }
 
     if (!succeeded) {
-      // Stop executing further chunks if this chunk could not be written
       break;
     }
 
@@ -99,15 +103,15 @@ export interface TursoDbStatus {
     latencyMs?: number;
     error?: string;
   };
-  localSqlite: {
+  storageEngine: {
     status: 'ONLINE';
     mode: string;
   };
 }
 
 export async function getTursoConnectionStatus(): Promise<TursoDbStatus> {
-  const footballConfigured = Boolean(process.env.football_turso_url);
-  const predictionsConfigured = Boolean(process.env.predictions_turso_url);
+  const footballConfigured = Boolean(footballUrl);
+  const predictionsConfigured = Boolean(predictionsUrl);
 
   let footballStatus: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' = footballConfigured ? 'DISCONNECTED' : 'NOT_CONFIGURED';
   let footballLatency: number | undefined;
@@ -141,7 +145,7 @@ export async function getTursoConnectionStatus(): Promise<TursoDbStatus> {
     }
   }
 
-  const maskUrl = (rawUrl?: string) => {
+  const maskUrl = (rawUrl?: string | null) => {
     if (!rawUrl) return null;
     try {
       const sanitized = rawUrl.startsWith('libsql://') ? rawUrl.replace('libsql://', 'https://') : rawUrl;
@@ -156,20 +160,20 @@ export async function getTursoConnectionStatus(): Promise<TursoDbStatus> {
     footballDb: {
       configured: footballConfigured,
       status: footballStatus,
-      url: maskUrl(process.env.football_turso_url),
+      url: maskUrl(footballUrl),
       latencyMs: footballLatency,
       error: footballError,
     },
     predictionsDb: {
       configured: predictionsConfigured,
       status: predictionsStatus,
-      url: maskUrl(process.env.predictions_turso_url),
+      url: maskUrl(predictionsUrl),
       latencyMs: predictionsLatency,
       error: predictionsError,
     },
-    localSqlite: {
+    storageEngine: {
       status: 'ONLINE',
-      mode: 'PERSISTENT_WASM_SQLITE',
+      mode: 'TURSO_LIBSQL_CLOUD_ONLY',
     },
   };
 }
