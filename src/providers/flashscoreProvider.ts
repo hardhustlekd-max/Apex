@@ -27,8 +27,8 @@ export class FlashscoreProvider implements APIProvider {
     return flashscoreScraperService.getLiveScores();
   }
 
-  async syncHistoricalData(): Promise<{ success: boolean; matchesCount: number; message: string }> {
-    return flashscoreScraperService.syncHistoricalData();
+  async syncHistoricalData(daysBack = 7, shouldClear = true): Promise<{ success: boolean; matchesCount: number; message: string }> {
+    return flashscoreScraperService.syncHistoricalData(daysBack, shouldClear);
   }
 
   async getLeagueStandings(league: string): Promise<LeagueStandingTable | null> {

@@ -13,7 +13,7 @@ import { DEFAULT_HISTORICAL_MATCHES } from './defaultHistoricalMatches.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague } from './leagueMapper.js';
-import { getRelativeDateStr, getCurrentSeason } from './dateUtils.js';
+import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -113,18 +113,31 @@ export class ServerEngine {
   }
 
   public static predictFixtureUnified(
-    f: Fixture,
+    fixture: Fixture,
     allMatches: HistoricalMatch[],
     settings: EngineSettings,
     cachedH2H?: HeadToHeadMeasurement | null,
     tacticalInput?: any,
-    scrapedMap?: Map<string, any>
+    scrapedMap?: Map<string, any>,
+    historicalContextOverride?: HistoricalMatch[]
   ): Fixture {
-    const leagueMatches = allMatches.filter((m) =>
-      matchesLeague(m.div, (m as any).leagueName, f.league) ||
-      matchesLeague(m.div, (m as any).leagueName, f.leagueName)
-    );
-    const historicalContext = leagueMatches.length >= 10 ? leagueMatches : allMatches;
+    // Standardize date/time for the incoming fixture
+    const f = {
+      ...fixture,
+      matchDate: normalizeDateStr(fixture.matchDate),
+      kickOffTime: normalizeTimeStr(fixture.kickOffTime)
+    };
+    const historicalContext = historicalContextOverride && historicalContextOverride.length >= 5
+      ? historicalContextOverride 
+      : (allMatches.filter((m) =>
+          matchesLeague(m.div, (m as any).leagueName, f.league) ||
+          matchesLeague(m.div, (m as any).leagueName, f.leagueName)
+        ).length >= 10 
+          ? allMatches.filter((m) =>
+              matchesLeague(m.div, (m as any).leagueName, f.league) ||
+              matchesLeague(m.div, (m as any).leagueName, f.leagueName)
+            )
+          : allMatches);
 
     // Dynamically calculate rest days if not already provided
     const restDaysHome = tacticalInput?.restDaysHome ?? f.restDaysHome ?? this.calculateDynamicRestDays(
@@ -403,16 +416,37 @@ export class ServerEngine {
 
     const allMatches = this.getUnifiedHistoricalUniverse();
     const cachedH2HMap = db.getAllPredictionMeasurements();
+    
+    // Optimization: Get all existing IDs in one go to avoid repetitive queries in the loop
+    const existingIds = new Set<string>();
+    try {
+      const histData = predictionsDb.getHistoricalPredictions({ limit: 5000 });
+      histData.forEach(f => { if (f.id) existingIds.add(f.id); });
+    } catch {
+      // ignore
+    }
+
+    // Optimization: Group all matches by league for O(1) context lookup instead of O(N) filtering inside the loop
+    const matchesByLeague = new Map<string, HistoricalMatch[]>();
+    for (const m of allMatches) {
+        const div = String(m.div || '').toUpperCase();
+        if (!matchesByLeague.has(div)) matchesByLeague.set(div, []);
+        matchesByLeague.get(div)!.push(m);
+        
+        const leagueName = String((m as any).leagueName || '').toUpperCase();
+        if (leagueName && leagueName !== div) {
+           if (!matchesByLeague.has(leagueName)) matchesByLeague.set(leagueName, []);
+           matchesByLeague.get(leagueName)!.push(m);
+        }
+    }
 
     const enrichedHistory: Fixture[] = [];
     
     for (const m of historicalMatches) {
       const fixtureId = m.id?.startsWith('hist_') ? m.id : `hist_${m.id}`;
       
-      // Skip if already in predictionsDb to remove reproduction
-      const existing = predictionsDb.getPredictionById(fixtureId);
-      if (existing && existing.prediction && (existing.bestValueMarket || existing.mostLikelyOutcome)) {
-        enrichedHistory.push(existing);
+      // Fast in-memory check instead of getPredictionById (which does SQL + JSON parse)
+      if (existingIds.has(fixtureId)) {
         continue;
       }
 
@@ -423,6 +457,10 @@ export class ServerEngine {
 
       const homeTeam = m.homeTeam || m.home?.name || 'Home Club';
       const awayTeam = m.awayTeam || m.away?.name || 'Away Club';
+
+      const divUpper = String(m.div || 'LEAGUE').toUpperCase();
+      const leagueNameUpper = String(m.leagueName || m.div || 'Historical Match').toUpperCase();
+      const historicalContext = matchesByLeague.get(divUpper) || matchesByLeague.get(leagueNameUpper) || allMatches;
 
       let odds = undefined;
       if (m.b365H && m.b365D && m.b365A) {
@@ -441,8 +479,8 @@ export class ServerEngine {
         providerId: 'HISTORICAL',
         league: m.div || 'LEAGUE',
         leagueName: m.leagueName || m.div || 'Historical Match',
-        matchDate: m.matchDate || getRelativeDateStr(-30),
-        kickOffTime: 'FT',
+        matchDate: normalizeDateStr(m.matchDate || getRelativeDateStr(-30)),
+        kickOffTime: normalizeTimeStr(m.kickOffTime || 'FT'),
         homeTeam,
         awayTeam,
         status: 'FINISHED' as const,
@@ -455,18 +493,38 @@ export class ServerEngine {
         restDaysAway: m.restDaysAway || 7,
       };
 
-      const result = this.predictFixtureUnified(tempFixture, allMatches, settings, cachedH2H);
+      // Optimization: Filter league matches once per iteration or use a Map
+      // Actually, predictFixtureUnified already does this, but it takes allMatches.
+      // We can optimize predictFixtureUnified to be faster if we pass league matches.
+      const result = this.predictFixtureUnified(tempFixture, allMatches, settings, cachedH2H, undefined, undefined, historicalContext);
       enrichedHistory.push(result);
+      
+      // Batch save every 50 to keep memory low and provide progress (logs)
+      if (enrichedHistory.length % 100 === 0) {
+        predictionsDb.saveHistoricalPredictions(enrichedHistory.slice(-100));
+        loggerService.addLog({
+           level: 'INFO',
+           category: 'PREDICTION',
+           source: 'ServerEngine',
+           message: `Historical sync progress: ${enrichedHistory.length}/${historicalMatches.length} matches processed...`,
+        });
+      }
     }
 
     await predictionsDb.init();
-    predictionsDb.saveHistoricalPredictions(enrichedHistory);
+    // Save remaining
+    if (enrichedHistory.length > 0) {
+       const remaining = enrichedHistory.slice(-(enrichedHistory.length % 100 || enrichedHistory.length));
+       if (remaining.length > 0) {
+          predictionsDb.saveHistoricalPredictions(remaining);
+       }
+    }
 
     loggerService.addLog({
       level: 'SUCCESS',
       category: 'PREDICTION',
       source: 'ServerEngine',
-      message: `Unified 5-Pillar Engine evaluated ${enrichedHistory.length} historical matches`,
+      message: `Unified 5-Pillar Engine evaluated ${enrichedHistory.length} new historical matches`,
       details: { count: enrichedHistory.length, universeSize: allMatches.length },
     });
 

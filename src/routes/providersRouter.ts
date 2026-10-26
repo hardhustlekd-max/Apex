@@ -143,69 +143,80 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     message: 'Starting Flashscore historical & upcoming feeds synchronization...',
   });
 
-  const syncRes = await flashscoreScraperService.syncHistoricalData(7);
-  const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-  const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
+  try {
+    const syncRes = await flashscoreScraperService.syncHistoricalData(7, !options.resetDatabase);
+    const upcoming = await flashscoreScraperService.getUpcomingFixtures();
+    const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
 
-  // Predict and store historical matches in predictions db
-  const allHist = ServerEngine.getUnifiedHistoricalUniverse();
-  const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
+    // Predict and store historical matches in predictions db
+    const allHist = ServerEngine.getUnifiedHistoricalUniverse();
+    const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
 
-  // Update live predictions if any live games are active
-  const activeProvider = providerManager.getActiveProvider();
-  const liveScores = await activeProvider.getLiveScores().catch(() => []);
-  let livePredCount = 0;
-  if (liveScores && liveScores.length > 0) {
-    const liveFixtures: Fixture[] = liveScores.map((s) => ({
-      id: s.fixtureId,
-      providerId: 'FLASHSCORE',
-      league: s.league || 'ALL',
-      leagueName: s.leagueName || 'Live In-Play',
-      matchDate: getRelativeDateStr(0),
-      kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
-      homeTeam: s.homeTeam,
-      awayTeam: s.awayTeam,
-      status: 'LIVE' as const,
-      minute: s.minute,
-      score: { home: s.homeScore, away: s.awayScore },
-      odds: {
-        homeWin: 2.10,
-        draw: 3.30,
-        awayWin: 3.40,
-        over25: 1.85,
-        under25: 1.95,
-      },
-    }));
-    const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
-    livePredCount = liveRes.count;
+    // Update live predictions if any live games are active
+    const activeProvider = providerManager.getActiveProvider();
+    const liveScores = await activeProvider.getLiveScores().catch(() => []);
+    let livePredCount = 0;
+    if (liveScores && liveScores.length > 0) {
+      const liveFixtures: Fixture[] = liveScores.map((s) => ({
+        id: s.fixtureId,
+        providerId: 'FLASHSCORE',
+        league: s.league || 'ALL',
+        leagueName: s.leagueName || 'Live In-Play',
+        matchDate: getRelativeDateStr(0),
+        kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+        homeTeam: s.homeTeam,
+        awayTeam: s.awayTeam,
+        status: 'LIVE' as const,
+        minute: s.minute,
+        score: { home: s.homeScore, away: s.awayScore },
+        odds: {
+          homeWin: 2.10,
+          draw: 3.30,
+          awayWin: 3.40,
+          over25: 1.85,
+          under25: 1.95,
+        },
+      }));
+      const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
+      livePredCount = liveRes.count;
+    }
+
+    const updatedStats = {
+      ...db.getStatsSummary(),
+      rawFeedsCount: db.getRawFeedsCount(),
+      upcomingCount: db.getUpcomingFixturesCount(),
+      predictionsCount: predictionsDb.count(),
+    };
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'DATA_FETCH',
+      source: 'SyncEngine',
+      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${allHist.length} historical, ${livePredCount} live predicted`,
+    });
+
+    return {
+      success: true,
+      message: options.resetDatabase || options.resetRawFeeds
+        ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical predictions)`
+        : `Predictions updated in database (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical)`,
+      matchesCount: syncRes.matchesCount,
+      upcomingCount: upcoming.length,
+      predictionsCount: predRes.count,
+      historicalPredictionsCount: histPredRes.count,
+      livePredictionsCount: livePredCount,
+      stats: updatedStats,
+    };
+  } catch (err: any) {
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'DATA_FETCH',
+      source: 'SyncEngine',
+      message: `Fatal error during sync workflow: ${err?.message}`,
+      details: { stack: err?.stack }
+    });
+    throw err;
   }
-
-  const updatedStats = {
-    ...db.getStatsSummary(),
-    rawFeedsCount: db.getRawFeedsCount(),
-    upcomingCount: db.getUpcomingFixturesCount(),
-    predictionsCount: predictionsDb.count(),
-  };
-
-  loggerService.addLog({
-    level: 'SUCCESS',
-    category: 'DATA_FETCH',
-    source: 'SyncEngine',
-    message: `Sync completed: ${upcoming.length} upcoming fixtures, ${allHist.length} historical, ${livePredCount} live predicted`,
-  });
-
-  return {
-    success: true,
-    message: options.resetDatabase || options.resetRawFeeds
-      ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical predictions)`
-      : `Predictions updated in database (${predRes.count} upcoming, ${livePredCount} live, ${histPredRes.count} historical)`,
-    matchesCount: syncRes.matchesCount,
-    upcomingCount: upcoming.length,
-    predictionsCount: predRes.count,
-    historicalPredictionsCount: histPredRes.count,
-    livePredictionsCount: livePredCount,
-    stats: updatedStats,
-  };
 }
 
 // Unified Reset Database, Raw Feeds & Full Data Sync

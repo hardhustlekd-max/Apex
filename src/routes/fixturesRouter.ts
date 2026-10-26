@@ -5,7 +5,7 @@ import { ServerEngine } from '../core/serverEngine.js';
 import { providerManager } from '../providers/providerManager.js';
 import { ApexEngine } from '../core/poisson.js';
 import { EngineSettings, Fixture } from '../core/types.js';
-import { getRelativeDateStr } from '../core/dateUtils.js';
+import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { isMatchStarted } from '../core/accumulator.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
@@ -173,7 +173,7 @@ fixturesRouter.get('/history', async (req, res) => {
           id: sm.matchId || `scraped_${idx}`,
           div: sm.leagueName || sm.stage || 'FLASHSCORE',
           leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-          matchDate: sm.date ? sm.date.slice(0, 10) : '2024-01-01',
+          matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-365)),
           homeTeam: sm.home.name,
           awayTeam: sm.away.name,
           fthg: parseInt(sm.result!.home!, 10) || 0,

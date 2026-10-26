@@ -4,7 +4,7 @@ import initSqlJs, { Database } from 'sql.js';
 import { Fixture } from './types.js';
 import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
-import { getRelativeDateStr, getPossibleDateStrs, getCurrentDateTimeStr } from './dateUtils.js';
+import { getRelativeDateStr, getPossibleDateStrs, getCurrentDateTimeStr, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
 import { getSlugForCode, getCodeForSlug, getLeagueAliases, matchesLeague } from './leagueMapper.js';
 import { predictionsTurso, safeTursoBatch } from './tursoClient.js';
 
@@ -312,6 +312,22 @@ export class PredictionsDB {
       CREATE INDEX IF NOT EXISTS idx_hist_pred_date ON historical_predictions(match_date);
       CREATE INDEX IF NOT EXISTS idx_hist_pred_league ON historical_predictions(league);
     `);
+
+    // Schema migration for older tables with leagueName -> league_name
+    try {
+      const tables = ['upcoming_predictions', 'live_predictions', 'historical_predictions'];
+      for (const tbl of tables) {
+        const tableInfo = this.db.exec(`PRAGMA table_info(${tbl});`);
+        if (tableInfo && tableInfo[0]) {
+          const columns = tableInfo[0].values.map((v) => String(v[1]));
+          if (columns.includes('leagueName') && !columns.includes('league_name')) {
+            this.db.run(`ALTER TABLE ${tbl} RENAME COLUMN leagueName TO league_name;`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Column rename check completed:', e);
+    }
   }
 
   async savePredictions(fixtures: Fixture[]): Promise<void> {
@@ -358,8 +374,8 @@ export class PredictionsDB {
             f.league || 'ALL',
             f.leagueName || f.league || 'Unknown League',
             f.stage || null,
-            f.matchDate,
-            f.kickOffTime || 'TBD',
+            normalizeDateStr(f.matchDate),
+            normalizeTimeStr(f.kickOffTime || 'TBD'),
             f.homeTeam,
             f.awayTeam,
             f.homeBadge || null,
@@ -684,8 +700,8 @@ export class PredictionsDB {
             f.league || 'ALL',
             f.leagueName || f.league || 'Live In-Play',
             f.stage || null,
-            f.matchDate,
-            f.kickOffTime || `${f.minute || 0}'`,
+            normalizeDateStr(f.matchDate),
+            normalizeTimeStr(f.kickOffTime || `${f.minute || 0}'`),
             f.homeTeam,
             f.awayTeam,
             f.homeBadge || null,
@@ -880,8 +896,8 @@ export class PredictionsDB {
             f.league || 'ALL',
             f.leagueName || f.league || 'Historical Match',
             f.stage || null,
-            f.matchDate,
-            f.kickOffTime || 'FT',
+            normalizeDateStr(f.matchDate),
+            normalizeTimeStr(f.kickOffTime || 'FT'),
             f.homeTeam,
             f.awayTeam,
             f.homeBadge || null,
@@ -954,8 +970,8 @@ export class PredictionsDB {
               f.league || 'ALL',
               f.leagueName || f.league || 'Historical Match',
               f.stage || null,
-              f.matchDate,
-              f.kickOffTime || 'FT',
+              normalizeDateStr(f.matchDate),
+              normalizeTimeStr(f.kickOffTime || 'FT'),
               f.homeTeam,
               f.awayTeam,
               f.homeBadge || null,
@@ -1035,15 +1051,8 @@ export class PredictionsDB {
           sql += ` WHERE ` + conditions.join(' AND ');
         }
 
-        // Extremely robust sorting: Ensure 'YYYY-MM-DD' sort works even if some are 'DD-MM-YYYY' or 'DD/MM/YYYY'
-        // We force YYYY to the front if we detect DD-MM-YYYY or DD/MM/YYYY
-        sql += ` ORDER BY 
-          CASE 
-            WHEN match_date LIKE '____-%' OR match_date LIKE '____/%' THEN match_date 
-            WHEN match_date LIKE '__-__-____' OR match_date LIKE '__/__/____' THEN SUBSTR(match_date, 7, 4) || '-' || SUBSTR(match_date, 4, 2) || '-' || SUBSTR(match_date, 1, 2)
-            ELSE match_date 
-          END DESC, 
-          kick_off_time DESC`;
+        // With unified data, simple string comparison works perfectly
+        sql += ` ORDER BY match_date DESC, kick_off_time DESC`;
 
         if (filters?.limit) {
           sql += ` LIMIT ?`;
@@ -1059,7 +1068,10 @@ export class PredictionsDB {
           const row = stmt.getAsObject() as { full_fixture_json: string };
           if (row.full_fixture_json) {
             try {
-              fixtures.push(JSON.parse(row.full_fixture_json) as Fixture);
+              const f = JSON.parse(row.full_fixture_json) as Fixture;
+              f.matchDate = normalizeDateStr(f.matchDate);
+              f.kickOffTime = normalizeTimeStr(f.kickOffTime || 'FT');
+              fixtures.push(f);
             } catch {}
           }
         }
@@ -1076,7 +1088,9 @@ export class PredictionsDB {
 
     fixtures.sort((a, b) => {
       // Primary: Date Descending (Newest first)
-      if (a.matchDate !== b.matchDate) return b.matchDate.localeCompare(a.matchDate);
+      const dateA = normalizeDateStr(a.matchDate);
+      const dateB = normalizeDateStr(b.matchDate);
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
       
       // Secondary: League Priority (Major leagues top within the day)
       const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
@@ -1084,7 +1098,9 @@ export class PredictionsDB {
       if (priorityA !== priorityB) return priorityA - priorityB;
       
       // Tertiary: Time Descending
-      return (b.kickOffTime || '').localeCompare(a.kickOffTime || '');
+      const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
+      const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
+      return timeB.localeCompare(timeA);
     });
 
     return fixtures;

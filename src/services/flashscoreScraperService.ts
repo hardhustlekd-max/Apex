@@ -2,7 +2,7 @@ import { Fixture, BookmakerOdds, HistoricalMatch, LeagueCode, FlashscoreScrapedM
 import { LiveOddsUpdate, LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
-import { getCurrentSeason } from '../core/dateUtils.js';
+import { getCurrentSeason, normalizeDateStr, normalizeTimeStr, getStandardDateStr, getStandardTimeStr } from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
 import { DEFAULT_HISTORICAL_MATCHES } from '../core/defaultHistoricalMatches.js';
 
@@ -172,13 +172,8 @@ export class FlashscoreScraperService {
         seenMatchIds.add(m.matchId);
 
         const matchDateObj = m.timestamp ? new Date((m.timestamp + 3 * 3600) * 1000) : new Date();
-        const year = matchDateObj.getUTCFullYear();
-        const month = String(matchDateObj.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(matchDateObj.getUTCDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        const hours = String(matchDateObj.getUTCHours()).padStart(2, '0');
-        const mins = String(matchDateObj.getUTCMinutes()).padStart(2, '0');
-        const kickOffTime = `${hours}:${mins}`;
+        const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
+        const kickOffTime = normalizeTimeStr(getStandardTimeStr(matchDateObj));
 
         const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
         const odds = this.generateMatchOdds();
@@ -366,16 +361,18 @@ export class FlashscoreScraperService {
   /**
    * Scrapes completed match results from Flashscore to populate historical database
    */
-  async syncHistoricalData(daysBack = 7): Promise<{ success: boolean; matchesCount: number; message: string }> {
+  async syncHistoricalData(daysBack = 7, shouldClear = true): Promise<{ success: boolean; matchesCount: number; message: string }> {
     loggerService.addLog({
       level: 'INFO',
       category: 'SCRAPER',
       source: 'FlashscoreScraperService',
-      message: `Starting syncHistoricalData with daysBack: ${daysBack}`,
+      message: `Starting syncHistoricalData with daysBack: ${daysBack}, shouldClear: ${shouldClear}`,
     });
-    // Clear existing data and local caches before refilling
-    db.clearDatabase();
-    this.clearCaches();
+    // Clear existing data and local caches before refilling if requested
+    if (shouldClear) {
+      db.clearDatabase();
+      this.clearCaches();
+    }
 
     let inserted = 0;
     // Scrape past days down to -7 (Flashscore maximum historical feed range)
@@ -412,7 +409,7 @@ export class FlashscoreScraperService {
         seenHistIds.add(m.matchId);
         const { code } = this.mapToLeagueCode(m.tournament, m.country);
         const matchDateObj = m.timestamp ? new Date((m.timestamp + 3 * 3600) * 1000) : new Date();
-        const dateStr = matchDateObj.toISOString().slice(0, 10);
+        const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
 
         const homeScore = m.homeScore!;
         const awayScore = m.awayScore!;
@@ -473,75 +470,77 @@ export class FlashscoreScraperService {
       { path: '/football/usa/mls/results/', code: 'usa_major_league_soccer' },
     ];
 
-    for (const t of tournamentPages) {
-      let timeout: NodeJS.Timeout | null = null;
-      try {
-        const pageUrl = `https://www.flashscore.com${t.path}`;
-        const controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(pageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          },
-          signal: controller.signal,
-        });
-        if (res.ok) {
-          const html = await res.text();
-          const resultsMatch = html.match(/cjs\.initialFeeds\[['"](?:summary-)?results['"]\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
-          if (resultsMatch && resultsMatch[1]) {
-            const sections = resultsMatch[1].split('~');
-            for (const s of sections) {
-              if (!s.startsWith('AA÷')) continue;
-              const parts = s.split('¬');
-              const data: Record<string, string> = {};
-              for (const p of parts) {
-                const [k, v] = p.split('÷');
-                if (k && v !== undefined) data[k] = v;
+    await Promise.allSettled(
+      tournamentPages.map(async (t) => {
+        let timeout: NodeJS.Timeout | null = null;
+        try {
+          const pageUrl = `https://www.flashscore.com${t.path}`;
+          const controller = new AbortController();
+          timeout = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(pageUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+            signal: controller.signal,
+          });
+          if (res.ok) {
+            const html = await res.text();
+            const resultsMatch = html.match(/cjs\.initialFeeds\[['"](?:summary-)?results['"]\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
+            if (resultsMatch && resultsMatch[1]) {
+              const sections = resultsMatch[1].split('~');
+              for (const s of sections) {
+                if (!s.startsWith('AA÷')) continue;
+                const parts = s.split('¬');
+                const data: Record<string, string> = {};
+                for (const p of parts) {
+                  const [k, v] = p.split('÷');
+                  if (k && v !== undefined) data[k] = v;
+                }
+                const matchId = data['AA'];
+                if (!matchId || seenHistIds.has(matchId)) continue;
+                if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
+
+                const homeTeam = (data['AE'] || '').trim();
+                const awayTeam = (data['AF'] || '').trim();
+                const homeScore = parseInt(data['AG'], 10);
+                const awayScore = parseInt(data['AH'], 10);
+                if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
+
+                seenHistIds.add(matchId);
+                const ts = parseInt(data['AD'] || '0', 10);
+                const matchDateObj = ts ? new Date(ts * 1000) : new Date();
+                const matchDate = normalizeDateStr(getStandardDateStr(matchDateObj));
+                const ftr = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
+
+                historicalMatches.push({
+                  id: `fs_hist_${matchId}`,
+                  div: t.code,
+                  season: getCurrentSeason(),
+                  matchDate,
+                  homeTeam,
+                  awayTeam,
+                  fthg: homeScore,
+                  ftag: awayScore,
+                  ftr,
+                });
               }
-              const matchId = data['AA'];
-              if (!matchId || seenHistIds.has(matchId)) continue;
-              if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
-
-              const homeTeam = (data['AE'] || '').trim();
-              const awayTeam = (data['AF'] || '').trim();
-              const homeScore = parseInt(data['AG'], 10);
-              const awayScore = parseInt(data['AH'], 10);
-              if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
-
-              seenHistIds.add(matchId);
-              const ts = parseInt(data['AD'] || '0', 10);
-              const matchDate = ts ? new Date(ts * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-              const ftr = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
-
-              historicalMatches.push({
-                id: `fs_hist_${matchId}`,
-                div: t.code,
-                season: getCurrentSeason(),
-                matchDate,
-                homeTeam,
-                awayTeam,
-                fthg: homeScore,
-                ftag: awayScore,
-                ftr,
-              });
             }
           }
+        } catch (err) {
+          loggerService.addLog({
+            level: 'WARN',
+            category: 'SCRAPER',
+            source: 'FlashscoreScraperService',
+            message: `Failed tournament scraping for ${t.path}: ${err}`,
+          });
+        } finally {
+          if (timeout) {
+            clearTimeout(timeout);
+            timeout = null;
+          }
         }
-      } catch (err) {
-        loggerService.addLog({
-          level: 'WARN',
-          category: 'SCRAPER',
-          source: 'FlashscoreScraperService',
-          message: `Failed tournament scraping for ${t.path}: ${err}`,
-        });
-        // continue to next tournament
-      } finally {
-        if (timeout) {
-          clearTimeout(timeout);
-          timeout = null;
-        }
-      }
-    }
+      })
+    );
 
     if (historicalMatches.length > 0) {
       inserted = db.insertHistoricalMatches(historicalMatches);
@@ -675,7 +674,8 @@ export class FlashscoreScraperService {
             const hG = parseInt(d['KU'] || '0', 10);
             const aG = parseInt(d['KT'] || '0', 10);
             const timestamp = parseInt(d['KC'] || '0', 10);
-            const dateStr = timestamp > 0 ? new Date((timestamp + 3 * 3600) * 1000).toISOString().split('T')[0] : '';
+            const matchDateObj = timestamp > 0 ? new Date((timestamp + 3 * 3600) * 1000) : new Date();
+            const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
             const competition = d['KF'] || 'League';
 
             if (currentSection === 'HOME_RECENT') {

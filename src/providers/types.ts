@@ -30,6 +30,6 @@ export interface APIProvider {
   getUpcomingFixtures(date?: string): Promise<Fixture[]>;
   getLiveOdds(fixtureId: string): Promise<LiveOddsUpdate>;
   getLiveScores(): Promise<LiveScore[]>;
-  syncHistoricalData(): Promise<{ success: boolean; matchesCount: number; message: string }>;
+  syncHistoricalData(daysBack?: number, shouldClear?: boolean): Promise<{ success: boolean; matchesCount: number; message: string }>;
   getLeagueStandings?(league: string): Promise<LeagueStandingTable | null>;
 }

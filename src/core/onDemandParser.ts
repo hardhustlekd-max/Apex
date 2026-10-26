@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { parseFeedText, ScrapedRawMatch } from './feedParser.js';
 import { HeadToHeadMeasurement, HeadToHeadMatchRecord, TeamFormMatch } from './types.js';
 import { loggerService } from '../services/loggerService.js';
+import { normalizeDateStr, getStandardDateStr } from './dateUtils.js';
 
 export class OnDemandParser {
   /**
@@ -163,7 +164,8 @@ export class OnDemandParser {
         const hG = parseInt(d['KU'] || '0', 10);
         const aG = parseInt(d['KT'] || '0', 10);
         const timestamp = parseInt(d['KC'] || '0', 10);
-        const dateStr = timestamp > 0 ? new Date((timestamp + 3 * 3600) * 1000).toISOString().split('T')[0] : '';
+        const matchDateObj = timestamp > 0 ? new Date((timestamp + 3 * 3600) * 1000) : new Date();
+        const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
         const competition = d['KF'] || 'League';
 
         if (currentSection === 'HOME_RECENT') {

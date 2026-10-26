@@ -3,7 +3,7 @@ import { Filter, ChevronDown, Search, X } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { Fixture } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
-import { getRelativeDateStr, getPossibleDateStrs } from '../core/dateUtils.js';
+import { getRelativeDateStr, getPossibleDateStrs, getStandardDateStr, normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
 import { FixtureCard } from './FixtureCard.js';
 import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe.js';
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
@@ -133,7 +133,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const baseToday = useMemo(() => {
-    const localToday = getRelativeDateStr(0);
+    const localToday = getStandardDateStr();
     const utcToday = new Date().toISOString().slice(0, 10);
     if (fixtures.some((f) => f.matchDate === localToday)) {
       return localToday;
@@ -226,19 +226,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [activeScope, selectedLeague]);
 
   const getOffsetDate = (offsetDays: number) => {
-    try {
-      const parts = baseToday.split('-');
-      if (parts.length === 3) {
-        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        d.setDate(d.getDate() + offsetDays);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      }
-    } catch {
-      // fallback
-    }
     return getRelativeDateStr(offsetDays);
   };
 
@@ -442,10 +429,20 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           return true;
         })
         .sort((a, b) => {
+          // Primary: Date Descending (Newest dates first)
+          const dateA = normalizeDateStr(a.matchDate);
+          const dateB = normalizeDateStr(b.matchDate);
+          if (dateA !== dateB) return dateB.localeCompare(dateA);
+
+          // Secondary: League Priority (Major leagues top within that date)
           const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
           const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
           if (priorityA !== priorityB) return priorityA - priorityB;
-          return b.matchDate.localeCompare(a.matchDate);
+
+          // Tertiary: Time Descending
+          const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
+          const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
+          return timeB.localeCompare(timeA);
         });
       return applySort(filtered);
     }

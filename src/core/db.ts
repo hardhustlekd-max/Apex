@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import initSqlJs, { Database, SqlValue } from 'sql.js';
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, LeagueStandingTable, LeagueStandingEntry } from './types.js';
-import { getRelativeDateStr, getCurrentSeason, getPossibleDateStrs } from './dateUtils.js';
+import { getRelativeDateStr, getCurrentSeason, getPossibleDateStrs, normalizeDateStr } from './dateUtils.js';
 import { getCodeForSlug } from './leagueMapper.js';
 import { loggerService } from '../services/loggerService.js';
 
@@ -675,9 +675,11 @@ export class FootballDB {
         filtered = filtered.filter((f) => (f.league || '').toUpperCase() === leagueFilter!.toUpperCase());
       }
       if (dateParam) {
-        filtered = filtered.filter((f) => f.matchDate === dateParam);
+        filtered = filtered.filter((f) => f.matchDate === normalizeDateStr(dateParam));
       } else if (startDate && endDate) {
-        filtered = filtered.filter((f) => f.matchDate >= startDate! && f.matchDate <= endDate!);
+        const nStart = normalizeDateStr(startDate);
+        const nEnd = normalizeDateStr(endDate);
+        filtered = filtered.filter((f) => f.matchDate >= nStart && f.matchDate <= nEnd);
       } else if (dateFilter === 'TODAY') {
         filtered = filtered.filter((f) => todayStrs.includes(f.matchDate));
       } else if (dateFilter === 'TOMORROW') {
@@ -690,8 +692,9 @@ export class FootballDB {
         const minDate = todayStrs[0];
         const maxDate = day6Strs[day6Strs.length - 1];
         filtered = filtered.filter((f) => f.matchDate >= minDate && f.matchDate <= maxDate);
-      } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
-        filtered = filtered.filter((f) => f.matchDate === dateFilter);
+      } else if (dateFilter && dateFilter !== 'ALL') {
+        const normFilter = normalizeDateStr(dateFilter);
+        filtered = filtered.filter((f) => f.matchDate === normFilter);
       }
       if (limit && limit > 0) {
         filtered = filtered.slice(0, limit);
@@ -710,10 +713,10 @@ export class FootballDB {
 
       if (dateParam) {
         query += ` AND match_date = ?`;
-        params.push(dateParam);
+        params.push(normalizeDateStr(dateParam));
       } else if (startDate && endDate) {
         query += ` AND match_date >= ? AND match_date <= ?`;
-        params.push(startDate, endDate);
+        params.push(normalizeDateStr(startDate), normalizeDateStr(endDate));
       } else if (dateFilter === 'TODAY') {
         query += ` AND match_date IN (${todayStrs.map(() => '?').join(',')})`;
         params.push(...todayStrs);
@@ -726,9 +729,9 @@ export class FootballDB {
       } else if (dateFilter === 'THIS_WEEK') {
         query += ` AND match_date >= ? AND match_date <= ?`;
         params.push(todayStrs[0], day6Strs[day6Strs.length - 1]);
-      } else if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter)) {
+      } else if (dateFilter && dateFilter !== 'ALL') {
         query += ` AND match_date = ?`;
-        params.push(dateFilter);
+        params.push(normalizeDateStr(dateFilter));
       }
 
       query += ` ORDER BY match_date ASC, kick_off_time ASC`;

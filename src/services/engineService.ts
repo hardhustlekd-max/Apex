@@ -37,7 +37,7 @@ const PROVIDER_METADATA: ProviderStatus[] = [
 export class EngineService {
   private static async safeJsonFetch(url: string, options?: RequestInit): Promise<any> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), 75000);
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);

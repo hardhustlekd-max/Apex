@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Fixture } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import { CheckCircle2, XCircle, RefreshCw, BarChart3, ShieldCheck, Target, Layers } from 'lucide-react';
+import { getLeaguePriority } from '../core/leaguePriority.js';
+import { normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
 
 export const PredictionHistoryView: React.FC = () => {
   const [history, setHistory] = useState<Fixture[]>([]);
@@ -17,7 +19,20 @@ export const PredictionHistoryView: React.FC = () => {
     }
     try {
       const data = await EngineService.getHistoricalMatches('ALL', recordLimit);
-      setHistory(data);
+      const sorted = (data || []).slice().sort((a, b) => {
+        const dateA = normalizeDateStr(a.matchDate);
+        const dateB = normalizeDateStr(b.matchDate);
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+
+        const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
+        const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
+        if (priorityA !== priorityB) return priorityA - priorityB;
+
+        const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
+        const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
+        return timeB.localeCompare(timeA);
+      });
+      setHistory(sorted);
     } catch (err) {
       console.error('Error fetching historical predictions:', err);
     } finally {

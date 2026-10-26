@@ -5,7 +5,7 @@ import {
   EngineSettings,
   MarketOption,
 } from './types.js';
-import { getRelativeDateStr, getUtcDateStr } from './dateUtils.js';
+import { getRelativeDateStr, getUtcDateStr, hasMatchStarted } from './dateUtils.js';
 
 export interface AccaGenerationParams {
   strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';
@@ -51,69 +51,19 @@ export function isMatchStarted(f: Fixture): boolean {
     ) {
       return true;
     }
-    if (s !== 'SCHEDULED' && s !== 'TIMED' && s !== 'NS' && s !== 'NOT_STARTED' && s !== 'UPCOMING') {
-      return true;
-    }
   }
 
   // 2. Score check: if match already has scored goals and is not explicitly scheduled/timed
   if (f.score && (f.score.home !== undefined || f.score.away !== undefined)) {
-    if (f.status !== 'SCHEDULED' && f.status !== 'TIMED') {
-      return true;
-    }
     if ((f.score.home || 0) > 0 || (f.score.away || 0) > 0) {
-      return true;
+      if (f.status !== 'SCHEDULED' && f.status !== 'TIMED') return true;
     }
   }
 
-  const now = new Date();
-  const nowMs = now.getTime();
-
-  // 3. Full ISO date or timestamp check
-  if (f.matchDate && (f.matchDate.includes('T') || f.matchDate.includes('Z'))) {
-    const parsedTime = Date.parse(f.matchDate);
-    if (!isNaN(parsedTime) && parsedTime <= nowMs) {
-      return true;
-    }
-  }
-
-  const cleanDate = f.matchDate ? f.matchDate.substring(0, 10) : '';
-  const todayStr = getRelativeDateStr(0);
-
-  const utcYear = now.getUTCFullYear();
-  const utcMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const utcDay = String(now.getUTCDate()).padStart(2, '0');
-  const utcTodayStr = `${utcYear}-${utcMonth}-${utcDay}`;
-
-  // 4. Past date check (either local or UTC)
-  if (cleanDate && (cleanDate < todayStr && cleanDate < utcTodayStr)) {
-    return true;
-  }
-
-  // 5. Kickoff time check for today
-  if (cleanDate && (cleanDate === todayStr || cleanDate === utcTodayStr) && f.kickOffTime) {
-    const timeMatch = f.kickOffTime.trim().match(/^(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      let kHours = parseInt(timeMatch[1], 10);
-      const kMinutes = parseInt(timeMatch[2], 10);
-      if (f.kickOffTime.toLowerCase().includes('pm') && kHours < 12) kHours += 12;
-      if (f.kickOffTime.toLowerCase().includes('am') && kHours === 12) kHours = 0;
-
-      const currentLocalMins = now.getHours() * 60 + now.getMinutes();
-      const currentUtcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
-      const kickOffMins = kHours * 60 + kMinutes;
-
-      if (cleanDate === todayStr && kickOffMins <= currentLocalMins) {
-        return true;
-      }
-      if (cleanDate === utcTodayStr && kickOffMins <= currentUtcMins) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  // 3. Normalized time comparison
+  return hasMatchStarted(f.matchDate, f.kickOffTime);
 }
+
 
 export class AccumulatorGenerator {
   /**
