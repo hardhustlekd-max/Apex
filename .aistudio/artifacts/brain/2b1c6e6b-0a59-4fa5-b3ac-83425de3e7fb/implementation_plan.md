@@ -1,154 +1,126 @@
-# Industry-Standard Database Reset & Full Synchronization Engine
+# Apex UI Design System: Pure Visual, Spatial Grid & Mobile Touch Optimization
 
-Architectural blueprint and implementation plan for a production-grade, non-blocking asynchronous database reset and data synchronization architecture for the Apex Football Prediction Engine.
+Architectural blueprint and implementation plan for upgrading the visual styling, spatial geometry, responsive breakpoints, and touchscreen ergonomics of the Apex Football Engine while preserving 100% of existing content, views, filters, and data fields with zero additions or removals.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions were confirmed based on your selections to ensure zero-timeout execution and cloud deployment resilience:
-> - **Execution Model**: **Async Job with Progress Polling**. When triggered, the server immediately acknowledges the request with an HTTP 202 and a unique Job ID. The browser polls the job's granular step progress (`/api/sync/status/:jobId`), completely eliminating HTTP 504 gateway timeouts and premature `AbortController` cancellations.
-> - **Fault-Tolerance Strategy**: **Resilient Hybrid Ingestion with Verified Fallback**. In the event of network timeouts, Cloudflare/Akamai rate-limiting, or `403 Forbidden` responses from remote scrapers, the engine seamlessly fails over to high-coverage cached feeds and verified historical datasets without erroring out.
-> - **Cloud Persistence Strategy**: **Dual-Tier Persistent SQLite with `/tmp` Auto-Routing**. Storage dynamically checks filesystem permissions, auto-routing SQLite writes to `/tmp` on serverless environments (Vercel, AWS Lambda) or persistent disk on container runtimes, while maintaining real-time in-memory state and background Turso synchronization.
+> - **Strict Content Preservation (Zero Additions / Zero Removals)**: Every existing screen, view, tab, metric, filter, modal, and button remains strictly preserved in place. No existing data points or features will be removed, and no extraneous or unrequested content will be added.
+> - **In-Place Visual & Spatial Polish**: The modernization is purely visual, layout, and ergonomic—applying a deterministic hybrid 4-pt/8-pt grid, scalable Deep Obsidian color palette, and 48px touch target hitboxes directly to the existing UI architecture.
+> - **Color Tokens**: Deep Obsidian canvas (`#09090B`), subtle dark structural surfaces (`#121216` / `#18181D`), crisp hairline borders (`#27272A`), and high-intent Electric Volt (`#CCFF00`) accents for active states and primary actions.
+> - **Strict MUI Iconography & Zero Emojis**: Continues strict compliance with the directive: no emojis anywhere; Material UI (MUI) icons for all controls, status anchors, and buttons.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Overview & Scope
 
-### What It Delivers
-A resilient, fault-tolerant background synchronization pipeline that allows users to reset local tables, purge stale feed caches, and ingest multi-season historical match data and upcoming fixtures without browser freezes, connection timeouts, or unhandled exceptions.
-
-### Key Value
-- **Zero-Timeout Reliability**: Eliminates HTTP 504 and client abort errors by detaching heavy scraping and Poisson mathematical modeling from the synchronous request-response cycle.
-- **Granular Visual Telemetry**: Replaces the static spinner with step-by-step progress bars and stage descriptions (e.g., *Purging tables*, *Ingesting tournament feeds [6/12]*, *Computing Poisson xG & Dixon-Coles parameters*, *Finalizing SQLite write*).
-- **Environment Agnostic**: Runs predictably in local development, containerized deployments (Docker / Cloud Run), and serverless environments (Vercel) with auto-detecting filesystem fallbacks.
+### Scope Boundary
+This revision is dedicated exclusively to enhancing the presentation, readability, touch responsiveness, and spatial geometry of the application:
+- **Preserved Existing Features**: Top Bar, Upcoming Fixtures, Live Matches, History View, Acca Builder, Simplified Wireframe view, Market Choice Filters (Best Value, 1X2, Over/Under, BTTS), Date Selector, Search Input, Match Detail Inspection Modal (Head-to-Head, Form, Probability Matrix, Value Bets), Settings Modal (Engine parameters, Data Sync, Appearance), Terminal Logs Drawer, Bottom Nav Dock.
+- **Upgraded Design Attributes**: Spatial math (hybrid 4-pt/8-pt spacing), typography scaling with tabular figures, mobile touch target hitboxes ($\ge 48\text{px}$), and dark/light color palette refinement.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Spatial Grid, Color System & Ergonomics
 
-### Key User Flows
-1. **Triggering Reset & Sync**:
-   - The user opens **Settings > Data Management** and selects **Reset Database, Raw Feeds & Trigger Full Sync**.
-   - A confirmation dialog explains the purge actions with cancel and confirm actions.
-2. **Asynchronous Progress Modal / Bar**:
-   - Upon confirmation, the modal dispatches `POST /api/providers/sync/start` and receives an immediate `{ jobId, status: "RUNNING" }` response.
-   - The UI displays an active progress bar with percentage, current stage tag, and elapsed time counter.
-   - The client polls `GET /api/providers/sync/status/:jobId` every 1,000ms.
-3. **Completion & Real-Time Hydration**:
-   - Once the status reaches `COMPLETED`, the UI displays a clean success banner showing exact metrics (fixtures ingested, models generated, database write time).
-   - The fixture list, history view, and provider counters automatically revalidate without requiring a manual page reload.
-4. **Resilient Failure Recovery**:
-   - If an external scraper endpoint is throttled or times out, the progress banner notes *"Remote endpoint throttled; activated verified hybrid fallback"*, completes the job smoothly, and leaves the database in a consistent, non-corrupted state.
+### A. Hybrid 4-Point & 8-Point Spatial Grid
+Applied directly across all existing containers, cards, and modal dialogs:
 
-### Visual Styling & Component Hierarchy
-- **Typography & Data**: Strictly monospace tabular numerals (`font-mono tabular-nums`) for percentages, elapsed times, and match counters.
-- **Color Discipline**:
-  - Background: Clean neutral slate card (`bg-white dark:bg-[#121212]`).
-  - Active Progress: Vibrant neon lime accent (`#CCFF00`) with smooth transition curves (`cubic-bezier(0.16, 1, 0.3, 1)`).
-  - Status Indicators: Text-and-icon pairings (MUI icons only, zero emojis, zero standalone colored dots).
-- **Zero-Pill Restraint**: Granular telemetry displayed as inline muted text separated by middle dots (`·`), avoiding nested badge clusters.
+- **Micro-Scale (4-Point)**: 
+  - `4px` (`gap-1`, `p-1`) for inline badge spacing, icon-to-text gaps, and border offsets.
+  - `8px` (`gap-2`, `p-2`) for tight list rows, button internal icon gaps, and secondary metadata spacing.
+  - `12px` (`gap-3`, `p-3`) for compact card padding and segmented control tabs.
+- **Macro-Scale (8-Point)**:
+  - `16px` (`gap-4`, `p-4`) standard container inner padding, card gutters, and form control padding.
+  - `24px` (`gap-6`, `p-6`) for section dividers and modal body padding.
+  - `32px` (`gap-8`, `p-8`) for desktop container gutters and hero vertical margins.
+  - `48px` (`min-h-[48px]`, `h-12`) ergonomic minimum touch target hitbox across all mobile buttons, tabs, and filters.
+  - `64px` (`h-16`) standard fixed header and bottom dock height.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+### B. Scalable UI Color Palette (60-30-10 Distribution)
 
-### Decision 1: Async Job Polling vs. Synchronous Request vs. WebSockets
-- **Chosen Approach**: Asynchronous Job Queue with Client Polling.
-- **Why**: 
-  - Standard HTTP endpoints timeout on cloud gateways (e.g. Vercel 10s limit, Cloud Run 60s proxy caps).
-  - WebSockets introduce firewall and proxy disconnection issues in serverless runtimes.
-  - Job polling over lightweight HTTP GET (`/api/providers/sync/status/:jobId`) is resilient to transient network blips and works across all platforms.
-- **Alternatives Considered**: 
-  - *Server-Sent Events (SSE)*: Good for continuous streaming, but proxy buffering on certain cloud reverse proxies can stall event delivery.
-  - *Single Long HTTP POST*: Frequently aborted by browser `fetch` timeouts or intermediate load balancers.
+All existing UI elements mapped cleanly to structured theme tokens:
 
-### Decision 2: Dual-Tier Storage (In-Memory + Auto-Routing Disk)
-- **Chosen Approach**: Dual-Tier SQLite (`sql.js`) with dynamic path resolution.
-- **Why**:
-  - Writing directly to `./data/*.sqlite` fails on serverless platforms (Vercel) with `EROFS: read-only file system`.
-  - Checking `fs.access` with fallback to `/tmp/*.sqlite` and in-memory export guarantees persistence wherever possible and crash-free execution in read-only environments.
-- **Alternatives Considered**: 
-  - *In-memory only*: Loses all state on every cold start.
-  - *External Turso only*: Fails if user credentials or remote network latency fluctuates.
+- **60% Dominant Neutral Canvas**:
+  - Dark Mode: `#09090B` (Canvas), `#121216` (Card Surfaces).
+  - Light Mode: `#F8FAFC` (Canvas), `#FFFFFF` (Card Surfaces).
+- **30% Structural Surfaces & Typography**:
+  - Borders: `#27272A` (Dark hairline), `#E2E8F0` (Light hairline).
+  - Text Primary: `#FAFAFA` (Dark), `#0F172A` (Light).
+  - Text Muted: `#A1A1AA` (Dark Zinc 400), `#64748B` (Light Slate 500).
+- **10% High-Intent Accents**:
+  - Primary Accent: `#CCFF00` (Electric Volt) for active tabs, selected states, and value tips.
+  - Success / Hit: `#22C55E` (Emerald 500).
+  - Danger / Missed: `#EF4444` (Rose 500).
+  - Live Indicator: High-contrast amber/volt pulse.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+### C. Mobile Touchscreen Ergonomics (Thumb-Zone Optimization)
 
-### System Architecture Diagram
+- **48px Minimum Hitbox**: Every existing interactive element—including calendar date pills, league filters, scope switchers (Upcoming/Live/History), search clear buttons, and card click areas—receives explicit `min-h-[48px] min-w-[48px]` touch envelopes to eliminate mis-taps.
+- **Lower 40% Reach Zone**: Bottom Dock and modal action buttons positioned comfortably in the natural thumb zone.
+- **15% Fixed Surface Cap**: Header (56px) + Bottom Dock (64px) aggregate to 120px, guaranteeing over 85% of mobile viewport space remains open for fluid content scrolling.
+
+---
+
+## 3. Component-by-Component In-Place Refinement
+
+Every existing component is polished in-place without removing or adding elements:
+
+1. **Top Bar & Navigation (`TopAppBar.tsx`)**:
+   - Preserves existing brand title, provider status indicator, theme toggle, and settings triggers.
+   - Restyles with 56px height, single-line alignment, and clean border separator.
+2. **Calendar & Date Filter Strip (`FixturesList.tsx`)**:
+   - Preserves 6-day calendar pills and date filter modes (Today, Tomorrow, 3 Days, Week, Custom).
+   - Upgrades date pills to ergonomic 48px touch targets with smooth scroll snap on mobile.
+3. **Fixture Card (`FixtureCard.tsx` / `SimplifiedPredictionsWireframe.tsx`)**:
+   - Preserves all club badges, names, kick-off times, league labels, 1X2 market odds, model probabilities, and best value market badges.
+   - Refines layout using 4-pt/8-pt padding (`p-4`), unboxed metadata with `·` separators, and tabular numerals (`tabular-nums`) for odds and percentages.
+4. **Match Detail Modal (`MatchDetailModal.tsx`)**:
+   - Preserves Head-to-Head stats, recent form, probability matrix, Dixon-Coles parameters, and Poisson calculations.
+   - Adapts responsively: fluid full-width bottom sheet on mobile (`< 768px`) with drag handle and 48px touch buttons; centered modal on desktop (`≥ 768px`).
+5. **Settings & Terminal Modals (`SettingsModal.tsx`, `TerminalModal.tsx`)**:
+   - Preserves Engine settings, Ingestion controls, Turso status, and Terminal logs viewer.
+   - Refines form inputs, progress indicators, and button padding to standard 4-pt/8-pt tokens.
+6. **Bottom Dock (`BottomNavDock.tsx`)**:
+   - Preserves Upcoming, Live, History, Acca, and Settings destinations.
+   - Upgrades touch targets to 48px with safe-area padding (`pb-safe`) for edge-to-edge mobile screens.
+
+---
+
+## 4. Technical Architecture & File Plan
+
+### Architecture Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        BROWSER CLIENT (React / Vite)                  │
+│                        RESPONSIVE VIEWPORT CANVAS                      │
 │                                                                        │
-│   SettingsModal                FixturesList       PredictionHistory    │
-│         │                            ▲                     ▲           │
-│         ▼ (POST /sync/start)         │ (GET /fixtures)     │ (GET /hist)
-│   SyncJobManager ──(poll /status)────┼─────────────────────┘           │
-└─────────┼────────────────────────────┼─────────────────────────────────┘
-          │ (HTTP 202 + Job ID)        │
-          ▼                            ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        EXPRESS APPLICATION LAYER                       │
-│                                                                        │
-│  providersRouter.ts                                                    │
-│    ├── POST /sync/start     ──> Launches detached Async Background Task │
-│    ├── GET  /sync/status/:id ──> Reads in-memory JobState store        │
-│    └── POST /sync/cancel/:id ──> Aborts running workers               │
-│                                                                        │
-│  SyncJobRunner (Worker Logic)                                          │
-│    ├── Phase 1: Database Purge (clearAllData & clearAll)               │
-│    ├── Phase 2: Ingest Historical Feeds (Parallel Scraper + Fallback)  │
-│    ├── Phase 3: Upcoming Feeds & Live In-Play Ingestion               │
-│    ├── Phase 4: Batch Poisson & Dixon-Coles Prediction Pipeline       │
-│    └── Phase 5: Atomic SQLite Export & Turso Sync                      │
-└─────────┼──────────────────────────────────────────────────────────────┘
-          ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        PERSISTENCE & REPLICATION                       │
-│                                                                        │
-│  Dual-Tier SQLite Engine:                                              │
-│    Primary:   ./data/predictions.sqlite (Persistent local volume)      │
-│    Fallback:  /tmp/predictions.sqlite   (Serverless ephemeral volume)  │
-│    Emergency: sql.js In-Memory Store     (Zero-filesystem fallback)    │
-│    Replication: Turso LibSQL (Non-blocking background sync)            │
-└────────────────────────────────────────────────────────────────────────┘
+│  TopAppBar (56px fixed, 48px touch controls, single line)             │
+├────────────────────────────────────────────────────────────────────────┤
+│  Scope Switcher (Upcoming │ Live │ History │ Acca)                     │
+│  Calendar Date Strip (48px Touch Targets, Horizontal Scroll-Snap)      │
+│  League Filter & Search Bar (Hairline border, 48px touch input)        │
+├────────────────────────────────────────────────────────────────────────┤
+│  Fixture List & Prediction Stream                                      │
+│  ├── Desktop (≥ 768px): 2-Column Responsive Grid                       │
+│  └── Mobile (< 768px): 1-Column Fluid Stream (16px gutters, 4-pt gaps) │
+├────────────────────────────────────────────────────────────────────────┤
+│  BottomNavDock (64px fixed, 48px touch targets, pb-safe)               │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+    ┌───────────────────────────────┴───────────────────────────────┐
+    ▼                                                               ▼
+[ Mobile: Bottom Sheet Responsive Layout ]         [ Desktop: Centered Responsive Layout ]
+- MatchDetailModal (Bottom Sheet on mobile)        - MatchDetailModal (Centered Dialog)
+- SettingsModal (Bottom Sheet on mobile)           - SettingsModal (Centered Dialog)
+- TerminalModal (Bottom Sheet on mobile)           - TerminalModal (Centered Dialog)
 ```
 
-### Async Job Lifecycle & State Model
-
-```typescript
-interface SyncJobState {
-  id: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
-  progress: number; // 0 to 100
-  currentStep: string;
-  totalSteps: number;
-  completedSteps: number;
-  stats: {
-    purgedRecords: number;
-    scrapedMatches: number;
-    upcomingFixtures: number;
-    predictionsGenerated: number;
-  };
-  error?: string;
-  startTime: number;
-  endTime?: number;
-}
-```
-
-### Phased Execution Steps
-1. **Step 1 - Purge & Schema Verification**:
-   - Truncates SQLite tables (`upcoming_predictions`, `live_predictions`, `historical_predictions`, `raw_feed_data`).
-   - Ensures column definitions are strictly snake_case (`league_name`) with auto-healing `ALTER TABLE` guards.
-2. **Step 2 - Concurrent Scraper Ingestion**:
-   - Executes parallel `fetch` calls for 8 historical feed offsets with 4-second timeouts.
-   - Concurrently fetches top tournament results using `Promise.allSettled`.
-   - On error or block, seamlessly seeds verified fallback datasets to ensure database is always populated.
-3. **Step 3 - High-Throughput Prediction Modeling**:
-   - Pre-indexes historical matches by league code for $O(1)$ lookups.
-   - Calculates dynamic rest days, home advantages, and Dixon-Coles expected values.
-   - Saves predictions in batched SQLite transactions (100 fixtures per commit).
-4. **Step 4 - Dual-Tier Persistence**:
-   - Exports the WASM binary buffer to `./data/*.sqlite` or `/tmp/*.sqlite`.
-   - Updates JobState to `COMPLETED` with detailed summary metrics.
+### Pure Styling In-Place Scope
+- **Zero changes to database schemas, queries, or API endpoints**.
+- **Zero modifications to business logic, Poisson modeling, or state management**.
+- All edits target CSS classes, layout containers, responsive breakpoints (`sm:`, `md:`, `lg:`), and touch hitbox dimensions.

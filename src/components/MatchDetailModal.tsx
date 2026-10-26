@@ -268,11 +268,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
   const authoritativeValue = getAuthoritativeValueBet(currentFixture);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#121212] text-slate-950 dark:text-neutral-100 rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/80 dark:border-neutral-800 shadow-[0_24px_64px_rgba(0,0,0,0.8)]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-white dark:bg-[#121216] text-slate-950 dark:text-neutral-100 rounded-t-3xl sm:rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200/80 dark:border-[#27272A] shadow-[0_24px_64px_rgba(0,0,0,0.85)]">
         
+        {/* Mobile Drag Handle Affordance */}
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-neutral-700 rounded-full mx-auto my-2.5 sm:hidden shrink-0" />
+
         {/* Modal Top Bar */}
-        <div className="bg-white dark:bg-[#121212] px-4 sm:px-6 pt-4 pb-3 border-b border-slate-100 dark:border-neutral-800 shrink-0">
+        <div className="bg-white dark:bg-[#121216] px-4 sm:px-6 pt-1 sm:pt-4 pb-3 border-b border-slate-100 dark:border-[#27272A] shrink-0">
           <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
             {/* Competition & Timing Metadata */}
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-slate-500 dark:text-neutral-400">
@@ -292,7 +295,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               {fixture.status === 'LIVE' && (
                 <>
                   <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
-                  <span className="text-slate-950 dark:text-[#CCFF00] font-black flex items-center gap-1 text-[10px] sm:text-[11px] whitespace-nowrap shrink-0 bg-[#CCFF00] text-slate-950 dark:bg-[#CCFF00] px-2 py-0.5 rounded-full">
+                  <span className="text-slate-950 dark:text-slate-950 font-black flex items-center gap-1 text-[10px] sm:text-[11px] whitespace-nowrap shrink-0 bg-[#CCFF00] px-2 py-0.5 rounded-full font-mono tabular-nums">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
                     Live In Play
                   </span>
@@ -300,11 +303,11 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               )}
             </div>
 
-            {/* Close Button */}
+            {/* Close Button with min 44px hitbox */}
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-neutral-800 dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
+              className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-[#18181D] dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0 border border-slate-200/60 dark:border-[#27272A]"
               aria-label="Close match details"
             >
               <X className="w-5 h-5 stroke-[2.5]" />
@@ -312,7 +315,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
           </div>
 
           {/* Hero Scoreboard Banner */}
-          <div className="mt-3 p-4 sm:p-5 rounded-3xl bg-slate-100/90 dark:bg-[#161616] border border-slate-200/60 dark:border-neutral-800 min-w-0 shadow-xs">
+          <div className="mt-3 p-4 sm:p-5 rounded-3xl bg-slate-100/90 dark:bg-[#18181D] border border-slate-200/60 dark:border-[#27272A] min-w-0 shadow-xs">
             <div className="grid grid-cols-12 items-center gap-1 sm:gap-4">
               
               {/* Home Team */}
@@ -326,7 +329,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
                     {fixture.homeTeam.slice(0, 1)}
                   </div>
                 )}
@@ -335,10 +338,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     {fixture.homeTeam}
                   </span>
                   <div className="flex items-center gap-1 mt-0.5 flex-nowrap">
-                    <span className="px-1.5 py-0.5 rounded-md bg-slate-50 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-mono text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0">
+                    <span className="px-1.5 py-0.5 rounded-md bg-slate-200/70 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-mono tabular-nums text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0">
                       {homeWinPct}% Win
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono hidden md:inline whitespace-nowrap shrink-0">
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
                       xG {pred.homeXG}
                     </span>
                   </div>
@@ -349,7 +352,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               <div className="col-span-2 flex flex-col items-center justify-center text-center shrink-0 px-0.5">
                 {fixture.score && fixture.score.home !== undefined ? (
                   <div>
-                    <span className="text-base sm:text-2xl font-mono font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
+                    <span className="text-base sm:text-2xl font-mono tabular-nums font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
                       {fixture.score.home} : {fixture.score.away}
                     </span>
                     <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mt-0.5 whitespace-nowrap">
@@ -358,10 +361,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                   </div>
                 ) : (
                   <div>
-                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg bg-white dark:bg-[#070A0F] text-slate-400 dark:text-slate-500 shadow-2xs whitespace-nowrap">
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] text-slate-400 dark:text-neutral-400 shadow-2xs whitespace-nowrap">
                       VS
                     </span>
-                    <span className="block text-[9px] sm:text-[10px] font-mono text-slate-400 mt-0.5 whitespace-nowrap">
+                    <span className="block text-[9px] sm:text-[10px] font-mono tabular-nums text-slate-400 mt-0.5 whitespace-nowrap">
                       {fixture.kickOffTime}
                     </span>
                   </div>
@@ -375,10 +378,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     {fixture.awayTeam}
                   </span>
                   <div className="flex items-center justify-end gap-1 mt-0.5 flex-nowrap">
-                    <span className="text-[10px] text-slate-400 font-mono hidden md:inline whitespace-nowrap shrink-0">
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
                       xG {pred.awayXG}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-mono text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0">
+                    <span className="px-1.5 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-mono tabular-nums text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0 border border-transparent dark:border-cyan-800/40">
                       {awayWinPct}% Win
                     </span>
                   </div>
@@ -392,7 +395,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-cyan-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-cyan-700 dark:text-cyan-400 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
                     {fixture.awayTeam.slice(0, 1)}
                   </div>
                 )}
@@ -401,15 +404,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             </div>
           </div>
 
-          {/* Segmented Sub-Navigation Bar */}
-          <div className="mt-2 sm:mt-3 w-full flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#070c14] rounded-xl sm:rounded-2xl overflow-x-auto no-scrollbar flex-nowrap shrink-0 touch-pan-x">
+          {/* Segmented Sub-Navigation Bar with min 44px hitboxes */}
+          <div className="mt-2 sm:mt-3 w-full flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#09090B] rounded-2xl overflow-x-auto no-scrollbar flex-nowrap shrink-0 touch-pan-x border border-transparent dark:border-[#27272A]">
             <button
               type="button"
               onClick={() => setActiveTab('OVERVIEW')}
-              className={`flex-1 min-w-[64px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center ${
+              className={`flex-1 min-w-[68px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'OVERVIEW'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <span>Overview</span>
@@ -418,15 +421,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('H2H')}
-              className={`flex-1 min-w-[54px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 ${
+              className={`flex-1 min-w-[58px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 active:scale-95 ${
                 activeTab === 'H2H'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <span>H2H</span>
               {h2h.matchesCount > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#162038] text-slate-700 dark:text-slate-300 font-mono font-bold">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#09090B] text-slate-700 dark:text-neutral-300 font-mono tabular-nums font-bold">
                   {h2h.matchesCount}
                 </span>
               )}
@@ -436,14 +439,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               <button
                 type="button"
                 onClick={() => setActiveTab('STATS')}
-                className={`flex-1 min-w-[70px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 ${
+                className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 active:scale-95 ${
                   activeTab === 'STATS'
-                    ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                    : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 <span>Statistics</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-mono font-bold">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-mono tabular-nums font-bold">
                   {parsedStatsSummary.items.length}
                 </span>
               </button>
@@ -452,10 +455,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('TEAMS')}
-              className={`flex-1 min-w-[72px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center ${
+              className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'TEAMS'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <span>Team Form</span>
@@ -464,10 +467,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('STANDINGS')}
-              className={`flex-1 min-w-[72px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center ${
+              className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'STANDINGS'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <span>Standings</span>
@@ -476,10 +479,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('PREDICTIONS')}
-              className={`flex-1 min-w-[80px] sm:min-w-0 px-2 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center ${
+              className={`flex-1 min-w-[84px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'PREDICTIONS'
-                  ? 'bg-white dark:bg-[#162038] text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
+                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
               }`}
             >
               <span>Predictions</span>
@@ -495,30 +498,30 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <div className="space-y-4 animate-in fade-in duration-150">
               
               {/* Win Probability Proportional Gauge & Cards */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 border border-slate-200/60 dark:border-[#27272A]">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span className="text-xs font-bold text-slate-800 dark:text-neutral-200">
                     Outcome Probabilities
                   </span>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">
                     Dixon-Coles Model
                   </span>
                 </div>
 
                 {/* 3-Section Proportional Bar */}
-                <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
-                  <div style={{ width: `${homeWinPct}%` }} className="bg-slate-500 transition-all duration-300" />
+                <div className="h-2 w-full bg-slate-200 dark:bg-[#09090B] rounded-full flex overflow-hidden border border-transparent dark:border-[#27272A]">
+                  <div style={{ width: `${homeWinPct}%` }} className="bg-[#CCFF00] transition-all duration-300" />
                   <div style={{ width: `${drawPct}%` }} className="bg-amber-500 transition-all duration-300" />
                   <div style={{ width: `${awayWinPct}%` }} className="bg-cyan-500 transition-all duration-300" />
                 </div>
 
                 {/* 3 Metric Cards */}
-                <div className="grid grid-cols-3 gap-1 pt-1 font-mono">
-                  <div className="p-1.5 rounded-lg bg-white dark:bg-[#070A0F] text-center shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-sans">
+                <div className="grid grid-cols-3 gap-1 pt-1 font-mono tabular-nums">
+                  <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] text-center shadow-xs border border-slate-200/60 dark:border-[#27272A]">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block truncate font-sans">
                       {fixture.homeTeam} Win
                     </span>
-                    <span className="text-sm sm:text-base font-extrabold text-slate-600 dark:text-slate-400 block mt-0.5">
+                    <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-[#CCFF00] block mt-0.5">
                       {homeWinPct}%
                     </span>
                     <span className="text-[10px] text-slate-400 block mt-0.5">
@@ -526,8 +529,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </span>
                   </div>
 
-                  <div className="p-1.5 rounded-lg bg-white dark:bg-[#070A0F] text-center shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">
+                  <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] text-center shadow-xs border border-slate-200/60 dark:border-[#27272A]">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">
                       Draw
                     </span>
                     <span className="text-sm sm:text-base font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5">
@@ -538,8 +541,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </span>
                   </div>
 
-                  <div className="p-1.5 rounded-lg bg-white dark:bg-[#070A0F] text-center shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-sans">
+                  <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] text-center shadow-xs border border-slate-200/60 dark:border-[#27272A]">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block truncate font-sans">
                       {fixture.awayTeam} Win
                     </span>
                     <span className="text-sm sm:text-base font-extrabold text-cyan-600 dark:text-cyan-400 block mt-0.5">
@@ -552,35 +555,35 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                 </div>
 
                 {/* Projections List (Draw, Over under, BTTS, Model Pick, Value Bet) */}
-                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60 space-y-1.5 text-xs font-mono">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">Draw Probability</span>
+                <div className="pt-2 border-t border-slate-200/60 dark:border-[#27272A] space-y-1.5 text-xs font-mono tabular-nums">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-neutral-400 font-sans">Draw Probability</span>
                     <span className="font-bold text-amber-600 dark:text-amber-400">{drawPct.toFixed(1)}%</span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">Over 2.5 Goals</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatProb(pred.over25Prob, 1)}</span>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-neutral-400 font-sans">Over 2.5 Goals</span>
+                    <span className="font-bold text-slate-800 dark:text-neutral-200">{formatProb(pred.over25Prob, 1)}</span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">BTTS (Both Teams Score)</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatProb(pred.bttsProb, 1)}</span>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-neutral-400 font-sans">BTTS (Both Teams Score)</span>
+                    <span className="font-bold text-slate-800 dark:text-neutral-200">{formatProb(pred.bttsProb, 1)}</span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans font-medium">Model Pick (Highest Prob)</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 font-sans">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-neutral-400 font-sans font-medium">Model Pick (Highest Prob)</span>
+                    <span className="font-bold text-slate-900 dark:text-[#CCFF00] font-sans">
                       {authoritativePick.label} ({authoritativePick.probabilityFormatted})
                     </span>
                   </div>
                   {authoritativeValue.hasValue ? (
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-500/20 shadow-xs flex items-center justify-between">
-                      <span className="text-emerald-700 dark:text-emerald-400 font-sans font-semibold">Value Bet (+EV)</span>
-                      <span className="font-bold text-emerald-700 dark:text-emerald-400 font-sans">
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50/60 dark:bg-[#09090B] border border-emerald-500/20 dark:border-[#CCFF00]/40 shadow-xs flex items-center justify-between">
+                      <span className="text-emerald-700 dark:text-[#CCFF00] font-sans font-semibold">Value Bet (+EV)</span>
+                      <span className="font-bold text-emerald-700 dark:text-[#CCFF00] font-sans">
                         {authoritativeValue.selection} ({authoritativeValue.evFormatted} @ {authoritativeValue.odds.toFixed(2)})
                       </span>
                     </div>
                   ) : (
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Value Bet (+EV)</span>
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 font-sans">Value Bet (+EV)</span>
                       <span className="font-medium text-slate-400 font-sans">
                         No Edge in Market
                       </span>
@@ -590,34 +593,34 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               </div>
 
               {/* Key Market Projections List */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-2">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block font-sans">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2 border border-slate-200/60 dark:border-[#27272A]">
+                <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 block font-sans">
                   Key Projections
                 </span>
-                <div className="space-y-1.5 font-mono">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                    <span className="text-slate-600 dark:text-slate-300 font-sans">Expected Goals</span>
+                <div className="space-y-1.5 font-mono tabular-nums">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between text-xs">
+                    <span className="text-slate-600 dark:text-neutral-300 font-sans">Expected Goals</span>
                     <div className="font-bold text-slate-900 dark:text-white">
-                      <span className="text-slate-600 dark:text-slate-400">{pred.homeXG}</span>
+                      <span className="text-slate-600 dark:text-neutral-400">{pred.homeXG}</span>
                       <span className="text-slate-400 px-1 font-normal">vs</span>
                       <span className="text-cyan-600 dark:text-cyan-400">{pred.awayXG}</span>
                     </div>
                   </div>
 
                   {pred.teamStrength ? (
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                      <span className="text-slate-600 dark:text-slate-300 font-sans">Team Strength</span>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-neutral-300 font-sans">Team Strength</span>
                       <div className="font-bold text-slate-900 dark:text-white">
-                        <span className="text-slate-600 dark:text-slate-400">{pred.teamStrength.homeStrengthRating}</span>
+                        <span className="text-slate-600 dark:text-neutral-400">{pred.teamStrength.homeStrengthRating}</span>
                         <span className="text-slate-400 px-1 font-normal">vs</span>
                         <span className="text-cyan-600 dark:text-cyan-400">{pred.teamStrength.awayStrengthRating}</span>
                       </div>
                     </div>
                   ) : pred.eloRatings ? (
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                      <span className="text-slate-600 dark:text-slate-300 font-sans">Elo Ratings</span>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-neutral-300 font-sans">Elo Ratings</span>
                       <div className="font-bold text-slate-900 dark:text-white">
-                        <span className="text-slate-600 dark:text-slate-400">{pred.eloRatings.homeElo}</span>
+                        <span className="text-slate-600 dark:text-neutral-400">{pred.eloRatings.homeElo}</span>
                         <span className="text-slate-400 px-1 font-normal">vs</span>
                         <span className="text-cyan-600 dark:text-cyan-400">{pred.eloRatings.awayElo}</span>
                       </div>
@@ -625,10 +628,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                   ) : null}
 
                   {pred.tacticalContext && (
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                      <span className="text-slate-600 dark:text-slate-300 font-sans">Rest Days</span>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-neutral-300 font-sans">Rest Days</span>
                       <div className="font-bold text-slate-900 dark:text-white">
-                        <span className="text-slate-600 dark:text-slate-400">{pred.tacticalContext.restDaysHome}d</span>
+                        <span className="text-slate-600 dark:text-neutral-400">{pred.tacticalContext.restDaysHome}d</span>
                         <span className="text-slate-400 px-1 font-normal">vs</span>
                         <span className="text-cyan-600 dark:text-cyan-400">{pred.tacticalContext.restDaysAway}d</span>
                       </div>
@@ -644,37 +647,37 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <div className="space-y-4 animate-in fade-in duration-150">
               
               {/* Summary Metrics */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3.5">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3.5 border border-slate-200/60 dark:border-[#27272A]">
                 <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-slate-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <History className="w-4 h-4 text-slate-500 dark:text-neutral-400" />
+                  <span className="text-xs font-bold text-slate-800 dark:text-neutral-200">
                     Head to Head Record
                   </span>
                 </div>
 
                 {/* 3 Outcome Summary Cards */}
                 {isLoadingH2H ? (
-                  <div className="grid grid-cols-3 gap-1 text-center font-mono">
+                  <div className="grid grid-cols-3 gap-1 text-center font-mono tabular-nums">
                     {[0, 1, 2].map((i) => (
-                      <div key={i} className="p-2 rounded-lg bg-white dark:bg-[#070A0F] shadow-xs animate-pulse">
-                        <div className="h-2.5 w-14 mx-auto bg-slate-200 dark:bg-slate-800 rounded" />
-                        <div className="h-4 w-6 mx-auto bg-slate-200 dark:bg-slate-800 rounded mt-1.5" />
+                      <div key={i} className="p-2 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs animate-pulse">
+                        <div className="h-2.5 w-14 mx-auto bg-slate-200 dark:bg-neutral-800 rounded" />
+                        <div className="h-4 w-6 mx-auto bg-slate-200 dark:bg-neutral-800 rounded mt-1.5" />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-1 text-center font-mono">
-                    <div className="p-2 rounded-lg bg-white dark:bg-[#070A0F] shadow-xs">
-                      <span className="text-[9px] text-slate-500 dark:text-slate-400 block truncate font-sans w-full">
+                  <div className="grid grid-cols-3 gap-1 text-center font-mono tabular-nums">
+                    <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                      <span className="text-[9px] text-slate-500 dark:text-neutral-400 block truncate font-sans w-full">
                         {fixture.homeTeam} Wins
                       </span>
-                      <span className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-400 block mt-0.5">
+                      <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-[#CCFF00] block mt-0.5">
                         {h2h.homeWins}
                       </span>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-white dark:bg-[#070A0F] shadow-xs">
-                      <span className="text-[9px] text-slate-500 dark:text-slate-400 block truncate font-sans w-full">
+                    <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                      <span className="text-[9px] text-slate-500 dark:text-neutral-400 block truncate font-sans w-full">
                         Draws
                       </span>
                       <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 block mt-0.5">
@@ -682,8 +685,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                       </span>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-white dark:bg-[#070A0F] shadow-xs">
-                      <span className="text-[9px] text-slate-500 dark:text-slate-400 block truncate font-sans w-full">
+                    <div className="p-2 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                      <span className="text-[9px] text-slate-500 dark:text-neutral-400 block truncate font-sans w-full">
                         {fixture.awayTeam} Wins
                       </span>
                       <span className="text-xs sm:text-sm font-black text-cyan-600 dark:text-cyan-400 block mt-0.5">
@@ -695,18 +698,18 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
 
                 {/* Key Insights (Averages & Multipliers) */}
                 {isLoadingH2H ? (
-                  <div className="space-y-1.5 text-xs font-mono pt-1">
+                  <div className="space-y-1.5 text-xs font-mono tabular-nums pt-1">
                     {[0, 1].map((i) => (
-                      <div key={i} className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between animate-pulse">
-                        <div className="h-3 w-20 bg-slate-200 dark:bg-slate-800 rounded" />
-                        <div className="h-3 w-16 bg-slate-200 dark:bg-slate-800 rounded" />
+                      <div key={i} className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between animate-pulse">
+                        <div className="h-3 w-20 bg-slate-200 dark:bg-neutral-800 rounded" />
+                        <div className="h-3 w-16 bg-slate-200 dark:bg-neutral-800 rounded" />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-1.5 text-xs font-mono pt-1">
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 text-[11px] font-sans">
+                  <div className="space-y-1.5 text-xs font-mono tabular-nums pt-1">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 text-[11px] font-sans">
                         Goals Per Match
                       </span>
                       <span className="font-bold text-slate-900 dark:text-white">
@@ -714,11 +717,11 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                       </span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 text-[11px] font-sans">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 text-[11px] font-sans">
                         H2H Factor
                       </span>
-                      <span className="font-bold text-slate-600 dark:text-slate-400">
+                      <span className="font-bold text-slate-900 dark:text-[#CCFF00]">
                         x{h2h.h2hMultiplierHome} vs x{h2h.h2hMultiplierAway}
                       </span>
                     </div>
@@ -727,14 +730,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               </div>
 
               {/* Historical Match Encounters List */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-2.5">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2.5 border border-slate-200/60 dark:border-[#27272A]">
+                <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 block">
                   Past Encounters
                 </span>
 
                 {isLoadingH2H ? (
-                  <div className="py-8 min-h-[140px] text-center text-xs text-slate-500 font-mono flex flex-col items-center justify-center gap-2">
-                    <div className="w-5 h-5 rounded-full border-2 border-slate-500 border-t-transparent animate-spin shrink-0" />
+                  <div className="py-8 min-h-[140px] text-center text-xs text-slate-500 font-mono tabular-nums flex flex-col items-center justify-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-slate-500 dark:border-[#CCFF00] border-t-transparent animate-spin shrink-0" />
                     <span>Loading records...</span>
                   </div>
                 ) : h2h.recentH2H && h2h.recentH2H.length > 0 ? (
@@ -742,14 +745,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     {h2h.recentH2H.map((enc, idx) => (
                       <div
                         key={idx}
-                        className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between gap-2 text-xs font-mono min-w-0"
+                        className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between gap-2 text-xs font-mono tabular-nums min-w-0"
                       >
                         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
                           <span className="text-[10px] text-slate-400 shrink-0 font-sans">
                             {enc.date}
                           </span>
                           {enc.competition && (
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[80px] sm:max-w-[120px] hidden sm:inline">
+                            <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate max-w-[80px] sm:max-w-[120px] hidden sm:inline">
                               {enc.competition}
                             </span>
                           )}
@@ -760,12 +763,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
 
                         <div className="flex items-center gap-2 shrink-0">
                           <span
-                            className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-xs font-black ${
+                            className={`px-2 py-0.5 rounded-lg text-xs font-black ${
                               enc.winner === 'HOME'
-                                ? 'bg-slate-50 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400'
+                                ? 'bg-[#CCFF00]/15 text-slate-950 dark:text-[#CCFF00] border border-[#CCFF00]/30'
                                 : enc.winner === 'AWAY'
-                                ? 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400'
-                                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
+                                ? 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 border border-cyan-800/40'
+                                : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-800/40'
                             }`}
                           >
                             {enc.score}
@@ -789,22 +792,22 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               
               {/* Possession Comparative Gauge */}
               {parsedStatsSummary.possession && (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-2 font-mono text-xs">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2 font-mono tabular-nums text-xs border border-slate-200/60 dark:border-[#27272A]">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-600 dark:text-slate-400 text-sm">
+                    <span className="font-bold text-slate-900 dark:text-white text-sm">
                       {parsedStatsSummary.possession.home}%
                     </span>
-                    <span className="font-sans text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <span className="font-sans text-xs font-bold text-slate-700 dark:text-neutral-300">
                       Ball Possession
                     </span>
                     <span className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">
                       {parsedStatsSummary.possession.away}%
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
+                  <div className="h-2 w-full bg-slate-200 dark:bg-[#09090B] rounded-full flex overflow-hidden border border-transparent dark:border-[#27272A]">
                     <div
                       style={{ width: `${parsedStatsSummary.possession.home}%` }}
-                      className="bg-slate-500 transition-all duration-300"
+                      className="bg-[#CCFF00] transition-all duration-300"
                     />
                     <div
                       style={{ width: `${parsedStatsSummary.possession.away}%` }}
@@ -816,7 +819,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
 
               {/* Dynamic Group Filter */}
               {parsedStatsSummary.availableGroups.length > 1 && (
-                <div className="w-full flex items-center bg-slate-100 dark:bg-slate-900/80 p-1 rounded-2xl overflow-x-auto no-scrollbar gap-1 flex-nowrap shrink-0">
+                <div className="w-full flex items-center bg-slate-100 dark:bg-[#09090B] p-1 rounded-2xl overflow-x-auto no-scrollbar gap-1 flex-nowrap shrink-0 border border-transparent dark:border-[#27272A]">
                   {parsedStatsSummary.availableGroups.map((g) => (
                     <button
                       key={g.group}
@@ -824,12 +827,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                       onClick={() => setStatFilterGroup(g.group)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1 shrink-0 ${
                         statFilterGroup === g.group
-                          ? 'bg-white dark:bg-[#0B0F17] text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                          ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs border border-slate-200/60 dark:border-[#27272A]'
+                          : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                       }`}
                     >
                       <span>{g.label}</span>
-                      <span className="text-[10px] opacity-75 font-mono">({g.count})</span>
+                      <span className="text-[10px] opacity-75 font-mono tabular-nums">({g.count})</span>
                     </button>
                   ))}
                 </div>
@@ -840,26 +843,26 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                 {filteredStatItems.map((stat, idx) => (
                   <div
                     key={idx}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-1.5"
+                    className="p-3 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-1.5 border border-slate-200/60 dark:border-[#27272A]"
                   >
-                    <div className="flex items-center justify-between text-xs font-mono">
+                    <div className="flex items-center justify-between text-xs font-mono tabular-nums">
                       <span
                         className={`font-bold w-14 text-left ${
                           stat.leader === 'HOME'
-                            ? 'text-slate-600 dark:text-slate-400 font-extrabold'
-                            : 'text-slate-700 dark:text-slate-300'
+                            ? 'text-slate-900 dark:text-[#CCFF00] font-extrabold'
+                            : 'text-slate-700 dark:text-neutral-300'
                         }`}
                       >
                         {stat.home.raw}
                       </span>
-                      <span className="text-slate-700 dark:text-slate-300 font-sans font-semibold text-center flex-1 truncate px-2 text-xs">
+                      <span className="text-slate-700 dark:text-neutral-300 font-sans font-semibold text-center flex-1 truncate px-2 text-xs">
                         {stat.category}
                       </span>
                       <span
                         className={`font-bold w-14 text-right ${
                           stat.leader === 'AWAY'
                             ? 'text-cyan-600 dark:text-cyan-400 font-extrabold'
-                            : 'text-slate-700 dark:text-slate-300'
+                            : 'text-slate-700 dark:text-neutral-300'
                         }`}
                       >
                         {stat.away.raw}
@@ -867,11 +870,11 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </div>
 
                     {/* Comparative Visual Share Bar */}
-                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full flex overflow-hidden">
+                    <div className="h-1.5 w-full bg-slate-200 dark:bg-[#09090B] rounded-full flex overflow-hidden">
                       <div
                         style={{ width: `${stat.homeSharePercent}%` }}
                         className={`transition-all duration-300 ${
-                          stat.isInverseMetric ? 'bg-rose-500' : 'bg-slate-500'
+                          stat.isInverseMetric ? 'bg-rose-500' : 'bg-[#CCFF00]'
                         }`}
                       />
                       <div
@@ -887,17 +890,17 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
 
               {/* Match Venue & Details if provided */}
               {(fixture.stage || (fixture.information && fixture.information.length > 0)) && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-2">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2 border border-slate-200/60 dark:border-[#27272A]">
+                  <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 block">
                     Venue Details
                   </span>
-                  <div className="space-y-1.5 text-xs font-mono">
+                  <div className="space-y-1.5 text-xs font-mono tabular-nums">
                     {fixture.information?.map((info, idx) => (
                       <div
                         key={idx}
-                        className="p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between gap-3"
+                        className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between gap-3"
                       >
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-sans">{info.category}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-sans">{info.category}</span>
                         <span className="font-bold text-slate-900 dark:text-white truncate text-right">{info.value}</span>
                       </div>
                     ))}
@@ -912,40 +915,40 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 animate-in fade-in duration-150">
               
               {/* Home Team Analysis */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3 sm:space-y-3.5 min-w-0 overflow-hidden">
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 sm:space-y-3.5 min-w-0 overflow-hidden border border-slate-200/60 dark:border-[#27272A]">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white truncate block">
                       {fixture.homeTeam}
                     </span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums">
                       Home Form & Statistics
                     </span>
                   </div>
-                  <span className="text-xs px-2 sm:px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-mono font-bold shrink-0">
+                  <span className="text-xs px-2 sm:px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-[#09090B] text-slate-700 dark:text-[#CCFF00] font-mono tabular-nums font-bold shrink-0 border border-slate-200/60 dark:border-[#27272A]">
                     x{pred.homeFormMultiplier} Form
                   </span>
                 </div>
 
                 {/* Recent Form Sequence Badges */}
                 {homeRecentFormList.length > 0 ? (
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs space-y-2 min-w-0">
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs space-y-2 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">Form Guide</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono font-bold">
+                      <span className="text-xs text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#18181D] text-slate-500 dark:text-neutral-400 font-mono tabular-nums font-bold">
                         Last {Math.min(10, homeRecentFormList.length)}
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono tabular-nums">
                       {homeRecentFormList.slice(0, 10).map((r, i) => (
                         <span
                           key={i}
-                          className={`w-6 h-6 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-bold flex items-center justify-center text-white shrink-0 shadow-2xs ${
+                          className={`w-6 h-6 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-bold flex items-center justify-center text-slate-950 shrink-0 shadow-2xs ${
                             r === 'W'
-                              ? 'bg-slate-500'
+                              ? 'bg-[#CCFF00]'
                               : r === 'D'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-rose-500 text-white'
                           }`}
                         >
                           {r}
@@ -954,45 +957,45 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </div>
                   </div>
                 ) : isLoadingH2H ? (
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs space-y-2 min-w-0">
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs space-y-2 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">Form Guide</span>
-                      <span className="text-[10px] text-slate-400 font-mono">Loading</span>
+                      <span className="text-xs text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
+                      <span className="text-[10px] text-slate-400 font-mono tabular-nums">Loading</span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono tabular-nums">
                       {[0, 1, 2, 3, 4].map((i) => (
-                        <span key={i} className="w-6 h-6 rounded-md sm:rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse shrink-0" />
+                        <span key={i} className="w-6 h-6 rounded-md sm:rounded-lg bg-slate-200 dark:bg-[#18181D] animate-pulse shrink-0" />
                       ))}
                     </div>
                   </div>
                 ) : null}
 
                 {/* Ratings & Averages */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Attack Rating</span>
-                    <span className="text-sm sm:text-base font-extrabold text-slate-600 dark:text-slate-400 block mt-0.5">
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Attack Rating</span>
+                    <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-[#CCFF00] block mt-0.5">
                       {pred.homeAttackStrength}
                     </span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Defense Rating</span>
-                    <span className="text-sm sm:text-base font-extrabold text-slate-600 dark:text-slate-400 block mt-0.5">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Defense Rating</span>
+                    <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-[#CCFF00] block mt-0.5">
                       {pred.homeDefenseStrength}
                     </span>
                   </div>
                 </div>
 
                 {(homeRecentMatchesList.length > 0 || homeStats) && (
-                  <div className="space-y-1.5 font-mono text-xs">
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Total Goals</span>
+                  <div className="space-y-1.5 font-mono tabular-nums text-xs">
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 font-sans">Total Goals</span>
                       <span className="font-bold text-slate-900 dark:text-white">
                         {homeGoalsScored} scored - {homeGoalsConceded} conceded
                       </span>
                     </div>
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Average Goals</span>
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 font-sans">Average Goals</span>
                       <span className="font-bold text-slate-900 dark:text-white">
                         {homeRecentMatchesList.length > 0
                           ? `${(homeGoalsScored / homeRecentMatchesList.length).toFixed(2)} - ${(homeGoalsConceded / homeRecentMatchesList.length).toFixed(2)} per match`
@@ -1005,25 +1008,25 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                 {homeRecentMatchesList.length > 0 ? (
                   <div className="space-y-2 pt-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-sans">
+                      <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 font-sans">
                         Recent Matches
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-bold">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-[#18181D] text-slate-600 dark:text-neutral-300 font-mono tabular-nums font-bold">
                         Last {Math.min(10, homeRecentMatchesList.length)}
                       </span>
                     </div>
-                    <div className="space-y-1.5 font-mono">
+                    <div className="space-y-1.5 font-mono tabular-nums">
                       {homeRecentMatchesList.slice(0, 10).map((m, idx) => (
                         <div
                           key={idx}
-                          className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between gap-2 text-xs min-w-0"
+                          className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between gap-2 text-xs min-w-0"
                         >
                           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
                             <span
                               className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
                                 m.isHome
-                                  ? 'bg-slate-100 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400'
-                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                  ? 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-300'
+                                  : 'bg-slate-200 dark:bg-[#18181D] text-slate-600 dark:text-neutral-400'
                               }`}
                               title={m.isHome ? 'Home' : 'Away'}
                             >
@@ -1037,8 +1040,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                                 <span className="shrink-0">{m.date}</span>
                                 {m.competition && (
                                   <>
-                                    <span className="text-slate-300 dark:text-slate-700 shrink-0">•</span>
-                                    <span className="truncate max-w-[85px] sm:max-w-[130px] text-slate-500 dark:text-slate-400">{m.competition}</span>
+                                    <span className="text-slate-300 dark:text-neutral-700 shrink-0">•</span>
+                                    <span className="truncate max-w-[85px] sm:max-w-[130px] text-slate-500 dark:text-neutral-400">{m.competition}</span>
                                   </>
                                 )}
                               </div>
@@ -1050,12 +1053,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                               {m.goalsFor} - {m.goalsAgainst}
                             </span>
                             <span
-                              className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0 ${
+                              className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-slate-950 shrink-0 ${
                                 m.result === 'W'
-                                  ? 'bg-slate-500'
+                                  ? 'bg-[#CCFF00]'
                                   : m.result === 'D'
-                                  ? 'bg-amber-500'
-                                  : 'bg-rose-500'
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-rose-500 text-white'
                               }`}
                             >
                               {m.result}
@@ -1066,52 +1069,52 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </div>
                   </div>
                 ) : isLoadingH2H ? (
-                  <div className="py-6 min-h-[160px] text-center text-xs text-slate-500 font-mono flex flex-col items-center justify-center gap-2">
-                    <div className="w-5 h-5 rounded-full border-2 border-slate-500 border-t-transparent animate-spin shrink-0" />
+                  <div className="py-6 min-h-[160px] text-center text-xs text-slate-500 font-mono tabular-nums flex flex-col items-center justify-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-[#CCFF00] border-t-transparent animate-spin shrink-0" />
                     <span>Loading recent matches...</span>
                   </div>
                 ) : (
-                  <div className="py-6 text-center text-xs text-slate-400 font-mono">
+                  <div className="py-6 text-center text-xs text-slate-400 font-mono tabular-nums">
                     No recent matches recorded
                   </div>
                 )}
               </div>
 
               {/* Away Team Analysis */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3 sm:space-y-3.5 min-w-0 overflow-hidden">
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 sm:space-y-3.5 min-w-0 overflow-hidden border border-slate-200/60 dark:border-[#27272A]">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white truncate block">
                       {fixture.awayTeam}
                     </span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums">
                       Away Form & Statistics
                     </span>
                   </div>
-                  <span className="text-xs px-2 sm:px-2.5 py-1 rounded-xl bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-mono font-bold shrink-0">
+                  <span className="text-xs px-2 sm:px-2.5 py-1 rounded-xl bg-cyan-50 dark:bg-[#09090B] text-cyan-700 dark:text-cyan-400 font-mono tabular-nums font-bold shrink-0 border border-cyan-200 dark:border-cyan-800/40">
                     x{pred.awayFormMultiplier} Form
                   </span>
                 </div>
 
                 {/* Recent Form Sequence Badges */}
                 {awayRecentFormList.length > 0 ? (
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs space-y-2 min-w-0">
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs space-y-2 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">Form Guide</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono font-bold">
+                      <span className="text-xs text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#18181D] text-slate-500 dark:text-neutral-400 font-mono tabular-nums font-bold">
                         Last {Math.min(10, awayRecentFormList.length)}
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono tabular-nums">
                       {awayRecentFormList.slice(0, 10).map((r, i) => (
                         <span
                           key={i}
                           className={`w-6 h-6 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-bold flex items-center justify-center text-white shrink-0 shadow-2xs ${
                             r === 'W'
-                              ? 'bg-slate-500'
+                              ? 'bg-cyan-500 text-slate-950 font-black'
                               : r === 'D'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-rose-500 text-white'
                           }`}
                         >
                           {r}
@@ -1120,29 +1123,29 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                     </div>
                   </div>
                 ) : isLoadingH2H ? (
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs space-y-2 min-w-0">
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs space-y-2 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">Form Guide</span>
-                      <span className="text-[10px] text-slate-400 font-mono">Loading</span>
+                      <span className="text-xs text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
+                      <span className="text-[10px] text-slate-400 font-mono tabular-nums">Loading</span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 font-mono tabular-nums">
                       {[0, 1, 2, 3, 4].map((i) => (
-                        <span key={i} className="w-6 h-6 rounded-md sm:rounded-lg bg-slate-200 dark:bg-slate-800 animate-pulse shrink-0" />
+                        <span key={i} className="w-6 h-6 rounded-md sm:rounded-lg bg-slate-200 dark:bg-[#18181D] animate-pulse shrink-0" />
                       ))}
                     </div>
                   </div>
                 ) : null}
 
                 {/* Ratings & Averages */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Attack Rating</span>
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Attack Rating</span>
                     <span className="text-sm sm:text-base font-extrabold text-cyan-600 dark:text-cyan-400 block mt-0.5">
                       {pred.awayAttackStrength}
                     </span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans">Defense Rating</span>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Defense Rating</span>
                     <span className="text-sm sm:text-base font-extrabold text-cyan-600 dark:text-cyan-400 block mt-0.5">
                       {pred.awayDefenseStrength}
                     </span>
@@ -1150,15 +1153,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                 </div>
 
                 {(awayRecentMatchesList.length > 0 || awayStats) && (
-                  <div className="space-y-1.5 font-mono text-xs">
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Total Goals</span>
+                  <div className="space-y-1.5 font-mono tabular-nums text-xs">
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 font-sans">Total Goals</span>
                       <span className="font-bold text-slate-900 dark:text-white">
                         {awayGoalsScored} scored - {awayGoalsConceded} conceded
                       </span>
                     </div>
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between">
-                      <span className="text-slate-500 dark:text-slate-400 font-sans">Average Goals</span>
+                    <div className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between">
+                      <span className="text-slate-500 dark:text-neutral-400 font-sans">Average Goals</span>
                       <span className="font-bold text-slate-900 dark:text-white">
                         {awayRecentMatchesList.length > 0
                           ? `${(awayGoalsScored / awayRecentMatchesList.length).toFixed(2)} - ${(awayGoalsConceded / awayRecentMatchesList.length).toFixed(2)} per match`
@@ -1171,25 +1174,25 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                 {awayRecentMatchesList.length > 0 && (
                   <div className="space-y-2 pt-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-sans">
+                      <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 font-sans">
                         Recent Matches
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-bold">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-[#18181D] text-slate-600 dark:text-neutral-300 font-mono tabular-nums font-bold">
                         Last {Math.min(10, awayRecentMatchesList.length)}
                       </span>
                     </div>
-                    <div className="space-y-1.5 font-mono">
+                    <div className="space-y-1.5 font-mono tabular-nums">
                       {awayRecentMatchesList.slice(0, 10).map((m, idx) => (
                         <div
                           key={idx}
-                          className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between gap-2 text-xs min-w-0"
+                          className="p-2 sm:p-2.5 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between gap-2 text-xs min-w-0"
                         >
                           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
                             <span
                               className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
                                 m.isHome
-                                  ? 'bg-slate-100 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400'
-                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                  ? 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-300'
+                                  : 'bg-slate-200 dark:bg-[#18181D] text-slate-600 dark:text-neutral-400'
                               }`}
                               title={m.isHome ? 'Home' : 'Away'}
                             >
@@ -1203,8 +1206,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                                 <span>{m.date}</span>
                                 {m.competition && (
                                   <>
-                                    <span className="text-slate-300 dark:text-slate-700 shrink-0">•</span>
-                                    <span className="truncate max-w-[85px] sm:max-w-[130px] text-slate-500 dark:text-slate-400">{m.competition}</span>
+                                    <span className="text-slate-300 dark:text-neutral-700 shrink-0">•</span>
+                                    <span className="truncate max-w-[85px] sm:max-w-[130px] text-slate-500 dark:text-neutral-400">{m.competition}</span>
                                   </>
                                 )}
                               </div>
@@ -1218,10 +1221,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                             <span
                               className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white shrink-0 ${
                                 m.result === 'W'
-                                  ? 'bg-slate-500'
+                                  ? 'bg-cyan-500 text-slate-950 font-black'
                                   : m.result === 'D'
-                                  ? 'bg-amber-500'
-                                  : 'bg-rose-500'
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-rose-500 text-white'
                               }`}
                             >
                               {m.result}
@@ -1239,24 +1242,24 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
           {/* TAB 5: PREDICTIONS */}
           {activeTab === 'PREDICTIONS' && (
             <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 space-y-3">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block font-sans">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 border border-slate-200/60 dark:border-[#27272A]">
+                <span className="text-xs font-bold text-slate-800 dark:text-neutral-200 block font-sans">
                   Market Predictions
                 </span>
                 {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 font-mono tabular-nums">
                     {bestMarketsPerGroup.map((market, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-white dark:bg-[#070A0F] shadow-xs flex items-center justify-between text-xs">
-                        <span className="text-slate-600 dark:text-slate-300 font-sans font-bold">{market.groupName}</span>
+                      <div key={idx} className="p-3 rounded-xl bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] shadow-xs flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-neutral-300 font-sans font-bold">{market.groupName}</span>
                         <div className="text-right">
-                          <span className="font-bold text-slate-900 dark:text-white block">{market.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono block">{(market.probability * 100).toFixed(1)}%</span>
+                          <span className="font-bold text-slate-900 dark:text-[#CCFF00] block font-sans">{market.name}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono tabular-nums">{(market.probability * 100).toFixed(1)}%</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-xs text-slate-400 font-mono">
+                  <div className="py-8 text-center text-xs text-slate-400 font-mono tabular-nums">
                     No market predictions available
                   </div>
                 )}

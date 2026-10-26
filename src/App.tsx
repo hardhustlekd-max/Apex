@@ -22,7 +22,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || saved === 'light') return saved;
-    return 'light';
+    return 'dark';
   });
   const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY'>('FIXTURES');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);

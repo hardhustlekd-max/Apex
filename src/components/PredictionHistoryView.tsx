@@ -118,7 +118,7 @@ export const PredictionHistoryView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-[#121212] rounded-3xl p-10 text-center font-sans border border-slate-200/80 dark:border-neutral-800 shadow-sm">
+      <div className="bg-white dark:bg-[#121216] rounded-3xl p-10 text-center font-sans border border-slate-200/80 dark:border-[#27272A] shadow-xs">
         <div className="w-8 h-8 rounded-full border-4 border-[#CCFF00] border-t-transparent animate-spin mx-auto" />
         <span className="mt-4 block text-xs font-bold text-slate-500 dark:text-neutral-400">Loading historical model predictions from server database...</span>
       </div>
@@ -143,7 +143,7 @@ export const PredictionHistoryView: React.FC = () => {
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-3.5 py-2 rounded-full bg-white dark:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700 text-xs font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs"
+            className="px-3.5 py-2 min-h-[44px] rounded-full bg-white dark:bg-[#18181D] border border-slate-200/80 dark:border-[#27272A] text-xs font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
           >
             <option value={30}>30 Matches</option>
             <option value={50}>50 Matches</option>
@@ -154,7 +154,7 @@ export const PredictionHistoryView: React.FC = () => {
           <button
             onClick={() => fetchHistory(limit, true)}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2 rounded-full text-xs font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -165,7 +165,7 @@ export const PredictionHistoryView: React.FC = () => {
       {/* Summary Stats Cards */}
       {totalEvaluated > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-[#121212] rounded-3xl p-5 border border-slate-200/80 dark:border-neutral-800 shadow-sm">
+          <div className="bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
               <Layers className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Evaluated Matches</span>
@@ -175,7 +175,7 @@ export const PredictionHistoryView: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#121212] rounded-3xl p-5 border border-slate-200/80 dark:border-neutral-800 shadow-sm">
+          <div className="bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
               <ShieldCheck className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Model Accuracy</span>
@@ -185,7 +185,7 @@ export const PredictionHistoryView: React.FC = () => {
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121212] rounded-3xl p-5 border border-slate-200/80 dark:border-neutral-800 shadow-sm">
+          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
               <Target className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Correct Hits</span>
@@ -199,32 +199,32 @@ export const PredictionHistoryView: React.FC = () => {
 
       {/* Fixtures List */}
       {history.length === 0 ? (
-        <div className="bg-white dark:bg-[#121212] rounded-3xl p-8 text-center text-xs font-medium text-slate-500 dark:text-neutral-400 border border-slate-200/80 dark:border-neutral-800 shadow-sm space-y-3">
+        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 text-center text-xs font-medium text-slate-500 dark:text-neutral-400 border border-slate-200/80 dark:border-[#27272A] shadow-xs space-y-3">
           <p>No historical predictions recorded in database yet.</p>
           <button
             onClick={() => fetchHistory(limit, true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2.5 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Evaluate Historical Database
           </button>
         </div>
       ) : (
-        <div className="rounded-3xl overflow-hidden bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800 shadow-sm">
+        <div className="rounded-3xl overflow-hidden bg-white dark:bg-[#121216] border border-slate-200/80 dark:border-[#27272A] divide-y divide-slate-100 dark:divide-[#27272A] shadow-xs">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
 
             return (
               <div
                 key={f.id}
-                className="px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
+                className="px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-[#18181D] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-extrabold text-slate-950 dark:text-white text-xs sm:text-[13px]">
                       {f.homeTeam} <span className="text-slate-400 dark:text-neutral-500 font-normal">vs</span> {f.awayTeam}
                     </span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-800 dark:text-neutral-200">
+                    <span className="text-[10px] font-mono tabular-nums font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 border border-slate-200/60 dark:border-[#27272A]">
                       {f.leagueName || f.league}
                     </span>
                     <span className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">
@@ -247,8 +247,8 @@ export const PredictionHistoryView: React.FC = () => {
                   <span
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black ${
                       evalResult.isCorrect
-                        ? 'bg-[#CCFF00] text-slate-950'
-                        : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                        ? 'bg-[#CCFF00] text-slate-950 font-mono tabular-nums'
+                        : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 font-mono tabular-nums'
                     }`}
                   >
                     {evalResult.isCorrect ? (
