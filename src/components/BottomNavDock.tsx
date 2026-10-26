@@ -1,5 +1,4 @@
-import React from 'react';
-import { Home, Trophy, Layers, Settings } from 'lucide-react';
+import { Home, Trophy, Layers, History, Settings } from 'lucide-react';
 
 interface BottomNavDockProps {
   activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY';
@@ -62,6 +61,21 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
         >
           <Trophy className={`w-3.5 h-3.5 ${activeTab === 'STANDINGS' ? 'stroke-[2.5px] text-slate-950' : ''}`} />
           <span className="text-[10.5px] tracking-tight">Bar</span>
+        </button>
+
+        {/* History Tab */}
+        <button
+          type="button"
+          onClick={() => onSelectTab('HISTORY')}
+          className={`min-h-[38px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'HISTORY'
+              ? 'bg-[#CCFF00] text-slate-950 font-black shadow-md'
+              : 'text-neutral-400 hover:text-white font-bold'
+          }`}
+          aria-label="Prediction History"
+        >
+          <History className={`w-3.5 h-3.5 ${activeTab === 'HISTORY' ? 'stroke-[2.5px] text-slate-950' : ''}`} />
+          <span className="text-[10.5px] tracking-tight">History</span>
         </button>
 
         {/* Settings / Config Tab */}

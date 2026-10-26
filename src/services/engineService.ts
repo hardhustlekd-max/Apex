@@ -300,6 +300,24 @@ export class EngineService {
     return this.resetAndSyncDatabase(onProgress);
   }
 
+  public static async syncHistoryOnly(): Promise<{
+    success: boolean;
+    message: string;
+    count?: number;
+  }> {
+    const serverData = await this.safeJsonFetch('/api/providers/flashscore/sync-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (serverData && serverData.success) {
+      return serverData;
+    }
+    return {
+      success: false,
+      message: serverData?.error || 'Failed to sync historical scraper data',
+    };
+  }
+
   public static async getProviders(): Promise<ProviderStatus[]> {
     const serverData = await this.safeJsonFetch('/api/providers');
     if (serverData && serverData.success && Array.isArray(serverData.providers)) {

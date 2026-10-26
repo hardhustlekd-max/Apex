@@ -355,6 +355,7 @@ export default function App() {
           setIsSettingsOpen(false);
           setIsTerminalOpen(true);
         }}
+        onRefreshMetrics={fetchSettingsAndProviders}
       />
 
       {/* Floating Bottom Navigation Dock (Wireframe design) */}

@@ -261,6 +261,43 @@ providersRouter.post('/sync/cancel/:jobId', (req, res) => {
   res.json({ success: cancelled });
 });
 
+// Dedicated Historical Data Scraper Endpoint
+providersRouter.post('/flashscore/sync-history', async (req, res) => {
+  try {
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'SCRAPER',
+      source: 'SyncHistoryOnly',
+      message: 'Starting historical archive scraper execution...',
+    });
+
+    const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
+    const allHist = ServerEngine.getUnifiedHistoricalUniverse();
+    const histPredRes = await ServerEngine.predictAndStoreHistoricalMatches(allHist);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'SCRAPER',
+      source: 'SyncHistoryOnly',
+      message: `Historical scraper completed: ${syncRes.matchesCount} historical matches synchronized into database`,
+    });
+
+    res.json({
+      success: true,
+      message: `Synchronized ${syncRes.matchesCount} historical matches and updated ${histPredRes.count} model predictions in database.`,
+      count: syncRes.matchesCount,
+    });
+  } catch (err: any) {
+    loggerService.addLog({
+      level: 'ERROR',
+      category: 'SCRAPER',
+      source: 'SyncHistoryOnly',
+      message: `Historical scraper error: ${err?.message}`,
+    });
+    res.status(500).json({ success: false, error: err?.message || 'Failed to sync historical data' });
+  }
+});
+
 // Unified Reset Database, Raw Feeds & Full Data Sync (Supports both async and synchronous fallback)
 providersRouter.post('/flashscore/reset-and-sync', async (req, res) => {
   // If caller requests async execution or accepts 202

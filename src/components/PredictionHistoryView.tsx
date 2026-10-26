@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Fixture } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
-import { CheckCircle2, XCircle, RefreshCw, BarChart3, ShieldCheck, Target, Layers } from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCw, BarChart3, ShieldCheck, Target, Layers, Database } from 'lucide-react';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
 
@@ -9,6 +9,8 @@ export const PredictionHistoryView: React.FC = () => {
   const [history, setHistory] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isSyncingHistory, setIsSyncingHistory] = useState<boolean>(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   const [limit, setLimit] = useState<number>(50);
 
   const fetchHistory = async (recordLimit = limit, showRefreshing = false) => {
@@ -22,12 +24,11 @@ export const PredictionHistoryView: React.FC = () => {
       const sorted = (data || []).slice().sort((a, b) => {
         const dateA = normalizeDateStr(a.matchDate);
         const dateB = normalizeDateStr(b.matchDate);
+        
+        // Date Descending
         if (dateA !== dateB) return dateB.localeCompare(dateA);
 
-        const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-        const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-        if (priorityA !== priorityB) return priorityA - priorityB;
-
+        // Time Descending (Time can be 'FT' or 'HH:mm')
         const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
         const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
         return timeB.localeCompare(timeA);
@@ -38,6 +39,26 @@ export const PredictionHistoryView: React.FC = () => {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const handleSyncHistoryScraper = async () => {
+    setIsSyncingHistory(true);
+    setSyncToast('Historical archive scraper running: fetching multi-year league feeds from Flashscore...');
+    try {
+      const res = await EngineService.syncHistoryOnly();
+      if (res.success) {
+        setSyncToast(res.message || 'Historical database populated with fresh archive scraper data!');
+        await fetchHistory(limit, true);
+      } else {
+        setSyncToast(res.message || 'Historical scraper sync encountered an issue.');
+      }
+    } catch (err) {
+      console.error('Error syncing historical scraper:', err);
+      setSyncToast('Failed to execute historical archive scraper.');
+    } finally {
+      setIsSyncingHistory(false);
+      setTimeout(() => setSyncToast(null), 4500);
     }
   };
 
@@ -127,19 +148,29 @@ export const PredictionHistoryView: React.FC = () => {
 
   return (
     <div className="space-y-3 font-sans">
+      {/* Toast Notification for Scraper Sync */}
+      {syncToast && (
+        <div className="p-3 rounded-2xl bg-slate-900 text-white dark:bg-[#18181D] dark:text-[#CCFF00] border border-slate-700 dark:border-[#CCFF00]/30 text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <Database className={`w-4 h-4 shrink-0 ${isSyncingHistory ? 'animate-spin text-[#CCFF00]' : 'text-[#CCFF00]'}`} />
+            <span>{syncToast}</span>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
           <h2 className="text-sm sm:text-base font-extrabold text-slate-950 dark:text-white flex items-center gap-1.5 tracking-tight">
             <BarChart3 className="w-4 h-4 text-[#CCFF00]" />
-            Historical Model Evaluation
+            Historical Prediction Evaluation
           </h2>
           <p className="text-[10px] text-slate-500 dark:text-neutral-400 mt-0.5">
-            Backtested Poisson & Apex-Engine accuracy across stored historical database fixtures
+            Compare stored predictions against historical match results from the database
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
@@ -151,9 +182,20 @@ export const PredictionHistoryView: React.FC = () => {
             <option value={200}>200 Matches</option>
           </select>
 
+          {/* Sync Historical Data Scraper Button */}
+          <button
+            onClick={handleSyncHistoryScraper}
+            disabled={isSyncingHistory || isRefreshing}
+            className="inline-flex items-center gap-1.5 min-h-[35px] px-3.5 py-1.5 rounded-full text-[10.5px] font-black bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
+            title="Run historical archive scraper to populate database with multi-year results"
+          >
+            <Database className={`w-3 h-3 ${isSyncingHistory ? 'animate-spin text-[#CCFF00] dark:text-slate-950' : 'text-[#CCFF00] dark:text-slate-950'}`} />
+            <span>{isSyncingHistory ? 'Syncing Scraper...' : 'Sync Historical Data'}</span>
+          </button>
+
           <button
             onClick={() => fetchHistory(limit, true)}
-            disabled={isRefreshing}
+            disabled={isRefreshing || isSyncingHistory}
             className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-[10.5px] font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />

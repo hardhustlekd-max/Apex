@@ -27,6 +27,7 @@ interface SettingsModalProps {
   onToggleTheme: () => void;
   onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
   onOpenTerminal?: () => void;
+  onRefreshMetrics?: () => void | Promise<void>;
   syncProgress?: {
     progress: number;
     currentStep: string;
@@ -52,6 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleTheme,
   onProviderChange,
   onOpenTerminal,
+  onRefreshMetrics,
   syncProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'UI'>('ENGINE');
@@ -62,6 +64,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [tursoStatus, setTursoStatus] = useState<any>(null);
   const [isCheckingTurso, setIsCheckingTurso] = useState<boolean>(false);
+  const [isRefreshingMetrics, setIsRefreshingMetrics] = useState<boolean>(false);
 
   const fetchTursoStatus = async () => {
     setIsCheckingTurso(true);
@@ -72,6 +75,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       console.error('Error checking Turso DB status:', err);
     } finally {
       setIsCheckingTurso(false);
+    }
+  };
+
+  const handleRefreshMetrics = async () => {
+    setIsRefreshingMetrics(true);
+    try {
+      await fetchTursoStatus();
+      if (onRefreshMetrics) {
+        await onRefreshMetrics();
+      }
+    } catch (err) {
+      console.error('Error refreshing live database & feed metrics:', err);
+    } finally {
+      setTimeout(() => setIsRefreshingMetrics(false), 300);
     }
   };
 
@@ -244,14 +261,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-4">
               {/* Live Database Metrics Overview */}
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                     Live Database & Feed Metrics
                   </h3>
-                  <span className="text-[11px] font-mono text-emerald-600 dark:text-[#CCFF00] font-bold flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10 border border-emerald-500/20 dark:border-[#CCFF00]/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
-                    SQLite Active
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleRefreshMetrics}
+                      disabled={isRefreshingMetrics}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      title="Refresh live metrics & feed stats"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isRefreshingMetrics ? 'animate-spin text-[#CCFF00]' : ''}`} />
+                      <span>Refresh</span>
+                    </button>
+                    <span className="text-[11px] font-mono text-emerald-600 dark:text-[#CCFF00] font-bold flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10 border border-emerald-500/20 dark:border-[#CCFF00]/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
+                      SQLite Active
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
