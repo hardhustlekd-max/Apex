@@ -27,6 +27,12 @@ interface SettingsModalProps {
   onToggleTheme: () => void;
   onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
   onOpenTerminal?: () => void;
+  syncProgress?: {
+    progress: number;
+    currentStep: string;
+    stepIndex?: number;
+    totalSteps?: number;
+  } | null;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -46,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleTheme,
   onProviderChange,
   onOpenTerminal,
+  syncProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'UI'>('ENGINE');
   const [activeProvider, setActiveProvider] = useState<EngineSettings['activeProvider']>(
@@ -396,16 +403,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {isOperating && (
-                  <div className="space-y-2 p-3.5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <RefreshCw className="w-3 h-3 animate-spin text-rose-600 dark:text-[#CCFF00]" />
-                        Purging database & raw feeds, rebuilding Poisson predictions...
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10">
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 truncate">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-600 dark:text-[#CCFF00] shrink-0" />
+                        <span className="truncate">{syncProgress?.currentStep || 'Purging database & raw feeds, rebuilding Poisson predictions...'}</span>
                       </span>
-                      <span className="text-[11px] font-mono text-slate-500">Executing...</span>
+                      <span className="text-[11px] font-mono tabular-nums font-black text-slate-900 dark:text-white shrink-0">
+                        {syncProgress?.progress ?? 50}%
+                        {syncProgress?.stepIndex && syncProgress?.totalSteps ? ` (Step ${syncProgress.stepIndex}/${syncProgress.totalSteps})` : ''}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#CCFF00] h-2 rounded-full animate-pulse w-full"></div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(5, syncProgress?.progress ?? 25))}%` }}
+                      />
                     </div>
                   </div>
                 )}

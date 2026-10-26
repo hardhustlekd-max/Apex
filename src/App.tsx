@@ -50,6 +50,12 @@ export default function App() {
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [isSyncingData, setIsSyncingData] = useState<boolean>(false);
+  const [syncJobProgress, setSyncJobProgress] = useState<{
+    progress: number;
+    currentStep: string;
+    stepIndex?: number;
+    totalSteps?: number;
+  } | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
@@ -60,7 +66,8 @@ export default function App() {
   const handleResetAndSyncData = async () => {
     try {
       setIsSyncingData(true);
-      showNotification('Purging database & raw feeds, restarting sync from zero...', 'info');
+      setSyncJobProgress({ progress: 5, currentStep: 'Initializing background sync worker...' });
+      showNotification('Starting background database reset & synchronization...', 'info');
       
       const currentTheme = localStorage.getItem('theme');
       localStorage.clear();
@@ -69,7 +76,15 @@ export default function App() {
         localStorage.setItem('theme', currentTheme);
       }
 
-      const res = await EngineService.resetAndSyncDatabase();
+      const res = await EngineService.resetAndSyncDatabase((job) => {
+        setSyncJobProgress({
+          progress: job.progress || 10,
+          currentStep: job.currentStep || 'Synchronizing...',
+          stepIndex: job.stepIndex,
+          totalSteps: job.totalSteps,
+        });
+      });
+
       if (res.success) {
         await Promise.all([
           fetchFixtures(),
@@ -85,6 +100,7 @@ export default function App() {
       showNotification('Error resetting database and syncing data', 'info');
     } finally {
       setIsSyncingData(false);
+      setSyncJobProgress(null);
     }
   };
 
@@ -334,6 +350,7 @@ export default function App() {
         onProviderChange={handleProviderChange}
         onSyncData={handleResetAndSyncData}
         isSyncingData={isSyncingData}
+        syncProgress={syncJobProgress}
         onOpenTerminal={() => {
           setIsSettingsOpen(false);
           setIsTerminalOpen(true);

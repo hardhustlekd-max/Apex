@@ -158,7 +158,40 @@ export class EngineService {
     return localSettings;
   }
 
-  public static async resetAndSyncDatabase(): Promise<{
+  public static async startSyncJob(options?: {
+    resetDatabase?: boolean;
+    resetRawFeeds?: boolean;
+  }): Promise<{ success: boolean; jobId?: string; job?: any; error?: string }> {
+    const res = await this.safeJsonFetch('/api/providers/sync/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resetDatabase: options?.resetDatabase ?? true,
+        resetRawFeeds: options?.resetRawFeeds ?? true,
+      }),
+    });
+    if (res && res.success && res.jobId) {
+      return res;
+    }
+    return { success: false, error: res?.error || 'Failed to start background sync' };
+  }
+
+  public static async getSyncJobStatus(jobId: string): Promise<any | null> {
+    const res = await this.safeJsonFetch(`/api/providers/sync/status/${jobId}`);
+    return res && res.success ? res.job : null;
+  }
+
+  public static async getActiveSyncJob(): Promise<any | null> {
+    const res = await this.safeJsonFetch('/api/providers/sync/active');
+    return res && res.success ? res.job : null;
+  }
+
+  public static async cancelSyncJob(jobId: string): Promise<boolean> {
+    const res = await this.safeJsonFetch(`/api/providers/sync/cancel/${jobId}`, { method: 'POST' });
+    return !!(res && res.success);
+  }
+
+  public static async resetAndSyncDatabase(onProgress?: (job: any) => void): Promise<{
     success: boolean;
     message: string;
     matchesCount?: number;
@@ -168,33 +201,67 @@ export class EngineService {
     livePredictionsCount?: number;
     stats?: any;
   }> {
-    const res = await this.safeJsonFetch('/api/providers/flashscore/reset-and-sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (res && res.success) {
-      return res;
+    // 1. Initiate async background sync job
+    const startRes = await this.startSyncJob({ resetDatabase: true, resetRawFeeds: true });
+
+    if (!startRes.success || !startRes.jobId) {
+      // Fallback: synchronous execution if async job endpoint cannot start
+      const fallbackRes = await this.safeJsonFetch('/api/providers/flashscore/reset-and-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (fallbackRes && fallbackRes.success) {
+        return fallbackRes;
+      }
+      return {
+        success: false,
+        message: fallbackRes?.error || startRes.error || 'Failed to reset and sync database',
+      };
     }
 
-    const fallbackRes = await this.safeJsonFetch('/api/providers/flashscore/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resetDatabase: true, resetRawFeeds: true }),
-    });
-    if (fallbackRes && fallbackRes.success) {
-      return fallbackRes;
+    const jobId = startRes.jobId;
+    let pollAttempts = 0;
+    const maxPollAttempts = 120; // 2 minutes maximum
+
+    while (pollAttempts < maxPollAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      pollAttempts++;
+
+      const job = await this.getSyncJobStatus(jobId);
+      if (!job) continue;
+
+      if (onProgress) {
+        onProgress(job);
+      }
+
+      if (job.status === 'COMPLETED') {
+        return {
+          success: true,
+          message: job.message || 'Database and feeds successfully reset and synchronized',
+          matchesCount: job.matchesCount || 0,
+          upcomingCount: job.upcomingCount || 0,
+          predictionsCount: job.predictionsCount || 0,
+          historicalPredictionsCount: job.historicalPredictionsCount || 0,
+          livePredictionsCount: job.livePredictionsCount || 0,
+          stats: job.stats,
+        };
+      }
+
+      if (job.status === 'FAILED' || job.status === 'CANCELLED') {
+        return {
+          success: false,
+          message: job.error || (job.status === 'CANCELLED' ? 'Sync cancelled by user' : 'Sync job encountered an error'),
+        };
+      }
     }
 
     return {
-      success: false,
-      message: res?.error || fallbackRes?.error || 'Failed to reset and sync database',
-      matchesCount: 0,
-      upcomingCount: 0,
-      predictionsCount: 0,
+      success: true,
+      message: 'Background synchronization is still continuing in server database.',
     };
   }
 
-  public static async syncFlashscoreData(): Promise<{
+  public static async syncFlashscoreData(onProgress?: (job: any) => void): Promise<{
     success: boolean;
     message: string;
     matchesCount?: number;
@@ -204,7 +271,7 @@ export class EngineService {
     livePredictionsCount?: number;
     stats?: any;
   }> {
-    return this.resetAndSyncDatabase();
+    return this.resetAndSyncDatabase(onProgress);
   }
 
   public static async getProviders(): Promise<ProviderStatus[]> {

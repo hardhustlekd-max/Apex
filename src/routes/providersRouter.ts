@@ -7,6 +7,7 @@ import { flashscoreScraperService } from '../services/flashscoreScraperService.j
 import { ServerEngine } from '../core/serverEngine.js';
 import { getRelativeDateStr } from '../core/dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
+import { syncJobService } from '../services/syncJobService.js';
 
 export const providersRouter = Router();
 
@@ -219,8 +220,54 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
   }
 }
 
-// Unified Reset Database, Raw Feeds & Full Data Sync
+// ==========================================
+// Async Job Runner Endpoints (Industry Standard)
+// ==========================================
+
+// Starts a detached background sync job and returns HTTP 202 immediately with Job ID
+providersRouter.post('/sync/start', (req, res) => {
+  try {
+    const resetDatabase = req.body?.resetDatabase ?? true;
+    const resetRawFeeds = req.body?.resetRawFeeds ?? true;
+    const job = syncJobService.startJob({ resetDatabase, resetRawFeeds });
+    res.status(202).json({
+      success: true,
+      jobId: job.id,
+      job,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Failed to start sync job' });
+  }
+});
+
+// Retrieves current state and progress for a specific job
+providersRouter.get('/sync/status/:jobId', (req, res) => {
+  const job = syncJobService.getJob(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Sync job not found' });
+  }
+  res.json({ success: true, job });
+});
+
+// Retrieves any currently active (running or pending) job
+providersRouter.get('/sync/active', (req, res) => {
+  const job = syncJobService.getActiveJob();
+  res.json({ success: true, job: job || null });
+});
+
+// Cancels a running sync job
+providersRouter.post('/sync/cancel/:jobId', (req, res) => {
+  const cancelled = syncJobService.cancelJob(req.params.jobId);
+  res.json({ success: cancelled });
+});
+
+// Unified Reset Database, Raw Feeds & Full Data Sync (Supports both async and synchronous fallback)
 providersRouter.post('/flashscore/reset-and-sync', async (req, res) => {
+  // If caller requests async execution or accepts 202
+  if (req.query.async === 'true' || req.headers['x-sync-mode'] === 'async') {
+    const job = syncJobService.startJob({ resetDatabase: true, resetRawFeeds: true });
+    return res.status(202).json({ success: true, jobId: job.id, job });
+  }
   try {
     const result = await runSyncWorkflow({ resetDatabase: true, resetRawFeeds: true });
     res.json(result);
@@ -237,9 +284,13 @@ providersRouter.post('/flashscore/reset-and-sync', async (req, res) => {
 
 // Standard sync route with optional reset support
 providersRouter.post('/flashscore/sync', async (req, res) => {
+  const resetDatabase = req.body?.resetDatabase ?? true;
+  const resetRawFeeds = req.body?.resetRawFeeds ?? true;
+  if (req.query.async === 'true' || req.headers['x-sync-mode'] === 'async') {
+    const job = syncJobService.startJob({ resetDatabase, resetRawFeeds });
+    return res.status(202).json({ success: true, jobId: job.id, job });
+  }
   try {
-    const resetDatabase = req.body?.resetDatabase ?? true;
-    const resetRawFeeds = req.body?.resetRawFeeds ?? true;
     const result = await runSyncWorkflow({ resetDatabase, resetRawFeeds });
     res.json(result);
   } catch (err: any) {
