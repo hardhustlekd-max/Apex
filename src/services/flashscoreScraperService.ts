@@ -359,6 +359,230 @@ export class FlashscoreScraperService {
   }
 
   /**
+   * Playwright headless browser fallback when direct HTTP feed requests fail or hit Cloudflare/403/429
+   */
+  private async runPlaywrightScraperFallback(seasonUrl: string): Promise<HistoricalMatch[]> {
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'SCRAPER',
+      source: 'FlashscoreScraperService',
+      message: `Executing Playwright headless browser fallback for URL: ${seasonUrl}`,
+    });
+
+    const matches: HistoricalMatch[] = [];
+    try {
+      // Dynamic import of playwright
+      // @ts-ignore
+      const { chromium } = await import('playwright');
+      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      });
+      const page = await context.newPage();
+
+      await page.goto(seasonUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+      // Click "Show more matches" if available
+      const loadMoreSelector = '[data-testid="wcl-buttonLink"]';
+      for (let i = 0; i < 5; i++) {
+        try {
+          const btn = await page.$(loadMoreSelector);
+          if (!btn) break;
+          await btn.click();
+          await page.waitForTimeout(600);
+        } catch {
+          break;
+        }
+      }
+
+      // Extract match elements from DOM
+      const rawDOMMatches = await page.evaluate(() => {
+        const els = Array.from(document.querySelectorAll('.event__match.event__match--static.event__match--twoLine'));
+        return els.map((el) => {
+          const id = el.id ? el.id.replace('g_1_', '') : '';
+          const home = el.querySelector('.event__participant--home')?.textContent?.trim() || '';
+          const away = el.querySelector('.event__participant--away')?.textContent?.trim() || '';
+          const scoreHome = el.querySelector('.event__score--home')?.textContent?.trim() || '';
+          const scoreAway = el.querySelector('.event__score--away')?.textContent?.trim() || '';
+          return { id, home, away, scoreHome, scoreAway };
+        });
+      });
+
+      await browser.close();
+
+      for (const m of rawDOMMatches) {
+        if (!m.id || !m.home || !m.away) continue;
+        const hScore = parseInt(m.scoreHome, 10);
+        const aScore = parseInt(m.scoreAway, 10);
+        if (isNaN(hScore) || isNaN(aScore)) continue;
+
+        const ftr = hScore > aScore ? 'H' : hScore < aScore ? 'A' : 'D';
+        matches.push({
+          id: `fs_hist_${m.id}`,
+          div: 'FLASHSCORE',
+          season: getCurrentSeason(),
+          matchDate: normalizeDateStr(getStandardDateStr(new Date())),
+          homeTeam: m.home,
+          awayTeam: m.away,
+          fthg: hScore,
+          ftag: aScore,
+          ftr,
+        });
+      }
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Playwright headless fallback successfully retrieved ${matches.length} matches from ${seasonUrl}`,
+      });
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Playwright headless fallback unavailable or encountered error: ${err?.message || err}. Falling back to cached feeds.`,
+      });
+    }
+
+    return matches;
+  }
+
+  /**
+   * Discovers and scrapes full multi-year season archive results for a given tournament path
+   */
+  async scrapeLeagueArchive(baseLeaguePath: string, leagueCode: string, maxSeasons = 2): Promise<HistoricalMatch[]> {
+    const historicalMatches: HistoricalMatch[] = [];
+    const seenMatchIds = new Set<string>();
+
+    try {
+      // 1. Fetch the /archive/ page to discover past season URLs
+      const archiveUrl = `https://www.flashscore.com${baseLeaguePath.replace(/\/results\/?$/, '')}/archive/`;
+      let seasonUrls: string[] = [`https://www.flashscore.com${baseLeaguePath}`];
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(archiveUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const html = await res.text();
+          // Match archive season URLs e.g. /football/england/premier-league-2023-2024/results/
+          const seasonMatches = Array.from(html.matchAll(/href=["'](\/football\/[a-z0-9-]+\/[a-z0-9-]+-[0-9]{4}-[0-9]{4}\/results\/)["']/g));
+          const extractedUrls = Array.from(new Set(seasonMatches.map((m) => `https://www.flashscore.com${m[1]}`)));
+          if (extractedUrls.length > 0) {
+            seasonUrls = [...seasonUrls, ...extractedUrls].slice(0, maxSeasons);
+          }
+        }
+      } catch (err) {
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'SCRAPER',
+          source: 'FlashscoreScraperService',
+          message: `Archive listing fetch note for ${leagueCode}: ${err}`,
+        });
+      }
+
+      // 2. Scrape results for each discovered season
+      for (const seasonUrl of seasonUrls) {
+        let seasonMatchesExtracted = 0;
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 6000);
+          const res = await fetch(seasonUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            const html = await res.text();
+            const resultsMatch = html.match(/cjs\.initialFeeds\[['"](?:summary-)?results['"]\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
+
+            if (resultsMatch && resultsMatch[1]) {
+              const sections = resultsMatch[1].split('~');
+              for (const s of sections) {
+                if (!s.startsWith('AA÷')) continue;
+                const parts = s.split('¬');
+                const data: Record<string, string> = {};
+                for (const p of parts) {
+                  const [k, v] = p.split('÷');
+                  if (k && v !== undefined) data[k] = v;
+                }
+                const matchId = data['AA'];
+                if (!matchId || seenMatchIds.has(matchId)) continue;
+                if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
+
+                const homeTeam = (data['AE'] || '').trim();
+                const awayTeam = (data['AF'] || '').trim();
+                const homeScore = parseInt(data['AG'], 10);
+                const awayScore = parseInt(data['AH'], 10);
+                if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
+
+                seenMatchIds.add(matchId);
+                const ts = parseInt(data['AD'] || '0', 10);
+                const matchDateObj = ts ? new Date(ts * 1000) : new Date();
+                const matchDate = normalizeDateStr(getStandardDateStr(matchDateObj));
+                const ftr = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
+
+                historicalMatches.push({
+                  id: `fs_hist_${matchId}`,
+                  div: leagueCode,
+                  season: getCurrentSeason(),
+                  matchDate,
+                  homeTeam,
+                  awayTeam,
+                  fthg: homeScore,
+                  ftag: awayScore,
+                  ftr,
+                });
+                seasonMatchesExtracted++;
+              }
+            }
+          }
+        } catch (err) {
+          // Trigger Playwright fallback if direct HTTP fails
+          const fallbackResults = await this.runPlaywrightScraperFallback(seasonUrl);
+          for (const fm of fallbackResults) {
+            if (!seenMatchIds.has(fm.id)) {
+              seenMatchIds.add(fm.id);
+              historicalMatches.push({ ...fm, div: leagueCode });
+            }
+          }
+        }
+
+        // If HTTP returned 0 matches, run Playwright fallback to ensure resilience
+        if (seasonMatchesExtracted === 0) {
+          const fallbackResults = await this.runPlaywrightScraperFallback(seasonUrl);
+          for (const fm of fallbackResults) {
+            if (!seenMatchIds.has(fm.id)) {
+              seenMatchIds.add(fm.id);
+              historicalMatches.push({ ...fm, div: leagueCode });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Failed multi-year archive scrape for ${leagueCode}: ${err}`,
+      });
+    }
+
+    return historicalMatches;
+  }
+
+  /**
    * Scrapes completed match results from Flashscore to populate historical database
    */
   async syncHistoricalData(daysBack = 7, shouldClear = true): Promise<{ success: boolean; matchesCount: number; message: string }> {
@@ -366,7 +590,7 @@ export class FlashscoreScraperService {
       level: 'INFO',
       category: 'SCRAPER',
       source: 'FlashscoreScraperService',
-      message: `Starting syncHistoricalData with daysBack: ${daysBack}, shouldClear: ${shouldClear}`,
+      message: `Starting syncHistoricalData with multi-year archive crawling (daysBack: ${daysBack}, shouldClear: ${shouldClear})`,
     });
     // Clear existing data and local caches before refilling if requested
     if (shouldClear) {
@@ -387,21 +611,9 @@ export class FlashscoreScraperService {
     for (const offset of historyDayOffsets) {
       const feedPath = `f_1_${offset}_3_en_1`;
       const feedText = await this.fetchAndPersistRawFeed(feedPath);
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'SCRAPER',
-        source: 'FlashscoreScraperService',
-        message: `Fetched raw feed for offset ${offset}: ${feedText ? 'Success' : 'Failed'}`,
-      });
       if (!feedText) continue;
 
       const rawMatches = parseFeedText(feedText);
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'SCRAPER',
-        source: 'FlashscoreScraperService',
-        message: `Parsed ${rawMatches.length} matches for offset ${offset}`,
-      });
       const finished = rawMatches.filter((m) => m.statusCode === '3' && m.homeScore !== undefined && m.awayScore !== undefined);
 
       for (const m of finished) {
@@ -454,7 +666,7 @@ export class FlashscoreScraperService {
       }
     }
 
-    // Scrape multi-year completed season results directly from Flashscore tournament pages
+    // Scrape multi-year completed season results for the last 2 complete seasons across global leagues
     const tournamentPages = [
       { path: '/football/england/premier-league/results/', code: 'england_premier_league' },
       { path: '/football/spain/laliga/results/', code: 'spain_la_liga' },
@@ -472,71 +684,11 @@ export class FlashscoreScraperService {
 
     await Promise.allSettled(
       tournamentPages.map(async (t) => {
-        let timeout: NodeJS.Timeout | null = null;
-        try {
-          const pageUrl = `https://www.flashscore.com${t.path}`;
-          const controller = new AbortController();
-          timeout = setTimeout(() => controller.abort(), 5000);
-          const res = await fetch(pageUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            },
-            signal: controller.signal,
-          });
-          if (res.ok) {
-            const html = await res.text();
-            const resultsMatch = html.match(/cjs\.initialFeeds\[['"](?:summary-)?results['"]\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
-            if (resultsMatch && resultsMatch[1]) {
-              const sections = resultsMatch[1].split('~');
-              for (const s of sections) {
-                if (!s.startsWith('AA÷')) continue;
-                const parts = s.split('¬');
-                const data: Record<string, string> = {};
-                for (const p of parts) {
-                  const [k, v] = p.split('÷');
-                  if (k && v !== undefined) data[k] = v;
-                }
-                const matchId = data['AA'];
-                if (!matchId || seenHistIds.has(matchId)) continue;
-                if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
-
-                const homeTeam = (data['AE'] || '').trim();
-                const awayTeam = (data['AF'] || '').trim();
-                const homeScore = parseInt(data['AG'], 10);
-                const awayScore = parseInt(data['AH'], 10);
-                if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
-
-                seenHistIds.add(matchId);
-                const ts = parseInt(data['AD'] || '0', 10);
-                const matchDateObj = ts ? new Date(ts * 1000) : new Date();
-                const matchDate = normalizeDateStr(getStandardDateStr(matchDateObj));
-                const ftr = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
-
-                historicalMatches.push({
-                  id: `fs_hist_${matchId}`,
-                  div: t.code,
-                  season: getCurrentSeason(),
-                  matchDate,
-                  homeTeam,
-                  awayTeam,
-                  fthg: homeScore,
-                  ftag: awayScore,
-                  ftr,
-                });
-              }
-            }
-          }
-        } catch (err) {
-          loggerService.addLog({
-            level: 'WARN',
-            category: 'SCRAPER',
-            source: 'FlashscoreScraperService',
-            message: `Failed tournament scraping for ${t.path}: ${err}`,
-          });
-        } finally {
-          if (timeout) {
-            clearTimeout(timeout);
-            timeout = null;
+        const archivedMatches = await this.scrapeLeagueArchive(t.path, t.code, 2);
+        for (const am of archivedMatches) {
+          if (!seenHistIds.has(am.id)) {
+            seenHistIds.add(am.id);
+            historicalMatches.push(am);
           }
         }
       })
@@ -562,7 +714,7 @@ export class FlashscoreScraperService {
     return {
       success: true,
       matchesCount: inserted + upcoming.length,
-      message: `FlashscoreScraping synchronized ${historicalMatches.length} real historical results and ${upcoming.length} upcoming fixtures directly into SQLite.`,
+      message: `FlashscoreScraping synchronized ${historicalMatches.length} real historical multi-year results and ${upcoming.length} upcoming fixtures directly into SQLite.`,
     };
   }
 
