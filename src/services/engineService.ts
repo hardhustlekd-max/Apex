@@ -191,6 +191,29 @@ export class EngineService {
     return !!(res && res.success);
   }
 
+  public static async clearClientStorage(): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      const theme = localStorage.getItem('theme');
+      localStorage.clear();
+      if (theme) localStorage.setItem('theme', theme);
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear();
+    }
+    if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+      try {
+        const dbs = await indexedDB.databases();
+        for (const dbInfo of dbs) {
+          if (dbInfo.name) {
+            indexedDB.deleteDatabase(dbInfo.name);
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+  }
+
   public static async resetAndSyncDatabase(onProgress?: (job: any) => void): Promise<{
     success: boolean;
     message: string;
@@ -201,6 +224,9 @@ export class EngineService {
     livePredictionsCount?: number;
     stats?: any;
   }> {
+    // 0. Purge local browser storage & IndexedDB
+    await this.clearClientStorage().catch(() => {});
+
     // 1. Initiate async background sync job
     const startRes = await this.startSyncJob({ resetDatabase: true, resetRawFeeds: true });
 

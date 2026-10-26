@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, ChevronLeft } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 
@@ -37,21 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 h-14 bg-white/90 dark:bg-[#09090B]/90 backdrop-blur-xl transition-colors border-b border-slate-200/80 dark:border-[#27272A]">
       <div className="max-w-6xl w-full h-full mx-auto px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-3">
-        {/* Left: Back / Clear Chevron & Brand */}
+        {/* Left: Brand */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <button
-            onClick={() => {
-              if (searchQuery && setSearchQuery) {
-                setSearchQuery('');
-              }
-            }}
-            className="min-h-[48px] min-w-[48px] rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 border border-slate-200/60 dark:border-[#27272A]"
-            title="Back / Clear"
-            aria-label="Back / Clear Search"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
               A
