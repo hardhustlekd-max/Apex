@@ -35,12 +35,12 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 font-sans text-slate-900 dark:text-slate-100">
+    <div className="space-y-3 font-sans text-slate-900 dark:text-slate-100">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+        <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-900 dark:text-white">
           Scoreline Probability Grid (Poisson)
         </h4>
-        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+        <div className="text-[9.5px] font-mono text-slate-500 dark:text-slate-400">
           <span className="font-bold text-slate-900 dark:text-white">{homeTeam} ({prediction.homeXG})</span>
           <span className="px-1 text-slate-400">vs</span>
           <span className="font-bold text-slate-900 dark:text-white">({prediction.awayXG}) {awayTeam}</span>
@@ -49,15 +49,15 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
 
       <div className="overflow-x-auto no-scrollbar">
         <div className="inline-block min-w-full">
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-mono">
+          <div className="grid grid-cols-7 gap-1 text-center font-mono">
             {/* Top Header Row (Away Goals) */}
-            <div className="p-1 text-slate-400 dark:text-slate-500 text-[10px] flex items-center justify-center font-bold">
+            <div className="p-1 text-slate-400 dark:text-slate-500 text-[8.5px] flex items-center justify-center font-bold">
               H \ A
             </div>
             {[0, 1, 2, 3, 4, 5].map((ag) => (
               <div
                 key={`away-h-${ag}`}
-                className="p-2 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-slate-100 font-bold text-xs"
+                className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px]"
               >
                 {ag}
               </div>
@@ -66,7 +66,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
             {/* Matrix Rows (Home Goals) */}
             {[0, 1, 2, 3, 4, 5].map((hg) => (
               <React.Fragment key={`row-${hg}`}>
-                <div className="p-2 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center justify-center">
+                <div className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px] flex items-center justify-center">
                   {hg}
                 </div>
                 {[0, 1, 2, 3, 4, 5].map((ag) => {
@@ -75,7 +75,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
                   return (
                     <div
                       key={`cell-${hg}-${ag}`}
-                      className={`p-2 rounded-xl border transition-colors text-[10px] flex flex-col items-center justify-center font-mono ${getHeatmapColor(
+                      className={`p-1.5 rounded-lg border transition-colors text-[8.5px] flex flex-col items-center justify-center font-mono ${getHeatmapColor(
                         prob
                       )}`}
                       title={`${homeTeam} ${hg} - ${ag} ${awayTeam}: ${pct}%`}
@@ -92,22 +92,22 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
 
       {/* Top Correct Scores breakdown */}
       {showTopScores && (
-        <div className="pt-2">
-          <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white mb-2">
+        <div className="pt-1.5">
+          <h5 className="text-[10.5px] font-black uppercase tracking-wider text-slate-900 dark:text-white mb-1.5">
             Most Probable Scorelines
           </h5>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
             {prediction.topCorrectScores.map((score, idx) => (
               <div
                 key={score.score}
-                className={`p-2.5 rounded-2xl border text-center font-mono ${
+                className={`p-2 rounded-xl border text-center font-mono ${
                   idx === 0
                     ? 'bg-[#CCFF00]/10 border-[#CCFF00]/40 text-slate-950 dark:text-[#CCFF00]'
                     : 'bg-slate-50 dark:bg-[#1E1E1E] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'
                 }`}
               >
-                <div className="text-xs font-black">{score.score}</div>
-                <div className="text-[10px] font-bold">
+                <div className="text-[10.5px] font-black">{score.score}</div>
+                <div className="text-[8.5px] font-bold">
                   {(score.probability * 100).toFixed(1)}%
                 </div>
               </div>

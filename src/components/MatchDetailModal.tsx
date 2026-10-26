@@ -268,80 +268,80 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
   const authoritativeValue = getAuthoritativeValueBet(currentFixture);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#121216] text-slate-950 dark:text-neutral-100 rounded-t-3xl sm:rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200/80 dark:border-[#27272A] shadow-[0_24px_64px_rgba(0,0,0,0.85)]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-3 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-white dark:bg-[#121216] text-slate-950 dark:text-neutral-100 rounded-t-2xl sm:rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden border-t sm:border border-slate-200/80 dark:border-[#27272A] shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
         
         {/* Mobile Drag Handle Affordance */}
-        <div className="w-12 h-1.5 bg-slate-300 dark:bg-neutral-700 rounded-full mx-auto my-2.5 sm:hidden shrink-0" />
+        <div className="w-10 h-1 bg-slate-300 dark:bg-neutral-700 rounded-full mx-auto my-2 sm:hidden shrink-0" />
 
         {/* Modal Top Bar */}
-        <div className="bg-white dark:bg-[#121216] px-4 sm:px-6 pt-1 sm:pt-4 pb-3 border-b border-slate-100 dark:border-[#27272A] shrink-0">
-          <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
+        <div className="bg-white dark:bg-[#121216] px-3.5 sm:px-5 pt-1 sm:pt-3 pb-2.5 border-b border-slate-100 dark:border-[#27272A] shrink-0">
+          <div className="flex items-center justify-between gap-2 min-w-0">
             {/* Competition & Timing Metadata */}
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-slate-500 dark:text-neutral-400">
-              <span className="font-extrabold text-slate-950 dark:text-white truncate whitespace-nowrap text-[11px] sm:text-xs">
+            <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-[10.5px] text-slate-500 dark:text-neutral-400">
+              <span className="font-extrabold text-slate-950 dark:text-white truncate whitespace-nowrap text-[10px] sm:text-[10.5px]">
                 {fixture.stage || fixture.leagueName}
               </span>
               <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
-              <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
-                <Calendar className="w-3 h-3 text-slate-400" />
+              <span className="flex items-center gap-1 font-mono tabular-nums text-[9px] sm:text-[10px] whitespace-nowrap shrink-0">
+                <Calendar className="w-2.5 h-2.5 text-slate-400" />
                 <span>{fixture.matchDate}</span>
               </span>
               <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
-              <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] sm:text-[11px] whitespace-nowrap shrink-0">
-                <Clock className="w-3 h-3 text-slate-400" />
+              <span className="flex items-center gap-1 font-mono tabular-nums text-[9px] sm:text-[10px] whitespace-nowrap shrink-0">
+                <Clock className="w-2.5 h-2.5 text-slate-400" />
                 <span>{fixture.kickOffTime}</span>
               </span>
               {fixture.status === 'LIVE' && (
                 <>
                   <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
-                  <span className="text-slate-950 dark:text-slate-950 font-black flex items-center gap-1 text-[10px] sm:text-[11px] whitespace-nowrap shrink-0 bg-[#CCFF00] px-2 py-0.5 rounded-full font-mono tabular-nums">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
+                  <span className="text-slate-950 dark:text-slate-950 font-black flex items-center gap-1 text-[9px] sm:text-[10px] whitespace-nowrap shrink-0 bg-[#CCFF00] px-1.5 py-0.5 rounded-full font-mono tabular-nums">
+                    <span className="w-1 h-1 rounded-full bg-slate-950 animate-pulse" />
                     Live In Play
                   </span>
                 </>
               )}
             </div>
 
-            {/* Close Button with min 44px hitbox */}
+            {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-[#18181D] dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0 border border-slate-200/60 dark:border-[#27272A]"
+              className="min-h-[35px] min-w-[35px] w-8 h-8 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-[#18181D] dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0 border border-slate-200/60 dark:border-[#27272A]"
               aria-label="Close match details"
             >
-              <X className="w-5 h-5 stroke-[2.5]" />
+              <X className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
 
           {/* Hero Scoreboard Banner */}
-          <div className="mt-3 p-4 sm:p-5 rounded-3xl bg-slate-100/90 dark:bg-[#18181D] border border-slate-200/60 dark:border-[#27272A] min-w-0 shadow-xs">
-            <div className="grid grid-cols-12 items-center gap-1 sm:gap-4">
+          <div className="mt-2.5 p-3 sm:p-4 rounded-2xl bg-slate-100/90 dark:bg-[#18181D] border border-slate-200/60 dark:border-[#27272A] min-w-0 shadow-xs">
+            <div className="grid grid-cols-12 items-center gap-1 sm:gap-3">
               
               {/* Home Team */}
-              <div className="col-span-5 flex items-center gap-2 sm:gap-3 min-w-0 flex-nowrap">
+              <div className="col-span-5 flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-nowrap">
                 {fixture.homeBadge ? (
                   <img
                     src={fixture.homeBadge}
                     alt=""
-                    className="w-7 h-7 sm:w-10 sm:h-10 object-contain shrink-0 rounded-full"
+                    className="w-5.5 h-5.5 sm:w-8 sm:h-8 object-contain shrink-0 rounded-full"
                     loading="lazy"
                     onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
+                  <div className="w-5.5 h-5.5 sm:w-8 sm:h-8 rounded-lg bg-slate-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-black text-[10px] sm:text-xs flex items-center justify-center shrink-0">
                     {fixture.homeTeam.slice(0, 1)}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs sm:text-base font-extrabold text-slate-900 dark:text-white truncate block" title={fixture.homeTeam}>
+                  <span className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 dark:text-white truncate block" title={fixture.homeTeam}>
                     {fixture.homeTeam}
                   </span>
                   <div className="flex items-center gap-1 mt-0.5 flex-nowrap">
-                    <span className="px-1.5 py-0.5 rounded-md bg-slate-200/70 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-mono tabular-nums text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0">
+                    <span className="px-1.5 py-0.5 rounded-md bg-slate-200/70 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-slate-700 dark:text-neutral-300 font-mono tabular-nums text-[8px] sm:text-[9px] font-bold whitespace-nowrap shrink-0">
                       {homeWinPct}% Win
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
+                    <span className="text-[9px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
                       xG {pred.homeXG}
                     </span>
                   </div>
@@ -352,19 +352,19 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               <div className="col-span-2 flex flex-col items-center justify-center text-center shrink-0 px-0.5">
                 {fixture.score && fixture.score.home !== undefined ? (
                   <div>
-                    <span className="text-base sm:text-2xl font-mono tabular-nums font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
+                    <span className="text-xs sm:text-lg font-mono tabular-nums font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap">
                       {fixture.score.home} : {fixture.score.away}
                     </span>
-                    <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+                    <span className="block text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mt-0.5 whitespace-nowrap">
                       {fixture.status === 'LIVE' ? (fixture.minute ? `${fixture.minute}'` : 'Live') : 'Full Time'}
                     </span>
                   </div>
                 ) : (
                   <div>
-                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] text-slate-400 dark:text-neutral-400 shadow-2xs whitespace-nowrap">
+                    <span className="text-[8.5px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white dark:bg-[#09090B] border border-slate-200/60 dark:border-[#27272A] text-slate-400 dark:text-neutral-400 shadow-2xs whitespace-nowrap">
                       VS
                     </span>
-                    <span className="block text-[9px] sm:text-[10px] font-mono tabular-nums text-slate-400 mt-0.5 whitespace-nowrap">
+                    <span className="block text-[8px] sm:text-[9px] font-mono tabular-nums text-slate-400 mt-0.5 whitespace-nowrap">
                       {fixture.kickOffTime}
                     </span>
                   </div>
@@ -372,16 +372,16 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               </div>
 
               {/* Away Team */}
-              <div className="col-span-5 flex items-center justify-end gap-1.5 sm:gap-2.5 min-w-0 text-right flex-nowrap">
+              <div className="col-span-5 flex items-center justify-end gap-1.5 sm:gap-2 min-w-0 text-right flex-nowrap">
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs sm:text-base font-extrabold text-slate-900 dark:text-white truncate block" title={fixture.awayTeam}>
+                  <span className="text-[10.5px] sm:text-xs font-extrabold text-slate-900 dark:text-white truncate block" title={fixture.awayTeam}>
                     {fixture.awayTeam}
                   </span>
                   <div className="flex items-center justify-end gap-1 mt-0.5 flex-nowrap">
-                    <span className="text-[10px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
+                    <span className="text-[9px] text-slate-400 font-mono tabular-nums hidden md:inline whitespace-nowrap shrink-0">
                       xG {pred.awayXG}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-mono tabular-nums text-[9px] sm:text-[10px] font-bold whitespace-nowrap shrink-0 border border-transparent dark:border-cyan-800/40">
+                    <span className="px-1.5 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-400 font-mono tabular-nums text-[8px] sm:text-[9px] font-bold whitespace-nowrap shrink-0 border border-transparent dark:border-cyan-800/40">
                       {awayWinPct}% Win
                     </span>
                   </div>
@@ -390,12 +390,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
                   <img
                     src={fixture.awayBadge}
                     alt=""
-                    className="w-7 h-7 sm:w-10 sm:h-10 object-contain shrink-0 rounded-full"
+                    className="w-5.5 h-5.5 sm:w-8 sm:h-8 object-contain shrink-0 rounded-full"
                     loading="lazy"
                     onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-cyan-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-cyan-700 dark:text-cyan-400 font-black text-xs sm:text-sm flex items-center justify-center shrink-0">
+                  <div className="w-5.5 h-5.5 sm:w-8 sm:h-8 rounded-lg bg-cyan-100 dark:bg-[#121216] border border-slate-200/60 dark:border-[#27272A] text-cyan-700 dark:text-cyan-400 font-black text-[10px] sm:text-xs flex items-center justify-center shrink-0">
                     {fixture.awayTeam.slice(0, 1)}
                   </div>
                 )}
@@ -404,12 +404,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             </div>
           </div>
 
-          {/* Segmented Sub-Navigation Bar with min 44px hitboxes */}
-          <div className="mt-2 sm:mt-3 w-full flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#09090B] rounded-2xl overflow-x-auto no-scrollbar flex-nowrap shrink-0 touch-pan-x border border-transparent dark:border-[#27272A]">
+          {/* Segmented Sub-Navigation Bar with min 35px hitboxes */}
+          <div className="mt-2 w-full flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#09090B] rounded-xl overflow-x-auto no-scrollbar flex-nowrap shrink-0 touch-pan-x border border-transparent dark:border-[#27272A]">
             <button
               type="button"
               onClick={() => setActiveTab('OVERVIEW')}
-              className={`flex-1 min-w-[68px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
+              className={`flex-1 min-w-[58px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'OVERVIEW'
                   ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                   : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
@@ -421,7 +421,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('H2H')}
-              className={`flex-1 min-w-[58px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 active:scale-95 ${
+              className={`flex-1 min-w-[48px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1 active:scale-95 ${
                 activeTab === 'H2H'
                   ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                   : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
@@ -429,7 +429,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             >
               <span>H2H</span>
               {h2h.matchesCount > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#09090B] text-slate-700 dark:text-neutral-300 font-mono tabular-nums font-bold">
+                <span className="text-[8.5px] px-1 py-0.5 rounded-md bg-slate-100 dark:bg-[#09090B] text-slate-700 dark:text-neutral-300 font-mono tabular-nums font-bold">
                   {h2h.matchesCount}
                 </span>
               )}
@@ -439,14 +439,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
               <button
                 type="button"
                 onClick={() => setActiveTab('STATS')}
-                className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1.5 active:scale-95 ${
+                className={`flex-1 min-w-[62px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center gap-1 active:scale-95 ${
                   activeTab === 'STATS'
                     ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                     : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 <span>Statistics</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-mono tabular-nums font-bold">
+                <span className="text-[8.5px] px-1 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-mono tabular-nums font-bold">
                   {parsedStatsSummary.items.length}
                 </span>
               </button>
@@ -455,7 +455,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('TEAMS')}
-              className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
+              className={`flex-1 min-w-[62px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'TEAMS'
                   ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                   : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
@@ -467,7 +467,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('STANDINGS')}
-              className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
+              className={`flex-1 min-w-[62px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'STANDINGS'
                   ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                   : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
@@ -479,7 +479,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose: () => void 
             <button
               type="button"
               onClick={() => setActiveTab('PREDICTIONS')}
-              className={`flex-1 min-w-[84px] sm:min-w-0 min-h-[44px] px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
+              className={`flex-1 min-w-[68px] sm:min-w-0 min-h-[35px] px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 sm:shrink flex items-center justify-center active:scale-95 ${
                 activeTab === 'PREDICTIONS'
                   ? 'bg-white dark:bg-[#18181D] text-slate-900 dark:text-[#CCFF00] shadow-xs font-black border border-slate-200/60 dark:border-[#27272A]'
                   : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'

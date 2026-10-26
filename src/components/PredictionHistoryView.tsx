@@ -126,24 +126,24 @@ export const PredictionHistoryView: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 font-sans">
+    <div className="space-y-3 font-sans">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
-          <h2 className="text-base sm:text-lg font-extrabold text-slate-950 dark:text-white flex items-center gap-2 tracking-tight">
-            <BarChart3 className="w-5 h-5 text-[#CCFF00]" />
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-950 dark:text-white flex items-center gap-1.5 tracking-tight">
+            <BarChart3 className="w-4 h-4 text-[#CCFF00]" />
             Historical Model Evaluation
           </h2>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+          <p className="text-[10px] text-slate-500 dark:text-neutral-400 mt-0.5">
             Backtested Poisson & Apex-Engine accuracy across stored historical database fixtures
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-3.5 py-2 min-h-[44px] rounded-full bg-white dark:bg-[#18181D] border border-slate-200/80 dark:border-[#27272A] text-xs font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
+            className="px-3 py-1.5 min-h-[35px] rounded-full bg-white dark:bg-[#18181D] border border-slate-200/80 dark:border-[#27272A] text-[10.5px] font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
           >
             <option value={30}>30 Matches</option>
             <option value={50}>50 Matches</option>
@@ -154,9 +154,9 @@ export const PredictionHistoryView: React.FC = () => {
           <button
             onClick={() => fetchHistory(limit, true)}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2 rounded-full text-xs font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-[10.5px] font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
         </div>
@@ -164,34 +164,34 @@ export const PredictionHistoryView: React.FC = () => {
 
       {/* Summary Stats Cards */}
       {totalEvaluated > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
-              <Layers className="w-3.5 h-3.5 text-[#CCFF00]" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
+              <Layers className="w-3 h-3 text-[#CCFF00]" />
               <span>Evaluated Matches</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
+            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
               {totalEvaluated}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#CCFF00]" />
+          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
+              <ShieldCheck className="w-3 h-3 text-[#CCFF00]" />
               <span>Model Accuracy</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums text-slate-950 dark:text-[#CCFF00]">
+            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-[#CCFF00]">
               {accuracyPct}%
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121216] rounded-3xl p-5 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
-              <Target className="w-3.5 h-3.5 text-[#CCFF00]" />
+          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
+              <Target className="w-3 h-3 text-[#CCFF00]" />
               <span>Correct Hits</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
-              {correctCount} <span className="text-xs font-bold text-slate-500 dark:text-neutral-500">/ {totalEvaluated}</span>
+            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
+              {correctCount} <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-500">/ {totalEvaluated}</span>
             </div>
           </div>
         </div>
@@ -199,40 +199,40 @@ export const PredictionHistoryView: React.FC = () => {
 
       {/* Fixtures List */}
       {history.length === 0 ? (
-        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 text-center text-xs font-medium text-slate-500 dark:text-neutral-400 border border-slate-200/80 dark:border-[#27272A] shadow-xs space-y-3">
+        <div className="bg-white dark:bg-[#121216] rounded-2xl p-6 text-center text-[10.5px] font-medium text-slate-500 dark:text-neutral-400 border border-slate-200/80 dark:border-[#27272A] shadow-xs space-y-2.5">
           <p>No historical predictions recorded in database yet.</p>
           <button
             onClick={() => fetchHistory(limit, true)}
-            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2.5 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-2 rounded-full text-[10.5px] font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3 h-3" />
             Evaluate Historical Database
           </button>
         </div>
       ) : (
-        <div className="rounded-3xl overflow-hidden bg-white dark:bg-[#121216] border border-slate-200/80 dark:border-[#27272A] divide-y divide-slate-100 dark:divide-[#27272A] shadow-xs">
+        <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#121216] border border-slate-200/80 dark:border-[#27272A] divide-y divide-slate-100 dark:divide-[#27272A] shadow-xs">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
 
             return (
               <div
                 key={f.id}
-                className="px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-[#18181D] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
+                className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-[#18181D] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px]"
               >
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-extrabold text-slate-950 dark:text-white text-xs sm:text-[13px]">
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-extrabold text-slate-950 dark:text-white text-[10.5px] sm:text-xs">
                       {f.homeTeam} <span className="text-slate-400 dark:text-neutral-500 font-normal">vs</span> {f.awayTeam}
                     </span>
-                    <span className="text-[10px] font-mono tabular-nums font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 border border-slate-200/60 dark:border-[#27272A]">
+                    <span className="text-[8.5px] font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 border border-slate-200/60 dark:border-[#27272A]">
                       {f.leagueName || f.league}
                     </span>
-                    <span className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">
+                    <span className="text-[8.5px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">
                       {f.matchDate}
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums flex items-center gap-2.5 flex-wrap">
+                  <div className="text-[9.5px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums flex items-center gap-2 flex-wrap">
                     <span>
                       Final Score: <strong className="text-slate-950 dark:text-white font-black">{evalResult.hG} - {evalResult.aG}</strong>
                     </span>
@@ -243,9 +243,9 @@ export const PredictionHistoryView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="shrink-0 flex items-center gap-2">
+                <div className="shrink-0 flex items-center gap-1.5">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black ${
                       evalResult.isCorrect
                         ? 'bg-[#CCFF00] text-slate-950 font-mono tabular-nums'
                         : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 font-mono tabular-nums'
@@ -253,12 +253,12 @@ export const PredictionHistoryView: React.FC = () => {
                   >
                     {evalResult.isCorrect ? (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />
+                        <CheckCircle2 className="w-3 h-3 text-slate-950" />
                         <span>Hit</span>
                       </>
                     ) : (
                       <>
-                        <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                        <XCircle className="w-3 h-3 text-rose-500" />
                         <span>Missed</span>
                       </>
                     )}

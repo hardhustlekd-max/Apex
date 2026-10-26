@@ -249,9 +249,9 @@ export default function App() {
     <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#121212] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-20 sm:bottom-6 right-4 z-[100] bg-white dark:bg-[#121212] text-slate-900 dark:text-white font-mono text-xs px-4 py-3 rounded-full shadow-2xl border border-slate-200 dark:border-white/10 flex items-center gap-2.5 animate-in slide-in-from-bottom-2">
-          <span className="w-2 h-2 rounded-full bg-[#CCFF00] shrink-0 animate-pulse" />
-          <span className="truncate max-w-[320px] font-bold">{notification.message}</span>
+        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-white dark:bg-[#121212] text-slate-900 dark:text-white font-mono text-[10.5px] px-3 py-2.5 rounded-full shadow-2xl border border-slate-200 dark:border-white/10 flex items-center gap-2 animate-in slide-in-from-bottom-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shrink-0 animate-pulse" />
+          <span className="truncate max-w-[256px] font-bold">{notification.message}</span>
         </div>
       )}
 
@@ -275,7 +275,7 @@ export default function App() {
 
       {/* Main Content Dashboard */}
       <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-        <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-3.5 flex flex-col pb-24 sm:pb-28">
+        <main className="flex-1 max-w-[920px] w-full mx-auto px-2.5 sm:px-3.5 lg:px-5 py-2.5 sm:py-3 space-y-2.5 flex flex-col pb-20 sm:pb-22">
         {activeTab === 'FIXTURES' && (
           <FixturesList
             fixtures={fixtures}
