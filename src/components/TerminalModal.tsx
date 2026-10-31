@@ -119,9 +119,9 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#121212] text-slate-100 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-[0_24px_64px_rgba(0,0,0,0.85)] border border-neutral-800 overflow-hidden font-mono text-[10.5px]">
+      <div className="bg-[#121212] text-slate-100 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono text-[10.5px]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#121212] border-b border-neutral-800">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#121212]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-full bg-[#CCFF00] text-slate-950 font-black">
               <Terminal className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -166,7 +166,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Filter bar */}
-        <div className="px-4 py-2.5 bg-[#161616] border-b border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 font-sans">
+        <div className="px-4 py-2.5 bg-[#161616] flex flex-wrap items-center justify-between gap-2 font-sans">
           {/* Category Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
             {['ALL', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
@@ -197,7 +197,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              className="bg-neutral-800 rounded-full px-3 py-1 text-[10px] font-bold text-neutral-200 outline-none cursor-pointer border border-neutral-700 focus:border-[#CCFF00]"
+              className="bg-neutral-800 rounded-full px-3 py-1 text-[10px] font-bold text-neutral-200 outline-none cursor-pointer"
             >
               <option value="ALL">All Levels</option>
               <option value="ERROR">Errors Only</option>
@@ -213,7 +213,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filter terminal..."
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-full pl-7 pr-3 py-1 text-[10px] font-bold text-neutral-200 placeholder-neutral-500 outline-none focus:border-[#CCFF00]"
+                className="w-full bg-neutral-800 rounded-full pl-7 pr-3 py-1 text-[10px] font-bold text-neutral-200 placeholder-neutral-500 outline-none"
               />
             </div>
           </div>

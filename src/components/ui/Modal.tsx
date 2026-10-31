@@ -25,28 +25,28 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
       <div
-        className={`bg-white dark:bg-[#121212] text-slate-900 dark:text-neutral-100 rounded-2xl w-full ${maxWidth} max-h-[92vh] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-slate-200/80 dark:border-neutral-800 flex flex-col animate-in zoom-in-95 duration-100`}
+        className={`bg-white dark:bg-[#121216] text-slate-900 dark:text-white rounded-2xl w-full ${maxWidth} max-h-[92vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-100`}
       >
         {/* Header */}
-        <div className="px-4 sm:px-5 py-3 flex items-center justify-between shrink-0 border-b border-slate-100 dark:border-neutral-800/80">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             {icon && (
-              <div className="p-2 rounded-full bg-[#CCFF00] text-slate-950 shrink-0 font-bold">
+              <div className="p-2.5 rounded-xl bg-[#CCFF00] text-slate-950 shrink-0 font-extrabold shadow-xs">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="font-extrabold text-sm text-slate-950 dark:text-white truncate">{title}</h3>
-              {subtitle && <p className="text-[10px] text-slate-500 dark:text-neutral-400 truncate">{subtitle}</p>}
+              <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white truncate">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-500 dark:text-neutral-400 truncate">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7.5 h-7.5 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-neutral-800 dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
+            className="min-h-[44px] min-w-[44px] w-9 h-9 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-[#18181D] dark:hover:bg-[#CCFF00] text-slate-800 dark:text-white dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
             aria-label="Close modal"
           >
-            <X className="w-4 h-4 stroke-[2.5]" />
+            <X className="w-4.5 h-4.5 stroke-[2.5]" />
           </button>
         </div>
 

@@ -4,14 +4,54 @@
 
 @layer base {
   :root {
-    --color-canvas-default: #f4f5f7;
+    /* Football Betting Tips (FREE) Design Tokens */
+    --font-family-primary: 'Lato', sans-serif;
+    --font-size-base: 16px;
+    --font-line-height-base: 28px;
+    
+    /* Typography Scale */
+    --font-size-xs: 11px;
+    --font-size-sm: 11.04px;
+    --font-size-md: 11.2px;
+    --font-size-lg: 12.8px;
+    --font-size-xl: 14px;
+    --font-size-2xl: 15px;
+    --font-size-3xl: 16px;
+    --font-size-4xl: 18px;
+
+    /* Color Palette */
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #ffffff;
+    --color-text-tertiary: #64748b;
+    --color-text-inverse: #06b6d4;
+    --color-surface-base: #f8fafc;
+    --color-surface-muted: #f1f5f9;
+    --color-surface-strong: #ccff00;
+    --color-border-default: #e2e8f0;
+    --color-border-strong: #ccff00;
+
+    /* Spacing Scale */
+    --space-1: 4.8px;
+    --space-2: 6px;
+    --space-3: 8px;
+    --space-4: 12px;
+    --space-5: 16px;
+    --space-6: 24px;
+
+    /* Radius & Shadow */
+    --radius-xs: 4px;
+    --radius-sm: 20px;
+    --shadow-1: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+    /* Legacy compatibility mappings */
+    --color-canvas-default: #f8fafc;
     --color-canvas-subtle: #ffffff;
-    --color-canvas-inset: #e5e7eb;
-    --color-border-default: #e5e7eb;
-    --color-border-muted: #cbd5e1;
-    --color-fg-default: #09090b;
-    --color-fg-muted: #71717a;
-    --color-fg-subtle: #a1a1aa;
+    --color-canvas-inset: #f1f5f9;
+    --color-border-default: #e2e8f0;
+    --color-border-muted: #94a3b8;
+    --color-fg-default: #0f172a;
+    --color-fg-muted: #64748b;
+    --color-fg-subtle: #06b6d4;
     --color-accent-fg: #09090b;
     --color-accent-subtle: #ccff00;
     --apex-lime: #ccff00;
@@ -19,33 +59,44 @@
   }
 
   .dark {
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #09090b;
+    --color-text-tertiary: #a1a1aa;
+    --color-text-inverse: #ccff00;
+    --color-surface-base: #09090b;
+    --color-surface-muted: #18181d;
+    --color-surface-strong: #ccff00;
+    --color-border-default: #27272a;
+    --color-border-strong: #ccff00;
+
     --color-canvas-default: #09090b;
     --color-canvas-subtle: #121216;
     --color-canvas-inset: #18181d;
     --color-border-default: #27272a;
-    --color-border-muted: #3f3f46;
-    --color-fg-default: #f4f4f5;
+    --color-border-muted: #52525b;
+    --color-fg-default: #f9fafb;
     --color-fg-muted: #a1a1aa;
-    --color-fg-subtle: #71717a;
-    --color-accent-fg: #ccff00;
-    --color-accent-subtle: #121216;
+    --color-fg-subtle: #ccff00;
+    --color-accent-fg: #09090b;
+    --color-accent-subtle: #ccff00;
     --apex-lime: #ccff00;
     --apex-black: #09090b;
   }
 
   html {
-    font-size: 100%;
+    font-size: 16px;
+    line-height: 28px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: #09090b;
-    background-color: #f4f5f7;
+    font-family: 'Lato', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
   }
 
   .dark html,
   html.dark,
   body.dark {
-    color: #f4f4f5;
+    color: #f9fafb;
     background-color: #09090b;
   }
 
@@ -97,17 +148,83 @@
     transform: scale(1.04);
   }
 
-  .btn-apex-dark {
-    background-color: #121212;
-    color: #ffffff;
-    border-radius: 9999px;
+  /* Keyboard-first Focus-visible Accessibility (WCAG 2.2 AA) */
+  *:focus-visible {
+    outline: 2px solid #06b6d4 !important;
+    outline-offset: 2px !important;
+  }
+  .dark *:focus-visible {
+    outline: 2px solid #ccff00 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Semantic Token Utilities */
+  .font-lato {
+    font-family: 'Lato', sans-serif !important;
+  }
+  .text-olbg-primary {
+    color: #0f172a !important;
+  }
+  .dark .text-olbg-primary {
+    color: #ffffff !important;
+  }
+  .text-olbg-secondary {
+    color: #ffffff !important;
+  }
+  .text-olbg-tertiary {
+    color: #64748b !important;
+  }
+  .text-olbg-inverse {
+    color: #06b6d4 !important;
+  }
+  .dark .text-olbg-inverse {
+    color: #ccff00 !important;
+  }
+  .bg-olbg-muted {
+    background-color: #f1f5f9 !important;
+  }
+  .dark .bg-olbg-muted {
+    background-color: #18181d !important;
+  }
+  .bg-olbg-strong {
+    background-color: #ccff00 !important;
+    color: #09090b !important;
+  }
+  .border-olbg-default {
+    border-color: #e2e8f0 !important;
+  }
+  .dark .border-olbg-default {
+    border-color: #27272a !important;
+  }
+  .border-olbg-strong {
+    border-color: #ccff00 !important;
+  }
+  .dark .border-olbg-strong {
+    border-color: #ccff00 !important;
+  }
+  .shadow-olbg-1 {
+    box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+  }
+  .radius-olbg-xs {
+    border-radius: 4px !important;
+  }
+  .radius-olbg-sm {
+    border-radius: 20px !important;
+  }
+
+  .btn-olbg-primary {
+    background-color: #ccff00;
+    color: #09090b;
+    border-radius: 20px;
     font-weight: 700;
     transition: all 0.15s ease-in-out;
   }
-
-  .btn-apex-dark:hover {
-    background-color: #262626;
+  .btn-olbg-primary:hover {
+    background-color: #b8e600;
     transform: scale(1.02);
+  }
+  .btn-olbg-primary:active {
+    transform: scale(0.98);
   }
 
   .no-scrollbar::-webkit-scrollbar {

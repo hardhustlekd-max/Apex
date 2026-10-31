@@ -66,9 +66,9 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
       <div
         ref={modalRef}
-        className="bg-white dark:bg-[#121212] text-slate-900 dark:text-slate-100 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-white/10 flex flex-col animate-in zoom-in-95 duration-100"
+        className="bg-white dark:bg-[#121212] text-slate-900 dark:text-slate-100 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-100"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/10">
+        <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-700 dark:text-slate-200">
               <Filter className="w-3.5 h-3.5" />
@@ -76,7 +76,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wide">Match Filters</span>
               {activeFilterCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[8.5px] font-black font-mono">
+                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-xs font-black font-mono">
                   {activeFilterCount} active
                 </span>
               )}
@@ -87,7 +87,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="text-[10.5px] font-bold text-rose-500 hover:text-rose-600 hover:underline cursor-pointer"
+                className="text-xs font-bold text-rose-500 hover:text-rose-600 hover:underline cursor-pointer"
               >
                 Reset All
               </button>
@@ -95,7 +95,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 transition-all cursor-pointer hover:scale-105 active:scale-95 border border-transparent dark:border-white/10"
+              className="w-7.5 h-7.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 transition-all cursor-pointer hover:scale-105 active:scale-95"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -105,7 +105,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         <div className="p-4 flex flex-col gap-3">
           <div className="w-full relative min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
                 League Filter
               </label>
               <button
@@ -114,7 +114,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
                   setIsLeagueModalOpen(true);
                   onClose();
                 }}
-                className="text-[9.5px] font-bold text-sky-600 dark:text-[#CCFF00] hover:underline cursor-pointer"
+                className="text-xs font-bold text-sky-600 dark:text-[#CCFF00] hover:underline cursor-pointer"
               >
                 Browse All Leagues...
               </button>
@@ -122,7 +122,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             <select
               value={selectedLeague}
               onChange={(e) => onSelectLeague(e.target.value)}
-              className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-[10.5px] font-bold text-slate-900 dark:text-white focus:outline-none border border-transparent dark:border-white/10 cursor-pointer"
+              className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
             >
               {leagueOptions.map((opt, idx) => (
                 <option key={`${opt.code}-${idx}`} value={opt.code} className="bg-white dark:bg-[#121212] text-slate-900 dark:text-white">
@@ -134,13 +134,13 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="relative min-w-0">
-              <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
                 Date Range
               </label>
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-[10.5px] font-bold text-slate-900 dark:text-white focus:outline-none border border-transparent dark:border-white/10 cursor-pointer"
+                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
               >
                 {dateOptions.map((opt) => (
                   <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#121212] text-slate-900 dark:text-white">
@@ -151,13 +151,13 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             </div>
 
             <div className="relative min-w-0">
-              <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
                 Market
               </label>
               <select
                 value={marketChoiceFilter}
                 onChange={(e) => setMarketChoiceFilter(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-[10.5px] font-bold text-slate-900 dark:text-white focus:outline-none border border-transparent dark:border-white/10 cursor-pointer"
+                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
               >
                 {marketOptions.map((opt) => (
                   <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#121212] text-slate-900 dark:text-white">
@@ -170,14 +170,14 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
 
           <div className="relative min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                 Sort by Percentage
               </label>
               {sortBy && sortBy !== 'DEFAULT' && (
                 <button
                   type="button"
                   onClick={() => onSelectSortBy?.('DEFAULT')}
-                  className="text-[8.5px] font-bold text-rose-500 hover:underline cursor-pointer"
+                  className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
                 >
                   Reset Sort
                 </button>
@@ -187,7 +187,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
               id="sort-predictions-by-percentage"
               value={sortBy || 'DEFAULT'}
               onChange={(e) => onSelectSortBy?.(e.target.value)}
-              className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-[10.5px] font-bold text-slate-900 dark:text-white focus:outline-none border border-transparent dark:border-white/10 cursor-pointer"
+              className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.key} value={opt.key} className="bg-white dark:bg-[#121212] text-slate-900 dark:text-white">
@@ -199,12 +199,12 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-[8.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Search Team</label>
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Search Team</label>
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="text-[8.5px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 >
                   Clear
                 </button>
@@ -217,7 +217,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
                 placeholder="Find team (e.g., Arsenal, Real Madrid)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full pl-9 pr-8 py-2 text-[10.5px] text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none border border-transparent dark:border-white/10 font-semibold"
+                className="w-full bg-slate-100 dark:bg-[#1E1E1E] rounded-full pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-500 focus:outline-none font-semibold"
               />
               {searchQuery && (
                 <button
@@ -232,14 +232,14 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           </div>
         </div>
 
-        <div className="px-4 pb-4 pt-2.5 border-t border-slate-100 dark:border-white/10 flex items-center gap-1.5">
+        <div className="px-4 pb-4 pt-2.5 flex items-center gap-1.5">
           {activeFilterCount > 0 && onResetFilters && (
             <button
               type="button"
               onClick={() => {
                 onResetFilters();
               }}
-              className="py-2 px-4 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-[10.5px] font-bold transition-all cursor-pointer border border-transparent dark:border-white/10"
+              className="py-2 px-4 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
             >
               Reset
             </button>
@@ -247,7 +247,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 px-4 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] text-white dark:text-slate-950 text-[10.5px] font-black shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+            className="flex-1 py-2 px-4 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] text-white dark:text-slate-950 text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Apply Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>

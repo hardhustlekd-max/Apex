@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { Header } from './components/Header.js';
+import { DesktopSidebar } from './components/DesktopSidebar.js';
 import { FixturesList } from './components/FixturesList.js';
 import { PrebuiltAccumulators } from './components/PrebuiltAccumulators.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
 import { PredictionHistoryView } from './components/PredictionHistoryView.js';
-import { MatchDetailModal } from './components/MatchDetailModal.js';
+import { MatchDetailModal, MatchDetailView } from './components/MatchDetailModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
 import { BottomNavDock } from './components/BottomNavDock.js';
@@ -44,8 +45,9 @@ export default function App() {
   });
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
 
-  // Modals
+  // Modals & Detail
   const [selectedDetailFixture, setSelectedDetailFixture] = useState<Fixture | null>(null);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
@@ -62,6 +64,21 @@ export default function App() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3500);
   };
+
+  const handleSelectFixture = (f: Fixture) => {
+    setSelectedDetailFixture(f);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileDetailOpen(true);
+    }
+  };
+
+  // Pre-select first/best fixture for desktop master-detail pane once loaded
+  useEffect(() => {
+    if (!selectedDetailFixture && fixtures.length > 0) {
+      const highValue = fixtures.find((f) => f.prediction && f.prediction.homeWinProb >= 0.55);
+      setSelectedDetailFixture(highValue || fixtures[0]);
+    }
+  }, [fixtures, selectedDetailFixture]);
 
   const handleResetAndSyncData = async () => {
     try {
@@ -246,16 +263,16 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#121212] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-white dark:bg-[#121212] text-slate-900 dark:text-white font-mono text-[10.5px] px-3 py-2.5 rounded-full shadow-2xl border border-slate-200 dark:border-white/10 flex items-center gap-2 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-white dark:bg-[#121216] text-slate-900 dark:text-white font-mono text-xs px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shrink-0 animate-pulse" />
-          <span className="truncate max-w-[256px] font-bold">{notification.message}</span>
+          <span className="truncate max-w-[280px] font-bold">{notification.message}</span>
         </div>
       )}
 
-      {/* Header */}
+      {/* Top Application Header */}
       <Header
         liveScores={liveScores}
         settings={settings}
@@ -271,60 +288,105 @@ export default function App() {
         onToggleTheme={toggleTheme}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onSyncData={handleResetAndSyncData}
       />
 
-      {/* Main Content Dashboard */}
-      <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-        <main className="flex-1 max-w-[920px] w-full mx-auto px-2.5 sm:px-3.5 lg:px-5 py-2.5 sm:py-3 space-y-2.5 flex flex-col pb-20 sm:pb-22">
-        {activeTab === 'FIXTURES' && (
-          <FixturesList
-            fixtures={fixtures}
-            liveScores={liveScores}
-            isLoading={isLoadingFixtures}
-            onSelectDetail={(f) => setSelectedDetailFixture(f)}
-            selectedLeague={selectedLeague}
-            onSelectLeague={setSelectedLeague}
-            dateFilter={dateFilter}
-            setDateFilter={setDateFilter}
-            marketChoiceFilter={marketChoiceFilter}
-            setMarketChoiceFilter={setMarketChoiceFilter}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            isLeagueModalOpen={isLeagueModalOpen}
-            setIsLeagueModalOpen={setIsLeagueModalOpen}
-            sortBy={sortBy}
-            onSelectSortBy={setSortBy}
-          />
-        )}
-
-        {activeTab === 'ACCAS' && (
-          <PrebuiltAccumulators
-            fixtures={fixtures}
-            settings={settings}
-            onSelectDetail={(f) => setSelectedDetailFixture(f)}
-          />
-        )}
-
-        {activeTab === 'STANDINGS' && (
-          <LeagueStandings
-            selectedLeague={selectedLeague}
-            onSelectLeague={setSelectedLeague}
-          />
-        )}
-        {activeTab === 'HISTORY' && (
-          <PredictionHistoryView />
-        )}
-      </main>
-      </PullToRefresh>
-
-      {/* Match Detail Modal (Poisson Heatmap & Radar) */}
-      {selectedDetailFixture && (
-        <MatchDetailModal
-          fixture={selectedDetailFixture}
-          onClose={() => setSelectedDetailFixture(null)}
+      {/* Main Workspace with Desktop Sidebar & Viewport */}
+      <div className="flex-1 w-full flex min-w-0">
+        {/* Desktop Sidebar (lg:flex, hidden on mobile) */}
+        <DesktopSidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          selectedLeague={selectedLeague}
+          onSelectLeague={setSelectedLeague}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenTerminal={() => setIsTerminalOpen(true)}
+          onOpenLeagueModal={() => setIsLeagueModalOpen(true)}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          totalMatchesCount={fixtures.length}
+          liveMatchesCount={liveScores.length}
+          isSyncing={isLoadingFixtures || isSyncingData}
         />
+
+        {/* Content Viewport */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-3.5 space-y-4 pb-20 lg:pb-8">
+              {activeTab === 'FIXTURES' && (
+                <div className="w-full grid grid-cols-12 gap-4 lg:gap-5 items-start">
+                  {/* Master Feed Column */}
+                  <div className="col-span-12 lg:col-span-7 xl:col-span-7 min-w-0">
+                    <FixturesList
+                      fixtures={fixtures}
+                      liveScores={liveScores}
+                      isLoading={isLoadingFixtures}
+                      onSelectDetail={handleSelectFixture}
+                      selectedLeague={selectedLeague}
+                      onSelectLeague={setSelectedLeague}
+                      dateFilter={dateFilter}
+                      setDateFilter={setDateFilter}
+                      marketChoiceFilter={marketChoiceFilter}
+                      setMarketChoiceFilter={setMarketChoiceFilter}
+                      searchQuery={searchQuery}
+                      setSearchQuery={setSearchQuery}
+                      viewMode={viewMode}
+                      setViewMode={setViewMode}
+                      isLeagueModalOpen={isLeagueModalOpen}
+                      setIsLeagueModalOpen={setIsLeagueModalOpen}
+                      sortBy={sortBy}
+                      onSelectSortBy={setSortBy}
+                      selectedFixtureId={selectedDetailFixture?.id}
+                    />
+                  </div>
+
+                  {/* Detail Inspector Column (Desktop Only Live Preview) */}
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-16 h-[calc(100vh-4.75rem)] rounded-2xl bg-white dark:bg-[#121216] shadow-sm overflow-hidden">
+                    <MatchDetailView
+                      fixture={selectedDetailFixture}
+                      isPanel={true}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'ACCAS' && (
+                <div className="max-w-4xl mx-auto w-full">
+                  <PrebuiltAccumulators
+                    fixtures={fixtures}
+                    settings={settings}
+                    onSelectDetail={handleSelectFixture}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'STANDINGS' && (
+                <div className="max-w-5xl mx-auto w-full">
+                  <LeagueStandings
+                    selectedLeague={selectedLeague}
+                    onSelectLeague={setSelectedLeague}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'HISTORY' && (
+                <div className="max-w-4xl mx-auto w-full">
+                  <PredictionHistoryView />
+                </div>
+              )}
+            </main>
+          </PullToRefresh>
+        </div>
+      </div>
+
+      {/* Mobile Match Detail Drawer Modal (only visible on mobile screens) */}
+      {isMobileDetailOpen && selectedDetailFixture && (
+        <div className="lg:hidden">
+          <MatchDetailModal
+            fixture={selectedDetailFixture}
+            onClose={() => setIsMobileDetailOpen(false)}
+          />
+        </div>
       )}
 
       {/* Terminal Logs Modal */}
@@ -358,7 +420,7 @@ export default function App() {
         onRefreshMetrics={fetchSettingsAndProviders}
       />
 
-      {/* Floating Bottom Navigation Dock (Wireframe design) */}
+      {/* Floating Bottom Navigation Dock (Mobile Only) */}
       <BottomNavDock
         activeTab={activeTab}
         onSelectTab={setActiveTab}

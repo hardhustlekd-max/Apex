@@ -96,16 +96,16 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     <div className="space-y-2.5 font-sans">
       {!compact && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-xs font-extrabold text-slate-950 dark:text-white">
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-950 dark:text-white">
             League Standings
           </h2>
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 p-1 bg-white dark:bg-[#121212] rounded-full border border-slate-200/80 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 p-1 bg-white dark:bg-[#121212] rounded-full shadow-xs">
             {POPULAR_LEAGUES.map((l) => (
               <button
                 key={l.code}
                 type="button"
                 onClick={() => handleLeagueChange(l.code)}
-                className={`px-3 py-1.5 rounded-full text-[10.5px] font-extrabold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
                   currentLeague === l.code
                     ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-md scale-[1.02]'
                     : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
@@ -120,20 +120,20 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
 
       {compact && standingsData && (
         <div className="flex items-center justify-between gap-1.5 px-1">
-          <div className="flex items-center gap-1">
-            <Trophy className="w-3 h-3 text-slate-400 dark:text-neutral-400" />
-            <span className="text-[10.5px] font-extrabold text-slate-950 dark:text-white">
+          <div className="flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 text-slate-400 dark:text-neutral-400" />
+            <span className="text-xs font-extrabold text-slate-950 dark:text-white">
               {standingsData.leagueName} Table
             </span>
           </div>
-          <span className="text-[9.5px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">
+          <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-neutral-400">
             {standingsData.source === 'FLASHSCORE_SCRAPED' ? 'Flashscore Live Table' : 'Database Table'}
           </span>
         </div>
       )}
 
       {isLoading && (
-        <div className="bg-white dark:bg-[#121212] rounded-2xl p-5 border border-slate-200/80 dark:border-neutral-800 shadow-sm space-y-1.5 animate-pulse">
+        <div className="bg-white dark:bg-[#121212] rounded-2xl p-5 shadow-sm space-y-1.5 animate-pulse">
           <div className="h-3.5 bg-slate-100 dark:bg-neutral-800 rounded-full w-1/3 mb-3" />
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-6.5 bg-slate-100 dark:bg-neutral-800 rounded-xl flex items-center justify-between px-2.5" />
@@ -142,13 +142,13 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!isLoading && error && (
-        <div className="bg-white dark:bg-[#121212] rounded-2xl p-6 border border-slate-200/80 dark:border-neutral-800 text-center space-y-2.5 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] rounded-2xl p-6 text-center space-y-2.5 shadow-sm">
           <AlertCircle className="w-5 h-5 text-slate-400 mx-auto" />
-          <p className="text-[10.5px] text-slate-500 dark:text-neutral-400 font-medium">{error}</p>
+          <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium">{error}</p>
           <button
             type="button"
             onClick={() => fetchStandings(currentLeague)}
-            className="px-3 py-1.5 rounded-full text-[10.5px] font-black bg-[#CCFF00] text-slate-950 cursor-pointer mt-1.5 active:scale-95 shadow-xs"
+            className="px-3.5 py-1.5 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 cursor-pointer mt-1.5 active:scale-95 shadow-xs"
           >
             Retry
           </button>
@@ -156,22 +156,22 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!isLoading && standingsData && standingsData.table.length > 0 && (
-        <div className="bg-white dark:bg-[#121212] rounded-2xl border border-slate-200/80 dark:border-neutral-800 overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#121212] rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left border-collapse text-[10.5px]">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-100/80 dark:bg-neutral-900/80 text-[10.5px] font-extrabold text-slate-800 dark:text-neutral-200 border-b border-slate-200/80 dark:border-neutral-800">
-                  <th className="py-2.5 pl-3 pr-1.5 text-center w-7 font-mono tabular-nums">#</th>
-                  <th className="py-2.5 px-2.5">Team</th>
-                  <th className="py-2.5 px-1.5 text-center w-7 font-mono tabular-nums" title="Played">MP</th>
-                  <th className="py-2.5 px-1.5 text-center w-7 font-mono tabular-nums" title="Won">W</th>
-                  <th className="py-2.5 px-1.5 text-center w-7 font-mono tabular-nums" title="Drawn">D</th>
-                  <th className="py-2.5 px-1.5 text-center w-7 font-mono tabular-nums" title="Lost">L</th>
-                  <th className="py-2.5 px-1.5 text-center hidden sm:table-cell w-10 font-mono tabular-nums" title="Goal Difference">GD</th>
-                  <th className="py-2.5 px-2.5 text-center font-black text-slate-950 dark:text-white w-9 font-mono tabular-nums" title="Points">PTS</th>
+                <tr className="bg-slate-100/80 dark:bg-neutral-900/80 text-xs font-extrabold text-slate-800 dark:text-neutral-200">
+                  <th className="py-2 pl-3 pr-1.5 text-center w-7 font-mono tabular-nums">#</th>
+                  <th className="py-2 px-2.5">Team</th>
+                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Played">MP</th>
+                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Won">W</th>
+                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Drawn">D</th>
+                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Lost">L</th>
+                  <th className="py-2 px-1.5 text-center hidden sm:table-cell w-10 font-mono tabular-nums" title="Goal Difference">GD</th>
+                  <th className="py-2 px-2.5 text-center font-black text-slate-950 dark:text-white w-9 font-mono tabular-nums" title="Points">PTS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800/60 font-semibold">
+              <tbody className="font-semibold">
                 {standingsData.table.map((row) => {
                   const highlightRole = isTeamHighlighted(row.teamName);
                   const isTop4 = row.rank <= 4;

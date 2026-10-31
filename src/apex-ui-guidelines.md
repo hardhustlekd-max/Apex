@@ -73,9 +73,9 @@ Key Tenets:
 - **Inactive Pill**: Soft white capsule or unboxed text (`bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full px-3.5 py-2`).
 
 ### D. Bottom Navigation Dock (`BottomNavDock.tsx`)
-- **Shell**: Pitch Black floating shell (`bg-[#161616]/95 backdrop-blur-md rounded-full p-2 border border-slate-800 shadow-2xl`).
+- **Shell**: Light/Dark adaptive floating shell (`bg-white/95 dark:bg-[#161616]/95 backdrop-blur-md p-2 border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] dark:shadow-2xl`).
 - **Active Nav Item**: Electric Lime capsule (`bg-[#CCFF00] text-slate-950 font-bold rounded-full px-4 py-2.5 flex items-center gap-2`).
-- **Inactive Nav Item**: Muted gray icon with sub-label (`text-slate-400 hover:text-white px-3 py-2`).
+- **Inactive Nav Item**: Adaptive muted icon with sub-label (`text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white px-3 py-2`).
 
 ---
 

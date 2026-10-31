@@ -139,7 +139,7 @@ export const PredictionHistoryView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-[#121216] rounded-3xl p-10 text-center font-sans border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+      <div className="bg-white dark:bg-[#121216] rounded-3xl p-10 text-center font-sans shadow-xs">
         <div className="w-8 h-8 rounded-full border-4 border-[#CCFF00] border-t-transparent animate-spin mx-auto" />
         <span className="mt-4 block text-xs font-bold text-slate-500 dark:text-neutral-400">Loading historical model predictions from server database...</span>
       </div>
@@ -150,7 +150,7 @@ export const PredictionHistoryView: React.FC = () => {
     <div className="space-y-3 font-sans">
       {/* Toast Notification for Scraper Sync */}
       {syncToast && (
-        <div className="p-3 rounded-2xl bg-slate-900 text-white dark:bg-[#18181D] dark:text-[#CCFF00] border border-slate-700 dark:border-[#CCFF00]/30 text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div className="p-3 rounded-2xl bg-slate-900 text-white dark:bg-[#18181D] dark:text-[#CCFF00] text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2">
             <Database className={`w-4 h-4 shrink-0 ${isSyncingHistory ? 'animate-spin text-[#CCFF00]' : 'text-[#CCFF00]'}`} />
             <span>{syncToast}</span>
@@ -165,7 +165,7 @@ export const PredictionHistoryView: React.FC = () => {
             <BarChart3 className="w-4 h-4 text-[#CCFF00]" />
             Historical Prediction Evaluation
           </h2>
-          <p className="text-[10px] text-slate-500 dark:text-neutral-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
             Compare stored predictions against historical match results from the database
           </p>
         </div>
@@ -174,7 +174,7 @@ export const PredictionHistoryView: React.FC = () => {
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-3 py-1.5 min-h-[35px] rounded-full bg-white dark:bg-[#18181D] border border-slate-200/80 dark:border-[#27272A] text-[10.5px] font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
+            className="px-3 py-1.5 min-h-[35px] rounded-full bg-white dark:bg-[#18181D] text-xs font-bold text-slate-900 dark:text-neutral-100 focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
           >
             <option value={30}>30 Matches</option>
             <option value={50}>50 Matches</option>
@@ -186,19 +186,19 @@ export const PredictionHistoryView: React.FC = () => {
           <button
             onClick={handleSyncHistoryScraper}
             disabled={isSyncingHistory || isRefreshing}
-            className="inline-flex items-center gap-1.5 min-h-[35px] px-3.5 py-1.5 rounded-full text-[10.5px] font-black bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
             title="Run historical archive scraper to populate database with multi-year results"
           >
-            <Database className={`w-3 h-3 ${isSyncingHistory ? 'animate-spin text-[#CCFF00] dark:text-slate-950' : 'text-[#CCFF00] dark:text-slate-950'}`} />
+            <Database className={`w-3.5 h-3.5 ${isSyncingHistory ? 'animate-spin text-[#CCFF00] dark:text-slate-950' : 'text-[#CCFF00] dark:text-slate-950'}`} />
             <span>{isSyncingHistory ? 'Syncing Scraper...' : 'Sync Historical Data'}</span>
           </button>
 
           <button
             onClick={() => fetchHistory(limit, true)}
             disabled={isRefreshing || isSyncingHistory}
-            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-[10.5px] font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
-            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
         </div>
@@ -207,9 +207,9 @@ export const PredictionHistoryView: React.FC = () => {
       {/* Summary Stats Cards */}
       {totalEvaluated > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
-              <Layers className="w-3 h-3 text-[#CCFF00]" />
+          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
+              <Layers className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Evaluated Matches</span>
             </div>
             <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
@@ -217,9 +217,9 @@ export const PredictionHistoryView: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
-              <ShieldCheck className="w-3 h-3 text-[#CCFF00]" />
+          <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Model Accuracy</span>
             </div>
             <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-[#CCFF00]">
@@ -227,13 +227,13 @@ export const PredictionHistoryView: React.FC = () => {
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121216] rounded-2xl p-4 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-[10.5px] font-semibold mb-1">
-              <Target className="w-3 h-3 text-[#CCFF00]" />
+          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#121216] rounded-2xl p-4 shadow-xs">
+            <div className="flex items-center gap-1 text-slate-500 dark:text-neutral-400 text-xs font-semibold mb-1">
+              <Target className="w-3.5 h-3.5 text-[#CCFF00]" />
               <span>Correct Hits</span>
             </div>
             <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-950 dark:text-white">
-              {correctCount} <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-500">/ {totalEvaluated}</span>
+              {correctCount} <span className="text-xs font-bold text-slate-500 dark:text-neutral-500">/ {totalEvaluated}</span>
             </div>
           </div>
         </div>
@@ -241,18 +241,18 @@ export const PredictionHistoryView: React.FC = () => {
 
       {/* Fixtures List */}
       {history.length === 0 ? (
-        <div className="bg-white dark:bg-[#121216] rounded-2xl p-6 text-center text-[10.5px] font-medium text-slate-500 dark:text-neutral-400 border border-slate-200/80 dark:border-[#27272A] shadow-xs space-y-2.5">
+        <div className="bg-white dark:bg-[#121216] rounded-2xl p-6 text-center text-xs font-medium text-slate-500 dark:text-neutral-400 shadow-xs space-y-2.5">
           <p>No historical predictions recorded in database yet.</p>
           <button
             onClick={() => fetchHistory(limit, true)}
-            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-2 rounded-full text-[10.5px] font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-2 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-3.5 h-3.5" />
             Evaluate Historical Database
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#121216] border border-slate-200/80 dark:border-[#27272A] divide-y divide-slate-100 dark:divide-[#27272A] shadow-xs">
+        <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#121216] shadow-xs">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
 
@@ -266,7 +266,7 @@ export const PredictionHistoryView: React.FC = () => {
                     <span className="font-extrabold text-slate-950 dark:text-white text-[10.5px] sm:text-xs">
                       {f.homeTeam} <span className="text-slate-400 dark:text-neutral-500 font-normal">vs</span> {f.awayTeam}
                     </span>
-                    <span className="text-[8.5px] font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 border border-slate-200/60 dark:border-[#27272A]">
+                    <span className="text-[8.5px] font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200">
                       {f.leagueName || f.league}
                     </span>
                     <span className="text-[8.5px] font-mono tabular-nums text-slate-500 dark:text-neutral-400">

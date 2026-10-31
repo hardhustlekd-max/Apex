@@ -24,14 +24,14 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
     }
   }
 
-  // Refined heatmap color palette based on Apex UI design system (Pitch Black & Electric Lime)
+  // Refined heatmap color palette based on modern borderless style
   const getHeatmapColor = (prob: number) => {
     const intensity = Math.min(1, prob / maxProb);
-    if (intensity < 0.08) return 'bg-slate-50 dark:bg-[#121212] border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400';
-    if (intensity < 0.25) return 'bg-lime-100 dark:bg-[#CCFF00]/10 border-lime-300 dark:border-[#CCFF00]/30 text-slate-900 dark:text-[#CCFF00] font-bold';
-    if (intensity < 0.55) return 'bg-lime-300 dark:bg-[#CCFF00]/30 text-slate-950 dark:text-[#CCFF00] border-lime-400 dark:border-[#CCFF00]/50 font-bold';
-    if (intensity < 0.8) return 'bg-lime-400 dark:bg-[#CCFF00]/60 text-slate-950 border-lime-500 dark:border-[#CCFF00]/80 font-black';
-    return 'bg-[#CCFF00] text-slate-950 border-[#CCFF00] font-black shadow-xs';
+    if (intensity < 0.08) return 'bg-slate-50 dark:bg-[#121212] text-slate-500 dark:text-slate-400';
+    if (intensity < 0.25) return 'bg-lime-100 dark:bg-[#CCFF00]/10 text-slate-900 dark:text-[#CCFF00] font-bold';
+    if (intensity < 0.55) return 'bg-lime-300 dark:bg-[#CCFF00]/30 text-slate-950 dark:text-[#CCFF00] font-bold';
+    if (intensity < 0.8) return 'bg-lime-400 dark:bg-[#CCFF00]/60 text-slate-950 font-black';
+    return 'bg-[#CCFF00] text-slate-950 font-black shadow-xs';
   };
 
   return (
@@ -57,7 +57,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
             {[0, 1, 2, 3, 4, 5].map((ag) => (
               <div
                 key={`away-h-${ag}`}
-                className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px]"
+                className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px]"
               >
                 {ag}
               </div>
@@ -66,7 +66,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
             {/* Matrix Rows (Home Goals) */}
             {[0, 1, 2, 3, 4, 5].map((hg) => (
               <React.Fragment key={`row-${hg}`}>
-                <div className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] border border-slate-200 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px] flex items-center justify-center">
+                <div className="p-1.5 bg-slate-100 dark:bg-[#1E1E1E] rounded-lg text-slate-900 dark:text-slate-100 font-bold text-[10px] flex items-center justify-center">
                   {hg}
                 </div>
                 {[0, 1, 2, 3, 4, 5].map((ag) => {
@@ -75,7 +75,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
                   return (
                     <div
                       key={`cell-${hg}-${ag}`}
-                      className={`p-1.5 rounded-lg border transition-colors text-[8.5px] flex flex-col items-center justify-center font-mono ${getHeatmapColor(
+                      className={`p-1.5 rounded-lg transition-colors text-[8.5px] flex flex-col items-center justify-center font-mono ${getHeatmapColor(
                         prob
                       )}`}
                       title={`${homeTeam} ${hg} - ${ag} ${awayTeam}: ${pct}%`}
@@ -100,10 +100,10 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
             {prediction.topCorrectScores.map((score, idx) => (
               <div
                 key={score.score}
-                className={`p-2 rounded-xl border text-center font-mono ${
+                className={`p-2 rounded-xl text-center font-mono ${
                   idx === 0
-                    ? 'bg-[#CCFF00]/10 border-[#CCFF00]/40 text-slate-950 dark:text-[#CCFF00]'
-                    : 'bg-slate-50 dark:bg-[#1E1E1E] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300'
+                    ? 'bg-[#CCFF00]/15 text-slate-950 dark:text-[#CCFF00]'
+                    : 'bg-slate-50 dark:bg-[#1E1E1E] text-slate-700 dark:text-slate-300'
                 }`}
               >
                 <div className="text-[10.5px] font-black">{score.score}</div>

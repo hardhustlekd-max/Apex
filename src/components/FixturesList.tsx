@@ -32,6 +32,7 @@ interface FixturesListProps {
   setIsLeagueModalOpen: (b: boolean) => void;
   sortBy?: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
   onSelectSortBy?: (s: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC') => void;
+  selectedFixtureId?: string | number;
 }
 
 import { getAuthoritative1X2Pick, getProbValue } from '../core/formatters.js';
@@ -71,6 +72,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   setIsLeagueModalOpen,
   sortBy = 'DEFAULT',
   onSelectSortBy,
+  selectedFixtureId,
 }) => {
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [historyFixtures, setHistoryFixtures] = useState<Fixture[]>([]);
@@ -506,16 +508,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 else if (cd.index === 1) setDateFilter('TOMORROW');
                 else setDateFilter(cd.dateStr);
               }}
-              className={`w-full min-h-[38px] flex flex-col items-center justify-center py-1.5 px-1 sm:px-1.5 rounded-xl sm:rounded-full transition-all cursor-pointer active:scale-95 ${
+              className={`w-full min-h-[38px] flex flex-col items-center justify-center py-1 px-1 sm:px-1.5 rounded-xl sm:rounded-full transition-all cursor-pointer active:scale-95 ${
                 isSelected
-                  ? 'bg-[#09090B] dark:bg-[#CCFF00] text-white dark:text-slate-950 shadow-md font-black scale-[1.03]'
-                  : 'bg-white dark:bg-[#121216] text-slate-800 dark:text-neutral-200 border border-slate-200/80 dark:border-[#27272A] hover:bg-slate-50 dark:hover:bg-[#18181D] font-bold'
+                  ? 'bg-[#09090B] dark:bg-[#CCFF00] text-white dark:text-slate-950 shadow-md font-black scale-[1.02]'
+                  : 'bg-white dark:bg-[#121216] text-slate-800 dark:text-neutral-200 hover:bg-slate-50 dark:hover:bg-[#18181D] font-bold shadow-xs'
               }`}
             >
-              <span className="text-[7.5px] opacity-80 uppercase tracking-wider font-semibold truncate max-w-full">
+              <span className="text-[10px] sm:text-[11px] opacity-80 uppercase tracking-wide font-bold truncate max-w-full">
                 {cd.index === 0 ? 'Today' : cd.dayName}
               </span>
-              <span className="text-[10px] sm:text-[11px] font-black font-mono tabular-nums">{cd.dayNum}</span>
+              <span className="text-xs sm:text-[13px] font-black font-mono tabular-nums leading-tight">{cd.dayNum}</span>
             </button>
           );
         })}
@@ -523,12 +525,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* 3. Scope Sub-Tabs: Upcoming, Live, History & Filters */}
       <div className="flex items-center justify-between gap-1.5 flex-wrap pt-0.5">
-        <div className="flex items-center bg-white dark:bg-[#121216] p-1 rounded-full shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+        <div className="flex items-center bg-white dark:bg-[#121216] p-1 rounded-full shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-1 shadow-xs">
           <button
             id="subtab-upcoming-btn"
             type="button"
             onClick={() => setActiveScope('UPCOMING')}
-            className={`min-h-[32px] px-3 py-1.5 rounded-full text-[10.5px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
+            className={`min-h-[32px] px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
               activeScope === 'UPCOMING'
                 ? 'bg-[#09090B] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
@@ -541,16 +543,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-live-btn"
             type="button"
             onClick={() => setActiveScope('LIVE')}
-            className={`min-h-[32px] px-3 py-1.5 rounded-full text-[10.5px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1 ${
+            className={`min-h-[32px] px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1.5 ${
               activeScope === 'LIVE'
                 ? 'bg-[#09090B] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
             }`}
           >
-            <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
             <span className="whitespace-nowrap">Live</span>
             {liveScores && liveScores.length > 0 && (
-              <span className="ml-0.5 px-1 py-0.5 rounded-full bg-[#CCFF00] text-slate-950 text-[8.5px] font-black font-mono tabular-nums">
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-[#CCFF00] text-slate-950 text-[10px] sm:text-xs font-black font-mono tabular-nums">
                 {liveScores.length}
               </span>
             )}
@@ -560,7 +562,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             id="subtab-history-btn"
             type="button"
             onClick={() => setActiveScope('HISTORY')}
-            className={`min-h-[32px] px-3 py-1.5 rounded-full text-[10.5px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
+            className={`min-h-[32px] px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
               activeScope === 'HISTORY'
                 ? 'bg-[#09090B] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
@@ -575,20 +577,20 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`min-h-[32px] flex items-center justify-center gap-1 px-3 py-1.5 rounded-full text-[10.5px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+            className={`min-h-[32px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
               activeFilterCount > 0
                 ? 'bg-[#CCFF00] text-slate-950 font-black'
-                : 'bg-white dark:bg-[#121216] border border-slate-200/80 dark:border-[#27272A] text-slate-800 dark:text-neutral-200 hover:bg-slate-100 dark:hover:bg-[#18181D]'
+                : 'bg-white dark:bg-[#121216] text-slate-800 dark:text-neutral-200 hover:bg-slate-100 dark:hover:bg-[#18181D]'
             }`}
           >
-            <Filter className="w-3 h-3 text-current" />
+            <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="min-w-3.5 h-3.5 px-0.5 rounded-full bg-slate-950 text-[#CCFF00] text-[8.5px] font-black font-mono tabular-nums flex items-center justify-center">
+              <span className="min-w-4 h-4 px-1 rounded-full bg-slate-950 text-[#CCFF00] text-[10px] sm:text-xs font-black font-mono tabular-nums flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
-            <ChevronDown className="w-2.5 h-2.5 opacity-70" />
+            <ChevronDown className="w-3 h-3 opacity-70" />
           </button>
         </div>
 
@@ -619,13 +621,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Active Filter Chips Strip */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap py-2 px-3 bg-slate-100/70 dark:bg-[#121216]/70 rounded-2xl text-xs border border-transparent dark:border-[#27272A]">
-          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+        <div className="flex items-center gap-1.5 flex-wrap py-1.5 px-3 bg-slate-100/70 dark:bg-[#121216]/70 rounded-2xl text-xs">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
             Active filters:
           </span>
 
           {selectedLeague !== 'ALL' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-[11px] border border-slate-200/60 dark:border-[#27272A]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-xs">
               <span className="text-slate-500 dark:text-slate-400">League:</span>
               <span className="truncate max-w-[130px] font-semibold">{selectedLeagueLabel}</span>
               <button
@@ -641,7 +643,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {dateFilter !== 'TODAY' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-[11px] border border-slate-200/60 dark:border-[#27272A]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-xs">
               <span className="text-slate-500 dark:text-slate-400">Date:</span>
               <span className="font-semibold">{dateOptionObj?.label || dateFilter}</span>
               <button
@@ -657,7 +659,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {marketChoiceFilter !== 'BEST_VALUE' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-[11px] border border-slate-200/60 dark:border-[#27272A]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-xs">
               <span className="text-slate-500 dark:text-slate-400">Market:</span>
               <span className="font-semibold">{marketOptionObj?.label || marketChoiceFilter}</span>
               <button
@@ -673,7 +675,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {searchQuery.trim().length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-[11px] border border-slate-200/60 dark:border-[#27272A]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-xs">
               <span className="text-slate-500 dark:text-slate-400">Search:</span>
               <span className="truncate max-w-[110px] font-semibold">"{searchQuery}"</span>
               <button
@@ -689,7 +691,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {sortBy && sortBy !== 'DEFAULT' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-[11px] border border-slate-200/60 dark:border-[#27272A]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white dark:bg-[#18181D] text-slate-900 dark:text-white font-medium shadow-xs text-xs">
               <span className="text-slate-500 dark:text-slate-400">Sort:</span>
               <span className="font-semibold">{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
               <button
@@ -707,7 +709,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={handleResetAllFilters}
-            className="ml-auto text-[11px] font-bold text-sky-600 dark:text-[#CCFF00] hover:underline px-1 py-0.5 cursor-pointer"
+            className="ml-auto text-xs font-bold text-sky-600 dark:text-[#CCFF00] hover:underline px-1 py-0.5 cursor-pointer"
           >
             Clear all
           </button>
@@ -716,13 +718,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Match List Display */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-white dark:bg-[#121216] rounded-3xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center border border-slate-200/80 dark:border-[#27272A] shadow-xs">
+        <div className="bg-white dark:bg-[#121216] rounded-3xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center shadow-xs">
           <div className="w-6 h-6 rounded-full border-2 border-slate-900 dark:border-[#CCFF00] border-t-transparent animate-spin shrink-0 mx-auto" />
           <span className="mt-3 text-xs text-slate-500 dark:text-neutral-400 font-bold">Loading match data...</span>
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 sm:p-12 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 border border-slate-200/80 dark:border-[#27272A] shadow-xs">
-          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 sm:p-12 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 shadow-xs">
+          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-900/80 flex items-center justify-center text-slate-500 dark:text-slate-400">
             <Filter className="w-5 h-5" />
           </div>
           <p className="text-sm font-extrabold text-slate-900 dark:text-white">
@@ -744,7 +746,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={handleResetAllFilters}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 Reset all filters ({activeFilterCount})
               </button>
@@ -762,12 +764,23 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilter('TOMORROW')}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 Show tomorrow
               </button>
             )}
           </div>
+        </div>
+      ) : viewMode === 'CARDS' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {displayedFixtures.map((fixture) => (
+            <FixtureCard
+              key={fixture.id}
+              fixture={fixture}
+              onSelectDetail={onSelectDetail}
+              isSelected={selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id)}
+            />
+          ))}
         </div>
       ) : (
         <SimplifiedPredictionsWireframe
@@ -776,6 +789,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           marketFilter={marketChoiceFilter as any}
           sortBy={sortBy}
           onSelectSortBy={onSelectSortBy}
+          selectedFixtureId={selectedFixtureId}
         />
       )}
 
