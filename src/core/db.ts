@@ -432,8 +432,18 @@ export class FootballDB {
     }
   }
 
+  private scrapedMatchesMemory: Map<string, any> = new Map();
+  private matchStatsMemory: Map<string, any[]> = new Map();
+
   saveFlashscoreScrapedMatches(matches: Array<any>): void {
-    if (!footballTurso || matches.length === 0) return;
+    if (matches.length === 0) return;
+    for (const m of matches) {
+      if (m.matchId) {
+        this.scrapedMatchesMemory.set(m.matchId, m);
+      }
+    }
+
+    if (!footballTurso) return;
     try {
       const statements = matches.map((m) => ({
         sql: `INSERT OR REPLACE INTO flashscore_scraped_matches (
@@ -449,10 +459,10 @@ export class FootballDB {
           m.date || '',
           m.country || null,
           m.leagueName || null,
-          m.home.name,
-          m.home.image || null,
-          m.away.name,
-          m.away.image || null,
+          m.home?.name || m.homeTeam || '',
+          m.home?.image || m.homeBadge || null,
+          m.away?.name || m.awayTeam || '',
+          m.away?.image || m.awayBadge || null,
           m.result?.home ? parseInt(m.result.home, 10) : null,
           m.result?.away ? parseInt(m.result.away, 10) : null,
           m.result?.regulationTime || null,
@@ -466,36 +476,53 @@ export class FootballDB {
     } catch {}
   }
 
-  getFlashscoreScrapedMatches(_limit = 100): any[] {
-    return [];
+  getFlashscoreScrapedMatches(limit = 100): any[] {
+    const all = Array.from(this.scrapedMatchesMemory.values());
+    return all.slice(0, limit);
   }
 
   savePredictionMeasurement(fixtureId: string, h2h: HeadToHeadMeasurement): void {
     if (!fixtureId) return;
+    const cleanId = fixtureId.replace(/^fs_/, '').trim();
     this.measurementsMemory.set(fixtureId, h2h);
+    this.measurementsMemory.set(cleanId, h2h);
+    this.measurementsMemory.set(`fs_${cleanId}`, h2h);
+
     if (footballTurso) {
       footballTurso.execute({
         sql: `INSERT OR REPLACE INTO prediction_measurements_cache (fixture_id, h2h_json, calculated_at) VALUES (?, ?, ?)`,
-        args: [fixtureId, JSON.stringify(h2h), new Date().toISOString()],
+        args: [cleanId, JSON.stringify(h2h), new Date().toISOString()],
       }).catch(() => {});
     }
   }
 
   getPredictionMeasurement(fixtureId: string): HeadToHeadMeasurement | null {
-    return this.measurementsMemory.get(fixtureId) || null;
+    if (!fixtureId) return null;
+    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    return this.measurementsMemory.get(fixtureId) || this.measurementsMemory.get(cleanId) || this.measurementsMemory.get(`fs_${cleanId}`) || null;
   }
 
   getAllPredictionMeasurements(): Map<string, HeadToHeadMeasurement> {
     return this.measurementsMemory;
   }
 
-  saveRawFeedData(fixtureId: string, _feedPath: string, rawText: string): void {
-    if (!fixtureId) return;
-    this.rawFeedsMemory.set(fixtureId, rawText);
-    if (footballTurso) {
+  saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): void {
+    if (!rawText) return;
+    if (fixtureId) {
+      this.rawFeedsMemory.set(fixtureId, rawText);
+      const cleanId = fixtureId.replace(/^fs_/, '').trim();
+      this.rawFeedsMemory.set(cleanId, rawText);
+      this.rawFeedsMemory.set(`fs_${cleanId}`, rawText);
+    }
+    if (feedPath) {
+      this.rawFeedsMemory.set(feedPath, rawText);
+    }
+
+    if (footballTurso && fixtureId) {
+      const cleanId = fixtureId.replace(/^fs_/, '').trim();
       footballTurso.execute({
         sql: `INSERT OR REPLACE INTO raw_feed_data (fixture_id, feed_path, raw_text, scraped_at) VALUES (?, ?, ?, ?)`,
-        args: [fixtureId, _feedPath, rawText, new Date().toISOString()],
+        args: [cleanId, feedPath || fixtureId, rawText, new Date().toISOString()],
       }).catch(() => {});
     }
   }
@@ -505,20 +532,40 @@ export class FootballDB {
   }
 
   getRawFeed(fixtureId: string): { rawText: string } | null {
-    const text = this.rawFeedsMemory.get(fixtureId);
-    return text ? { rawText: text } : null;
+    if (!fixtureId) return null;
+    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+
+    // 1. Direct key match in rawFeedsMemory
+    let directText = this.rawFeedsMemory.get(fixtureId) || this.rawFeedsMemory.get(cleanId) || this.rawFeedsMemory.get(`fs_${cleanId}`);
+    if (directText) {
+      return { rawText: directText };
+    }
+
+    // 2. Search daily raw feeds stored in memory for section containing this match ID (AA÷matchId)
+    for (const [key, rawText] of this.rawFeedsMemory.entries()) {
+      if (rawText && (rawText.includes(`AA÷${cleanId}`) || rawText.includes(`AA÷${fixtureId}`))) {
+        return { rawText };
+      }
+    }
+
+    return null;
   }
 
   getRawFeedsCount(): number {
     return this.rawFeedsMemory.size;
   }
 
-  saveMatchStatistics(_matchId: string, _statistics: any[]): void {
-    // Stored with scraped match
+  saveMatchStatistics(matchId: string, statistics: any[]): void {
+    if (!matchId) return;
+    const cleanId = matchId.replace(/^fs_/, '').trim();
+    this.matchStatsMemory.set(matchId, statistics);
+    this.matchStatsMemory.set(cleanId, statistics);
   }
 
-  getMatchStatistics(_matchId: string): any[] {
-    return [];
+  getMatchStatistics(matchId: string): any[] {
+    if (!matchId) return [];
+    const cleanId = matchId.replace(/^fs_/, '').trim();
+    return this.matchStatsMemory.get(matchId) || this.matchStatsMemory.get(cleanId) || [];
   }
 
   saveH2HRecord(fixtureId: string, h2hOrHomeTeam: any, _awayTeam?: string, h2hObj?: HeadToHeadMeasurement): void {

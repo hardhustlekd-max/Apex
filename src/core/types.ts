@@ -333,6 +333,8 @@ export interface FlashscoreScrapedMatch {
   stage?: string;
   date: string;
   status: string;
+  country?: string;
+  leagueName?: string;
   home: {
     name: string;
     image?: string;

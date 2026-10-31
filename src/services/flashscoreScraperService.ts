@@ -38,7 +38,7 @@ export class FlashscoreScraperService {
       let timeout: NodeJS.Timeout | null = null;
       try {
         const controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), 2000);
+        timeout = setTimeout(() => controller.abort(), 6000);
 
         const res = await fetch(url, {
           headers: {
@@ -197,6 +197,10 @@ export class FlashscoreScraperService {
             ? { home: m.homeScore, away: m.awayScore }
             : undefined,
         };
+
+        // Save raw feed under both matchId and fs_matchId so getRawFeed(matchId) resolves instantly
+        db.saveRawFeedData(m.matchId, feedPath, feedText);
+        db.saveRawFeedData(`fs_${m.matchId}`, feedPath, feedText);
 
         if (m.statistics && m.statistics.length > 0) {
           db.saveMatchStatistics(m.matchId, m.statistics);
@@ -722,10 +726,49 @@ export class FlashscoreScraperService {
    * Match detail extraction matching gustavofariaa/FlashscoreScraping schema
    */
   async getMatchData(matchId: string): Promise<FlashscoreScrapedMatch | null> {
+    const cleanId = matchId.replace(/^fs_/, '').trim();
     const matches = db.getFlashscoreScrapedMatches(500);
-    const existing = matches.find((m) => m.matchId === matchId || `fs_${m.matchId}` === matchId);
+    const existing = matches.find((m) => m.matchId === matchId || m.matchId === cleanId || `fs_${m.matchId}` === matchId);
     if (existing) {
       return existing;
+    }
+
+    // Try parsing directly from raw feed in DB
+    const rawFeed = db.getRawFeed(cleanId);
+    if (rawFeed && rawFeed.rawText) {
+      const parsedMatches = parseFeedText(rawFeed.rawText);
+      const m = parsedMatches.find((pm) => pm.matchId === cleanId);
+      if (m) {
+        const { name } = this.mapToLeagueCode(m.tournament, m.country);
+        const matchObj: FlashscoreScrapedMatch = {
+          matchId: m.matchId,
+          stage: m.tournament,
+          status: m.statusCode === '3' ? 'FINISHED' : m.statusCode === '2' ? 'LIVE' : 'SCHEDULED',
+          date: m.timestamp ? new Date((m.timestamp + 3 * 3600) * 1000).toISOString() : '',
+          country: m.country,
+          leagueName: name,
+          home: {
+            name: m.homeTeam,
+            image: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
+          },
+          away: {
+            name: m.awayTeam,
+            image: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
+          },
+          result: {
+            home: m.homeScore !== undefined ? String(m.homeScore) : undefined,
+            away: m.awayScore !== undefined ? String(m.awayScore) : undefined,
+          },
+          information: [
+            { category: 'Source', value: 'Flashscore Scraping Raw Feed' },
+            { category: 'Country', value: m.country },
+            { category: 'Competition', value: name },
+          ],
+          statistics: m.statistics || [],
+        };
+        db.saveFlashscoreScrapedMatches([matchObj]);
+        return matchObj;
+      }
     }
 
     return null;
@@ -957,6 +1000,100 @@ export class FlashscoreScraperService {
         source: 'FlashscoreScraper',
         message: `H2H feed unavailable for match ${cleanId} (${fixtureHomeTeam || 'Home'} vs ${fixtureAwayTeam || 'Away'}) - using baseline head-to-head`,
       });
+    }
+
+    // Fallback: Calculate H2H & Recent Matches from DB historical matches if teams provided
+    if (fixtureHomeTeam || fixtureAwayTeam) {
+      const homeName = (fixtureHomeTeam || '').toLowerCase().trim();
+      const awayName = (fixtureAwayTeam || '').toLowerCase().trim();
+
+      const homeHist = fixtureHomeTeam ? db.getTeamHistoricalMatches(fixtureHomeTeam, 15) : [];
+      const awayHist = fixtureAwayTeam ? db.getTeamHistoricalMatches(fixtureAwayTeam, 15) : [];
+
+      const homeRecentMatches: TeamFormMatch[] = homeHist.map((m) => {
+        const isH = m.homeTeam.toLowerCase().includes(homeName);
+        const gf = isH ? m.fthg : m.ftag;
+        const ga = isH ? m.ftag : m.fthg;
+        const opp = isH ? m.awayTeam : m.homeTeam;
+        const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+        return {
+          date: m.matchDate,
+          opponent: opp,
+          isHome: isH,
+          goalsFor: gf,
+          goalsAgainst: ga,
+          result: res,
+          competition: m.div,
+        };
+      });
+
+      const awayRecentMatches: TeamFormMatch[] = awayHist.map((m) => {
+        const isH = m.homeTeam.toLowerCase().includes(awayName);
+        const gf = isH ? m.fthg : m.ftag;
+        const ga = isH ? m.ftag : m.fthg;
+        const opp = isH ? m.awayTeam : m.homeTeam;
+        const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+        return {
+          date: m.matchDate,
+          opponent: opp,
+          isHome: isH,
+          goalsFor: gf,
+          goalsAgainst: ga,
+          result: res,
+          competition: m.div,
+        };
+      });
+
+      const directH2H = db.getAllHistoricalMatches(1500).filter(
+        (m) =>
+          (m.homeTeam.toLowerCase().includes(homeName) && m.awayTeam.toLowerCase().includes(awayName)) ||
+          (m.homeTeam.toLowerCase().includes(awayName) && m.awayTeam.toLowerCase().includes(homeName))
+      );
+
+      let homeWins = 0, draws = 0, awayWins = 0, homeGoalsTotal = 0, awayGoalsTotal = 0;
+      const recentH2H: HeadToHeadMatchRecord[] = directH2H.slice(0, 10).map((m) => {
+        const isHomeFixture = m.homeTeam.toLowerCase().includes(homeName);
+        const gHome = isHomeFixture ? m.fthg : m.ftag;
+        const gAway = isHomeFixture ? m.ftag : m.fthg;
+        homeGoalsTotal += gHome;
+        awayGoalsTotal += gAway;
+        if (gHome > gAway) homeWins++;
+        else if (gAway > gHome) awayWins++;
+        else draws++;
+
+        return {
+          date: m.matchDate,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          score: `${m.fthg}-${m.ftag}`,
+          winner: m.fthg > m.ftag ? (isHomeFixture ? 'HOME' : 'AWAY') : m.ftag > m.fthg ? (isHomeFixture ? 'AWAY' : 'HOME') : 'DRAW',
+          competition: m.div,
+        };
+      });
+
+      const matchesCount = directH2H.length;
+      const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
+      const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
+
+      const fallbackMeasurement: HeadToHeadMeasurement = {
+        matchesCount,
+        homeWins,
+        draws,
+        awayWins,
+        homeGoalsAvg,
+        awayGoalsAvg,
+        h2hMultiplierHome: 1.0,
+        h2hMultiplierAway: 1.0,
+        recentH2H,
+        homeClub: fixtureHomeTeam,
+        awayClub: fixtureAwayTeam,
+        homeRecentMatches,
+        awayRecentMatches,
+      };
+
+      this.cacheH2H.set(cleanId, fallbackMeasurement);
+      db.savePredictionMeasurement(cleanId, fallbackMeasurement);
+      return fallbackMeasurement;
     }
 
     // Zero encounters between teams in real records directly from Flashscore feed
