@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="w-full max-w-7xl h-full mx-auto px-3.5 sm:px-5 lg:px-6 flex items-center justify-between gap-3">
         {/* Left: Brand */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+          <div className="w-8 h-8 rounded-full bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
             A
           </div>
           <div className="hidden sm:flex flex-col min-w-0">
@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="open-settings-modal-btn"
             onClick={onOpenSettings}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-xs sm:text-sm font-extrabold shadow-xs active:scale-95"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-800 dark:text-neutral-200 hover:bg-slate-950 hover:text-[#CCFF00] dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-xs sm:text-sm font-extrabold shadow-xs active:scale-95"
             title="Settings & Preferences"
             aria-label="Settings"
           >

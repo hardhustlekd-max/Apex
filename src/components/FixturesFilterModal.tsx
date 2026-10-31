@@ -247,7 +247,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 px-4 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] text-white dark:text-slate-950 text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+            className="flex-1 py-2.5 px-4 rounded-full bg-slate-950 hover:bg-slate-900 text-[#CCFF00] dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] dark:text-slate-950 text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Apply Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>

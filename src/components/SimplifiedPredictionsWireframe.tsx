@@ -308,10 +308,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             title={`Model Pick: ${pick.label} (${pick.probabilityFormatted})`}
           >
             <div className="flex items-center gap-1 font-mono tabular-nums">
-              <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 text-xs font-bold whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
+              <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 text-xs font-black whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
                 {pick.shortLabel}
               </span>
-              <span className="hidden sm:inline text-xs font-bold text-slate-700 dark:text-slate-200 font-mono tabular-nums">
+              <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">
                 {pick.probabilityPercent.toFixed(0)}%
               </span>
             </div>
@@ -324,8 +324,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     over25 >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300 font-bold'
                   }`}
                 >
                   {over25.toFixed(0)}
@@ -333,8 +333,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     under25 >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300 font-bold'
                   }`}
                 >
                   {under25.toFixed(0)}
@@ -345,8 +345,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     bttsYes >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300 font-bold'
                   }`}
                 >
                   {bttsYes.toFixed(0)}
@@ -354,8 +354,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     bttsNo >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-slate-300 font-bold'
                   }`}
                 >
                   {bttsNo.toFixed(0)}
@@ -366,7 +366,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     homeProb >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
                       : homeProb >= 35
                       ? 'bg-slate-200 dark:bg-[#27272A] text-slate-900 dark:text-white font-bold'
                       : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'
@@ -377,7 +377,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     drawProb >= 35
-                      ? 'bg-amber-500/15 text-amber-700 dark:text-[#CCFF00] font-bold'
+                      ? 'bg-amber-500/20 text-amber-900 dark:text-[#CCFF00] font-bold'
                       : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'
                   }`}
                 >
@@ -386,7 +386,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     awayProb >= 50
-                      ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-bold shadow-xs'
+                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
                       : awayProb >= 35
                       ? 'bg-slate-200 dark:bg-[#27272A] text-slate-900 dark:text-white font-bold'
                       : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'

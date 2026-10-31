@@ -49,12 +49,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
             {fixture.status === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 font-mono tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-rose-600 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-mono tabular-nums shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-950 animate-pulse" />
                 LIVE
               </span>
             ) : isPositiveEv ? (
-              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 font-mono tracking-wide">
+              <span className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] border border-[#CCFF00]/30 dark:bg-[#CCFF00] dark:text-slate-950 font-mono tracking-wide shadow-xs">
                 VALUE PICK
               </span>
             ) : null}
@@ -117,24 +117,24 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         {pred && (
           <div className="my-3 space-y-1.5">
             <div className="flex items-center justify-between text-xs sm:text-sm font-mono tabular-nums text-slate-600 dark:text-neutral-400">
-              <span className="font-extrabold text-slate-900 dark:text-neutral-200">1: {formatProb(pred.homeWinProb, 1)}</span>
-              <span className="font-bold text-slate-500">X: {formatProb(pred.drawProb, 1)}</span>
-              <span className="font-extrabold text-slate-900 dark:text-neutral-200">2: {formatProb(pred.awayWinProb, 1)}</span>
+              <span className="font-extrabold text-slate-950 dark:text-[#CCFF00]">1: {formatProb(pred.homeWinProb, 1)}</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400">X: {formatProb(pred.drawProb, 1)}</span>
+              <span className="font-extrabold text-cyan-700 dark:text-cyan-400">2: {formatProb(pred.awayWinProb, 1)}</span>
             </div>
-            <div className="h-2.5 w-full bg-slate-100 dark:bg-[#18181D] rounded-full flex overflow-hidden p-1">
+            <div className="h-2.5 w-full bg-slate-100 dark:bg-[#18181D] rounded-full flex overflow-hidden p-0.5">
               <div
                 style={{ width: `${pred.homeWinProb * 100}%` }}
-                className="bg-[#CCFF00] rounded-full transition-all duration-300"
+                className="bg-slate-950 dark:bg-[#CCFF00] rounded-full transition-all duration-300"
                 title={`Home Win: ${formatProb(pred.homeWinProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.drawProb * 100}%` }}
-                className="bg-slate-300 dark:bg-neutral-600 rounded-full transition-all duration-300"
+                className="bg-amber-500 dark:bg-amber-500 rounded-full transition-all duration-300"
                 title={`Draw: ${formatProb(pred.drawProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.awayWinProb * 100}%` }}
-                className="bg-slate-900 dark:bg-white rounded-full transition-all duration-300"
+                className="bg-cyan-600 dark:bg-cyan-400 rounded-full transition-all duration-300"
                 title={`Away Win: ${formatProb(pred.awayWinProb, 1)}`}
               />
             </div>
@@ -143,16 +143,18 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 
         {/* Highest Predicted Outcome */}
         {topPredictionLabel && (
-          <div className="mt-3 p-3 rounded-2xl bg-slate-100/70 dark:bg-[#18181D] flex items-center justify-between text-xs sm:text-sm min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0 truncate">
-              <span className="text-slate-500 dark:text-neutral-400 font-semibold">Predicted Pick:</span>
-              <span className="font-extrabold text-slate-950 dark:text-white truncate font-mono tabular-nums">{topPredictionLabel}</span>
+          <div className="mt-3 p-3 rounded-2xl bg-slate-50 dark:bg-[#18181D] flex items-center justify-between text-xs sm:text-sm min-w-0">
+            <div className="flex items-center gap-2 min-w-0 truncate">
+              <span className="text-slate-500 dark:text-neutral-400 font-semibold shrink-0">Predicted Pick:</span>
+              <span className="font-extrabold px-2.5 py-0.5 rounded-lg bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 truncate font-mono tabular-nums text-xs sm:text-[13px] shadow-xs">
+                {topPredictionLabel}
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Action Footer with Ergonomic Circular Electric Volt Button */}
+      {/* Action Footer with High Contrast Button */}
       <div className="mt-3 pt-3 flex items-center justify-between">
         <span className="text-xs sm:text-sm font-bold text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
           <Info className="w-4.5 h-4.5 text-slate-400" />
@@ -165,7 +167,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             e.stopPropagation();
             onSelectDetail(fixture);
           }}
-          className="min-h-[46px] min-w-[46px] w-11 h-11 rounded-full bg-[#CCFF00] text-slate-950 flex items-center justify-center font-black transition-all hover:scale-105 active:scale-95 shadow-xs cursor-pointer"
+          className="min-h-[44px] min-w-[44px] w-11 h-11 rounded-full bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:text-slate-950 dark:hover:bg-[#b8e600] flex items-center justify-center font-black transition-all hover:scale-105 active:scale-95 shadow-xs cursor-pointer"
           title="View Match Analytics"
           aria-label="View Match Analytics"
         >

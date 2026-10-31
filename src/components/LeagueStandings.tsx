@@ -107,7 +107,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                 onClick={() => handleLeagueChange(l.code)}
                 className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
                   currentLeague === l.code
-                    ? 'bg-[#121212] dark:bg-[#CCFF00] text-white dark:text-slate-950 font-black shadow-md scale-[1.02]'
+                    ? 'bg-slate-950 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-md scale-[1.02]'
                     : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
@@ -148,7 +148,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
           <button
             type="button"
             onClick={() => fetchStandings(currentLeague)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 cursor-pointer mt-1.5 active:scale-95 shadow-xs"
+            className="px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 cursor-pointer mt-1.5 active:scale-95 shadow-xs"
           >
             Retry
           </button>
@@ -192,7 +192,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                         <span
                           className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8.5px] font-black ${
                             isTop4
-                              ? 'bg-[#CCFF00] text-slate-950'
+                              ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950'
                               : isRelegation
                               ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
                               : 'text-slate-500 dark:text-neutral-400'

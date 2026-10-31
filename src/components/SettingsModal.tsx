@@ -595,9 +595,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               Close
             </button>
+            {/* Save Settings Action */}
             <button
               onClick={handleSave}
-              className="px-6 py-2.5 rounded-full bg-[#CCFF00] hover:bg-[#b5ff00] text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
+              className="px-6 py-2.5 rounded-full bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] dark:text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
             >
               Save Settings
             </button>

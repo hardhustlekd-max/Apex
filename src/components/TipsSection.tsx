@@ -88,7 +88,7 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
         <button
           onClick={onRefresh}
           disabled={isRefreshing || isLoading}
-          className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-full text-xs font-bold bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+          className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b8e600] dark:text-slate-950 shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
           title="Refresh trends"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -112,7 +112,7 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
               onClick={() => setSelectedCategory(tab.id)}
               className={`px-3.5 py-1.5 min-h-[36px] rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 selectedCategory === tab.id
-                  ? 'bg-[#CCFF00] text-slate-950 font-black shadow-xs'
+                  ? 'bg-slate-950 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
                   : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >

@@ -33,7 +33,7 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
         {/* Header */}
         <div className="px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-full bg-[#CCFF00] text-slate-950 font-black">
+            <div className="p-2.5 rounded-full bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs">
               <Globe className="w-4.5 h-4.5 stroke-[2.5]" />
             </div>
             <div>
