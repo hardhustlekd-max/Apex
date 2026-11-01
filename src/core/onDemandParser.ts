@@ -10,7 +10,7 @@ export class OnDemandParser {
    */
   public static async getParsedMatch(fixtureId: string): Promise<ScrapedRawMatch | null> {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
     
     loggerService.addLog({
       level: 'INFO',
@@ -96,7 +96,7 @@ export class OnDemandParser {
     fixtureAwayTeam?: string
   ): Promise<HeadToHeadMeasurement | null> {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
 
     const rawData = db.getRawFeed(cleanId);
     if (!rawData || !rawData.rawText || (!rawData.rawText.includes('KB÷') && !rawData.rawText.includes('KC÷'))) {

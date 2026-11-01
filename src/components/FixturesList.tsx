@@ -104,6 +104,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const dateOptions = [
     { key: 'TODAY', label: "Today's Matches" },
     { key: 'TOMORROW', label: 'Tomorrow' },
+    { key: 'DAY_2', label: 'Day 2' },
+    { key: 'DAY_3', label: 'Day 3' },
     { key: 'NEXT_3_DAYS', label: 'Next 3 Days' },
     { key: 'THIS_WEEK', label: 'This Week' },
     { key: 'ALL', label: 'All Dates' },
@@ -131,19 +133,19 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   ];
 
   const datasetDates = useMemo(() => {
-    return Array.from(new Set(fixtures.map((f) => f.matchDate))).filter(Boolean).sort();
+    return Array.from(new Set(fixtures.map((f) => normalizeDateStr(f.matchDate)))).filter(Boolean).sort();
   }, [fixtures]);
 
   const baseToday = useMemo(() => {
     const localToday = getStandardDateStr();
     const utcToday = new Date().toISOString().slice(0, 10);
-    if (fixtures.some((f) => f.matchDate === localToday)) {
+    if (fixtures.some((f) => normalizeDateStr(f.matchDate) === localToday)) {
       return localToday;
     }
-    if (fixtures.some((f) => f.matchDate === utcToday)) {
+    if (fixtures.some((f) => normalizeDateStr(f.matchDate) === utcToday)) {
       return utcToday;
     }
-    // Find nearest date >= localToday
+    // Find nearest date >= localToday or utcToday
     const upcomingDate = datasetDates.find((d) => d >= localToday || d >= utcToday);
     if (upcomingDate) return upcomingDate;
     // Fallback to latest available date or localToday
@@ -241,26 +243,32 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const filteredUpcomingFixtures = useMemo(() => {
-    const todayStrs = Array.from(new Set([...getPossibleDateStrs(0), baseToday]));
-    const tomorrowStrs = Array.from(new Set([...getPossibleDateStrs(1), getOffsetDate(1)]));
-    const day2Strs = getPossibleDateStrs(2);
-    const day6Strs = getPossibleDateStrs(6);
-    const day2Str = getOffsetDate(2);
-    const day6Str = getOffsetDate(6);
-    const minToday = todayStrs.slice().sort()[0];
-    const maxNext3 = [day2Strs[day2Strs.length - 1], day2Str].sort().pop()!;
-    const maxWeek = [day6Strs[day6Strs.length - 1], day6Str].sort().pop()!;
+    const todayStr = getRelativeDateStr(0);
+    const tomorrowStr = getRelativeDateStr(1);
+    const day2Str = getRelativeDateStr(2);
+    const day3Str = getRelativeDateStr(3);
+    const next3Max = getRelativeDateStr(2);
+    const weekMax = getRelativeDateStr(6);
 
     let matches = uniqueFixtures.filter((f) => {
-      // Date filtering - resilient to UTC vs local timezone offsets
+      const matchDateNorm = normalizeDateStr(f.matchDate);
+
+      // Date filtering strictly matching Flashscore UTC standard dates
       if (dateFilter === 'TODAY') {
-        if (!todayStrs.includes(f.matchDate)) return false;
+        if (matchDateNorm !== todayStr && matchDateNorm !== baseToday) return false;
       } else if (dateFilter === 'TOMORROW') {
-        if (!tomorrowStrs.includes(f.matchDate)) return false;
+        if (matchDateNorm !== tomorrowStr) return false;
+      } else if (dateFilter === 'DAY_2') {
+        if (matchDateNorm !== day2Str) return false;
+      } else if (dateFilter === 'DAY_3') {
+        if (matchDateNorm !== day3Str) return false;
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        if (f.matchDate < minToday || f.matchDate > maxNext3) return false;
+        if (matchDateNorm < todayStr || matchDateNorm > next3Max) return false;
       } else if (dateFilter === 'THIS_WEEK') {
-        if (f.matchDate < minToday || f.matchDate > maxWeek) return false;
+        if (matchDateNorm < todayStr || matchDateNorm > weekMax) return false;
+      } else if (dateFilter !== 'ALL') {
+        // Specific calendar date filter
+        if (matchDateNorm !== normalizeDateStr(dateFilter)) return false;
       }
 
       // League filter
@@ -478,14 +486,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
   const calendarDays = useMemo(() => {
     const days = [];
-    const base = new Date();
     for (let i = 0; i < 6; i++) {
-      const d = new Date(base);
-      d.setDate(d.getDate() + i);
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const dayNum = d.getDate();
-      const dateStr = d.toISOString().slice(0, 10);
-      days.push({ dayName, dayNum, dateStr, index: i });
+      const dateStr = getRelativeDateStr(i);
+      const [y, m, dNum] = dateStr.split('-').map((p) => parseInt(p, 10));
+      const utcDate = new Date(Date.UTC(y, m - 1, dNum));
+      const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : utcDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+      days.push({ dayName, dayNum: dNum, dateStr, index: i });
     }
     return days;
   }, []);

@@ -478,7 +478,7 @@ export class FootballDB {
 
   getFlashscoreScrapedMatches(limit = 100): any[] {
     const all = Array.from(this.scrapedMatchesMemory.values());
-    return all.slice(0, limit);
+    return all.sort((a, b) => new Date(b.scraped_at || 0).getTime() - new Date(a.scraped_at || 0).getTime()).slice(0, limit);
   }
 
   savePredictionMeasurement(fixtureId: string, h2h: HeadToHeadMeasurement): void {

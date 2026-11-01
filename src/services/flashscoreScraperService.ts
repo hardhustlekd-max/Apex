@@ -4,7 +4,7 @@ import { db } from '../core/db.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { getCurrentSeason, normalizeDateStr, normalizeTimeStr, getStandardDateStr, getStandardTimeStr } from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
-import { DEFAULT_HISTORICAL_MATCHES } from '../core/defaultHistoricalMatches.js';
+
 
 const FLASHSCORE_FEED_BASE = 'https://www.flashscore.com/x/feed';
 const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
@@ -171,9 +171,11 @@ export class FlashscoreScraperService {
         if (seenMatchIds.has(m.matchId)) continue;
         seenMatchIds.add(m.matchId);
 
-        const matchDateObj = m.timestamp ? new Date((m.timestamp + 3 * 3600) * 1000) : new Date();
-        const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
-        const kickOffTime = normalizeTimeStr(getStandardTimeStr(matchDateObj));
+        const matchDateObj = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
+        const dateStr = normalizeDateStr(matchDateObj.toISOString().slice(0, 10));
+        const hours = String(matchDateObj.getUTCHours()).padStart(2, '0');
+        const minutes = String(matchDateObj.getUTCMinutes()).padStart(2, '0');
+        const kickOffTime = `${hours}:${minutes}`;
 
         const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
         const odds = this.generateMatchOdds();
@@ -702,15 +704,6 @@ export class FlashscoreScraperService {
       inserted = db.insertHistoricalMatches(historicalMatches);
     }
     const currentHistCount = db.getAllHistoricalMatches(1500).length;
-    if (currentHistCount === 0) {
-      inserted = db.insertHistoricalMatches(DEFAULT_HISTORICAL_MATCHES);
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'SCRAPER',
-        source: 'FlashscoreScraperService',
-        message: `Seeded ${inserted} default historical matches into database fallback`,
-      });
-    }
 
     // Refresh upcoming fixtures as well
     const upcoming = await this.getUpcomingFixtures();
@@ -726,7 +719,7 @@ export class FlashscoreScraperService {
    * Match detail extraction matching gustavofariaa/FlashscoreScraping schema
    */
   async getMatchData(matchId: string): Promise<FlashscoreScrapedMatch | null> {
-    const cleanId = matchId.replace(/^fs_/, '').trim();
+    const cleanId = matchId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
     const matches = db.getFlashscoreScrapedMatches(500);
     const existing = matches.find((m) => m.matchId === matchId || m.matchId === cleanId || `fs_${m.matchId}` === matchId);
     if (existing) {
@@ -793,7 +786,7 @@ export class FlashscoreScraperService {
    * Scrapes real Head-to-Head (H2H) match history and recent matches directly from Flashscore detailed feed (df_hh_1_{id})
    */
   async getMatchHeadToHead(matchId: string, fixtureHomeTeam?: string, fixtureAwayTeam?: string): Promise<HeadToHeadMeasurement> {
-    const cleanId = matchId.replace(/^fs_/, '').trim();
+    const cleanId = matchId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
     if (this.cacheH2H.has(cleanId)) {
       return this.cacheH2H.get(cleanId)!;
     }

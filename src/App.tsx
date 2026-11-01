@@ -17,7 +17,7 @@ import {
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
-import { getRelativeDateStr, getPossibleDateStrs } from './core/dateUtils.js';
+import { getRelativeDateStr, getPossibleDateStrs, normalizeDateStr } from './core/dateUtils.js';
 import { indexedDbClient } from './core/indexedDbClient.js';
 
 export default function App() {
@@ -178,8 +178,8 @@ export default function App() {
 
       const todayStrs = getPossibleDateStrs(0);
       const tomorrowStrs = getPossibleDateStrs(1);
-      const hasTodayMatches = data.some(f => todayStrs.includes(f.matchDate) && f.status !== 'LIVE');
-      const hasTomorrowMatches = data.some(f => tomorrowStrs.includes(f.matchDate) && f.status !== 'LIVE');
+      const hasTodayMatches = data.some(f => todayStrs.includes(normalizeDateStr(f.matchDate)) && f.status !== 'LIVE');
+      const hasTomorrowMatches = data.some(f => tomorrowStrs.includes(normalizeDateStr(f.matchDate)) && f.status !== 'LIVE');
       if (hasTodayMatches) {
         setDateFilter('TODAY');
       } else if (hasTomorrowMatches) {

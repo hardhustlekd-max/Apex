@@ -5,7 +5,7 @@ import {
   EngineSettings,
   MarketOption,
 } from './types.js';
-import { getRelativeDateStr, getUtcDateStr, hasMatchStarted } from './dateUtils.js';
+import { getRelativeDateStr, getUtcDateStr, hasMatchStarted, normalizeDateStr } from './dateUtils.js';
 
 export interface AccaGenerationParams {
   strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';
@@ -90,19 +90,20 @@ export class AccumulatorGenerator {
 
     // Filter candidate fixtures according to the specified date filter
     let candidateFixtures = unstartedFixtures.filter((f) => {
+      const matchDateNorm = normalizeDateStr(f.matchDate);
       if (dateFilter === 'TODAY') {
-        return f.matchDate === todayStr || f.matchDate === utcTodayStr;
+        return matchDateNorm === todayStr || matchDateNorm === utcTodayStr;
       } else if (dateFilter === 'TOMORROW') {
-        return f.matchDate === tomorrowStr || f.matchDate === utcTomorrowStr;
+        return matchDateNorm === tomorrowStr || matchDateNorm === utcTomorrowStr;
       } else if (dateFilter === 'NEXT_3_DAYS') {
         const minDate = todayStr < utcTodayStr ? todayStr : utcTodayStr;
-        return f.matchDate >= minDate && f.matchDate <= next3DaysStr;
+        return matchDateNorm >= minDate && matchDateNorm <= next3DaysStr;
       } else if (dateFilter === 'THIS_WEEK') {
         const minDate = todayStr < utcTodayStr ? todayStr : utcTodayStr;
-        return f.matchDate >= minDate && f.matchDate <= thisWeekStr;
+        return matchDateNorm >= minDate && matchDateNorm <= thisWeekStr;
       } else if (dateFilter === 'CUSTOM') {
-        if (params.customStartDate && f.matchDate < params.customStartDate) return false;
-        if (params.customEndDate && f.matchDate > params.customEndDate) return false;
+        if (params.customStartDate && matchDateNorm < normalizeDateStr(params.customStartDate)) return false;
+        if (params.customEndDate && matchDateNorm > normalizeDateStr(params.customEndDate)) return false;
         return true;
       }
       return true; // ALL

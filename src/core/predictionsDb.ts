@@ -163,16 +163,29 @@ export class PredictionsDB {
   async savePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
 
+    const finishedFixtures: Fixture[] = [];
+    const upcomingFixtures: Fixture[] = [];
+
     for (const f of fixtures) {
       if (f.id) {
         this.memoryFallback.set(f.id, f);
       }
+      
+      if (f.status === 'FINISHED') {
+        finishedFixtures.push(f);
+      } else {
+        upcomingFixtures.push(f);
+      }
     }
 
-    if (predictionsTurso) {
+    if (finishedFixtures.length > 0) {
+      await this.saveHistoricalPredictions(finishedFixtures);
+    }
+
+    if (predictionsTurso && upcomingFixtures.length > 0) {
       try {
         const now = new Date().toISOString();
-        const batchStatements = fixtures.map((f) => {
+        const batchStatements = upcomingFixtures.map((f) => {
           const pred = f.prediction;
           const bestTip = f.bestValueMarket;
 
@@ -318,6 +331,20 @@ export class PredictionsDB {
     let fixtures = Array.from(this.memoryFallback.values());
     if (filters?.league && filters.league !== 'ALL') {
       fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
+    }
+    if (filters?.date) {
+      const targetDate = normalizeDateStr(filters.date);
+      fixtures = fixtures.filter((f) => normalizeDateStr(f.matchDate) === targetDate);
+    } else if (filters?.dateFilter && filters.dateFilter !== 'ALL') {
+      const todayStrs = getPossibleDateStrs(0);
+      const tomorrowStrs = getPossibleDateStrs(1);
+      const df = filters.dateFilter.toUpperCase();
+      fixtures = fixtures.filter((f) => {
+        const norm = normalizeDateStr(f.matchDate);
+        if (df === 'TODAY') return todayStrs.includes(norm);
+        if (df === 'TOMORROW') return tomorrowStrs.includes(norm);
+        return true;
+      });
     }
     return fixtures;
   }
@@ -508,6 +535,55 @@ export class PredictionsDB {
     return fixtures;
   }
 
+  async getHistoricalPredictionsAsync(filters?: { league?: string; limit?: number }): Promise<Fixture[]> {
+    let fixtures: Fixture[] = [];
+
+    if (predictionsTurso) {
+      try {
+        let sql = `SELECT full_fixture_json FROM historical_predictions WHERE 1=1`;
+        const args: any[] = [];
+
+        if (filters?.league && filters.league !== 'ALL') {
+          sql += ` AND (league = ? OR league_name = ?)`;
+          args.push(filters.league, filters.league);
+        }
+
+        sql += ` ORDER BY match_date DESC, kick_off_time DESC`;
+        if (filters?.limit) {
+          sql += ` LIMIT ?`;
+          args.push(filters.limit);
+        }
+
+        const res = await predictionsTurso.execute({ sql, args });
+        if (res.rows && res.rows.length > 0) {
+          for (const row of res.rows) {
+            if (row.full_fixture_json) {
+              try {
+                const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
+                fixtures.push(parsed);
+              } catch {}
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PredictionsDB] Error querying Turso historical predictions:', err?.message);
+      }
+    }
+
+    if (fixtures.length === 0) {
+      fixtures = Array.from(this.historyMemoryFallback.values());
+      if (filters?.league && filters.league !== 'ALL') {
+        fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
+      }
+      fixtures.sort((a, b) => (b.matchDate || '').localeCompare(a.matchDate || ''));
+      if (filters?.limit) {
+        fixtures = fixtures.slice(0, filters.limit);
+      }
+    }
+
+    return fixtures;
+  }
+
   countHistoricalPredictions(): number {
     return this.historyMemoryFallback.size;
   }
@@ -523,6 +599,52 @@ export class PredictionsDB {
         await predictionsTurso.execute('DELETE FROM live_predictions;');
         await predictionsTurso.execute('DELETE FROM historical_predictions;');
       } catch {}
+    }
+  }
+
+  async reconcileStaleMatches(): Promise<void> {
+    if (!predictionsTurso) return;
+
+    try {
+      const todayStr = getRelativeDateStr(0);
+
+      // Find matches that are in the past relative to Flashscore standard UTC today
+      const sql = `SELECT full_fixture_json FROM upcoming_predictions WHERE match_date < ?`;
+      const res = await predictionsTurso.execute({ sql, args: [todayStr] });
+
+      if (res.rows && res.rows.length > 0) {
+        const staleMatches: Fixture[] = [];
+        for (const row of res.rows) {
+          if (row.full_fixture_json) {
+            try {
+              const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
+              // Force mark as finished and migrate
+              parsed.status = 'FINISHED';
+              staleMatches.push(parsed);
+            } catch {}
+          }
+        }
+
+        if (staleMatches.length > 0) {
+          console.log(`[PredictionsDB] Reconciling ${staleMatches.length} stale matches...`);
+          await this.saveHistoricalPredictions(staleMatches as unknown as Fixture[]);
+          
+          // Remove from upcoming
+          const ids = staleMatches.map(m => m.id);
+          const placeholders = ids.map(() => '?').join(',');
+          await predictionsTurso.execute({
+            sql: `DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`,
+            args: ids
+          });
+          
+          // Clear memory
+          for (const id of ids) {
+            this.memoryFallback.delete(id);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('[PredictionsDB] Error during stale match reconciliation:', err?.message);
     }
   }
 }

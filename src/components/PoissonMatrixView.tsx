@@ -97,7 +97,7 @@ export const PoissonMatrixView: React.FC<PoissonMatrixViewProps> = ({
             Most Probable Scorelines
           </h5>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-            {prediction.topCorrectScores.map((score, idx) => (
+            {prediction.topCorrectScores?.map((score, idx) => (
               <div
                 key={score.score}
                 className={`p-2 rounded-xl text-center font-mono ${
