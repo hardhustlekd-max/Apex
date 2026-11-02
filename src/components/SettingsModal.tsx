@@ -407,27 +407,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Merged Reset Database & Trigger Full Data Sync Card */}
+              {/* Full Data & H2H Sync Card */}
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-4 shadow-xs">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                        <RotateCcw className="w-4 h-4" />
+                      <div className="p-2 rounded-full bg-lime-500/10 text-lime-600 dark:text-[#CCFF00]">
+                        <RefreshCw className="w-4 h-4" />
                       </div>
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                        Reset Database, Raw Feeds & Trigger Full Sync
+                        Full Sync (Historical Data, Upcoming Feeds & H2H)
                       </h3>
                     </div>
                     {isOperating && (
-                      <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+                      <span className="text-xs text-lime-600 dark:text-[#CCFF00] font-semibold flex items-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         In Progress...
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-                    Purges all local SQLite database tables, relational statistics, cached raw Flashscore feeds, and prediction models, then immediately executes a complete end-to-end sync to fetch fresh feeds and regenerate Poisson predictions from zero.
+                    Fetches fresh Flashscore raw feeds for historical match results, upcoming fixtures, Head-to-Head (H2H) records, and live scores, recalculating Poisson prediction models without deleting existing database records.
                   </p>
                 </div>
 
@@ -435,8 +435,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-2.5 p-4 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 truncate">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-600 dark:text-[#CCFF00] shrink-0" />
-                        <span className="truncate">{syncProgress?.currentStep || 'Purging database & raw feeds, rebuilding Poisson predictions...'}</span>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#CCFF00] shrink-0" />
+                        <span className="truncate">{syncProgress?.currentStep || 'Fetching historical archives, upcoming feeds & H2H...'}</span>
                       </span>
                       <span className="text-[11px] font-mono tabular-nums font-black text-slate-900 dark:text-white shrink-0">
                         {syncProgress?.progress ?? 50}%
@@ -445,7 +445,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-rose-600 via-amber-500 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
+                        className="bg-gradient-to-r from-lime-500 via-emerald-400 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(100, Math.max(5, syncProgress?.progress ?? 25))}%` }}
                       />
                     </div>
@@ -457,21 +457,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onClick={() => setIsConfirmingReset(true)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 font-black transition-all cursor-pointer text-xs uppercase tracking-wide active:scale-[0.99]"
                   >
-                    <RotateCcw className="w-4 h-4 text-rose-400 dark:text-rose-600" />
-                    <span>Reset Database & Trigger Full Data Sync</span>
+                    <RefreshCw className="w-4 h-4 text-[#CCFF00] dark:text-slate-950" />
+                    <span>Trigger Full Data & H2H Sync</span>
                   </button>
                 )}
 
                 {!isOperating && isConfirmingReset && (
-                  <div className="p-4 rounded-2xl bg-rose-500/10 space-y-3">
+                  <div className="p-4 rounded-2xl bg-lime-500/10 dark:bg-[#CCFF00]/10 space-y-3">
                     <div className="flex items-start gap-2.5">
-                      <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                      <RefreshCw className="w-4 h-4 text-slate-900 dark:text-[#CCFF00] shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
-                        <p className="text-xs font-bold text-rose-900 dark:text-rose-300">
-                          Are you sure you want to proceed?
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">
+                          Start Full Data & H2H Synchronization?
                         </p>
-                        <p className="text-[11px] text-rose-700 dark:text-rose-400">
-                          This will permanently purge all database records and raw feed cache, then re-sync all live fixtures from Flashscore.
+                        <p className="text-[11px] text-slate-700 dark:text-slate-300">
+                          This will fetch the latest historical match archives, upcoming fixture feeds, H2H team records, and live score updates from Flashscore.
                         </p>
                       </div>
                     </div>
@@ -479,10 +479,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleExecuteResetAndSync}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs transition-colors cursor-pointer active:scale-95"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-lime-400 text-white dark:text-slate-950 font-black text-xs transition-colors cursor-pointer active:scale-95"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Confirm Reset & Full Sync</span>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Confirm & Trigger Full Sync</span>
                       </button>
                       <button
                         onClick={() => setIsConfirmingReset(false)}

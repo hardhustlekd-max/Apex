@@ -1110,6 +1110,26 @@ export class FlashscoreScraperService {
   }
 
   /**
+   * Prefetches and persists H2H raw feeds for upcoming matches during full sync
+   */
+  async prefetchH2HForUpcomingFixtures(upcoming: Fixture[], limit = 30): Promise<number> {
+    let count = 0;
+    const targetFixtures = upcoming.slice(0, limit);
+    for (const f of targetFixtures) {
+      const cleanId = f.id.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+      if (cleanId) {
+        try {
+          await this.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
+          count++;
+        } catch {
+          // Non-blocking prefetch error catch
+        }
+      }
+    }
+    return count;
+  }
+
+  /**
    * Parses recent match list for a specific club directly from scraper response
    */
   async getClubRecentMatches(clubName: string, matchId?: string): Promise<TeamFormMatch[]> {

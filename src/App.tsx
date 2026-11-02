@@ -84,15 +84,8 @@ export default function App() {
   const handleResetAndSyncData = async () => {
     try {
       setIsSyncingData(true);
-      setSyncJobProgress({ progress: 5, currentStep: 'Initializing background sync worker...' });
-      showNotification('Starting background database reset & synchronization...', 'info');
-      
-      const currentTheme = localStorage.getItem('theme');
-      localStorage.clear();
-      sessionStorage.clear();
-      if (currentTheme) {
-        localStorage.setItem('theme', currentTheme);
-      }
+      setSyncJobProgress({ progress: 5, currentStep: 'Initializing full data & H2H sync worker...' });
+      showNotification('Starting full data & H2H synchronization...', 'info');
 
       const res = await EngineService.resetAndSyncDatabase((job) => {
         setSyncJobProgress({
@@ -109,13 +102,13 @@ export default function App() {
           fetchSettingsAndProviders(),
           fetchLiveScores(),
         ]);
-        showNotification(res.message || 'Database and raw feeds reset! Fresh predictions synchronized.', 'success');
+        showNotification(res.message || 'Full data, historical archives, upcoming feeds, and H2H records synchronized!', 'success');
       } else {
         showNotification(res.message || 'Failed to sync data', 'info');
       }
     } catch (err: any) {
-      console.error('Error resetting and syncing:', err);
-      showNotification('Error resetting database and syncing data', 'info');
+      console.error('Error syncing data:', err);
+      showNotification('Error executing full data sync', 'info');
     } finally {
       setIsSyncingData(false);
       setSyncJobProgress(null);

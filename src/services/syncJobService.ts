@@ -65,7 +65,8 @@ export class SyncJobService {
     return true;
   }
 
-  public startJob(options: { resetDatabase: boolean; resetRawFeeds: boolean }): SyncJobState {
+  public startJob(options?: { resetDatabase?: boolean; resetRawFeeds?: boolean }): SyncJobState {
+    const opts = { resetDatabase: false, resetRawFeeds: false, ...options };
     // If an active job is already running, return it instead of spawning concurrent resets
     const existing = this.getActiveJob();
     if (existing) {
@@ -77,7 +78,7 @@ export class SyncJobService {
       id: jobId,
       status: 'RUNNING',
       progress: 5,
-      currentStep: 'Initializing background sync worker...',
+      currentStep: 'Initializing full data & H2H sync worker...',
       stepIndex: 1,
       totalSteps: 5,
       matchesCount: 0,
@@ -93,7 +94,7 @@ export class SyncJobService {
 
     // Detach execution so HTTP response returns immediately (202 Accepted)
     setTimeout(() => {
-      this.executeJob(jobId, options).catch((err) => {
+      this.executeJob(jobId, opts).catch((err) => {
         console.error(`[SyncJobService] Uncaught error in job ${jobId}:`, err);
       });
     }, 10);
@@ -128,34 +129,27 @@ export class SyncJobService {
       level: 'INFO',
       category: 'DATABASE',
       source: 'SyncJobService',
-      message: `Initiating async sync job ${jobId} (resetDatabase: ${options.resetDatabase}, resetRawFeeds: ${options.resetRawFeeds})`,
+      message: `Initiating async full sync job ${jobId} (historical, upcoming feeds, and H2H)`,
     });
 
     try {
-      // Step 1: Purge tables, cached raw feeds, and predictions
-      if (options.resetDatabase || options.resetRawFeeds) {
-        this.updateProgress(jobId, {
-          progress: 15,
-          stepIndex: 1,
-          currentStep: 'Purging database tables, raw feeds, and cached predictions...',
-        });
-        db.clearAllData(options.resetRawFeeds);
-        predictionsDb.clearAll();
-        flashscoreScraperService.clearCaches();
-      } else {
-        // Always reconcile stale matches on sync if not a full reset
-        await predictionsDb.reconcileStaleMatches();
-      }
+      // Step 1: Reconcile stale matches and verify databases
+      this.updateProgress(jobId, {
+        progress: 10,
+        stepIndex: 1,
+        currentStep: 'Reconciling past matches and initializing sync worker...',
+      });
+      await predictionsDb.reconcileStaleMatches();
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 2: Ingest historical matches from feeds and tournament pages (with resilient fallback)
+      // Step 2: Ingest historical matches from feeds and tournament pages
       this.updateProgress(jobId, {
-        progress: 35,
+        progress: 30,
         stepIndex: 2,
-        currentStep: 'Scraping historical results and tournament feeds...',
+        currentStep: 'Scraping historical results and tournament archive feeds...',
       });
-      const syncRes = await flashscoreScraperService.syncHistoricalData(7, !options.resetDatabase);
+      const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
 
       if (this.isCancelled(jobId)) return;
 
@@ -163,19 +157,20 @@ export class SyncJobService {
       this.updateProgress(jobId, {
         progress: 55,
         stepIndex: 3,
-        currentStep: 'Fetching upcoming fixtures and calculating Poisson predictions...',
+        currentStep: 'Fetching upcoming fixtures raw feeds and calculating Poisson predictions...',
       });
       const upcoming = await flashscoreScraperService.getUpcomingFixtures();
       const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 4: Save finished scraped matches to historical predictions database
+      // Step 4: Fetch and store Head-to-Head (H2H) raw feeds for upcoming games
       this.updateProgress(jobId, {
         progress: 75,
         stepIndex: 4,
-        currentStep: 'Storing historical match results in database...',
+        currentStep: 'Fetching Head-to-Head (H2H) raw feeds and team recent form records...',
       });
+      await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
       const scrapedMatches = db.getFlashscoreScrapedMatches(500);
       const finishedScraped = scrapedMatches
         .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
