@@ -309,7 +309,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   return (
                     <div
                       key={p.id}
-                      onClick={() => handleProviderSelect(p.id)}
+                      onClick={() => handleProviderSelect(p.id as any)}
                       className={`p-4 rounded-2xl transition-all cursor-pointer flex items-center justify-between gap-3 ${
                         isSelected
                           ? 'bg-slate-200 dark:bg-[#252525] text-slate-900 dark:text-white shadow-xs'
@@ -320,7 +320,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-sm text-slate-900 dark:text-white">{p.name}</span>
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200 dark:bg-[#121212] text-slate-800 dark:text-slate-300">
-                            v{p.version || '1.0'}
+                            v{(p as any).version || '1.0'}
                           </span>
                           <span className="text-xs font-mono text-slate-500 dark:text-[#CCFF00] font-bold">{p.latencyMs}ms</span>
                         </div>

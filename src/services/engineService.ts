@@ -531,15 +531,9 @@ export class EngineService {
   }
 
   public static async getLiveScores(): Promise<LiveScore[]> {
-    try {
-      const res = await fetch('/api/providers/live-scores');
-      if (!res.ok) return [];
-      const data = await res.json();
-      if (data && data.success && Array.isArray(data.scores)) {
-        return data.scores;
-      }
-    } catch {
-      // Non-blocking live scores polling fallback
+    const data = await this.safeJsonFetch('/api/providers/live-scores');
+    if (data && data.success && Array.isArray(data.scores)) {
+      return data.scores;
     }
     return [];
   }
