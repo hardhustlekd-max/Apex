@@ -7,11 +7,17 @@ export const statsRouter = Router();
 statsRouter.get('/', (req, res) => {
   try {
     const baseStats = db.getStatsSummary();
+    const rawFeedsCount = db.getRawFeedsCount();
+    const upcomingDbCount = db.getUpcomingFixturesCount();
+    const predCount = predictionsDb.count();
+    const histPredCount = predictionsDb.countHistoricalPredictions();
+
     const stats = {
       ...baseStats,
-      rawFeedsCount: db.getRawFeedsCount(),
-      upcomingCount: db.getUpcomingFixturesCount(),
-      predictionsCount: predictionsDb.count(),
+      rawFeedsCount,
+      upcomingCount: Math.max(upcomingDbCount, predCount),
+      predictionsCount: predCount,
+      totalMatches: Math.max(baseStats.totalMatches, histPredCount),
     };
     res.json({
       success: true,

@@ -68,18 +68,8 @@ async function startServer() {
       }
 
       if (db.getUpcomingFixturesCount() === 0) {
-        const { flashscoreScraperService } = await import('./src/services/flashscoreScraperService.js');
         const { ServerPredictionGeneratorService } = await import('./src/services/serverPredictionGeneratorService.js');
-        const initialUpcoming = await flashscoreScraperService.getUpcomingFixtures().catch(() => []);
-        if (initialUpcoming && initialUpcoming.length > 0) {
-          await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
-          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
-          if (liveInUpcoming.length > 0) {
-            await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
-          }
-        } else {
-          await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
-        }
+        await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb().catch(() => {});
       }
     } catch (err: any) {
       console.warn('Boot background fixture/history seed notice:', err?.message);

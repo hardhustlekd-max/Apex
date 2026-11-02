@@ -1,6 +1,6 @@
 {
-  "summary":  "Updated system-wide date and time implementation plan to strictly use Flashscore standard date/time and UTC/Unix epoch kick-off evaluation without browser-based timing.",
-  "updatedAt":  "2026-11-01T15:12:58.876141394Z",
+  "summary":  "Implementation plan for fixing On-Demand service 'no raw feed found' errors using multi-tier lookup (Memory -> Turso DB -> Flashscore Live Scraper) and canonical match ID normalization.",
+  "updatedAt":  "2026-11-02T09:12:34.238311078Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

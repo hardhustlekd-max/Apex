@@ -39,24 +39,53 @@ export class EngineService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 75000);
     try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
+      const fetchHeaders: Record<string, string> = {
+        'Accept': 'application/json',
+      };
+      if (options?.headers) {
+        if (options.headers instanceof Headers) {
+          options.headers.forEach((v, k) => { fetchHeaders[k] = v; });
+        } else if (Array.isArray(options.headers)) {
+          options.headers.forEach(([k, v]) => { fetchHeaders[k] = v; });
+        } else {
+          Object.assign(fetchHeaders, options.headers);
+        }
+      }
+
+      const res = await fetch(url, { ...options, headers: fetchHeaders, signal: controller.signal });
       clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type') || '';
+
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        const errObj = new Error(`HTTP ${res.status} ${res.statusText} for ${url} - ${errText}`);
+        const isHtml = contentType.includes('text/html') || errText.trim().startsWith('<');
         loggerService.addLog({
-          level: 'ERROR',
+          level: 'WARN',
           category: 'DATA_FETCH',
           source: 'EngineService',
-          message: `Data fetch HTTP error ${res.status} on ${url}`,
-          details: { url, status: res.status, statusText: res.statusText, response: errText, stack: errObj.stack },
+          message: `Data fetch HTTP ${res.status} on ${url}`,
+          details: { url, status: res.status, statusText: res.statusText, response: isHtml ? errText.slice(0, 150) : errText },
         });
         return null;
       }
+
       const text = await res.text();
       if (!text || text.trim() === '') {
         return null;
       }
+
+      if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `Server returned HTML response on ${url} (server booting or route fallback)`,
+          details: { url, snippet: text.slice(0, 150) },
+        });
+        return null;
+      }
+
       try {
         return JSON.parse(text);
       } catch (jsonErr: any) {
@@ -142,6 +171,22 @@ export class EngineService {
     return null;
   }
 
+  public static async getScraperStatus(): Promise<{
+    circuit: { state: 'CLOSED' | 'HALF_OPEN' | 'OPEN'; failureCount: number };
+    rawFeedsCount: number;
+    mirrors: Array<{ name: string; url: string; status: string }>;
+  } | null> {
+    const serverData = await this.safeJsonFetch('/api/settings/scraper-status');
+    if (serverData && serverData.success) {
+      return {
+        circuit: serverData.circuit || { state: 'CLOSED', failureCount: 0 },
+        rawFeedsCount: serverData.rawFeedsCount || 0,
+        mirrors: serverData.mirrors || [],
+      };
+    }
+    return null;
+  }
+
   public static async updateSettings(newSettings: Partial<EngineSettings>): Promise<EngineSettings> {
     const serverData = await this.safeJsonFetch('/api/settings', {
       method: 'PUT',
@@ -157,6 +202,64 @@ export class EngineService {
     localSettings = { ...localSettings, ...newSettings };
     return localSettings;
   }
+
+  public static async updateUpcomingPredictions(onProgress?: (job: any) => void): Promise<{
+    success: boolean;
+    count?: number;
+    totalPredictionsCount?: number;
+    message?: string;
+    error?: string;
+  }> {
+    const startRes = await this.safeJsonFetch('/api/settings/update-predictions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!startRes || !startRes.success || !startRes.jobId) {
+      return {
+        success: false,
+        error: startRes?.error || 'Failed to start prediction update process',
+      };
+    }
+
+    const jobId = startRes.jobId;
+    let pollAttempts = 0;
+    const maxPollAttempts = 120;
+
+    while (pollAttempts < maxPollAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      pollAttempts++;
+
+      const job = await this.getSyncJobStatus(jobId);
+      if (!job) continue;
+
+      if (onProgress) {
+        onProgress(job);
+      }
+
+      if (job.status === 'COMPLETED') {
+        return {
+          success: true,
+          count: job.matchesCount || job.upcomingCount || 0,
+          totalPredictionsCount: job.predictionsCount || 0,
+          message: job.message || `Successfully recalculated and updated predictions for ${job.matchesCount || 0} upcoming matches in database`,
+        };
+      }
+
+      if (job.status === 'FAILED' || job.status === 'CANCELLED') {
+        return {
+          success: false,
+          error: job.error || (job.status === 'CANCELLED' ? 'Prediction recalculation cancelled by user' : 'Prediction update encountered an error'),
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Prediction recalculation process is continuing in server background.',
+    };
+  }
+
 
   public static async startSyncJob(options?: {
     resetDatabase?: boolean;
@@ -343,7 +446,14 @@ export class EngineService {
     return true;
   }
 
-  public static async getStats(): Promise<{ totalMatches: number; totalTeams: number; leagues: any[] }> {
+  public static async getStats(): Promise<{
+    totalMatches: number;
+    totalTeams: number;
+    leagues: any[];
+    rawFeedsCount?: number;
+    upcomingCount?: number;
+    predictionsCount?: number;
+  }> {
     const serverData = await this.safeJsonFetch('/api/stats');
     if (serverData && serverData.success && serverData.stats) {
       return serverData.stats;

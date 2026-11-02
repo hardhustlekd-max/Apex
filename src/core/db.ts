@@ -506,34 +506,61 @@ export class FootballDB {
     return this.measurementsMemory;
   }
 
-  saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): void {
-    if (!rawText) return;
+  private rawFeedHashesMemory: Map<string, string> = new Map();
+
+  private computeFeedHash(text: string): string {
+    if (!text) return 'empty_0';
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return `${text.length}_${hash}`;
+  }
+
+  saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): { hasChanged: boolean } {
+    if (!rawText) return { hasChanged: false };
+    const newHash = this.computeFeedHash(rawText);
+    const key = fixtureId || feedPath;
+    const existingHash = this.rawFeedHashesMemory.get(key);
+    const hasChanged = existingHash !== newHash;
+
+    if (hasChanged) {
+      this.rawFeedHashesMemory.set(key, newHash);
+    }
+
     if (fixtureId) {
       this.rawFeedsMemory.set(fixtureId, rawText);
       const cleanId = fixtureId.replace(/^fs_/, '').trim();
       this.rawFeedsMemory.set(cleanId, rawText);
       this.rawFeedsMemory.set(`fs_${cleanId}`, rawText);
+      this.rawFeedHashesMemory.set(cleanId, newHash);
+      this.rawFeedHashesMemory.set(`fs_${cleanId}`, newHash);
     }
     if (feedPath) {
       this.rawFeedsMemory.set(feedPath, rawText);
+      this.rawFeedHashesMemory.set(feedPath, newHash);
     }
 
-    if (footballTurso && fixtureId) {
+    if (footballTurso && fixtureId && hasChanged) {
       const cleanId = fixtureId.replace(/^fs_/, '').trim();
       footballTurso.execute({
         sql: `INSERT OR REPLACE INTO raw_feed_data (fixture_id, feed_path, raw_text, scraped_at) VALUES (?, ?, ?, ?)`,
         args: [cleanId, feedPath || fixtureId, rawText, new Date().toISOString()],
       }).catch(() => {});
     }
+
+    return { hasChanged };
   }
 
-  saveRawFeed(fixtureId: string, feedPath: string, rawText: string): void {
-    this.saveRawFeedData(fixtureId, feedPath, rawText);
+  saveRawFeed(fixtureId: string, feedPath: string, rawText: string): { hasChanged: boolean } {
+    return this.saveRawFeedData(fixtureId, feedPath, rawText);
   }
 
   getRawFeed(fixtureId: string): { rawText: string } | null {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
 
     // 1. Direct key match in rawFeedsMemory
     let directText = this.rawFeedsMemory.get(fixtureId) || this.rawFeedsMemory.get(cleanId) || this.rawFeedsMemory.get(`fs_${cleanId}`);
@@ -545,6 +572,33 @@ export class FootballDB {
     for (const [key, rawText] of this.rawFeedsMemory.entries()) {
       if (rawText && (rawText.includes(`AA÷${cleanId}`) || rawText.includes(`AA÷${fixtureId}`))) {
         return { rawText };
+      }
+    }
+
+    return null;
+  }
+
+  async getRawFeedAsync(fixtureId: string): Promise<{ rawText: string } | null> {
+    const memRes = this.getRawFeed(fixtureId);
+    if (memRes) return memRes;
+
+    if (!fixtureId) return null;
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
+
+    if (footballTurso) {
+      try {
+        const res = await footballTurso.execute({
+          sql: `SELECT raw_text FROM raw_feed_data WHERE fixture_id = ? OR feed_path = ? OR feed_path = ? LIMIT 1`,
+          args: [cleanId, cleanId, `df_hh_1_${cleanId}`],
+        });
+        if (res.rows && res.rows.length > 0 && res.rows[0].raw_text) {
+          const rawText = String(res.rows[0].raw_text);
+          this.rawFeedsMemory.set(cleanId, rawText);
+          this.rawFeedsMemory.set(`fs_${cleanId}`, rawText);
+          return { rawText };
+        }
+      } catch (err: any) {
+        console.warn('[FootballDB] Turso raw_feed_data query note:', err?.message);
       }
     }
 

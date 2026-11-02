@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, AlertCircle, Hash, Award, Minus, X, BarChart3, Hash as HashIcon, CircleDot } from 'lucide-react';
+import { Trophy, AlertCircle, Hash, Award, Minus, X, BarChart3, Hash as HashIcon, CircleDot, RefreshCw } from 'lucide-react';
 import { LeagueStandingTable } from '../core/types.js';
 
 interface LeagueStandingsProps {
@@ -8,6 +8,7 @@ interface LeagueStandingsProps {
   onSelectLeague?: (league: string) => void;
   highlightTeams?: { homeTeam?: string; awayTeam?: string };
   compact?: boolean;
+  onTriggerFullSync?: () => void;
 }
 
 const POPULAR_LEAGUES = [
@@ -31,6 +32,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   onSelectLeague: externalOnSelectLeague,
   highlightTeams,
   compact = false,
+  onTriggerFullSync,
 }) => {
   const [internalLeague, setInternalLeague] = useState<string>(
     initialLeague && initialLeague !== 'ALL' ? initialLeague : 'england_premier_league'
@@ -142,16 +144,28 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!isLoading && error && (
-        <div className="bg-white dark:bg-[#121212] rounded-2xl p-6 text-center space-y-2.5 shadow-sm">
+        <div className="bg-white dark:bg-[#121212] rounded-2xl p-6 text-center space-y-3 shadow-sm">
           <AlertCircle className="w-5 h-5 text-slate-400 mx-auto" />
           <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium">{error}</p>
-          <button
-            type="button"
-            onClick={() => fetchStandings(currentLeague)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 cursor-pointer mt-1.5 active:scale-95 shadow-xs"
-          >
-            Retry
-          </button>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => fetchStandings(currentLeague)}
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-200 cursor-pointer active:scale-95 shadow-xs"
+            >
+              Retry
+            </button>
+            {onTriggerFullSync && (
+              <button
+                type="button"
+                onClick={onTriggerFullSync}
+                className="px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 cursor-pointer active:scale-95 shadow-xs flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Start Full Sync</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 

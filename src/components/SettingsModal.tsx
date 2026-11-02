@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Cpu, Check, Sun, Moon, Terminal, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle } from 'lucide-react';
+import { X, Settings, Cpu, Check, Sun, Moon, Terminal, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle, Sparkles, TrendingUp, Target } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 
@@ -56,15 +56,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRefreshMetrics,
   syncProgress,
 }) => {
-  const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'UI'>('ENGINE');
+  const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'PREDICTIONS' | 'UI'>('ENGINE');
   const [activeProvider, setActiveProvider] = useState<EngineSettings['activeProvider']>(
     settings?.activeProvider || 'FLASHSCORE'
   );
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [tursoStatus, setTursoStatus] = useState<any>(null);
+  const [scraperStatus, setScraperStatus] = useState<any>(null);
+  const [localStats, setLocalStats] = useState<any>(stats);
   const [isCheckingTurso, setIsCheckingTurso] = useState<boolean>(false);
   const [isRefreshingMetrics, setIsRefreshingMetrics] = useState<boolean>(false);
+  const [isUpdatingPredictions, setIsUpdatingPredictions] = useState<boolean>(false);
+  const [predictionProgress, setPredictionProgress] = useState<{
+    progress: number;
+    currentStep: string;
+    stepIndex?: number;
+    totalSteps?: number;
+    matchesCount?: number;
+    upcomingCount?: number;
+    predictionsCount?: number;
+  } | null>(null);
+  const [predictionResultMsg, setPredictionResultMsg] = useState<string | null>(null);
+  const [predictionErrMsg, setPredictionErrMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (stats) setLocalStats(stats);
+  }, [stats]);
 
   const fetchTursoStatus = async () => {
     setIsCheckingTurso(true);
@@ -78,10 +96,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const fetchScraperStatus = async () => {
+    try {
+      const data = await EngineService.getScraperStatus();
+      setScraperStatus(data);
+    } catch (err) {
+      console.error('Error checking Scraper status:', err);
+    }
+  };
+
+  const fetchFreshStats = async () => {
+    try {
+      const s = await EngineService.getStats();
+      if (s) setLocalStats(s);
+    } catch (err) {
+      console.error('Error fetching fresh stats:', err);
+    }
+  };
+
   const handleRefreshMetrics = async () => {
     setIsRefreshingMetrics(true);
     try {
-      await fetchTursoStatus();
+      await Promise.all([fetchTursoStatus(), fetchScraperStatus(), fetchFreshStats()]);
       if (onRefreshMetrics) {
         await onRefreshMetrics();
       }
@@ -92,15 +128,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (isOpen && activeTab === 'DATA') {
-      fetchTursoStatus();
+  const handleUpdatePredictions = async () => {
+    setIsUpdatingPredictions(true);
+    setPredictionResultMsg(null);
+    setPredictionErrMsg(null);
+    setPredictionProgress(null);
+    try {
+      const res = await EngineService.updateUpcomingPredictions((job) => {
+        setPredictionProgress(job);
+      });
+      if (res.success) {
+        setPredictionResultMsg(res.message || `Updated predictions for upcoming games in database.`);
+        setPredictionProgress(null);
+        await Promise.all([fetchTursoStatus(), fetchScraperStatus(), fetchFreshStats()]);
+        if (onRefreshMetrics) {
+          await onRefreshMetrics();
+        }
+      } else {
+        setPredictionErrMsg(res.error || 'Failed to update upcoming predictions.');
+        setPredictionProgress(null);
+      }
+    } catch (err: any) {
+      setPredictionErrMsg(err?.message || 'Error executing prediction update.');
+      setPredictionProgress(null);
+    } finally {
+      setIsUpdatingPredictions(false);
     }
-  }, [isOpen, activeTab]);
-
-  if (!isOpen || !settings) return null;
+  };
 
   const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isResettingDatabase);
+
+  useEffect(() => {
+    if (isOpen && (activeTab === 'DATA' || activeTab === 'PREDICTIONS')) {
+      fetchTursoStatus();
+      fetchScraperStatus();
+      fetchFreshStats();
+    }
+  }, [isOpen, activeTab, isOperating]);
+
+  if (!isOpen || !settings) return null;
 
   const handleExecuteResetAndSync = () => {
     setIsConfirmingReset(false);
@@ -144,7 +210,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div>
               <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">Settings</h2>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure engine, data, and UI</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure engine, data, predictions, and UI</p>
             </div>
           </div>
 
@@ -182,7 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Navigation Tabs: Engine, Data Management, UI */}
+        {/* Modal Navigation Tabs: Engine, Data Management, Predictions, UI */}
         <div className="px-4 sm:px-5 pb-1.5 pt-1">
           <div className="p-1 bg-slate-100 dark:bg-[#1E1E1E] rounded-full flex items-center gap-1 text-[10.5px] overflow-x-auto no-scrollbar">
             <button
@@ -206,6 +272,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <Database className="w-3 h-3" />
               <span>Data Management</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('PREDICTIONS')}
+              className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'PREDICTIONS'
+                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400" />
+              <span>Predictions</span>
             </button>
             <button
               onClick={() => setActiveTab('UI')}
@@ -287,28 +364,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Upcoming Fixtures</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
-                      {stats?.upcomingCount !== undefined ? stats.upcomingCount : '—'}
+                      {localStats?.upcomingCount !== undefined ? localStats.upcomingCount : (stats?.upcomingCount !== undefined ? stats.upcomingCount : '—')}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Model Predictions</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
-                      {stats?.predictionsCount !== undefined ? stats.predictionsCount : '—'}
+                      {localStats?.predictionsCount !== undefined ? localStats.predictionsCount : (stats?.predictionsCount !== undefined ? stats.predictionsCount : '—')}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Stored Raw Feeds</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
-                      {stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—'}
+                      {localStats?.rawFeedsCount !== undefined ? localStats.rawFeedsCount : (stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—')}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Historical Matches</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
-                      {stats?.totalMatches !== undefined ? stats.totalMatches : '—'}
+                      {localStats?.totalMatches !== undefined ? localStats.totalMatches : (stats?.totalMatches !== undefined ? stats.totalMatches : '—')}
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-4 h-4 text-[#CCFF00]" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Scraper Engine & Circuit Breaker Health
+                    </h3>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black flex items-center gap-1 ${
+                    scraperStatus?.circuit?.state === 'OPEN'
+                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                      : scraperStatus?.circuit?.state === 'HALF_OPEN'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00]'
+                  }`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
+                    CIRCUIT: {scraperStatus?.circuit?.state || 'CLOSED'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Circuit Failures</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">{scraperStatus?.circuit?.failureCount ?? 0}</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Cached Raw Feeds</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-[#CCFF00]">{scraperStatus?.rawFeedsCount ?? localStats?.rawFeedsCount ?? stats?.rawFeedsCount ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* Feed Mirrors & CDN Endpoint Status */}
+                {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-1.5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-slate-500 dark:text-slate-400 block">
+                      Active Scraper Feed Mirrors & CDN Endpoints
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono">
+                      {scraperStatus.mirrors.map((m: any, idx: number) => (
+                        <div key={idx} className="p-2 rounded-xl bg-white dark:bg-[#121212] flex items-center justify-between gap-2 shadow-xs">
+                          <span className="truncate text-slate-700 dark:text-slate-300 font-medium">{m.name}</span>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] shrink-0">
+                            {m.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Turso DBs Connection Status Section */}
@@ -493,6 +622,138 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'PREDICTIONS' && (
+            <div className="space-y-4">
+              {/* Predictions Engine Status Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Upcoming Predictions Engine</h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">5-Pillar Poisson Model & Database Persistence</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10.5px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00]">
+                    DB Persisted
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1 font-mono">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Upcoming Fixtures</span>
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
+                      {localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Stored Model Predictions</span>
+                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
+                      {localStats?.predictionsCount ?? stats?.predictionsCount ?? '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Card: Trigger Predictions Update for Upcoming Games */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-full bg-slate-900 dark:bg-[#CCFF00] text-white dark:text-slate-950 font-bold">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Recalculate Upcoming Predictions
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
+                    Triggers Poisson model recalculation for <strong>upcoming games only</strong>. Evaluates 1X2 probabilities, expected value (+EV) edges, goal line distributions, and banker picks, and updates the database records.
+                  </p>
+                </div>
+
+                {/* Real-time Background Job Progress Panel */}
+                {isUpdatingPredictions && (
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-white dark:bg-[#121212] shadow-xs border border-amber-500/20 dark:border-[#CCFF00]/20">
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 truncate">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500 dark:text-[#CCFF00] shrink-0" />
+                        <span className="truncate">{predictionProgress?.currentStep || 'Recalculating 5-Pillar Poisson predictions...'}</span>
+                      </span>
+                      <span className="text-[11px] font-mono tabular-nums font-black text-slate-900 dark:text-white shrink-0">
+                        {predictionProgress?.progress ?? 15}%
+                        {predictionProgress?.stepIndex && predictionProgress?.totalSteps ? ` (Step ${predictionProgress.stepIndex}/${predictionProgress.totalSteps})` : ''}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-amber-500 via-emerald-400 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(5, predictionProgress?.progress ?? 15))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10.5px] font-mono text-slate-500 dark:text-slate-400 pt-0.5">
+                      <span>Matches Processed: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.matchesCount ?? 0} / {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? '—'}</strong></span>
+                      <span>Predictions Saved: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.predictionsCount ?? localStats?.predictionsCount ?? '—'}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback Alerts */}
+                {predictionResultMsg && (
+                  <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-800 dark:text-[#CCFF00] text-xs font-bold flex items-center gap-2 font-mono">
+                    <Check className="w-4 h-4 text-emerald-600 dark:text-[#CCFF00] shrink-0" />
+                    <span>{predictionResultMsg}</span>
+                  </div>
+                )}
+
+                {predictionErrMsg && (
+                  <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-700 dark:text-rose-400 text-xs font-bold flex items-center gap-2 font-mono">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <span>{predictionErrMsg}</span>
+                  </div>
+                )}
+
+                {/* Update Predictions Button */}
+                <button
+                  type="button"
+                  id="update-upcoming-predictions-btn"
+                  onClick={handleUpdatePredictions}
+                  disabled={isUpdatingPredictions}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] text-white dark:text-slate-950 font-black transition-all cursor-pointer text-xs uppercase tracking-wide shadow-xs active:scale-95 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isUpdatingPredictions ? 'animate-spin' : ''}`} />
+                  <span>{isUpdatingPredictions ? 'Calculating & Updating DB...' : 'Update Predictions'}</span>
+                </button>
+              </div>
+
+              {/* Calculated Market Categories Info */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-2 text-xs">
+                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[10px] block font-mono">
+                  Market Categories & Calculation Scope
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    <span>1X2 Match Outcomes</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span>Goals Over/Under (1.5, 2.5, 3.5)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    <span>Both Teams to Score (BTTS)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                    <span>Double Chance (1X, X2, 12)</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

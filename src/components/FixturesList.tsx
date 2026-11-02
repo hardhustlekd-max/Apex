@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Filter, ChevronDown, Search, X } from 'lucide-react';
+import { Filter, ChevronDown, Search, X, RefreshCw } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { Fixture } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
@@ -33,6 +33,8 @@ interface FixturesListProps {
   sortBy?: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
   onSelectSortBy?: (s: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC') => void;
   selectedFixtureId?: string | number;
+  isProcessingActive?: boolean;
+  onTriggerFullSync?: () => void;
 }
 
 import { getAuthoritative1X2Pick, getProbValue } from '../core/formatters.js';
@@ -73,6 +75,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   sortBy = 'DEFAULT',
   onSelectSortBy,
   selectedFixtureId,
+  isProcessingActive = false,
+  onTriggerFullSync,
 }) => {
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [historyFixtures, setHistoryFixtures] = useState<Fixture[]>([]);
@@ -737,50 +741,51 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <span className="mt-3 text-xs text-slate-500 dark:text-neutral-400 font-bold">Loading match data...</span>
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 sm:p-12 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center space-y-3 shadow-xs">
-          <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-900/80 flex items-center justify-center text-slate-500 dark:text-slate-400">
-            <Filter className="w-5 h-5" />
+        <div className="bg-white dark:bg-[#121216] rounded-3xl p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center space-y-4 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-[#CCFF00]/15 dark:bg-[#CCFF00]/10 flex items-center justify-center text-slate-950 dark:text-[#CCFF00] shadow-xs">
+            <RefreshCw className="w-6 h-6" />
           </div>
-          <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-            {activeScope === 'UPCOMING'
-              ? 'No upcoming fixtures found matching your criteria.'
-              : activeScope === 'LIVE'
-              ? 'No live matches currently in play.'
-              : 'No historical matches found matching your criteria.'}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto font-medium">
-            {activeFilterCount > 0
-              ? 'Some active filters or search terms may be narrowing down the results.'
-              : activeScope === 'UPCOMING'
-              ? 'Try choosing This Week or resetting your search filters.'
-              : 'Try selecting a different league or clearing search.'}
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+          <div className="space-y-1.5 max-w-md">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              {activeScope === 'UPCOMING'
+                ? 'No upcoming fixtures found in database'
+                : activeScope === 'LIVE'
+                ? 'No live matches currently in play'
+                : 'No historical matches found in database'}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {activeFilterCount > 0
+                ? 'Some active filters or search terms may be narrowing down your results.'
+                : 'Trigger a full synchronization to fetch fresh Flashscore match data, live scores, head-to-head records, and 5-Pillar Poisson model predictions.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            {onTriggerFullSync && (
+              <button
+                type="button"
+                onClick={onTriggerFullSync}
+                className="px-4 py-2.5 bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b8e600] dark:text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Start Full Sync & Update Data</span>
+              </button>
+            )}
             {activeFilterCount > 0 && (
               <button
                 type="button"
                 onClick={handleResetAllFilters}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
-                Reset all filters ({activeFilterCount})
+                Reset filters ({activeFilterCount})
               </button>
             )}
             {activeScope === 'UPCOMING' && dateFilter !== 'ALL' && (
               <button
                 type="button"
                 onClick={() => setDateFilter('ALL')}
-                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
-                Show all upcoming dates ({uniqueFixtures.length})
-              </button>
-            )}
-            {activeScope === 'UPCOMING' && dateFilter === 'TODAY' && (
-              <button
-                type="button"
-                onClick={() => setDateFilter('TOMORROW')}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                Show tomorrow
+                Show all dates ({uniqueFixtures.length})
               </button>
             )}
           </div>

@@ -6,6 +6,7 @@ import {
   Loader2,
   ChevronDown,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 import { Fixture, AccumulatorSlip, EngineSettings } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
@@ -16,6 +17,7 @@ interface PrebuiltAccumulatorsProps {
   fixtures: Fixture[];
   settings: EngineSettings | null;
   onSelectDetail?: (fixture: Fixture) => void;
+  onTriggerFullSync?: () => void;
 }
 
 type PrebuiltCategory = 'BANKER' | 'VALUE_HUNTER' | 'HIGH_GOALS' | 'MEGA_COMBO';
@@ -69,6 +71,7 @@ function calculateRiskProfile(slip: AccumulatorSlip): RiskProfile {
 export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
   fixtures,
   onSelectDetail,
+  onTriggerFullSync,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<PrebuiltCategory>('BANKER');
   const [dateScope, setDateScope] = useState<'TODAY' | 'TOMORROW' | 'NEXT_3_DAYS' | 'ALL'>('TODAY');
@@ -140,13 +143,30 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
     );
   }
 
-  if (!fixtures || fixtures.length === 0) {
+  if (!fixtures || fixtures.length === 0 || !activeSlip) {
     return (
-      <div className="p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center bg-white dark:bg-[#121216] rounded-3xl space-y-2 font-sans shadow-xs">
-        <Layers className="w-8 h-8 text-slate-400 dark:text-neutral-600 mx-auto" />
-        <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-          No Fixtures Available
-        </h3>
+      <div className="p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center bg-white dark:bg-[#121216] rounded-3xl space-y-4 font-sans shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-[#CCFF00]/15 dark:bg-[#CCFF00]/10 flex items-center justify-center text-slate-950 dark:text-[#CCFF00] shadow-xs">
+          <RefreshCw className="w-6 h-6" />
+        </div>
+        <div className="space-y-1.5 max-w-md">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+            No Accumulators Available
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
+            Accumulator slips require active match fixture predictions. Run a full data sync to calculate high-value parlays.
+          </p>
+        </div>
+        {onTriggerFullSync && (
+          <button
+            type="button"
+            onClick={onTriggerFullSync}
+            className="px-4 py-2.5 bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b8e600] dark:text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 mt-1"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Start Full Sync & Update Data</span>
+          </button>
+        )}
       </div>
     );
   }

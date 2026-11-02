@@ -13,6 +13,63 @@ const STATIC_IMAGE_BASE = 'https://static.flashscore.com/res/image/data/';
 
 import { parseFeedText, ScrapedRawMatch } from '../core/feedParser.js';
 
+export type CircuitState = 'CLOSED' | 'HALF_OPEN' | 'OPEN';
+
+export class ScraperCircuitBreaker {
+  private failureCount = 0;
+  private successCount = 0;
+  private lastFailureTime = 0;
+  private state: CircuitState = 'CLOSED';
+  private failureThreshold = 5;
+  private resetTimeoutMs = 30000;
+
+  public async execute<T>(fn: () => Promise<T>): Promise<T> {
+    const now = Date.now();
+
+    if (this.state === 'OPEN') {
+      if (now - this.lastFailureTime > this.resetTimeoutMs) {
+        this.state = 'HALF_OPEN';
+        this.successCount = 0;
+      } else {
+        throw new Error('Circuit Breaker OPEN - backing off upstream scraper feed requests');
+      }
+    }
+
+    try {
+      const res = await fn();
+      this.onSuccess();
+      return res;
+    } catch (err) {
+      this.onFailure();
+      throw err;
+    }
+  }
+
+  private onSuccess() {
+    this.failureCount = 0;
+    if (this.state === 'HALF_OPEN') {
+      this.successCount++;
+      if (this.successCount >= 2) {
+        this.state = 'CLOSED';
+      }
+    }
+  }
+
+  private onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN';
+    }
+  }
+
+  public getStatus(): { state: CircuitState; failureCount: number } {
+    return { state: this.state, failureCount: this.failureCount };
+  }
+}
+
+export const scraperCircuitBreaker = new ScraperCircuitBreaker();
+
 export class FlashscoreScraperService {
   private cacheUpcoming: Fixture[] = [];
   private cacheH2H = new Map<string, HeadToHeadMeasurement>();
@@ -34,65 +91,76 @@ export class FlashscoreScraperService {
 
     let lastError: any = null;
 
-    for (const url of urls) {
-      let timeout: NodeJS.Timeout | null = null;
-      try {
-        const controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      return await scraperCircuitBreaker.execute(async () => {
+        for (let attempt = 0; attempt < urls.length; attempt++) {
+          const url = urls[attempt];
+          let timeout: NodeJS.Timeout | null = null;
+          try {
+            if (attempt > 0) {
+              const backoffMs = Math.min(2000, Math.pow(2, attempt - 1) * 300) + Math.random() * 150;
+              await new Promise((r) => setTimeout(r, backoffMs));
+            }
 
-        const res = await fetch(url, {
-          headers: {
-            'x-fsign': FSIGN_HEADER,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Referer': 'https://www.flashscore.com/',
-            'Origin': 'https://www.flashscore.com',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-          signal: controller.signal,
-        });
+            const controller = new AbortController();
+            timeout = setTimeout(() => controller.abort(), 6000);
 
-        if (res.ok) {
-          const text = await res.text();
-          if (text && text.length > 50) {
-            return text;
+            const res = await fetch(url, {
+              headers: {
+                'x-fsign': FSIGN_HEADER,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Referer': 'https://www.flashscore.com/',
+                'Origin': 'https://www.flashscore.com',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+              signal: controller.signal,
+            });
+
+            if (res.ok) {
+              const text = await res.text();
+              if (text && text.length > 50) {
+                return text;
+              }
+              lastError = new Error(`Flashscore feed response empty on ${url}`);
+            } else {
+              lastError = new Error(`Flashscore HTTP ${res.status} on ${url}`);
+            }
+          } catch (err: any) {
+            const isAbort = err?.name === 'AbortError' || err?.message?.includes('aborted');
+            lastError = isAbort
+              ? new Error(`Feed connection timed out (${url})`)
+              : (err instanceof Error ? err : new Error(String(err)));
+          } finally {
+            if (timeout) {
+              clearTimeout(timeout);
+              timeout = null;
+            }
           }
-          lastError = new Error(`Flashscore feed response empty on ${url}`);
-        } else {
-          lastError = new Error(`Flashscore HTTP ${res.status} on ${url}`);
         }
-      } catch (err: any) {
-        const isAbort = err?.name === 'AbortError' || err?.message?.includes('aborted');
-        lastError = isAbort
-          ? new Error(`Feed connection timed out (${url})`)
-          : (err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        if (timeout) {
-          clearTimeout(timeout);
-          timeout = null;
-        }
+        throw lastError || new Error(`All ${urls.length} Flashscore mirrors failed for path ${path}`);
+      });
+    } catch (cbErr: any) {
+      const localCached = db.getRawFeed(path);
+      if (localCached && localCached.rawText) {
+        return localCached.rawText;
       }
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'SCRAPER',
+        source: 'FlashscoreScraperService',
+        message: `Flashscore feed fallback for path "${path}": ${cbErr?.message || 'Remote endpoints unavailable'}`,
+        details: {
+          path,
+          error: cbErr?.message,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return null;
     }
-
-    const localCached = db.getRawFeed(path);
-    if (localCached && localCached.rawText) {
-      return localCached.rawText;
-    }
-
-    loggerService.addLog({
-      level: 'INFO',
-      category: 'SCRAPER',
-      source: 'FlashscoreScraperService',
-      message: `Flashscore feed fallback for path "${path}": ${lastError?.message || 'Remote endpoint unavailable'}`,
-      details: {
-        path,
-        error: lastError?.message,
-        timestamp: new Date().toISOString(),
-      },
-    });
-
-    return null;
   }
 
   async fetchAndPersistRawFeed(path: string, fixtureId?: string): Promise<string | null> {
@@ -377,9 +445,10 @@ export class FlashscoreScraperService {
 
     const matches: HistoricalMatch[] = [];
     try {
-      // Dynamic import of playwright
+      // Dynamic import of playwright via indirect evaluation so Vite dev server AST scanner does not try to bundle browser/Node playwright dependencies
       // @ts-ignore
-      const { chromium } = await import('playwright');
+      const pwImport = new Function('m', 'return import(m)');
+      const { chromium } = await pwImport('playwright');
       const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',

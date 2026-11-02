@@ -141,13 +141,15 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     level: 'INFO',
     category: 'DATABASE',
     source: 'SyncEngine',
-    message: 'Starting Flashscore historical & upcoming feeds synchronization...',
+    message: 'Starting Flashscore full data & H2H synchronization...',
   });
 
   try {
-    const syncRes = await flashscoreScraperService.syncHistoricalData(7, !options.resetDatabase);
+    await predictionsDb.reconcileStaleMatches();
+    const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
     const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
+    await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
 
     // Save finished scraped matches to historical predictions db
     const scrapedMatches = db.getFlashscoreScrapedMatches(500);

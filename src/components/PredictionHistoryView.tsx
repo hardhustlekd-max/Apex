@@ -5,7 +5,15 @@ import { CheckCircle2, XCircle, RefreshCw, BarChart3, ShieldCheck, Target, Layer
 import { getLeaguePriority } from '../core/leaguePriority.js';
 import { normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
 
-export const PredictionHistoryView: React.FC = () => {
+interface PredictionHistoryViewProps {
+  isProcessingActive?: boolean;
+  onTriggerFullSync?: () => void;
+}
+
+export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
+  isProcessingActive = false,
+  onTriggerFullSync,
+}) => {
   const [history, setHistory] = useState<Fixture[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -185,7 +193,7 @@ export const PredictionHistoryView: React.FC = () => {
           {/* Sync Historical Data Scraper Button */}
           <button
             onClick={handleSyncHistoryScraper}
-            disabled={isSyncingHistory || isRefreshing}
+            disabled={isSyncingHistory || isRefreshing || isProcessingActive}
             className="inline-flex items-center gap-1.5 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
             title="Run historical archive scraper to populate database with multi-year results"
           >
@@ -195,7 +203,7 @@ export const PredictionHistoryView: React.FC = () => {
 
           <button
             onClick={() => fetchHistory(limit, true)}
-            disabled={isRefreshing || isSyncingHistory}
+            disabled={isRefreshing || isSyncingHistory || isProcessingActive}
             className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -241,15 +249,38 @@ export const PredictionHistoryView: React.FC = () => {
 
       {/* Fixtures List */}
       {history.length === 0 ? (
-        <div className="bg-white dark:bg-[#121216] rounded-2xl p-6 text-center text-xs font-medium text-slate-500 dark:text-neutral-400 shadow-xs space-y-2.5">
-          <p>No historical predictions recorded in database yet.</p>
-          <button
-            onClick={() => fetchHistory(limit, true)}
-            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-2 rounded-full text-xs font-black bg-[#CCFF00] text-slate-950 transition-all active:scale-95 shadow-xs cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Evaluate Historical Database
-          </button>
+        <div className="bg-white dark:bg-[#121216] rounded-2xl p-8 text-center text-xs shadow-xs space-y-4">
+          <div className="w-10 h-10 rounded-2xl bg-[#CCFF00]/15 dark:bg-[#CCFF00]/10 flex items-center justify-center text-slate-950 dark:text-[#CCFF00] mx-auto shadow-xs">
+            <RefreshCw className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              No historical predictions recorded in database yet
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium max-w-sm mx-auto">
+              Run a full sync to fetch Flashscore match archives, evaluate Poisson predictions, and build accuracy logs.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            {onTriggerFullSync && (
+              <button
+                type="button"
+                onClick={onTriggerFullSync}
+                className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 transition-all active:scale-95 shadow-md cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Start Full Sync & Update Data</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchHistory(limit, true)}
+              className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-200 transition-all active:scale-95 shadow-xs cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Evaluate Historical Database</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl overflow-hidden bg-white dark:bg-[#121216] shadow-xs">

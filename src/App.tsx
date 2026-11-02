@@ -10,6 +10,7 @@ import { MatchDetailModal, MatchDetailView } from './components/MatchDetailModal
 import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
 import { BottomNavDock } from './components/BottomNavDock.js';
+import { SyncLockOverlay } from './components/SyncLockOverlay.js';
 import {
   Fixture,
   EngineSettings,
@@ -19,6 +20,8 @@ import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
 import { getRelativeDateStr, getPossibleDateStrs, normalizeDateStr } from './core/dateUtils.js';
 import { indexedDbClient } from './core/indexedDbClient.js';
+
+import { RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -53,6 +56,7 @@ export default function App() {
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [isSyncingData, setIsSyncingData] = useState<boolean>(false);
+  const [activeSyncJob, setActiveSyncJob] = useState<any | null>(null);
   const [syncJobProgress, setSyncJobProgress] = useState<{
     progress: number;
     currentStep: string;
@@ -250,14 +254,41 @@ export default function App() {
     }
   }, []);
 
+  const checkActiveSyncJob = useCallback(async () => {
+    try {
+      const active = await EngineService.getActiveSyncJob();
+      if (active && (active.status === 'RUNNING' || active.status === 'PENDING')) {
+        setActiveSyncJob(active);
+      } else if (activeSyncJob && (activeSyncJob.status === 'RUNNING' || activeSyncJob.status === 'PENDING')) {
+        setActiveSyncJob(null);
+        setIsSyncingData(false);
+        await Promise.all([fetchFixtures(), fetchSettingsAndProviders(), fetchLiveScores()]);
+        showNotification('Synchronization & prediction recalculation complete!', 'success');
+      } else {
+        setActiveSyncJob(null);
+      }
+    } catch {
+      // safe catch
+    }
+  }, [activeSyncJob, fetchFixtures, fetchSettingsAndProviders, fetchLiveScores]);
+
   useEffect(() => {
     fetchSettingsAndProviders();
     fetchFixtures();
     fetchLiveScores();
+    checkActiveSyncJob();
 
-    const interval = setInterval(fetchLiveScores, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    // Adaptive polling: 1s for active job, 15s for live scores, 60s for upcoming odds
+    const activeJobInterval = setInterval(checkActiveSyncJob, 1000);
+    const liveInterval = setInterval(fetchLiveScores, 15000);
+    const fixturesInterval = setInterval(fetchFixtures, 60000);
+
+    return () => {
+      clearInterval(activeJobInterval);
+      clearInterval(liveInterval);
+      clearInterval(fixturesInterval);
+    };
+  }, [checkActiveSyncJob]);
 
   const handleSelectLeague = (league: string) => {
     setSelectedLeague(league);
@@ -286,8 +317,6 @@ export default function App() {
     }
   };
 
-
-
   const handleRefresh = async () => {
     await Promise.all([
       fetchSettingsAndProviders(),
@@ -295,6 +324,11 @@ export default function App() {
       fetchLiveScores()
     ]);
   };
+
+  const isProcessingActive = Boolean(
+    isSyncingData ||
+    (activeSyncJob && (activeSyncJob.status === 'RUNNING' || activeSyncJob.status === 'PENDING'))
+  );
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
@@ -317,7 +351,7 @@ export default function App() {
         onOpenSeedModal={() => setIsSettingsOpen(true)}
         onSelectAccaCategory={() => setActiveTab('ACCAS')}
         onProviderChange={handleProviderChange}
-        isSyncing={isLoadingFixtures}
+        isSyncing={isLoadingFixtures || isProcessingActive}
         theme={theme}
         onToggleTheme={toggleTheme}
         searchQuery={searchQuery}
@@ -340,15 +374,50 @@ export default function App() {
           onToggleTheme={toggleTheme}
           totalMatchesCount={fixtures.length}
           liveMatchesCount={liveScores.length}
-          isSyncing={isLoadingFixtures || isSyncingData}
+          isSyncing={isLoadingFixtures || isProcessingActive}
         />
 
         {/* Content Viewport */}
         <div className="flex-1 min-w-0 flex flex-col">
           <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
             <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-3.5 space-y-4 pb-20 lg:pb-8">
+              {/* Blocking Job Overlay when Full Sync or Update Predictions is in progress */}
+              {isProcessingActive && (
+                <SyncLockOverlay
+                  job={activeSyncJob}
+                  onCancel={(jobId) => EngineService.cancelSyncJob(jobId)}
+                />
+              )}
+
+              {/* Notification Banner to Start Full Sync if Database has zero fixtures */}
+              {fixtures.length === 0 && !isLoadingFixtures && !isProcessingActive && (
+                <div className="bg-slate-950 text-white dark:bg-[#121216] dark:border dark:border-neutral-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#CCFF00]/15 flex items-center justify-center text-[#CCFF00] shrink-0">
+                      <RefreshCw className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-0.5 min-w-0">
+                      <h3 className="text-xs sm:text-sm font-extrabold tracking-tight">
+                        Database Synchronization Prompt
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-slate-300 dark:text-neutral-400 font-medium">
+                        Start full sync to fetch active Flashscore fixtures, team stats, H2H records, and calculate 5-Pillar Poisson model predictions.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetAndSyncData}
+                    className="px-4 py-2.5 rounded-full bg-[#CCFF00] text-slate-950 font-black text-xs hover:bg-[#b8e600] transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Start Full Sync & Update Data</span>
+                  </button>
+                </div>
+              )}
+
               {activeTab === 'FIXTURES' && (
-                <div className="w-full grid grid-cols-12 gap-4 lg:gap-5 items-start">
+                <div className={`w-full grid grid-cols-12 gap-4 lg:gap-5 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   {/* Master Feed Column */}
                   <div className="col-span-12 lg:col-span-7 xl:col-span-7 min-w-0">
                     <FixturesList
@@ -371,6 +440,8 @@ export default function App() {
                       sortBy={sortBy}
                       onSelectSortBy={setSortBy}
                       selectedFixtureId={selectedDetailFixture?.id}
+                      isProcessingActive={isProcessingActive}
+                      onTriggerFullSync={handleResetAndSyncData}
                     />
                   </div>
 
@@ -385,27 +456,32 @@ export default function App() {
               )}
 
               {activeTab === 'ACCAS' && (
-                <div className="max-w-4xl mx-auto w-full">
+                <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   <PrebuiltAccumulators
                     fixtures={fixtures}
                     settings={settings}
                     onSelectDetail={handleSelectFixture}
+                    onTriggerFullSync={handleResetAndSyncData}
                   />
                 </div>
               )}
 
               {activeTab === 'STANDINGS' && (
-                <div className="max-w-5xl mx-auto w-full">
+                <div className={`max-w-5xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   <LeagueStandings
                     selectedLeague={selectedLeague}
                     onSelectLeague={setSelectedLeague}
+                    onTriggerFullSync={handleResetAndSyncData}
                   />
                 </div>
               )}
 
               {activeTab === 'HISTORY' && (
-                <div className="max-w-4xl mx-auto w-full">
-                  <PredictionHistoryView />
+                <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
+                  <PredictionHistoryView
+                    isProcessingActive={isProcessingActive}
+                    onTriggerFullSync={handleResetAndSyncData}
+                  />
                 </div>
               )}
             </main>

@@ -3,6 +3,7 @@ import { parseFeedText, ScrapedRawMatch } from './feedParser.js';
 import { HeadToHeadMeasurement, HeadToHeadMatchRecord, TeamFormMatch } from './types.js';
 import { loggerService } from '../services/loggerService.js';
 import { normalizeDateStr, getStandardDateStr } from './dateUtils.js';
+import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 
 export class OnDemandParser {
   /**
@@ -10,7 +11,7 @@ export class OnDemandParser {
    */
   public static async getParsedMatch(fixtureId: string): Promise<ScrapedRawMatch | null> {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
     
     loggerService.addLog({
       level: 'INFO',
@@ -19,13 +20,23 @@ export class OnDemandParser {
       message: `Extracting on-demand match data from raw feed for fixture ${cleanId}`,
     });
 
-    const rawData = db.getRawFeed(cleanId);
+    let rawData = await db.getRawFeedAsync(cleanId);
+
+    // Fallback: If missing from memory & Turso DB, trigger active Flashscore CDN feed scrape
+    if (!rawData || !rawData.rawText) {
+      const feedPath = `df_hh_1_${cleanId}`;
+      const scrapedText = await flashscoreScraperService.fetchAndPersistRawFeed(feedPath, cleanId);
+      if (scrapedText) {
+        rawData = { rawText: scrapedText };
+      }
+    }
+
     if (!rawData || !rawData.rawText) {
       loggerService.addLog({
-        level: 'WARN',
+        level: 'INFO',
         category: 'DATABASE',
         source: 'OnDemandParser',
-        message: `No raw feed found in database for fixture ${cleanId}`,
+        message: `Raw feed unavailable for fixture ${cleanId} after multi-tier lookup`,
       });
       return null;
     }
@@ -96,9 +107,17 @@ export class OnDemandParser {
     fixtureAwayTeam?: string
   ): Promise<HeadToHeadMeasurement | null> {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
 
-    const rawData = db.getRawFeed(cleanId);
+    let rawData = await db.getRawFeedAsync(cleanId);
+    if (!rawData || !rawData.rawText || (!rawData.rawText.includes('KB÷') && !rawData.rawText.includes('KC÷'))) {
+      const feedPath = `df_hh_1_${cleanId}`;
+      const scrapedText = await flashscoreScraperService.fetchAndPersistRawFeed(feedPath, cleanId);
+      if (scrapedText) {
+        rawData = { rawText: scrapedText };
+      }
+    }
+
     if (!rawData || !rawData.rawText || (!rawData.rawText.includes('KB÷') && !rawData.rawText.includes('KC÷'))) {
       return null;
     }

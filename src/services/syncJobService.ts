@@ -24,6 +24,7 @@ export interface SyncJobState {
   stats?: any;
   startTime: number;
   endTime?: number;
+  jobType?: 'FULL' | 'PREDICTIONS';
 }
 
 export class SyncJobService {
@@ -96,6 +97,41 @@ export class SyncJobService {
     setTimeout(() => {
       this.executeJob(jobId, opts).catch((err) => {
         console.error(`[SyncJobService] Uncaught error in job ${jobId}:`, err);
+      });
+    }, 10);
+
+    return job;
+  }
+
+  public startPredictionJob(): SyncJobState {
+    const existing = this.getActiveJob();
+    if (existing) {
+      return existing;
+    }
+
+    const jobId = `pred_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const job: SyncJobState = {
+      id: jobId,
+      status: 'RUNNING',
+      progress: 10,
+      currentStep: 'Initializing prediction recalculation worker...',
+      stepIndex: 1,
+      totalSteps: 3,
+      matchesCount: 0,
+      upcomingCount: 0,
+      predictionsCount: 0,
+      historicalPredictionsCount: 0,
+      livePredictionsCount: 0,
+      jobType: 'PREDICTIONS',
+      startTime: Date.now(),
+    };
+
+    this.jobs.set(jobId, job);
+    this.cleanOldJobs();
+
+    setTimeout(() => {
+      this.executePredictionJob(jobId).catch((err) => {
+        console.error(`[SyncJobService] Uncaught error in prediction job ${jobId}:`, err);
       });
     }, 10);
 
@@ -298,6 +334,116 @@ export class SyncJobService {
       this.updateProgress(jobId, {
         status: 'FAILED',
         error: err?.message || 'Sync worker encountered an error',
+        currentStep: 'Failed',
+        endTime: Date.now(),
+      });
+    }
+  }
+
+  private async executePredictionJob(jobId: string): Promise<void> {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'PREDICTION',
+      source: 'SyncJobService',
+      message: `Initiating async prediction update job ${jobId}`,
+    });
+
+    try {
+      // Step 1: Fetch upcoming fixtures
+      this.updateProgress(jobId, {
+        progress: 15,
+        stepIndex: 1,
+        totalSteps: 3,
+        currentStep: 'Fetching upcoming fixtures raw feeds and database records...',
+      });
+
+      let upcoming = await flashscoreScraperService.getUpcomingFixtures().catch(() => []);
+      if (!upcoming || upcoming.length === 0) {
+        upcoming = db.getUpcomingFixtures();
+      }
+
+      if (this.isCancelled(jobId)) return;
+
+      this.updateProgress(jobId, {
+        progress: 35,
+        upcomingCount: upcoming.length,
+        currentStep: `Ingested ${upcoming.length} upcoming fixtures. Starting Poisson model calculations...`,
+      });
+
+      // Step 2: Recalculate predictions
+      let updatedCount = 0;
+      let count = 0;
+
+      if (upcoming && upcoming.length > 0) {
+        this.updateProgress(jobId, {
+          progress: 50,
+          stepIndex: 2,
+          currentStep: `Recalculating 5-Pillar Poisson model predictions for ${upcoming.length} upcoming games...`,
+        });
+
+        const result = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
+        count = result.count;
+        updatedCount = result.fixtures.length;
+      } else {
+        this.updateProgress(jobId, {
+          progress: 50,
+          stepIndex: 2,
+          currentStep: 'Synthesizing Poisson model predictions from database records...',
+        });
+
+        const { ServerPredictionGeneratorService } = await import('./serverPredictionGeneratorService.js');
+        const synthesized = await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
+        count = synthesized.length;
+        updatedCount = synthesized.length;
+      }
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 3: Persist & summary
+      this.updateProgress(jobId, {
+        progress: 85,
+        stepIndex: 3,
+        matchesCount: updatedCount,
+        predictionsCount: count,
+        currentStep: 'Finalizing database persistence and updating prediction tables...',
+      });
+
+      const totalPredictionsCount = predictionsDb.count();
+      const finalMessage = `Successfully recalculated and updated predictions for ${updatedCount} upcoming matches in database`;
+
+      this.updateProgress(jobId, {
+        status: 'COMPLETED',
+        progress: 100,
+        currentStep: 'Completed',
+        matchesCount: updatedCount,
+        upcomingCount: upcoming.length,
+        predictionsCount: totalPredictionsCount,
+        message: finalMessage,
+        endTime: Date.now(),
+      });
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'PREDICTION',
+        source: 'SyncJobService',
+        message: `Prediction update job ${jobId} completed: ${updatedCount} upcoming matches updated`,
+        details: { count: updatedCount, totalPredictionsCount },
+      });
+    } catch (err: any) {
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'PREDICTION',
+        source: 'SyncJobService',
+        message: `Prediction update job ${jobId} failed: ${err?.message}`,
+        details: { stack: err?.stack },
+      });
+
+      this.updateProgress(jobId, {
+        status: 'FAILED',
+        error: err?.message || 'Prediction recalculation worker encountered an error',
         currentStep: 'Failed',
         endTime: Date.now(),
       });

@@ -1,108 +1,110 @@
-# System-Wide Standardized Date & Time Engine
+# On-Demand Scraper & Raw Feed Fallback Engine Fix
 
-Standardize date parsing, formatting, storage, and match kick-off evaluation across server scrapers, database persistence layers, and client UI components using the **Flashscore Date/Time Standard** exclusively, eliminating browser-based clock dependencies, local client timezone shifts, and environment-dependent date discrepancies.
+Eliminates the "no raw feed found" warning and error state when inspecting matches, statistics, or H2H details by introducing an automated multi-tier lookup pipeline with active Flashscore CDN feed scraping and database caching.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The plan has been revised per your instructions to strictly utilize Flashscore data and time standards, completely bypassing browser-based clocks and local client timing.
+> The following architectural decisions were confirmed based on user clarification:
 
-- **Confirmed Decision 1 (Flashscore Data & Storage Standard)**: Scrapers, database persistence, predictions stores, and backend engines will strictly enforce Flashscore standardized date (`YYYY-MM-DD`) and 24-hour time (`HH:mm`) format (or raw Flashscore Unix timestamp epoch where provided by feeds), storing normalized timestamps uniformly across all deployments.
-- **Confirmed Decision 2 (Zero Browser Clock Dependency for Kick-off)**: Kick-off status evaluation (`hasMatchStarted`) will operate strictly on Flashscore feed timestamps and Flashscore/UTC epoch time, ignoring browser local clocks, system timezone overrides, or client-side `new Date()` locale shifts.
-- **Confirmed Decision 3 (UI Parity with Raw Feeds)**: Frontend components (Matches Grid, Historical Evaluation, Predictions View, Poisson Matrix) will display match dates and times directly in Flashscore standard time format, guaranteeing 1:1 visual parity with Flashscore feeds across all user environments.
+- **Confirmed Decision 1 (Active Scraper Fetch)**: When a raw feed is absent from local memory or database storage, `OnDemandParser` and match detail endpoints will actively trigger a live feed fetch from Flashscore via Ninja CDN endpoints with mirror failover and circuit breaker protection.
+- **Confirmed Decision 2 (Multi-Tier Persistence Lookup)**: Implemented a resilient 3-stage lookup: Memory Cache -> Turso Cloud DB (`raw_feed_data` table) -> Live CDN Scraper fallback.
+- **Confirmed Decision 3 (Canonical Match ID Normalization)**: Standardized ID resolution by stripping all lookup prefixes (`fs_`, `hist_`, `scraped_`) before executing database and feed queries.
 
 ---
 
 ## 1. Overview & Core Concept
 
-### What It Does
-This feature establishes a centralized, resilient **Flashscore Date & Time Core Module** (`dateUtils.ts`). It guarantees that match kick-off calculations, date queries, auto-migrations of finished games, and historical prediction evaluations operate on Flashscore standardized time specs across all environments (Vercel, Node server, client UI) with zero browser clock interference.
-
-### Target Audience
-Analytics engine users and automated predictions pipelines requiring strict alignment with Flashscore match schedules and 1:1 prediction evaluation accuracy.
-
-### Key Value
-- **Zero Browser Clock Dependency**: Prevents false "upcoming" or "finished" match states caused by incorrect local client clocks or browser timezone settings.
-- **1:1 Flashscore Feed Parity**: Eliminates time shift confusion between raw scraped feeds, predictions DB entries, and frontend scoreboards.
-- **Standardized Database Schema**: Ensures historical predictions query matching (`YYYY-MM-DD`) operates smoothly across every server deployment.
+- **What It Does**: Resolves raw feed missing errors when users open match details, inspect H2H records, view club form, or analyze on-demand statistics. Missing feeds are scraped dynamically on demand, stored in the SQLite/Turso database, and returned without breaking UI flow or logging server warnings.
+- **Target Audience / Persona**: Football analysts and bettor users reviewing individual match breakdowns, H2H team records, and statistical trends.
+- **Key Value**: Zero failed detail lookups, guaranteed stats and H2H availability, and automatic local feed caching to optimize future feed queries.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Key User Flows
-1. **Historical Prediction Evaluation View**:
-   - Queries `historical_predictions` DB strictly by Flashscore normalized date `YYYY-MM-DD`.
-   - Displays evaluation results matching Flashscore match dates with 100% accuracy.
-2. **Upcoming & Live Matches List**:
-   - Determines match state (`UPCOMING`, `LIVE`, `FINISHED`) using Flashscore kick-off epoch timestamps without consulting browser local time.
-   - Finished matches automatically migrate to `historical_predictions` when Flashscore feed marks them complete or kick-off timestamp passes Flashscore UTC threshold.
-3. **Poisson & Analysis Views**:
-   - Renders match schedule times in clean `HH:mm` Flashscore standard notation with monospace tabular alignment (`font-mono tabular-nums`).
+- **Key User Flows**:
+  1. User selects any fixture card in the main feed or searches for a historical/upcoming match.
+  2. Match Detail inspector modal loads.
+  3. If the match raw feed is present in memory, it parses immediately (<15ms).
+  4. If missing from memory, it queries Turso Cloud DB (`raw_feed_data`).
+  5. If missing from Turso, `OnDemandParser` triggers an active Flashscore CDN request for `df_m_1_{matchId}` or `df_hh_1_{matchId}` across rotated Ninja CDN endpoints (`46.flashscore.ninja`, `1.flashscore.ninja`, `2.flashscore.ninja`).
+  6. Scraped feed is persisted to DB and memory, and match statistics/H2H are instantly populated in the UI without error toasts or blank states.
 
-### Visual Identity & Theme
-- **Style**: Dark-mode sports analytics interface with `#CCFF00` (Lime) accent highlights.
-- **Typography**: `Plus Jakarta Sans` for titles, `JetBrains Mono` / `tabular-nums` for scorelines and Flashscore timestamps.
-- **Metadata Rule**: Clean text separators (`·` / `/`) with zero static pill enclosures.
+- **Visual Identity & Theme**:
+  - *Aesthetic*: Dark mode posture with dark neutral backgrounds (`#09090B`, `#121216`), bright neon accent `#CCFF00`, crisp typography, and MUI/Lucide icons.
+  - *Interactive Feedback*: Smooth loading state for match detail stats while on-demand fetch completes, followed by instantaneous rendering.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-### Decision 1: Pure Flashscore Time Standard Across All Layers
-- **Chosen Approach**: Parse and store all scraped match dates and kick-off times in Flashscore standard notation (`YYYY-MM-DD`, `HH:mm`, or Flashscore Unix timestamp). Frontend views render the exact Flashscore time string.
-- **Why**: Eliminates confusion caused by client browsers converting kick-off times into different local timezones.
-- **Alternatives Considered**: Converting Flashscore times to user local browser timezone, which caused date mismatch bugs when users viewed matches spanning midnight UTC.
+- **Decision 1: Active Fallback vs Static Error Message**
+  - *Chosen Approach*: On-demand live feed scraping upon cache miss.
+  - *Why*: Guarantees every match detail request succeeds even if the match wasn't included in the initial bulk background sync batch.
+  - *Alternatives Considered*: Static error message or empty placeholder. Rejected because it degraded user experience when inspecting niche or global matches.
 
-### Decision 2: Browser-Independent Kick-Off Evaluation Engine
-- **Chosen Approach**: Calculate match elapsed state using Flashscore kick-off Unix timestamp parsed from feed metadata or standard UTC epoch calculation (`Date.UTC(...)`), compared against server-synchronized UTC timestamp. Client browser local clock offsets are ignored.
-- **Why**: Guarantees consistent match status detection regardless of whether a user's phone or computer clock is fast, slow, or set to a different timezone.
+- **Decision 2: Multilevel Raw Feed Lookup (`Memory -> Turso -> Scraper`)**
+  - *Chosen Approach*: Synchronously check in-memory Map; if absent, asynchronously query Turso SQLite `raw_feed_data`; if absent, trigger `fetchFlashscoreFeed` with circuit breaker backoff.
+  - *Why*: Minimizes network overhead for repeatedly viewed matches while preserving 100% data coverage.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy
 
+### System Component & Lookup Sequence Diagram
+
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                 Flashscore Standardized Date & Time Pipeline                │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
- ┌───────────────────────────────────────────────────────────────────────────┐
- │                   Flashscore Scraper & Parser Service                     │
- │  Extracts match date/time -> Normalizes to Flashscore standard            │
- │  (YYYY-MM-DD / HH:mm / Unix Kickoff Epoch)                                │
- └───────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
- ┌───────────────────────────────────────────────────────────────────────────┐
- │                          PredictionsDB / SQLite DB                         │
- │  Stores date: 'YYYY-MM-DD', time: 'HH:mm', kickoff_timestamp: Unix epoch  │
- └───────────────────────────────────────────────────────────────────────────┘
-                                       │
-                        ┌──────────────┴──────────────┐
-                        ▼                             ▼
- ┌─────────────────────────────────────────┐ ┌──────────────────────────────┐
- │     Historical Evaluation DB Query      │ │ Flashscore Kickoff Engine    │
- │ (Matches predictions on date YYYY-MM-DD │ │ (Evaluates kickoff state     │
- │  against fixture results)               │ │  without browser clock drift)│
- └─────────────────────────────────────────┘ └──────────────────────────────┘
-                        │                             │
-                        └──────────────┬──────────────┘
-                                       ▼
- ┌───────────────────────────────────────────────────────────────────────────┐
- │                           Unified Frontend UI                             │
- │ (Renders Flashscore standard time directly with tabular numerals)         │
- └───────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Match Detail Request                            │
+│                  (GET /api/fixtures/:id/detail or h2h)                 │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                         Canonical ID Resolution                        │
+│                   cleanId = id.replace(/^(fs_|hist_)/, '')             │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       Stage 1: Memory Lookup                           │
+│                     db.getRawFeed(cleanId)                             │
+└───────────────┬────────────────────────────────────────┬───────────────┘
+                │ Found                                  │ Miss
+                ▼                                        ▼
+┌──────────────────────────────┐        ┌────────────────────────────────┐
+│  Parse & Return Match Feed   │        │     Stage 2: Turso DB Lookup   │
+└──────────────────────────────┘        │ SELECT raw_text FROM raw_feed… │
+                                        └───────┬────────────────┬───────┘
+                                                │ Found          │ Miss
+                                                ▼                ▼
+                                 ┌────────────────────┐ ┌────────────────┐
+                                 │ Save to Memory     │ │Stage 3: Scraper│
+                                 │ & Parse Match Feed │ │Fetch Flashscore│
+                                 └────────────────────┘ │CDN (Ninja)     │
+                                                        └───────┬────────┘
+                                                                │
+                                                                ▼
+                                                        ┌────────────────┐
+                                                        │Persist to DB & │
+                                                        │Memory Cache    │
+                                                        └────────────────┘
 ```
 
-### Proposed Code Refinements Across System
-1. **`src/core/dateUtils.ts`**:
-   - Update `hasMatchStarted` and `normalizeDateStr` / `normalizeTimeStr` to strictly process Flashscore feed date/time formats and Flashscore Unix timestamps.
-   - Strip out browser locale conversions to preserve pure Flashscore standard timestamps.
-2. **`src/services/flashscoreScraperService.ts` & `src/core/onDemandParser.ts`**:
-   - Ensure all scraped fixture items carry normalized Flashscore date (`YYYY-MM-DD`) and time (`HH:mm`) values.
-3. **`src/core/predictionsDb.ts` & `src/routes/fixturesRouter.ts`**:
-   - Ensure match reconciliation and migration to `historical_predictions` rely strictly on Flashscore kick-off status and standard date matching.
-4. **UI Components (`MatchesView`, `HistoricalEvaluation`, `PoissonMatrixView`)**:
-   - Display match times directly from Flashscore standard formatting using `font-mono tabular-nums`.
+### Implementation Sequence
+
+1. **`src/core/db.ts`**:
+   - Upgrade `getRawFeed(fixtureId)` to query Turso `raw_feed_data` table when an in-memory miss occurs.
+   - Standardize canonical ID searching in `rawFeedsMemory` and `raw_feed_data`.
+
+2. **`src/services/flashscoreScraperService.ts`**:
+   - Implement `fetchMatchRawFeed(fixtureId: string)` with rotated Ninja CDN endpoints and circuit breaker retry backoff.
+   - Automatically persist newly scraped feeds into `db.saveRawFeedData`.
+
+3. **`src/core/onDemandParser.ts`**:
+   - Update `getParsedMatch(fixtureId)` and `getParsedH2H(fixtureId)` to perform the multi-tier fetch fallback (`Memory -> Turso DB -> ScraperService`).
+   - Suppress warning logs when fallback fetching successfully resolves the feed.
+
+4. **`src/routes/fixturesRouter.ts`**:
+   - Ensure `fixturesRouter.get('/:id')` and `fixturesRouter.get('/:id/h2h')` call the upgraded `OnDemandParser` handlers asynchronously.
