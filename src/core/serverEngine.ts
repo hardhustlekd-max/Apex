@@ -257,6 +257,222 @@ export class ServerEngine {
     };
   }
 
+  /**
+   * Deterministic 5-Pillar Data Availability Gatekeeper.
+   * Only matches with >= 95% data availability across required analytical dimensions
+   * are eligible for Poisson model predictions. Matches below 95% are skipped.
+   */
+  public static calculateDataAvailability(
+    fixture: Fixture,
+    allMatches: HistoricalMatch[],
+    cachedH2H?: HeadToHeadMeasurement | null,
+    scrapedMap?: Map<string, any>
+  ): { score: number; isEligible: boolean; missingFields: string[] } {
+    let score = 0;
+    const missingFields: string[] = [];
+
+    // 1. Core Match Identification & Metadata (Weight: 20% = 0.20)
+    const hasHome = Boolean(fixture.homeTeam && fixture.homeTeam.trim().length >= 2);
+    const hasAway = Boolean(fixture.awayTeam && fixture.awayTeam.trim().length >= 2);
+    const hasDate = Boolean(fixture.matchDate && fixture.matchDate.trim().length >= 4);
+    const hasLeague = Boolean((fixture.league && fixture.league !== 'ALL') || fixture.leagueName);
+
+    if (hasHome && hasAway && hasDate && hasLeague) {
+      score += 0.20;
+    } else {
+      if (!hasHome) missingFields.push('homeTeam');
+      if (!hasAway) missingFields.push('awayTeam');
+      if (!hasDate) missingFields.push('matchDate');
+      if (!hasLeague) missingFields.push('league');
+    }
+
+    // 2. Home Team Historical Depth (Weight: 25% = 0.25)
+    const homeClean = (fixture.homeTeam || '').toLowerCase().trim();
+    const homeMatchesCount = allMatches.filter((m) => {
+      const h = (m.homeTeam || '').toLowerCase().trim();
+      const a = (m.awayTeam || '').toLowerCase().trim();
+      return h.includes(homeClean) || homeClean.includes(h) || a.includes(homeClean) || homeClean.includes(a);
+    }).length;
+    const scrapedHome = scrapedMap ? (scrapedMap.get(homeClean) || scrapedMap.get(fixture.id)) : null;
+    const hasHomeRecent = Boolean(
+      (cachedH2H?.homeRecentMatches && cachedH2H.homeRecentMatches.length >= 3) ||
+      (scrapedHome?.homeRecentMatches && scrapedHome.homeRecentMatches.length >= 3)
+    );
+
+    if (homeMatchesCount >= 3 || hasHomeRecent) {
+      score += 0.25;
+    } else {
+      missingFields.push('home_historical_depth');
+    }
+
+    // 3. Away Team Historical Depth (Weight: 25% = 0.25)
+    const awayClean = (fixture.awayTeam || '').toLowerCase().trim();
+    const awayMatchesCount = allMatches.filter((m) => {
+      const h = (m.homeTeam || '').toLowerCase().trim();
+      const a = (m.awayTeam || '').toLowerCase().trim();
+      return h.includes(awayClean) || awayClean.includes(h) || a.includes(awayClean) || awayClean.includes(a);
+    }).length;
+    const scrapedAway = scrapedMap ? (scrapedMap.get(awayClean) || scrapedMap.get(fixture.id)) : null;
+    const hasAwayRecent = Boolean(
+      (cachedH2H?.awayRecentMatches && cachedH2H.awayRecentMatches.length >= 3) ||
+      (scrapedAway?.awayRecentMatches && scrapedAway.awayRecentMatches.length >= 3)
+    );
+
+    if (awayMatchesCount >= 3 || hasAwayRecent) {
+      score += 0.25;
+    } else {
+      missingFields.push('away_historical_depth');
+    }
+
+    // 4. League & Baseline Scoring Context (Weight: 15% = 0.15)
+    const leagueName = fixture.league || fixture.leagueName || '';
+    const leagueMatchesCount = allMatches.filter((m) =>
+      matchesLeague(m.div, (m as any).leagueName, leagueName)
+    ).length;
+
+    if (leagueMatchesCount >= 3 || allMatches.length >= 20) {
+      score += 0.15;
+    } else {
+      missingFields.push('league_scoring_baselines');
+    }
+
+    // 5. Market Odds / Context / H2H Data (Weight: 15% = 0.15)
+    const hasOdds = Boolean(
+      fixture.odds &&
+      typeof fixture.odds.homeWin === 'number' &&
+      fixture.odds.homeWin > 1.0 &&
+      typeof fixture.odds.awayWin === 'number' &&
+      fixture.odds.awayWin > 1.0
+    );
+    const hasH2H = Boolean(
+      (cachedH2H && cachedH2H.matchesCount > 0) ||
+      (fixture.prediction?.measurements?.h2h && fixture.prediction.measurements.h2h.matchesCount > 0)
+    );
+    const hasTactical = Boolean(fixture.restDaysHome !== undefined || fixture.information || fixture.stage);
+
+    if (hasOdds || hasH2H || hasTactical) {
+      score += 0.15;
+    } else {
+      missingFields.push('market_or_h2h_context');
+    }
+
+    const roundedScore = Number(score.toFixed(2));
+    return {
+      score: roundedScore,
+      isEligible: roundedScore >= 0.90,
+      missingFields,
+    };
+  }
+
+  public static async recalculateUpcomingFromDbInChunks(
+    upcomingFixtures: Fixture[],
+    chunkSize = 50,
+    onProgress?: (processed: number, total: number, predicted: number, skipped: number) => void
+  ): Promise<{ predictedCount: number; skippedCount: number; fixtures: Fixture[] }> {
+    const settings: EngineSettings = db.getSettings() || {
+      activeProvider: 'FLASHSCORE',
+      rollingMatchWindow: 15,
+      minEVThreshold: 1.10,
+      safeWinThreshold: 0.72,
+      homeAdvantageFactor: 1.12,
+      formDecayRate: 0.85,
+      autoSyncDaily: true,
+    };
+
+    const seenIds = new Set<string>();
+    const validFixtures = upcomingFixtures.filter((f) => {
+      if (!f.id || seenIds.has(f.id)) return false;
+      seenIds.add(f.id);
+      return true;
+    });
+
+    const allMatches = this.getUnifiedHistoricalUniverse();
+    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+
+    const scrapedMap = new Map<string, any>();
+    for (const sm of scrapedMatches) {
+      if (sm.matchId) {
+        scrapedMap.set(sm.matchId, sm);
+        scrapedMap.set(`fs_${sm.matchId}`, sm);
+      }
+      if (sm.home?.name && sm.away?.name) {
+        scrapedMap.set(`${sm.home.name.toLowerCase()}__${sm.away.name.toLowerCase()}`, sm);
+      }
+    }
+
+    const cachedH2HMap = db.getAllPredictionMeasurements();
+    let predictedCount = 0;
+    let skippedCount = 0;
+    let processed = 0;
+    const allEnriched: Fixture[] = [];
+
+    await predictionsDb.init().catch(() => {});
+
+    for (let i = 0; i < validFixtures.length; i += chunkSize) {
+      const chunk = validFixtures.slice(i, i + chunkSize);
+      const predictedChunk: Fixture[] = [];
+
+      for (const f of chunk) {
+        const cleanId = (f.id || '').replace(/^fs_/, '');
+        const cachedH2H =
+          cachedH2HMap.get(cleanId) ||
+          cachedH2HMap.get(f.id) ||
+          (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0
+            ? f.prediction.measurements.h2h
+            : null);
+
+        const tacticalInput = {
+          information: f.information,
+          restDaysHome: f.restDaysHome,
+          restDaysAway: f.restDaysAway,
+          stage: f.stage,
+        };
+
+        const availability = this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
+
+        if (availability.isEligible) {
+          const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
+          predictedChunk.push(enriched);
+          allEnriched.push(enriched);
+          predictedCount++;
+        } else {
+          skippedCount++;
+        }
+      }
+
+      if (predictedChunk.length > 0) {
+        await db.saveUpcomingFixtures(predictedChunk);
+        try {
+          predictionsDb.savePredictions(predictedChunk);
+        } catch {
+          // ignore
+        }
+      }
+
+      processed += chunk.length;
+      if (onProgress) {
+        onProgress(processed, validFixtures.length, predictedCount, skippedCount);
+      }
+
+      // Small tick delay to yield control and keep server responsive
+      await new Promise((resolve) => setTimeout(resolve, 15));
+    }
+
+    loggerService.addLog({
+      level: 'INFO',
+      category: 'PREDICTION',
+      source: 'ServerEngine',
+      message: `Prediction update completed for ${validFixtures.length} matches: ${predictedCount} predicted (>=90% data), ${skippedCount} skipped (<90% data)`,
+      details: { total: validFixtures.length, predictedCount, skippedCount },
+    });
+
+    return {
+      predictedCount,
+      skippedCount,
+      fixtures: allEnriched,
+    };
+  }
+
   public static async predictAndStoreUpcomingFixtures(
     upcomingFixtures: Fixture[]
   ): Promise<{ count: number; fixtures: Fixture[] }> {

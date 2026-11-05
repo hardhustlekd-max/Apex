@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for fixing On-Demand service 'no raw feed found' errors using multi-tier lookup (Memory -> Turso DB -> Flashscore Live Scraper) and canonical match ID normalization.",
-  "updatedAt":  "2026-11-02T09:12:34.238311078Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Architectural refactoring plan for a strict read-only prediction model. Eliminates dynamic prediction calculations across all client and standard server API routes, isolates manual updates to the Settings modal Predictions tab with a 90% data availability gatekeeper, and gracefully falls back to displaying live scores without on-demand calculation.",
+  "updatedAt": "2026-11-05T10:30:15.933233293Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

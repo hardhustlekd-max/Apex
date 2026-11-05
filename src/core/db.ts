@@ -183,6 +183,53 @@ export class FootballDB {
         console.warn(`[FootballDB] Turso table creation note:`, err?.message);
       }
     }
+
+    if (footballTurso && this.fallbackUpcomingFixtures.length === 0) {
+      try {
+        const res = await footballTurso.execute('SELECT * FROM upcoming_fixtures LIMIT 1500;');
+        if (res.rows && res.rows.length > 0) {
+          const loaded: Fixture[] = [];
+          for (const row of res.rows) {
+            try {
+              loaded.push({
+                id: String(row.id),
+                providerId: (row.provider_id as any) || 'FLASHSCORE',
+                league: String(row.league || ''),
+                leagueName: String(row.league_name || row.league || ''),
+                matchDate: String(row.match_date || ''),
+                kickOffTime: String(row.kick_off_time || ''),
+                homeTeam: String(row.home_team || ''),
+                awayTeam: String(row.away_team || ''),
+                homeBadge: row.home_badge ? String(row.home_badge) : undefined,
+                awayBadge: row.away_badge ? String(row.away_badge) : undefined,
+                stage: row.stage ? String(row.stage) : undefined,
+                odds: {
+                  homeWin: Number(row.b365_h || 2.10),
+                  draw: Number(row.b365_d || 3.30),
+                  awayWin: Number(row.b365_a || 3.40),
+                  over25: row.b365_over25 ? Number(row.b365_over25) : 1.85,
+                  under25: row.b365_under25 ? Number(row.b365_under25) : 1.95,
+                  bttsYes: row.b365_btts_yes ? Number(row.b365_btts_yes) : undefined,
+                  bttsNo: row.b365_btts_no ? Number(row.b365_btts_no) : undefined,
+                },
+                status: (row.status as any) || 'SCHEDULED',
+                prediction: row.prediction_json ? JSON.parse(String(row.prediction_json)) : undefined,
+                markets: row.markets_json ? JSON.parse(String(row.markets_json)) : undefined,
+                bestValueMarket: row.best_value_market_json ? JSON.parse(String(row.best_value_market_json)) : undefined,
+                homeStats: row.home_stats_json ? JSON.parse(String(row.home_stats_json)) : undefined,
+                awayStats: row.away_stats_json ? JSON.parse(String(row.away_stats_json)) : undefined,
+                measurements: row.measurements_json ? JSON.parse(String(row.measurements_json)) : undefined,
+              });
+            } catch {}
+          }
+          if (loaded.length > 0) {
+            this.fallbackUpcomingFixtures = loaded;
+          }
+        }
+      } catch (err: any) {
+        console.warn('[FootballDB] Note hydrating upcoming fixtures:', err?.message);
+      }
+    }
   }
 
   async clearAllData(clearRaw = true): Promise<void> {

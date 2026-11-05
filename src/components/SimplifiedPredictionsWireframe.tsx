@@ -184,12 +184,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
       <div
         key={fixture.id}
         onClick={() => onSelectDetail(fixture)}
-        className={`group grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 transition-all cursor-pointer gap-2 ${
+        className={`group grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 transition-all cursor-pointer gap-2 border-b border-[#ECEEF2]/60 dark:border-[#20232D]/60 last:border-b-0 ${
           isSelected
-            ? 'bg-slate-100/90 dark:bg-[#1E1E26] shadow-xs'
+            ? 'bg-[#FF001F]/5 dark:bg-[#FF001F]/10'
             : isLive
-            ? 'bg-rose-50/20 dark:bg-rose-950/20 hover:bg-rose-50/40 dark:hover:bg-rose-950/40'
-            : 'hover:bg-slate-50 dark:hover:bg-[#18181D]/80'
+            ? 'bg-rose-50/30 dark:bg-rose-950/20 hover:bg-rose-50/60 dark:hover:bg-rose-950/40'
+            : 'hover:bg-slate-50/80 dark:hover:bg-[#1E2027]/60'
         }`}
       >
         {/* Match Info Column */}
@@ -207,7 +207,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   }}
                 />
               ) : (
-                <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-[#18181D] text-[10px] font-bold flex items-center justify-center shrink-0">
+                <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-[#1E2027] text-[10px] font-bold text-slate-700 dark:text-neutral-300 flex items-center justify-center shrink-0">
                   {fixture.homeTeam.slice(0, 1)}
                 </div>
               )}
@@ -220,10 +220,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             </div>
             {fixture.score && fixture.score.home !== undefined && (
               <span
-                className={`font-mono tabular-nums text-xs sm:text-[13px] shrink-0 ${
+                className={`font-mono tabular-nums text-xs sm:text-[13px] shrink-0 font-black ${
                   isLive
-                    ? 'text-rose-600 dark:text-rose-400 font-black px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950/60'
-                    : 'text-slate-900 dark:text-[#CCFF00] font-black'
+                    ? 'text-white px-1.5 py-0.2 rounded-full bg-[#FF001F]'
+                    : 'text-slate-900 dark:text-white'
                 }`}
               >
                 {fixture.score.home}
@@ -257,10 +257,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             </div>
             {fixture.score && fixture.score.away !== undefined && (
               <span
-                className={`font-mono tabular-nums text-xs sm:text-[13px] shrink-0 ${
+                className={`font-mono tabular-nums text-xs sm:text-[13px] shrink-0 font-black ${
                   isLive
-                    ? 'text-rose-600 dark:text-rose-400 font-black px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950/60'
-                    : 'text-slate-900 dark:text-[#CCFF00] font-black'
+                    ? 'text-white px-1.5 py-0.2 rounded-full bg-[#FF001F]'
+                    : 'text-slate-900 dark:text-white'
                 }`}
               >
                 {fixture.score.away}
@@ -271,7 +271,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           {/* Subtext info: Kickoff time, Status, League */}
           <div className="flex items-center gap-1.5 mt-0.5 text-[11px] sm:text-xs font-mono tabular-nums whitespace-nowrap min-w-0 truncate">
             {isLive ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-bold text-[10px] animate-pulse shrink-0">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-[#FF001F] text-white font-bold text-[10px] animate-pulse shrink-0">
                 <span className="w-1 h-1 rounded-full bg-white" />
                 <span>LIVE {fixture.minute ? `${fixture.minute}'` : ''}</span>
               </span>
@@ -288,12 +288,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               </>
             )}
             {!isLive && (
-              <span className="text-blue-600 dark:text-[#CCFF00] shrink-0 font-bold font-mono tabular-nums">
+              <span className="text-slate-500 dark:text-neutral-400 shrink-0 font-semibold font-mono tabular-nums">
                 {kickOff}
               </span>
             )}
             {isLive && fixture.minute && (
-              <span className="text-blue-600 dark:text-[#CCFF00] shrink-0 font-bold font-mono tabular-nums">
+              <span className="text-[#FF001F] shrink-0 font-bold font-mono tabular-nums">
                 {fixture.minute}'
               </span>
             )}
@@ -308,7 +308,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             title={`Model Pick: ${pick.label} (${pick.probabilityFormatted})`}
           >
             <div className="flex items-center gap-1 font-mono tabular-nums">
-              <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 text-xs font-black whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
+              <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-[#FF001F] text-white text-xs font-bold whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
                 {pick.shortLabel}
               </span>
               <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">
@@ -366,10 +366,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     homeProb >= 50
-                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      ? 'bg-[#FF001F] text-white font-bold shadow-xs'
                       : homeProb >= 35
-                      ? 'bg-slate-200 dark:bg-[#27272A] text-slate-900 dark:text-white font-bold'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'
+                      ? 'bg-slate-200 dark:bg-[#20232D] text-slate-900 dark:text-white font-bold'
+                      : 'bg-slate-100 dark:bg-[#1A1C24] text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {homeProb.toFixed(0)}
@@ -377,8 +377,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     drawProb >= 35
-                      ? 'bg-amber-500/20 text-amber-900 dark:text-[#CCFF00] font-bold'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'
+                      ? 'bg-amber-500/20 text-amber-900 dark:text-amber-400 font-bold'
+                      : 'bg-slate-100 dark:bg-[#1A1C24] text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {drawProb.toFixed(0)}
@@ -386,10 +386,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
                     awayProb >= 50
-                      ? 'bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
+                      ? 'bg-[#FF001F] text-white font-bold shadow-xs'
                       : awayProb >= 35
-                      ? 'bg-slate-200 dark:bg-[#27272A] text-slate-900 dark:text-white font-bold'
-                      : 'bg-slate-100 dark:bg-[#18181D] text-slate-600 dark:text-slate-400'
+                      ? 'bg-slate-200 dark:bg-[#20232D] text-slate-900 dark:text-white font-bold'
+                      : 'bg-slate-100 dark:bg-[#1A1C24] text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {awayProb.toFixed(0)}
@@ -399,7 +399,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           </div>
 
           {/* Wireframe Chevron Right Affordance */}
-          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-900 dark:group-hover:text-[#CCFF00] group-hover:translate-x-0.5 transition-all shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 group-hover:text-[#FF001F] group-hover:translate-x-0.5 transition-all shrink-0" />
         </div>
       </div>
     );
@@ -514,15 +514,15 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         groupedByLeague.map((group) => (
           <div
             key={group.headerKey}
-            className="rounded-2xl overflow-hidden bg-white dark:bg-[#121216] shadow-xs mb-3 transition-all"
+            className="rounded-2xl overflow-hidden bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] shadow-xs mb-3 transition-all"
           >
             {/* Box Header per League */}
-            <div className="bg-slate-100 dark:bg-[#18181D] grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2 font-black text-xs select-none">
+            <div className="bg-slate-50/80 dark:bg-[#1A1C24] border-b border-[#ECEEF2] dark:border-[#20232D] grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2 font-bold text-xs select-none">
               <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5">
                 <span className="truncate whitespace-nowrap font-extrabold text-slate-900 dark:text-white text-xs sm:text-[13px] uppercase tracking-wide">
                   {group.subDivision || group.leagueName}
                 </span>
-                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-mono tabular-nums font-bold bg-slate-200 dark:bg-[#121216] text-slate-800 dark:text-[#CCFF00]">
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-mono tabular-nums font-bold bg-[#FF001F]/10 text-[#FF001F]">
                   {group.fixtures.length}
                 </span>
               </div>
@@ -531,7 +531,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   <button
                     type="button"
                     onClick={() => onSelectSortBy?.('PROB_DESC')}
-                    className="min-h-[32px] flex items-center justify-center gap-1 font-mono tabular-nums text-xs font-bold text-slate-600 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-[#CCFF00] cursor-pointer"
+                    className="min-h-[32px] flex items-center justify-center gap-1 font-mono tabular-nums text-xs font-bold text-[#8F92A1] dark:text-[#9EA3B2] hover:text-[#FF001F] cursor-pointer"
                     title="Click to sort table by Model Pick %"
                     aria-label="Sort table by Model Pick %"
                   >
@@ -539,7 +539,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     <ArrowUpDown className="w-3 h-3 opacity-50" />
                   </button>
                 </div>
-                <div className="flex items-center justify-end gap-1 font-mono tabular-nums text-xs font-bold text-slate-600 dark:text-neutral-300 shrink-0">
+                <div className="flex items-center justify-end gap-1 font-mono tabular-nums text-xs font-bold text-[#8F92A1] dark:text-[#9EA3B2] shrink-0">
                   {marketFilter === 'OVER_UNDER' ? (
                     <>
                       <span className="w-8 sm:w-9 text-center">O 2.5</span>
@@ -555,7 +555,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('HOME_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-sky-600 dark:hover:text-[#CCFF00] cursor-pointer"
+                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-[#FF001F] cursor-pointer"
                         title="Sort by Home Win %"
                         aria-label="Sort by Home Win %"
                       >
@@ -564,7 +564,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('DRAW_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-sky-600 dark:hover:text-[#CCFF00] cursor-pointer"
+                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-[#FF001F] cursor-pointer"
                         title="Sort by Draw %"
                         aria-label="Sort by Draw %"
                       >
@@ -573,7 +573,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <button
                         type="button"
                         onClick={() => onSelectSortBy?.('AWAY_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-sky-600 dark:hover:text-[#CCFF00] cursor-pointer"
+                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-[#FF001F] cursor-pointer"
                         title="Sort by Away Win %"
                         aria-label="Sort by Away Win %"
                       >
@@ -584,7 +584,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-[#121216]">
+            <div className="bg-white dark:bg-[#15161C]">
               {group.fixtures.map((fixture) => renderFixtureRow(fixture, false))}
             </div>
           </div>

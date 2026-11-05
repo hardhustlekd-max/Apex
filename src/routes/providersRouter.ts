@@ -66,32 +66,6 @@ providersRouter.get('/live-scores', async (req, res) => {
       return [];
     });
 
-    // Ensure live match predictions are calculated and kept fresh in predictionsDb
-    await predictionsDb.init();
-    if (scores && scores.length > 0) {
-      const liveFixtures: Fixture[] = scores.map((s) => ({
-        id: s.fixtureId,
-        providerId: 'FLASHSCORE',
-        league: s.league || 'ALL',
-        leagueName: s.leagueName || 'Live In-Play',
-        matchDate: getRelativeDateStr(0),
-        kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
-        homeTeam: s.homeTeam,
-        awayTeam: s.awayTeam,
-        status: 'LIVE' as const,
-        minute: s.minute,
-        score: { home: s.homeScore, away: s.awayScore },
-        odds: {
-          homeWin: 2.10,
-          draw: 3.30,
-          awayWin: 3.40,
-          over25: 1.85,
-          under25: 1.95,
-        },
-      }));
-      await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
-    }
-
     res.json({
       success: true,
       provider: 'PREDICTIONS_DB',

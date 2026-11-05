@@ -1,110 +1,107 @@
-# On-Demand Scraper & Raw Feed Fallback Engine Fix
+# Read-Only Football Prediction Model & Isolated Manual Calculation Architecture
 
-Eliminates the "no raw feed found" warning and error state when inspecting matches, statistics, or H2H details by introducing an automated multi-tier lookup pipeline with active Flashscore CDN feed scraping and database caching.
+Transitioning the application to a **strict static read-only data model** for predictions. All dynamic prediction calculations, auto-generations, and on-demand adjustments across client-side components and standard server API routes are completely removed. Prediction generation is strictly isolated to a manual update trigger in the Settings modal with a 90% Data Availability Gatekeeper.
+
+---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions were confirmed based on user clarification:
+> The following architectural decisions were confirmed in Phase 1 interactive clarification:
 
-- **Confirmed Decision 1 (Active Scraper Fetch)**: When a raw feed is absent from local memory or database storage, `OnDemandParser` and match detail endpoints will actively trigger a live feed fetch from Flashscore via Ninja CDN endpoints with mirror failover and circuit breaker protection.
-- **Confirmed Decision 2 (Multi-Tier Persistence Lookup)**: Implemented a resilient 3-stage lookup: Memory Cache -> Turso Cloud DB (`raw_feed_data` table) -> Live CDN Scraper fallback.
-- **Confirmed Decision 3 (Canonical Match ID Normalization)**: Standardized ID resolution by stripping all lookup prefixes (`fs_`, `hist_`, `scraped_`) before executing database and feed queries.
+- **Confirmed Decision 1 (Upcoming Matches Below 90% Threshold)**: Matches that do not meet the 90% data availability requirement will be skipped during prediction updates. On the frontend, prediction tabs and value badges are hidden, displaying only the match schedule, teams, and scores.
+- **Confirmed Decision 2 (Live Matches with Stored Predictions)**: Live matches with pre-existing pre-match predictions stored in the database will display the original prediction alongside the live score. If no pre-match prediction exists, the UI falls back gracefully to showing only the live score without triggering dynamic calculation.
+- **Confirmed Decision 3 (Manual Update Location)**: The Manual Update trigger remains strictly isolated inside the Settings modal under the "Predictions" tab.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Resolves raw feed missing errors when users open match details, inspect H2H records, view club form, or analyze on-demand statistics. Missing feeds are scraped dynamically on demand, stored in the SQLite/Turso database, and returned without breaking UI flow or logging server warnings.
-- **Target Audience / Persona**: Football analysts and bettor users reviewing individual match breakdowns, H2H team records, and statistical trends.
-- **Key Value**: Zero failed detail lookups, guaranteed stats and H2H availability, and automatic local feed caching to optimize future feed queries.
+- **What It Does**: Enforces an immutable read-only pipeline where standard API endpoints (`GET /api/fixtures`, `GET /api/fixtures/live`, `GET /api/fixtures/history`) purely query and serve pre-calculated static records from the Turso SQLite database.
+- **Key Value**: Zero API latency delays caused by unexpected background calculations, zero race conditions, predictable database state, and guaranteed visual consistency across all client views.
 
 ---
 
 ## 2. User Experience & Visual Design
 
 - **Key User Flows**:
-  1. User selects any fixture card in the main feed or searches for a historical/upcoming match.
-  2. Match Detail inspector modal loads.
-  3. If the match raw feed is present in memory, it parses immediately (<15ms).
-  4. If missing from memory, it queries Turso Cloud DB (`raw_feed_data`).
-  5. If missing from Turso, `OnDemandParser` triggers an active Flashscore CDN request for `df_m_1_{matchId}` or `df_hh_1_{matchId}` across rotated Ninja CDN endpoints (`46.flashscore.ninja`, `1.flashscore.ninja`, `2.flashscore.ninja`).
-  6. Scraped feed is persisted to DB and memory, and match statistics/H2H are instantly populated in the UI without error toasts or blank states.
+  1. **Upcoming Matches Feed**: User views upcoming fixtures. Matches with stored predictions display prediction cards, probability bars, and +EV market badges. Matches without stored predictions (skipped due to <90% data) display clean schedule and odds information without broken prediction tabs.
+  2. **Live Matches View**: User opens the Live Scores view. Live scores poll live provider feeds. If a pre-stored prediction exists in `predictionsDb` for that match, it displays the pre-game 5-Pillar breakdown alongside live match minutes and score. If absent, it renders a clean live match scoreboard without error toasts or dynamic calculation spinners.
+  3. **Isolated Manual Recalculation**: User opens `Settings -> Predictions` tab and clicks "Update Predictions". The isolated backend worker reads raw DB fixtures, applies the 90% Data Gatekeeper, recalculates Poisson models in chunks, and updates the static database tables with real-time UI percentage and counter updates.
 
 - **Visual Identity & Theme**:
-  - *Aesthetic*: Dark mode posture with dark neutral backgrounds (`#09090B`, `#121216`), bright neon accent `#CCFF00`, crisp typography, and MUI/Lucide icons.
-  - *Interactive Feedback*: Smooth loading state for match detail stats while on-demand fetch completes, followed by instantaneous rendering.
+  - Dark mode aesthetic (`#09090B`, `#121216`) with high-contrast `#CCFF00` accent styling.
+  - Tabular numerals (`font-mono tabular-nums`) for all scores, probabilities, xG values, and percentages.
+  - Unboxed metadata with clean inline separators (`·`).
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Active Fallback vs Static Error Message**
-  - *Chosen Approach*: On-demand live feed scraping upon cache miss.
-  - *Why*: Guarantees every match detail request succeeds even if the match wasn't included in the initial bulk background sync batch.
-  - *Alternatives Considered*: Static error message or empty placeholder. Rejected because it degraded user experience when inspecting niche or global matches.
+- **Decision 1: Complete Removal of Dynamic Compute on API Endpoints**
+  - *Chosen Approach*: Strip out all `ServerEngine.predictAndStoreLiveFixtures` and `ServerPredictionGeneratorService` fallback generation calls from standard API handlers.
+  - *Why*: Eliminates unexpected server latency, 5-minute timeouts, and CPU spikes during standard user navigation.
+  - *Alternatives Considered*: Background lazy calculation on cache miss. Rejected because it violates the strict read-only requirement.
 
-- **Decision 2: Multilevel Raw Feed Lookup (`Memory -> Turso -> Scraper`)**
-  - *Chosen Approach*: Synchronously check in-memory Map; if absent, asynchronously query Turso SQLite `raw_feed_data`; if absent, trigger `fetchFlashscoreFeed` with circuit breaker backoff.
-  - *Why*: Minimizes network overhead for repeatedly viewed matches while preserving 100% data coverage.
+- **Decision 2: 90% Data Availability Gatekeeper**
+  - *Chosen Approach*: Evaluates matches against 5 analytical dimensions (core identification 20%, home depth 25%, away depth 25%, league baselines 15%, market/H2H 15%). Minimum score threshold: **0.90 (90%)**.
+  - *Why*: Ensures high mathematical confidence for generated Poisson predictions and avoids hallucinated or weak predictions on sparse records.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy
 
-### System Component & Lookup Sequence Diagram
+### Refactored System Architecture Diagram
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Match Detail Request                            │
-│                  (GET /api/fixtures/:id/detail or h2h)                 │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                         Canonical ID Resolution                        │
-│                   cleanId = id.replace(/^(fs_|hist_)/, '')             │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       Stage 1: Memory Lookup                           │
-│                     db.getRawFeed(cleanId)                             │
-└───────────────┬────────────────────────────────────────┬───────────────┘
-                │ Found                                  │ Miss
-                ▼                                        ▼
-┌──────────────────────────────┐        ┌────────────────────────────────┐
-│  Parse & Return Match Feed   │        │     Stage 2: Turso DB Lookup   │
-└──────────────────────────────┘        │ SELECT raw_text FROM raw_feed… │
-                                        └───────┬────────────────┬───────┘
-                                                │ Found          │ Miss
-                                                ▼                ▼
-                                 ┌────────────────────┐ ┌────────────────┐
-                                 │ Save to Memory     │ │Stage 3: Scraper│
-                                 │ & Parse Match Feed │ │Fetch Flashscore│
-                                 └────────────────────┘ │CDN (Ninja)     │
-                                                        └───────┬────────┘
-                                                                │
-                                                                ▼
-                                                        ┌────────────────┐
-                                                        │Persist to DB & │
-                                                        │Memory Cache    │
-                                                        └────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FRONTLINE READ PIPELINE                          │
+│               (Client App / Dashboard / Live Score Views)               │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                        GET /api/fixtures or /live
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Express Router Layer                           │
+│                (src/routes/fixturesRouter.ts - Pure Read)               │
+├─────────────────────────────────────────────────────────────────────────┤
+│  - NO dynamic compute or generator invocations                          │
+│  - Query Turso SQLite (`predictionsDb` / `upcoming_fixtures`)           │
+│  - Live matches: perform DB lookup for existing pre-match prediction    │
+│  - Return static JSON payload to client                                 │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       ISOLATED MANUAL UPDATE SERVICE                    │
+│                 (Settings Modal -> Predictions Tab Trigger)             │
+├─────────────────────────────────────────────────────────────────────────┤
+│  POST /api/settings/update-predictions -> SyncJobService.executeJob    │
+│  1. Read raw fixtures exclusively from Turso DB                         │
+│  2. Evaluate 90% Data Availability Gatekeeper (Score >= 0.90)           │
+│  3. Pass eligible fixtures through 5-Pillar Poisson Engine             │
+│  4. Save finalized static records into `upcoming_predictions` table     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Implementation Sequence
+### Technical Implementation Plan
 
-1. **`src/core/db.ts`**:
-   - Upgrade `getRawFeed(fixtureId)` to query Turso `raw_feed_data` table when an in-memory miss occurs.
-   - Standardize canonical ID searching in `rawFeedsMemory` and `raw_feed_data`.
+1. **`src/routes/fixturesRouter.ts`**:
+   - Remove `ServerPredictionGeneratorService.generateAndStorePredictionsFromDb` and `ServerEngine.predictAndStoreLiveFixtures` calls.
+   - For `GET /api/fixtures`: Read directly from `predictionsDb.getPredictions()`.
+   - For `GET /api/fixtures/live`: Fetch live scores from provider, check `predictionsDb.getPredictionById(fixtureId)`. If found, attach `prediction` object; if not, return live match without `prediction`.
 
-2. **`src/services/flashscoreScraperService.ts`**:
-   - Implement `fetchMatchRawFeed(fixtureId: string)` with rotated Ninja CDN endpoints and circuit breaker retry backoff.
-   - Automatically persist newly scraped feeds into `db.saveRawFeedData`.
+2. **`src/core/serverEngine.ts`**:
+   - Update `calculateDataAvailability` threshold from 0.95 to **0.90 (90%)**.
+   - Ensure `recalculateUpcomingFromDbInChunks` uses `availability.score >= 0.90`.
+   - Remove auto-execution calls from standard engine helpers.
 
-3. **`src/core/onDemandParser.ts`**:
-   - Update `getParsedMatch(fixtureId)` and `getParsedH2H(fixtureId)` to perform the multi-tier fetch fallback (`Memory -> Turso DB -> ScraperService`).
-   - Suppress warning logs when fallback fetching successfully resolves the feed.
+3. **`src/services/syncJobService.ts`**:
+   - Maintain `executePredictionJob` as the single isolated service for manual prediction recalculations.
+   - Read strictly from Turso DB (`db.getUpcomingFixtures()`), filter by $\ge 90\%$ data completeness, compute predictions in chunks of 50, and write static records to `upcoming_predictions`.
 
-4. **`src/routes/fixturesRouter.ts`**:
-   - Ensure `fixturesRouter.get('/:id')` and `fixturesRouter.get('/:id/h2h')` call the upgraded `OnDemandParser` handlers asynchronously.
+4. **Frontend UI Components (`FixtureCard.tsx`, `MatchInspectorModal.tsx`, `SettingsModal.tsx`)**:
+   - Ensure components check `if (fixture.prediction)` before rendering prediction tabs, xG meters, or value bet badges.
+   - If `fixture.prediction` is null or undefined, gracefully hide prediction sections and render schedule, team names, odds, and live scores.
+   - Settings modal Predictions tab copy updated to highlight the 90% Data Availability threshold.

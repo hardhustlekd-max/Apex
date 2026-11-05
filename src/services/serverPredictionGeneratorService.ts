@@ -36,21 +36,7 @@ export class ServerPredictionGeneratorService {
       predictions = db.getUpcomingFixtures(filters);
     }
 
-    // 3. Only if database has zero predictions at all, trigger initial synthesis from historical match dataset
-    if (predictions.length === 0 && predictionsDb.count() === 0 && db.getUpcomingFixturesCount() === 0) {
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'PREDICTION',
-        source: 'ServerPredictionGeneratorService',
-        message: 'Predictions database empty. Synthesizing initial predictions from SQLite historical database...',
-      });
-      await this.synthesizeAndStorePredictionsFromDb();
-      predictions = predictionsDb.getPredictions(filters);
-      if (predictions.length === 0) {
-        predictions = db.getUpcomingFixtures(filters);
-      }
-    }
-
+    // 3. Return static database records (empty array if no records exist)
     return predictions;
   }
 

@@ -27,39 +27,7 @@ fixturesRouter.get('/', async (req, res) => {
     await db.init();
     await predictionsDb.init();
 
-    const dbCount = db.getUpcomingFixturesCount();
-    const predCount = predictionsDb.count();
-
-    // If both upcoming fixtures database and predictions database have 0 records, trigger background ingestion or generate from DB
-    if (dbCount === 0 && predCount === 0) {
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'DATA_FETCH',
-        source: 'FixturesRouter',
-        message: 'No upcoming fixtures in database. Attempting scraper fetch or server-side prediction generation from DB...',
-      });
-      try {
-        const initialUpcoming = await Promise.race([
-          flashscoreScraperService.getUpcomingFixtures(),
-          new Promise<Fixture[]>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 8000))
-        ]).catch(() => []);
-
-        if (initialUpcoming && initialUpcoming.length > 0) {
-          await ServerEngine.predictAndStoreUpcomingFixtures(initialUpcoming);
-          const liveInUpcoming = initialUpcoming.filter((f) => f.status === 'LIVE');
-          if (liveInUpcoming.length > 0) {
-            await ServerEngine.predictAndStoreLiveFixtures(liveInUpcoming);
-          }
-        } else {
-          await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
-        }
-      } catch (err: any) {
-        console.warn('Initial ingestion notice:', err?.message);
-        await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
-      }
-    }
-
-    // Retrieve predictions using ServerPredictionGeneratorService
+    // Retrieve predictions strictly as static read-only data from database
     let resultFixtures = await ServerPredictionGeneratorService.getPredictionsForUi({
       league: leagueFilter,
       date: dateParam,
@@ -72,7 +40,7 @@ fixturesRouter.get('/', async (req, res) => {
       level: 'INFO',
       category: 'DATA_FETCH',
       source: 'FixturesRouter',
-      message: `Returning ${resultFixtures.length} upcoming fixtures for filter (${leagueFilter || 'ALL'}, ${dateFilter || dateParam || 'ALL'})`,
+      message: `Returning ${resultFixtures.length} static predictions for filter (${leagueFilter || 'ALL'}, ${dateFilter || dateParam || 'ALL'})`,
     });
 
     res.json({
@@ -97,12 +65,14 @@ fixturesRouter.get('/live', async (req, res) => {
     const league = req.query.league as string | undefined;
     const limit = parseInt((req.query.limit as string) || '100', 10);
 
+    await db.init();
     await predictionsDb.init();
 
-    // Fetch fresh live scores and ensure live predictions are up-to-date
+    // Fetch fresh live scores from active provider
     const activeProvider = providerManager.getActiveProvider();
-    const liveScores = await activeProvider.getLiveScores();
+    const liveScores = await activeProvider.getLiveScores().catch(() => []);
     let liveFixtures: Fixture[] = [];
+
     if (liveScores && liveScores.length > 0) {
       liveFixtures = liveScores.map((s) => ({
         id: s.fixtureId,
@@ -126,7 +96,7 @@ fixturesRouter.get('/live', async (req, res) => {
       }));
     }
 
-    if (liveFixtures.length === 0 && predictionsDb.countLivePredictions() === 0) {
+    if (liveFixtures.length === 0) {
       const upcoming = db.getUpcomingFixtures();
       const liveFromDb = upcoming.filter((f) => f.status === 'LIVE');
       if (liveFromDb.length > 0) {
@@ -134,17 +104,48 @@ fixturesRouter.get('/live', async (req, res) => {
       }
     }
 
-    if (liveFixtures.length > 0) {
-      await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
-    }
+    // Pure read-only lookup for existing pre-match prediction in database
+    // If prediction exists in DB, attach it; if not, return live score only without dynamic compute
+    const enrichedLive = liveFixtures.map((lf) => {
+      const cleanId = (lf.id || '').replace(/^fs_/, '');
+      const stored =
+        predictionsDb.getPredictionById(lf.id) ||
+        predictionsDb.getPredictionById(cleanId) ||
+        db.getFixtureById(lf.id) ||
+        db.getFixtureById(cleanId);
 
-    const livePredictions = predictionsDb.getLivePredictions({ league, limit });
+      if (stored && stored.prediction) {
+        return {
+          ...lf,
+          prediction: stored.prediction,
+          markets: stored.markets || lf.markets,
+          bestValueMarket: stored.bestValueMarket || lf.bestValueMarket,
+          homeStats: stored.homeStats || lf.homeStats,
+          awayStats: stored.awayStats || lf.awayStats,
+          measurements: stored.measurements || lf.measurements,
+        };
+      }
+
+      // Fallback: return live score without prediction object
+      return lf;
+    });
+
+    if (league && league !== 'ALL') {
+      const filterUpper = league.toUpperCase();
+      const filtered = enrichedLive.filter((f) => (f.league || '').toUpperCase() === filterUpper);
+      return res.json({
+        success: true,
+        provider: 'PREDICTIONS_DB',
+        count: filtered.slice(0, limit).length,
+        fixtures: filtered.slice(0, limit),
+      });
+    }
 
     res.json({
       success: true,
       provider: 'PREDICTIONS_DB',
-      count: livePredictions.length,
-      fixtures: livePredictions,
+      count: enrichedLive.slice(0, limit).length,
+      fixtures: enrichedLive.slice(0, limit),
     });
   } catch (err: any) {
     console.error('Error fetching live predictions from predictions db:', err);

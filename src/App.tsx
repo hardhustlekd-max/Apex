@@ -391,16 +391,16 @@ export default function App() {
 
               {/* Notification Banner to Start Full Sync if Database has zero fixtures */}
               {fixtures.length === 0 && !isLoadingFixtures && !isProcessingActive && (
-                <div className="bg-slate-950 text-white dark:bg-[#121216] dark:border dark:border-neutral-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+                <div className="bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] text-slate-900 dark:text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-[#CCFF00]/15 flex items-center justify-center text-[#CCFF00] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#FF001F]/10 flex items-center justify-center text-[#FF001F] shrink-0">
                       <RefreshCw className="w-5 h-5" />
                     </div>
                     <div className="space-y-0.5 min-w-0">
                       <h3 className="text-xs sm:text-sm font-extrabold tracking-tight">
                         Database Synchronization Prompt
                       </h3>
-                      <p className="text-[11px] sm:text-xs text-slate-300 dark:text-neutral-400 font-medium">
+                      <p className="text-[11px] sm:text-xs text-[#8F92A1] dark:text-[#9EA3B2] font-medium">
                         Start full sync to fetch active Flashscore fixtures, team stats, H2H records, and calculate 5-Pillar Poisson model predictions.
                       </p>
                     </div>
@@ -408,7 +408,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleResetAndSyncData}
-                    className="px-4 py-2.5 rounded-full bg-[#CCFF00] text-slate-950 font-black text-xs hover:bg-[#b8e600] transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-full bg-[#FF001F] text-white hover:bg-[#E6001C] font-bold text-xs transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-2"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Start Full Sync & Update Data</span>

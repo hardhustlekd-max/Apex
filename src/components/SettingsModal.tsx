@@ -74,6 +74,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     stepIndex?: number;
     totalSteps?: number;
     matchesCount?: number;
+    skippedCount?: number;
     upcomingCount?: number;
     predictionsCount?: number;
   } | null>(null);
@@ -673,7 +674,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </h3>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-                    Triggers Poisson model recalculation for <strong>upcoming games only</strong>. Evaluates 1X2 probabilities, expected value (+EV) edges, goal line distributions, and banker picks, and updates the database records.
+                    Recalculates Poisson model predictions for <strong>upcoming games only</strong> directly from the internal database. Matches must have at least <strong>90% data completeness</strong> to be predicted; incomplete fixtures are skipped.
                   </p>
                 </div>
 
@@ -697,8 +698,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       />
                     </div>
                     <div className="flex items-center justify-between text-[10.5px] font-mono text-slate-500 dark:text-slate-400 pt-0.5">
-                      <span>Matches Processed: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.matchesCount ?? 0} / {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? '—'}</strong></span>
-                      <span>Predictions Saved: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.predictionsCount ?? localStats?.predictionsCount ?? '—'}</strong></span>
+                      <span>Predicted: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.matchesCount ?? 0}</strong> / {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? '—'}</span>
+                      <span>Skipped (&lt;90% data): <strong className="text-amber-600 dark:text-amber-400">{predictionProgress?.skippedCount ?? 0}</strong></span>
                     </div>
                   </div>
                 )}

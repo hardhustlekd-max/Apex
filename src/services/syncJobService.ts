@@ -15,6 +15,7 @@ export interface SyncJobState {
   stepIndex: number;
   totalSteps: number;
   matchesCount: number;
+  skippedCount?: number;
   upcomingCount: number;
   predictionsCount: number;
   historicalPredictionsCount: number;
@@ -114,10 +115,11 @@ export class SyncJobService {
       id: jobId,
       status: 'RUNNING',
       progress: 10,
-      currentStep: 'Initializing prediction recalculation worker...',
+      currentStep: 'Querying upcoming fixtures from Turso database...',
       stepIndex: 1,
-      totalSteps: 3,
+      totalSteps: 2,
       matchesCount: 0,
+      skippedCount: 0,
       upcomingCount: 0,
       predictionsCount: 0,
       historicalPredictionsCount: 0,
@@ -348,78 +350,85 @@ export class SyncJobService {
       level: 'INFO',
       category: 'PREDICTION',
       source: 'SyncJobService',
-      message: `Initiating async prediction update job ${jobId}`,
+      message: `Initiating pure Turso database prediction update job ${jobId} (zero external scraper calls)`,
     });
 
     try {
-      // Step 1: Fetch upcoming fixtures
+      // Step 1: Query upcoming fixtures strictly from local Turso DB
+      this.updateProgress(jobId, {
+        progress: 10,
+        stepIndex: 1,
+        totalSteps: 2,
+        currentStep: 'Querying upcoming fixtures from Turso database...',
+      });
+
+      let upcoming = db.getUpcomingFixtures();
+      if (!upcoming || upcoming.length === 0) {
+        const allPreds = predictionsDb.getAllPredictions();
+        upcoming = allPreds.filter((f) => f.status === 'SCHEDULED' || f.status === 'TIMED' || (f.status as string) === 'UPCOMING' || (!f.status && f.status !== 'FINISHED' && f.status !== 'LIVE'));
+      }
+
+      const totalCount = upcoming ? upcoming.length : 0;
       this.updateProgress(jobId, {
         progress: 15,
-        stepIndex: 1,
-        totalSteps: 3,
-        currentStep: 'Fetching upcoming fixtures raw feeds and database records...',
+        upcomingCount: totalCount,
+        matchesCount: 0,
+        skippedCount: 0,
+        currentStep: totalCount > 0
+          ? `Loaded ${totalCount} upcoming matches from Turso DB. Filtering by 90% data availability...`
+          : 'No upcoming matches found in database. Run full sync to populate matches.',
       });
 
-      let upcoming = await flashscoreScraperService.getUpcomingFixtures().catch(() => []);
-      if (!upcoming || upcoming.length === 0) {
-        upcoming = db.getUpcomingFixtures();
+      if (totalCount === 0) {
+        this.updateProgress(jobId, {
+          status: 'COMPLETED',
+          progress: 100,
+          currentStep: 'Completed',
+          matchesCount: 0,
+          skippedCount: 0,
+          upcomingCount: 0,
+          predictionsCount: predictionsDb.count(),
+          message: 'No upcoming fixtures found in database to update.',
+          endTime: Date.now(),
+        });
+        return;
       }
 
       if (this.isCancelled(jobId)) return;
 
+      // Step 2: Recalculate predictions in chunks using the 90% Data Availability Gatekeeper
       this.updateProgress(jobId, {
-        progress: 35,
-        upcomingCount: upcoming.length,
-        currentStep: `Ingested ${upcoming.length} upcoming fixtures. Starting Poisson model calculations...`,
+        stepIndex: 2,
+        currentStep: `Recalculating predictions for ${totalCount} matches in chunks (90% data availability threshold)...`,
       });
 
-      // Step 2: Recalculate predictions
-      let updatedCount = 0;
-      let count = 0;
-
-      if (upcoming && upcoming.length > 0) {
-        this.updateProgress(jobId, {
-          progress: 50,
-          stepIndex: 2,
-          currentStep: `Recalculating 5-Pillar Poisson model predictions for ${upcoming.length} upcoming games...`,
-        });
-
-        const result = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
-        count = result.count;
-        updatedCount = result.fixtures.length;
-      } else {
-        this.updateProgress(jobId, {
-          progress: 50,
-          stepIndex: 2,
-          currentStep: 'Synthesizing Poisson model predictions from database records...',
-        });
-
-        const { ServerPredictionGeneratorService } = await import('./serverPredictionGeneratorService.js');
-        const synthesized = await ServerPredictionGeneratorService.generateAndStorePredictionsFromDb();
-        count = synthesized.length;
-        updatedCount = synthesized.length;
-      }
+      const { predictedCount, skippedCount } = await ServerEngine.recalculateUpcomingFromDbInChunks(
+        upcoming,
+        50,
+        (processed, total, predicted, skipped) => {
+          if (this.isCancelled(jobId)) return;
+          const pct = Math.min(95, Math.round(15 + (processed / total) * 80));
+          this.updateProgress(jobId, {
+            progress: pct,
+            matchesCount: predicted,
+            skippedCount: skipped,
+            currentStep: `Processed ${processed}/${total} matches (${predicted} predicted, ${skipped} skipped)`,
+          });
+        }
+      );
 
       if (this.isCancelled(jobId)) return;
-
-      // Step 3: Persist & summary
-      this.updateProgress(jobId, {
-        progress: 85,
-        stepIndex: 3,
-        matchesCount: updatedCount,
-        predictionsCount: count,
-        currentStep: 'Finalizing database persistence and updating prediction tables...',
-      });
 
       const totalPredictionsCount = predictionsDb.count();
-      const finalMessage = `Successfully recalculated and updated predictions for ${updatedCount} upcoming matches in database`;
+      const finalMessage = `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <90% data completeness).`;
 
       this.updateProgress(jobId, {
         status: 'COMPLETED',
         progress: 100,
         currentStep: 'Completed',
-        matchesCount: updatedCount,
-        upcomingCount: upcoming.length,
+        matchesCount: predictedCount,
+        skippedCount: skippedCount,
+        upcomingCount: totalCount,
         predictionsCount: totalPredictionsCount,
         message: finalMessage,
         endTime: Date.now(),
@@ -429,8 +438,8 @@ export class SyncJobService {
         level: 'SUCCESS',
         category: 'PREDICTION',
         source: 'SyncJobService',
-        message: `Prediction update job ${jobId} completed: ${updatedCount} upcoming matches updated`,
-        details: { count: updatedCount, totalPredictionsCount },
+        message: `Prediction update job ${jobId} completed from Turso DB: ${predictedCount} predicted, ${skippedCount} skipped`,
+        details: { predictedCount, skippedCount, totalUpcoming: totalCount, totalPredictionsCount },
       });
     } catch (err: any) {
       loggerService.addLog({

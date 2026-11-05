@@ -98,19 +98,19 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     <div className="space-y-2.5 font-sans">
       {!compact && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm sm:text-base font-extrabold text-slate-950 dark:text-white">
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
             League Standings
           </h2>
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 p-1 bg-white dark:bg-[#121212] rounded-full shadow-xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 p-1 bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] rounded-2xl shadow-xs">
             {POPULAR_LEAGUES.map((l) => (
               <button
                 key={l.code}
                 type="button"
                 onClick={() => handleLeagueChange(l.code)}
-                className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
                   currentLeague === l.code
-                    ? 'bg-slate-950 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-md scale-[1.02]'
-                    : 'text-slate-600 dark:text-neutral-400 hover:text-slate-950 dark:hover:text-white'
+                    ? 'bg-[#FF001F] text-white font-extrabold shadow-sm scale-[1.02]'
+                    : 'text-[#8F92A1] dark:text-[#9EA3B2] hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {l.name}

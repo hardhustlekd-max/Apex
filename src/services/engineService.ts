@@ -206,6 +206,7 @@ export class EngineService {
   public static async updateUpcomingPredictions(onProgress?: (job: any) => void): Promise<{
     success: boolean;
     count?: number;
+    skippedCount?: number;
     totalPredictionsCount?: number;
     message?: string;
     error?: string;
@@ -224,7 +225,7 @@ export class EngineService {
 
     const jobId = startRes.jobId;
     let pollAttempts = 0;
-    const maxPollAttempts = 120;
+    const maxPollAttempts = 300; // Up to 4 minutes of polling
 
     while (pollAttempts < maxPollAttempts) {
       await new Promise((resolve) => setTimeout(resolve, 800));
@@ -240,9 +241,10 @@ export class EngineService {
       if (job.status === 'COMPLETED') {
         return {
           success: true,
-          count: job.matchesCount || job.upcomingCount || 0,
+          count: job.matchesCount || 0,
+          skippedCount: job.skippedCount || 0,
           totalPredictionsCount: job.predictionsCount || 0,
-          message: job.message || `Successfully recalculated and updated predictions for ${job.matchesCount || 0} upcoming matches in database`,
+          message: job.message || `Successfully recalculated predictions for ${job.matchesCount || 0} upcoming matches.`,
         };
       }
 
@@ -255,8 +257,8 @@ export class EngineService {
     }
 
     return {
-      success: true,
-      message: 'Prediction recalculation process is continuing in server background.',
+      success: false,
+      error: 'Prediction recalculation process timed out while waiting for server response.',
     };
   }
 

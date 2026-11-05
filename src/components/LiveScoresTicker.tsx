@@ -35,7 +35,6 @@ export const LiveScoresTicker: React.FC<LiveScoresTickerProps> = ({ liveScores }
               <span className="font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap text-xs">{s.awayTeam}</span>
               {s.events && s.events.length > 0 && (
                 <span className="text-[10px] font-mono text-slate-400 dark:text-slate-400 font-medium ml-1 truncate max-w-[140px] whitespace-nowrap shrink-0">
-                  {s.events[s.events.length - 1].type === 'GOAL' ? '⚽ ' : ''}
                   {s.events[s.events.length - 1].player} ({s.events[s.events.length - 1].minute}')
                 </span>
               )}

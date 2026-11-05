@@ -158,6 +158,28 @@ export class PredictionsDB {
         console.warn('[PredictionsDB] Turso query note:', err?.message);
       }
     }
+
+    if (predictionsTurso && this.memoryFallback.size === 0) {
+      try {
+        const res = await predictionsTurso.execute('SELECT full_fixture_json FROM upcoming_predictions LIMIT 1500;');
+        if (res.rows && res.rows.length > 0) {
+          for (const row of res.rows) {
+            try {
+              if (row.full_fixture_json) {
+                const f: Fixture = JSON.parse(String(row.full_fixture_json));
+                if (f && f.id) {
+                  this.memoryFallback.set(f.id, f);
+                  const clean = f.id.replace(/^fs_/, '');
+                  this.memoryFallback.set(clean, f);
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch (err: any) {
+        console.warn('[PredictionsDB] Note hydrating from upcoming_predictions:', err?.message);
+      }
+    }
   }
 
   async savePredictions(fixtures: Fixture[]): Promise<void> {
