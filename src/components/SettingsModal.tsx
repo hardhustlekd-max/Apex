@@ -25,7 +25,6 @@ interface SettingsModalProps {
   };
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
-  onProviderChange?: (providerId: EngineSettings['activeProvider']) => void;
   onOpenTerminal?: () => void;
   onRefreshMetrics?: () => void | Promise<void>;
   syncProgress?: {
@@ -51,15 +50,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   stats,
   theme,
   onToggleTheme,
-  onProviderChange,
   onOpenTerminal,
   onRefreshMetrics,
   syncProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'PREDICTIONS' | 'UI'>('ENGINE');
-  const [activeProvider, setActiveProvider] = useState<EngineSettings['activeProvider']>(
-    settings?.activeProvider || 'FLASHSCORE'
-  );
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [tursoStatus, setTursoStatus] = useState<any>(null);
@@ -180,16 +175,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleProviderSelect = (providerId: EngineSettings['activeProvider']) => {
-    setActiveProvider(providerId);
-    if (onProviderChange) {
-      onProviderChange(providerId);
-    }
-  };
 
   const handleSave = () => {
     onSaveSettings({
-      activeProvider,
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -303,35 +291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
           {activeTab === 'ENGINE' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Select active prediction provider:</p>
-              <div className="space-y-2">
-                {providers.map((p) => {
-                  const isSelected = activeProvider === p.id;
-                  return (
-                    <div
-                      key={p.id}
-                      onClick={() => handleProviderSelect(p.id as any)}
-                      className={`p-4 rounded-2xl transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                        isSelected
-                          ? 'bg-slate-200 dark:bg-[#252525] text-slate-900 dark:text-white shadow-xs'
-                          : 'bg-slate-50 dark:bg-[#1A1A1A] hover:bg-slate-100 dark:hover:bg-[#1E1E1E]'
-                      }`}
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm text-slate-900 dark:text-white">{p.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200 dark:bg-[#121212] text-slate-800 dark:text-slate-300">
-                            v{(p as any).version || '1.0'}
-                          </span>
-                          <span className="text-xs font-mono text-slate-500 dark:text-[#CCFF00] font-bold">{p.latencyMs}ms</span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{p.description}</p>
-                      </div>
-                      {isSelected && <Check className="w-5 h-5 text-slate-950 dark:text-[#CCFF00] shrink-0" />}
-                    </div>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Prediction engine active.</p>
             </div>
           )}
 

@@ -188,7 +188,7 @@ export class ServerPredictionGeneratorService {
     await predictionsDb.init();
 
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -299,7 +299,7 @@ export class ServerPredictionGeneratorService {
     if (historicalUniverse.length === 0) return [];
 
     const activeSettings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,

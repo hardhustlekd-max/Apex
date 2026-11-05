@@ -2,7 +2,6 @@ import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { ServerEngine } from '../core/serverEngine.js';
-import { providerManager } from '../providers/providerManager.js';
 import { loggerService } from './loggerService.js';
 import { Fixture } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
@@ -262,8 +261,7 @@ export class SyncJobService {
         currentStep: 'Evaluating active live matches and updating SQLite cache...',
       });
 
-      const activeProvider = providerManager.getActiveProvider();
-      const liveScores = await activeProvider.getLiveScores().catch(() => []);
+      const liveScores = await flashscoreScraperService.getLiveScores().catch(() => []);
       let livePredCount = 0;
 
       if (liveScores && liveScores.length > 0) {

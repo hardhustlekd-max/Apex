@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
-import { providerManager } from '../providers/providerManager.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { ApexEngine } from '../core/poisson.js';
 import { AccumulatorGenerator, AccaGenerationParams, isMatchStarted } from '../core/accumulator.js';
@@ -42,7 +41,7 @@ accumulatorRouter.post('/generate', async (req, res) => {
   try {
     const params: AccaGenerationParams = req.body || {};
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,

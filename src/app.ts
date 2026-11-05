@@ -42,6 +42,7 @@ export function createApp(): Express {
   app.get('/api/health', healthHandler);
   app.get('/health', healthHandler);
 
+
   // Mount API routers under /api/...
   app.use('/api/fixtures', fixturesRouter);
   app.use('/api/accumulator', accumulatorRouter);

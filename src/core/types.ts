@@ -319,7 +319,6 @@ export interface AccumulatorSlip {
 }
 
 export interface EngineSettings {
-  activeProvider: 'FLASHSCORE' | 'ESPN' | 'FOOTBALL_DATA_CO_UK' | 'BIG_BALLS_DATA' | 'FOOTBALL_DATA_ORG' | 'API_FOOTBALL';
   rollingMatchWindow: number; // e.g. 10, 15, 20
   minEVThreshold: number; // e.g. 1.10 (10% EV)
   safeWinThreshold: number; // e.g. 0.70 (70%)

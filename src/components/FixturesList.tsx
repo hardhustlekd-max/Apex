@@ -347,7 +347,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         prediction,
         odds,
         {
-          activeProvider: 'FLASHSCORE',
+          
           rollingMatchWindow: 15,
           minEVThreshold: 1.10,
           safeWinThreshold: 0.72,

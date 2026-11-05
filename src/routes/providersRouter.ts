@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { providerManager } from '../providers/providerManager.js';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { EngineSettings, Fixture } from '../core/types.js';
@@ -13,50 +12,20 @@ export const providersRouter = Router();
 
 providersRouter.get('/', (req, res) => {
   try {
-    const list = providerManager.getAllProvidersStatus();
-    const activeProvider = providerManager.getActiveProvider();
-
+    const list = flashscoreScraperService.getProviderStatus();
     res.json({
       success: true,
-      activeProviderId: activeProvider.id,
-      providers: list,
+      activeProviderId: 'FLASHSCORE',
+      providers: [list],
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to list providers' });
   }
 });
 
-providersRouter.post('/switch', async (req, res) => {
-  try {
-    const { providerId } = req.body;
-    if (!providerId) {
-      return res.status(400).json({ success: false, error: 'providerId is required' });
-    }
-
-    const switched = providerManager.setActiveProvider(providerId as EngineSettings['activeProvider']);
-    if (!switched) {
-      return res.status(400).json({ success: false, error: 'Invalid provider ID' });
-    }
-
-    const activeProvider = providerManager.getActiveProvider();
-    // Optional sync
-    const syncRes = await activeProvider.syncHistoricalData();
-
-    res.json({
-      success: true,
-      activeProvider: activeProvider.name,
-      message: `Active provider hot-swapped to ${activeProvider.name}`,
-      syncDetails: syncRes,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to switch provider' });
-  }
-});
-
 providersRouter.get('/live-scores', async (req, res) => {
   try {
-    const activeProvider = providerManager.getActiveProvider();
-    const scores = await activeProvider.getLiveScores().catch((err) => {
+    const scores = await flashscoreScraperService.getLiveScores().catch((err) => {
       loggerService.addLog({
         level: 'WARN',
         category: 'SCRAPER',
@@ -68,7 +37,7 @@ providersRouter.get('/live-scores', async (req, res) => {
 
     res.json({
       success: true,
-      provider: 'PREDICTIONS_DB',
+      provider: 'FLASHSCORE',
       scores: scores || [],
     });
   } catch (err: any) {
@@ -79,7 +48,7 @@ providersRouter.get('/live-scores', async (req, res) => {
       message: `Failed to get live scores: ${err?.message || 'Unknown error'}`,
       details: { error: err?.message, stack: err?.stack },
     });
-    res.json({ success: true, provider: 'PREDICTIONS_DB', scores: [] });
+    res.json({ success: true, provider: 'FLASHSCORE', scores: [] });
   }
 });
 
@@ -171,8 +140,7 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     // Update live predictions if any live games are active
-    const activeProvider = providerManager.getActiveProvider();
-    const liveScores = await activeProvider.getLiveScores().catch(() => []);
+    const liveScores = await flashscoreScraperService.getLiveScores().catch(() => []);
     let livePredCount = 0;
     if (liveScores && liveScores.length > 0) {
       const liveFixtures: Fixture[] = liveScores.map((s) => ({

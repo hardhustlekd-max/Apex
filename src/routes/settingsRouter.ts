@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
-import { providerManager } from '../providers/providerManager.js';
 import { EngineSettings } from '../core/types.js';
 import { getTursoConnectionStatus } from '../core/tursoClient.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
@@ -13,7 +12,6 @@ settingsRouter.get('/', (req, res) => {
     res.json({
       success: true,
       settings: settings || {
-        activeProvider: 'FLASHSCORE',
         rollingMatchWindow: 15,
         minEVThreshold: 1.10,
         safeWinThreshold: 0.72,
@@ -63,7 +61,6 @@ settingsRouter.put('/', (req, res) => {
   try {
     const updated: Partial<EngineSettings> = req.body;
     const current = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -76,10 +73,6 @@ settingsRouter.put('/', (req, res) => {
       ...current,
       ...updated,
     };
-
-    if (updated.activeProvider) {
-      providerManager.setActiveProvider(updated.activeProvider);
-    }
 
     db.saveSettings(newSettings);
 

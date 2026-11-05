@@ -13,7 +13,7 @@ import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
 
 let localSettings: EngineSettings = {
-  activeProvider: 'FLASHSCORE',
+  
   rollingMatchWindow: 15,
   minEVThreshold: 1.10,
   safeWinThreshold: 0.72,
@@ -432,19 +432,7 @@ export class EngineService {
     return PROVIDER_METADATA;
   }
 
-  public static async switchProvider(providerId: EngineSettings['activeProvider']): Promise<boolean> {
-    const serverData = await this.safeJsonFetch('/api/providers/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ providerId }),
-    });
-
-    if (serverData && serverData.success) {
-      localSettings.activeProvider = providerId;
-      return true;
-    }
-
-    localSettings.activeProvider = providerId;
+  public static async switchProvider(): Promise<boolean> {
     return true;
   }
 

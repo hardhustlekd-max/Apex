@@ -1,10 +1,10 @@
 import { createClient, Client, InStatement } from '@libsql/client';
 
-const footballUrl = process.env.football_turso_url || process.env.TURSO_DATABASE_URL || process.env.TURSO_URL;
-const footballToken = process.env.football_turso_token || process.env.TURSO_AUTH_TOKEN || process.env.TURSO_TOKEN || '';
+const footballUrl = process.env.football_turso_url;
+const footballToken = process.env.football_turso_token || '';
 
-const predictionsUrl = process.env.predictions_turso_url || process.env.TURSO_DATABASE_URL || process.env.TURSO_URL || footballUrl;
-const predictionsToken = process.env.predictions_turso_token || process.env.TURSO_AUTH_TOKEN || process.env.TURSO_TOKEN || footballToken;
+const predictionsUrl = process.env.predictions_turso_url;
+const predictionsToken = process.env.predictions_turso_token || '';
 
 export const footballTurso = footballUrl
   ? createClient({

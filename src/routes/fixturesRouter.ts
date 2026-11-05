@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { ServerEngine } from '../core/serverEngine.js';
-import { providerManager } from '../providers/providerManager.js';
 import { ApexEngine } from '../core/poisson.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
@@ -69,8 +68,7 @@ fixturesRouter.get('/live', async (req, res) => {
     await predictionsDb.init();
 
     // Fetch fresh live scores from active provider
-    const activeProvider = providerManager.getActiveProvider();
-    const liveScores = await activeProvider.getLiveScores().catch(() => []);
+    const liveScores = await flashscoreScraperService.getLiveScores().catch(() => []);
     let liveFixtures: Fixture[] = [];
 
     if (liveScores && liveScores.length > 0) {
@@ -293,7 +291,7 @@ fixturesRouter.get('/:id', async (req, res) => {
       const parsedMatch = await OnDemandParser.getParsedMatch(cleanId);
 
       const settings: EngineSettings = db.getSettings() || {
-        activeProvider: 'FLASHSCORE',
+        
         rollingMatchWindow: 15,
         minEVThreshold: 1.10,
         safeWinThreshold: 0.72,
@@ -381,7 +379,7 @@ fixturesRouter.get('/:id', async (req, res) => {
     }
 
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,

@@ -32,7 +32,7 @@ export class FootballDB {
   private measurementsMemory: Map<string, HeadToHeadMeasurement> = new Map();
   private standingsMemory: Map<string, any> = new Map();
   private fallbackSettings: EngineSettings = {
-    activeProvider: 'FLASHSCORE',
+    
     rollingMatchWindow: 15,
     minEVThreshold: 1.10,
     safeWinThreshold: 0.72,

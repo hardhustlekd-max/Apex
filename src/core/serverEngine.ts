@@ -370,7 +370,7 @@ export class ServerEngine {
     onProgress?: (processed: number, total: number, predicted: number, skipped: number) => void
   ): Promise<{ predictedCount: number; skippedCount: number; fixtures: Fixture[] }> {
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -477,7 +477,7 @@ export class ServerEngine {
     upcomingFixtures: Fixture[]
   ): Promise<{ count: number; fixtures: Fixture[] }> {
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
@@ -554,7 +554,7 @@ export class ServerEngine {
     liveFixtures: Fixture[]
   ): Promise<{ count: number; fixtures: Fixture[] }> {
     const settings: EngineSettings = db.getSettings() || {
-      activeProvider: 'FLASHSCORE',
+      
       rollingMatchWindow: 15,
       minEVThreshold: 1.10,
       safeWinThreshold: 0.72,

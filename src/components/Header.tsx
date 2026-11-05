@@ -11,7 +11,6 @@ interface HeaderProps {
   onOpenTerminal?: () => void;
   onOpenSeedModal?: () => void;
   onSelectAccaCategory?: (cat: 'BANKER' | 'VALUE_HUNTER') => void;
-  onProviderChange: (providerId: EngineSettings['activeProvider']) => void;
   isSyncing: boolean;
   onSyncData?: () => void;
   isSyncingData?: boolean;

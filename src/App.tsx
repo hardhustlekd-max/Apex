@@ -294,11 +294,10 @@ export default function App() {
     setSelectedLeague(league);
   };
 
-  const handleProviderChange = async (providerId: EngineSettings['activeProvider']) => {
+  const handleProviderChange = async () => {
     try {
-      await EngineService.switchProvider(providerId);
-      setSettings((prev) => (prev ? { ...prev, activeProvider: providerId } : null));
-      showNotification(`Hot-swapped provider to ${providerId}`);
+      await EngineService.switchProvider();
+      showNotification(`Provider switched successfully`);
       fetchFixtures();
     } catch (e) {
       console.error('Failed to switch provider:', e);
@@ -350,7 +349,6 @@ export default function App() {
         onOpenTerminal={() => setIsTerminalOpen(true)}
         onOpenSeedModal={() => setIsSettingsOpen(true)}
         onSelectAccaCategory={() => setActiveTab('ACCAS')}
-        onProviderChange={handleProviderChange}
         isSyncing={isLoadingFixtures || isProcessingActive}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -519,7 +517,6 @@ export default function App() {
         isResettingDatabase={isSyncingData || isSeeding}
         theme={theme}
         onToggleTheme={toggleTheme}
-        onProviderChange={handleProviderChange}
         onSyncData={handleResetAndSyncData}
         isSyncingData={isSyncingData}
         syncProgress={syncJobProgress}
