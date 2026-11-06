@@ -39,9 +39,11 @@ function getTipProb(fixture: Fixture, marketFilter: string = 'BEST_VALUE'): numb
     return Math.max(y, getProbValue(100 - y, 1));
   }
   if (marketFilter === '1X2') {
-    return getAuthoritative1X2Pick(fixture).probabilityPercent;
+    const pick = getAuthoritative1X2Pick(fixture);
+    return pick ? pick.probabilityPercent : 0;
   }
-  return getHighestPredictionAcrossAllMarkets(fixture).probabilityPercent;
+  const highest = getHighestPredictionAcrossAllMarkets(fixture);
+  return highest ? highest.probabilityPercent : 0;
 }
 
 function getHomeProb(fixture: Fixture): number {
@@ -305,16 +307,22 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           {/* Section 1: Highest Probability Pick */}
           <div
             className="flex items-center justify-center shrink-0"
-            title={`Model Pick: ${pick.label} (${pick.probabilityFormatted})`}
+            title={pick ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})` : 'No Prediction in Database'}
           >
-            <div className="flex items-center gap-1 font-mono tabular-nums">
-              <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-[#FF001F] text-white text-xs font-bold whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
-                {pick.shortLabel}
+            {pick ? (
+              <div className="flex items-center gap-1 font-mono tabular-nums">
+                <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-[#FF001F] text-white text-xs font-bold whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
+                  {pick.shortLabel}
+                </span>
+                <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">
+                  {pick.probabilityPercent.toFixed(0)}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs font-mono font-bold text-slate-400 dark:text-neutral-500">
+                -
               </span>
-              <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-200 font-mono tabular-nums">
-                {pick.probabilityPercent.toFixed(0)}%
-              </span>
-            </div>
+            )}
           </div>
 
           {/* Section 2: Probabilities */}

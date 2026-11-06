@@ -3,7 +3,7 @@ import PullToRefresh from 'react-simple-pull-to-refresh';
 import { Header } from './components/Header.js';
 import { DesktopSidebar } from './components/DesktopSidebar.js';
 import { FixturesList } from './components/FixturesList.js';
-import { PrebuiltAccumulators } from './components/PrebuiltAccumulators.js';
+import { DailyFeaturedTip } from './components/DailyFeaturedTip.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
 import { PredictionHistoryView } from './components/PredictionHistoryView.js';
 import { MatchDetailModal, MatchDetailView } from './components/MatchDetailModal.js';
@@ -276,19 +276,14 @@ export default function App() {
     fetchSettingsAndProviders();
     fetchFixtures();
     fetchLiveScores();
-    checkActiveSyncJob();
 
-    // Adaptive polling: 1s for active job, 15s for live scores, 60s for upcoming odds
-    const activeJobInterval = setInterval(checkActiveSyncJob, 1000);
+    // Adaptive polling: 15s for live scores
     const liveInterval = setInterval(fetchLiveScores, 15000);
-    const fixturesInterval = setInterval(fetchFixtures, 60000);
 
     return () => {
-      clearInterval(activeJobInterval);
       clearInterval(liveInterval);
-      clearInterval(fixturesInterval);
     };
-  }, [checkActiveSyncJob]);
+  }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores]);
 
   const handleSelectLeague = (league: string) => {
     setSelectedLeague(league);
@@ -455,11 +450,8 @@ export default function App() {
 
               {activeTab === 'ACCAS' && (
                 <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
-                  <PrebuiltAccumulators
-                    fixtures={fixtures}
-                    settings={settings}
+                  <DailyFeaturedTip
                     onSelectDetail={handleSelectFixture}
-                    onTriggerFullSync={handleResetAndSyncData}
                   />
                 </div>
               )}

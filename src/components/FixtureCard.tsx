@@ -41,7 +41,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             </span>
             <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
             <span className="text-xs font-mono tabular-nums whitespace-nowrap shrink-0">
-              {fixture.status === 'LIVE' ? 'Live' : fixture.status === 'FINISHED' ? 'FT' : `${fixture.matchDate} · ${fixture.kickOffTime}`}
+              {fixture.status === 'LIVE' ? (fixture.minute ? `${fixture.minute}'` : 'Live') : fixture.status === 'FINISHED' ? 'FT' : `${fixture.matchDate} · ${fixture.kickOffTime}`}
             </span>
           </div>
 

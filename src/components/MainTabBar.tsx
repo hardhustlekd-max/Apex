@@ -19,7 +19,7 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
     },
     {
       id: 'ACCAS' as const,
-      label: 'Accumulators',
+      label: 'Featured',
       icon: Layers,
       count: '4',
     },

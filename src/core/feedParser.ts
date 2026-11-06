@@ -15,6 +15,7 @@ export interface ScrapedRawMatch {
   homeHtScore?: number;
   awayHtScore?: number;
   statistics?: any[];
+  minute?: number;
 }
 
 /**
@@ -103,6 +104,10 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
             break;
           case 'SK':
             if (matchData.statistics.length > 0) matchData.statistics[matchData.statistics.length - 1].awayValue = val;
+            break;
+          case 'DE':
+            const matchMinute = val.split('+')[0];
+            matchData.minute = parseInt(matchMinute, 10);
             break;
         }
       }

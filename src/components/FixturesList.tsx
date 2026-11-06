@@ -40,7 +40,8 @@ interface FixturesListProps {
 import { getAuthoritative1X2Pick, getProbValue } from '../core/formatters.js';
 
 function getTipProb(fixture: Fixture): number {
-  return getAuthoritative1X2Pick(fixture).probabilityPercent;
+  const pick = getAuthoritative1X2Pick(fixture);
+  return pick ? pick.probabilityPercent : 0;
 }
 
 function getHomeProb(fixture: Fixture): number {
@@ -335,30 +336,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         };
       }
-      const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(s.homeTeam, s.awayTeam, []);
-      const odds = {
-        homeWin: prediction.homeWinProb > 0 ? Number((1 / prediction.homeWinProb).toFixed(2)) : 2.20,
-        draw: prediction.drawProb > 0 ? Number((1 / prediction.drawProb).toFixed(2)) : 3.30,
-        awayWin: prediction.awayWinProb > 0 ? Number((1 / prediction.awayWinProb).toFixed(2)) : 3.20,
-        over25: prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : 1.90,
-        under25: prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : 1.90,
-      };
-      const { markets, bestValueMarket } = ApexEngine.calculateMarkets(
-        prediction,
-        odds,
-        {
-          
-          rollingMatchWindow: 15,
-          minEVThreshold: 1.10,
-          safeWinThreshold: 0.72,
-          homeAdvantageFactor: 1.12,
-          formDecayRate: 0.85,
-          autoSyncDaily: true,
-        },
-        s.homeTeam,
-        s.awayTeam
-      );
-
+      const defaultOdds = { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 };
       return {
         id: s.fixtureId,
         providerId: 'FLASHSCORE',
@@ -371,20 +349,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         status: 'LIVE' as const,
         minute: s.minute,
         score: { home: s.homeScore, away: s.awayScore },
-        odds,
-        prediction,
-        markets,
-        bestValueMarket,
-        homeStats,
-        awayStats,
-        measurements: prediction.measurements,
+        odds: defaultOdds,
       };
     });
 
     const seen = new Set<string>();
     const combined: Fixture[] = [];
-    // Prioritize fromPredictionsDb, then liveFromScores, then liveFromFixtures
-    for (const f of [...fromPredictionsDb, ...liveFromScores, ...liveFromFixtures]) {
+    // Prioritize liveFromScores so updated score and minute take precedence, then fromPredictionsDb, then liveFromFixtures
+    for (const f of [...liveFromScores, ...fromPredictionsDb, ...liveFromFixtures]) {
       if (!seen.has(f.id)) {
         seen.add(f.id);
         combined.push(f);

@@ -354,23 +354,45 @@ export class FlashscoreScraperService {
     });
 
     const liveScores: LiveScore[] = liveMatches.map((m) => {
-      let minute = 45;
+      let computedMinute = 45;
       let status: LiveScore['status'] = 'FIRST_HALF';
 
+      const nowSec = Math.floor(Date.now() / 1000);
+      const startSec = m.timestamp || 0;
+
       if (m.periodCode === '12') {
-        minute = 25;
         status = 'FIRST_HALF';
+        if (startSec > 0) {
+          const elapsed = Math.floor((nowSec - startSec) / 60);
+          computedMinute = Math.max(1, Math.min(45, elapsed));
+        } else {
+          computedMinute = 25;
+        }
       } else if (m.periodCode === '10' || m.periodCode === '19') {
-        minute = 45;
+        computedMinute = 45;
         status = 'HALF_TIME';
       } else if (m.periodCode === '13') {
-        minute = 70;
         status = 'SECOND_HALF';
+        if (startSec > 0) {
+          const elapsed2 = 45 + Math.floor((nowSec - (startSec + 3600)) / 60);
+          computedMinute = Math.max(46, Math.min(90, elapsed2));
+        } else {
+          computedMinute = 70;
+        }
       } else if (m.periodCode === '14') {
-        minute = 105;
         status = 'EXTRA_TIME';
+        if (startSec > 0) {
+          const elapsedET = 90 + Math.floor((nowSec - (startSec + 6300)) / 60);
+          computedMinute = Math.max(91, Math.min(120, elapsedET));
+        } else {
+          computedMinute = 105;
+        }
+      } else if (startSec > 0) {
+        const elapsed = Math.floor((nowSec - startSec) / 60);
+        computedMinute = Math.max(1, Math.min(90, elapsed));
       }
 
+      const finalMinute = (m.minute && m.minute > 0) ? m.minute : computedMinute;
       const { code, name } = this.mapToLeagueCode(m.tournament || '', m.country || '');
 
       return {
@@ -381,7 +403,7 @@ export class FlashscoreScraperService {
         awayTeam: m.awayTeam,
         homeScore: m.homeScore ?? 0,
         awayScore: m.awayScore ?? 0,
-        minute,
+        minute: finalMinute,
         status,
         events: [],
       };

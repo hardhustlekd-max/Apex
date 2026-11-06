@@ -68,17 +68,10 @@ export interface PickInfo {
 /**
  * Computes the authoritative highest probability 1X2 pick for a match.
  */
-export function getAuthoritative1X2Pick(fixture: Fixture): PickInfo {
+export function getAuthoritative1X2Pick(fixture: Fixture): PickInfo | null {
   const p = fixture.prediction;
   if (!p) {
-    return {
-      type: '1',
-      label: `${fixture.homeTeam} Win`,
-      shortLabel: '1',
-      probability: 0.45,
-      probabilityPercent: 45.0,
-      probabilityFormatted: '45.0%',
-    };
+    return null;
   }
 
   const h = p.homeWinProb ?? 0;
@@ -120,9 +113,9 @@ export function getAuthoritative1X2Pick(fixture: Fixture): PickInfo {
 /**
  * Computes the highest prediction percentage across ALL market categories (1X2, Over/Under 2.5, BTTS).
  */
-export function getHighestPredictionAcrossAllMarkets(fixture: Fixture): PickInfo {
+export function getHighestPredictionAcrossAllMarkets(fixture: Fixture): PickInfo | null {
   const p = fixture.prediction;
-  if (!p) return getAuthoritative1X2Pick(fixture);
+  if (!p) return null;
 
   const h = p.homeWinProb ?? 0;
   const d = p.drawProb ?? 0;
