@@ -702,10 +702,6 @@ export class FlashscoreScraperService {
         const awayScore = m.awayScore!;
         const ftr = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
 
-        const hthg = m.homeHtScore !== undefined ? m.homeHtScore : Math.floor(homeScore / 2);
-        const htag = m.awayHtScore !== undefined ? m.awayHtScore : Math.floor(awayScore / 2);
-        const htr = hthg > htag ? 'H' : hthg < htag ? 'A' : 'D';
-
         // Extract shots from statistics
         let hs, asShots, hst, ast;
         if (m.statistics) {
@@ -730,9 +726,6 @@ export class FlashscoreScraperService {
           fthg: homeScore,
           ftag: awayScore,
           ftr,
-          hthg,
-          htag,
-          htr,
           hs,
           asShots,
           hst,

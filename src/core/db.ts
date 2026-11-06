@@ -5,24 +5,7 @@ import { getPossibleDateStrs, normalizeDateStr } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { footballTurso, safeTursoBatch } from './tursoClient.js';
 
-function cleanupLocalDiskFiles(): void {
-  const filesToDelete = [
-    path.resolve(process.cwd(), 'data', 'football.sqlite'),
-    path.resolve(process.cwd(), 'data', 'predictions.sqlite'),
-    path.resolve('/tmp', 'data', 'football.sqlite'),
-    path.resolve('/tmp', 'data', 'predictions.sqlite'),
-  ];
-  for (const fileP of filesToDelete) {
-    try {
-      if (fs.existsSync(fileP)) {
-        fs.unlinkSync(fileP);
-        console.log(`[FootballDB] Removed local SQLite file: ${fileP}`);
-      }
-    } catch {
-      // Ignore if file doesn't exist or directory is read-only
-    }
-  }
-}
+
 
 export class FootballDB {
   private isInitialized = false;
@@ -44,8 +27,7 @@ export class FootballDB {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Remove local disk SQLite files
-    cleanupLocalDiskFiles();
+
 
     if (footballTurso) {
       try {
@@ -76,20 +58,10 @@ export class FootballDB {
         fthg INTEGER NOT NULL,
         ftag INTEGER NOT NULL,
         ftr TEXT NOT NULL,
-        hthg INTEGER,
-        htag INTEGER,
-        htr TEXT,
         hs INTEGER,
         as_shots INTEGER,
         hst INTEGER,
-        ast INTEGER,
-        b365_h REAL,
-        b365_d REAL,
-        b365_a REAL,
-        b365_over25 REAL,
-        b365_under25 REAL,
-        rest_days_home INTEGER DEFAULT 7,
-        rest_days_away INTEGER DEFAULT 7
+        ast INTEGER
       );`,
       `CREATE INDEX IF NOT EXISTS idx_matches_div ON historical_matches(div);`,
       `CREATE INDEX IF NOT EXISTS idx_matches_date ON historical_matches(match_date);`,
@@ -276,10 +248,8 @@ export class FootballDB {
       const statements = matches.map((m) => ({
         sql: `INSERT OR REPLACE INTO historical_matches (
           id, div, season, match_date, home_team, away_team,
-          fthg, ftag, ftr, hthg, htag, htr, hs, as_shots, hst, ast,
-          b365_h, b365_d, b365_a, b365_over25, b365_under25,
-          rest_days_home, rest_days_away
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          fthg, ftag, ftr, hs, as_shots, hst, ast
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           m.id,
           m.div,
@@ -290,20 +260,10 @@ export class FootballDB {
           m.fthg,
           m.ftag,
           m.ftr,
-          m.hthg ?? null,
-          m.htag ?? null,
-          m.htr ?? null,
           m.hs ?? null,
           m.asShots ?? null,
           m.hst ?? null,
           m.ast ?? null,
-          m.b365H ?? null,
-          m.b365D ?? null,
-          m.b365A ?? null,
-          m.b365Over25 ?? null,
-          m.b365Under25 ?? null,
-          m.restDaysHome ?? 7,
-          m.restDaysAway ?? 7,
         ],
       }));
 

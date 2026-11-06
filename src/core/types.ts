@@ -10,20 +10,10 @@ export interface HistoricalMatch {
   fthg: number; // Full Time Home Goals
   ftag: number; // Full Time Away Goals
   ftr: 'H' | 'D' | 'A'; // Full Time Result
-  hthg?: number; // Half Time Home Goals
-  htag?: number; // Half Time Away Goals
-  htr?: 'H' | 'D' | 'A';
   hs?: number; // Home Shots
   asShots?: number; // Away Shots
   hst?: number; // Home Shots on Target
   ast?: number; // Away Shots on Target
-  b365H?: number; // Bet365 Home Odds
-  b365D?: number; // Bet365 Draw Odds
-  b365A?: number; // Bet365 Away Odds
-  b365Over25?: number;
-  b365Under25?: number;
-  restDaysHome?: number;
-  restDaysAway?: number;
   leagueName?: string;
 }
 

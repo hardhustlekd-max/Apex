@@ -34,8 +34,6 @@ export class ServerEngine {
           fthg: homeScore,
           ftag: awayScore,
           ftr,
-          restDaysHome: 7,
-          restDaysAway: 7,
         };
       });
     const universe = [...rawHist, ...scrapedAsHistorical];

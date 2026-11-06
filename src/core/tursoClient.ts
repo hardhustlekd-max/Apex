@@ -6,19 +6,18 @@ const footballToken = process.env.football_turso_token || '';
 const predictionsUrl = process.env.predictions_turso_url;
 const predictionsToken = process.env.predictions_turso_token || '';
 
-export const footballTurso = footballUrl
-  ? createClient({
-      url: footballUrl,
-      authToken: footballToken,
-    })
-  : null;
+const isVercel = process.env.VERCEL === '1';
+const localDbPath = isVercel ? '/tmp' : 'data';
 
-export const predictionsTurso = predictionsUrl
-  ? createClient({
-      url: predictionsUrl,
-      authToken: predictionsToken,
-    })
-  : null;
+export const footballTurso = createClient({
+  url: footballUrl || `file:${localDbPath}/football.sqlite`,
+  authToken: footballToken,
+});
+
+export const predictionsTurso = createClient({
+  url: predictionsUrl || `file:${localDbPath}/predictions.sqlite`,
+  authToken: predictionsToken,
+});
 
 // Circuit breaker tracking: stops repetitive network attempts when remote Turso is unreachable
 const brokenClientsUntil = new WeakMap<Client, number>();

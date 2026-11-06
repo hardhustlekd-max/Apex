@@ -122,24 +122,11 @@ export class FootballDataCSVParser {
 
       const id = `${div}_${season.replace('/', '-')}_${homeTeam.replace(/\s+/g, '')}_${awayTeam.replace(/\s+/g, '')}_${formattedDate}`.toLowerCase();
 
-      // Half time stats
-      const hthg = row['HTHG'] !== undefined && row['HTHG'] !== '' ? parseInt(row['HTHG'], 10) : undefined;
-      const htag = row['HTAG'] !== undefined && row['HTAG'] !== '' ? parseInt(row['HTAG'], 10) : undefined;
-      const htr = (row['HTR'] || '').toUpperCase() as 'H' | 'D' | 'A' | undefined;
-
       // Shots
       const hs = row['HS'] ? parseInt(row['HS'], 10) : undefined;
       const asShots = row['AS'] ? parseInt(row['AS'], 10) : undefined;
       const hst = row['HST'] ? parseInt(row['HST'], 10) : undefined;
       const ast = row['AST'] ? parseInt(row['AST'], 10) : undefined;
-
-      // Odds (Bet365 or Pinnacle or Average)
-      const b365H = this.parseOdd(row['B365H'] || row['PSH'] || row['AvgH'] || row['BWH']);
-      const b365D = this.parseOdd(row['B365D'] || row['PSD'] || row['AvgD'] || row['BWD']);
-      const b365A = this.parseOdd(row['B365A'] || row['PSA'] || row['AvgA'] || row['BWA']);
-
-      const b365Over25 = this.parseOdd(row['B365>2.5'] || row['P>2.5'] || row['Avg>2.5'] || row['BbAv>2.5']);
-      const b365Under25 = this.parseOdd(row['B365<2.5'] || row['P<2.5'] || row['Avg<2.5'] || row['BbAv<2.5']);
 
       matches.push({
         id,
@@ -151,20 +138,10 @@ export class FootballDataCSVParser {
         fthg: isNaN(fthg) ? 0 : fthg,
         ftag: isNaN(ftag) ? 0 : ftag,
         ftr: ftr as 'H' | 'D' | 'A',
-        hthg: isNaN(hthg as number) ? undefined : hthg,
-        htag: isNaN(htag as number) ? undefined : htag,
-        htr: (htr === 'H' || htr === 'D' || htr === 'A') ? htr : undefined,
         hs: isNaN(hs as number) ? undefined : hs,
         asShots: isNaN(asShots as number) ? undefined : asShots,
         hst: isNaN(hst as number) ? undefined : hst,
         ast: isNaN(ast as number) ? undefined : ast,
-        b365H,
-        b365D,
-        b365A,
-        b365Over25,
-        b365Under25,
-        restDaysHome: 7,
-        restDaysAway: 7,
       });
     }
 

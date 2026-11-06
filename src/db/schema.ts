@@ -1,8 +1,3 @@
-/**
- * Database Schema Definition for SQLite / SQL Database
- * Keeps application data models and relational structures in system alignment
- */
-
 export interface HistoricalMatchSchema {
   id: string; // Primary Key
   div: string; // League code e.g. E0, SP1, D1, I1
@@ -13,20 +8,10 @@ export interface HistoricalMatchSchema {
   fthg: number; // Full-time home goals
   ftag: number; // Full-time away goals
   ftr: 'H' | 'D' | 'A'; // Full-time result
-  hthg?: number | null; // Half-time home goals
-  htag?: number | null; // Half-time away goals
-  htr?: 'H' | 'D' | 'A' | null; // Half-time result
   hs?: number | null; // Home shots
   as_shots?: number | null; // Away shots
   hst?: number | null; // Home shots on target
   ast?: number | null; // Away shots on target
-  b365_h?: number | null; // Bet365 Home Win odds
-  b365_d?: number | null; // Bet365 Draw odds
-  b365_a?: number | null; // Bet365 Away Win odds
-  b365_over25?: number | null; // Bet365 Over 2.5 goals odds
-  b365_under25?: number | null; // Bet365 Under 2.5 goals odds
-  rest_days_home: number; // Rest days before match (default 7)
-  rest_days_away: number; // Rest days before match (default 7)
 }
 
 export type ActiveProviderType = 'FLASHSCORE' | 'ESPN' | 'FOOTBALL_DATA_CO_UK' | 'BIG_BALLS_DATA' | 'FOOTBALL_DATA_ORG' | 'API_FOOTBALL';
@@ -123,21 +108,6 @@ export type QuickSlipStrategy = 'TODAY_SLIP' | 'SAFE_PICKS' | 'TOP_VALUE' | 'CUS
 export type DateFilterScope = 'TODAY' | 'TOMORROW' | 'NEXT_3_DAYS' | 'THIS_WEEK' | 'ALL' | 'CUSTOM';
 export type MarketChoiceFilter = 'BEST_VALUE' | 'OVER_UNDER' | '1X2' | 'BTTS';
 export type PrebuiltCategory = 'BANKER' | 'VALUE_HUNTER' | 'HIGH_GOALS' | 'MEGA_COMBO';
-
-export interface PrebuiltAccumulatorSchema {
-  id: string;
-  category: PrebuiltCategory;
-  name: string;
-  combined_odds: number;
-  combined_prob: number;
-  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
-  legs_json: string;
-  summary_text: string;
-  date_scope?: DateFilterScope | string;
-  server_processed?: boolean;
-  unstarted_only?: boolean;
-  created_at: string;
-}
 
 export interface TablePaginationSchema {
   currentPage: number;
@@ -366,18 +336,6 @@ export interface ServerlessDeploymentConfigSchema {
   updated_at: string;
 }
 
-export interface LiveScoresCacheSchema {
-  fixture_id: string; // Primary Key
-  home_team: string;
-  away_team: string;
-  home_score: number;
-  away_score: number;
-  minute: number;
-  status: string; // 'FIRST_HALF' | 'HALF_TIME' | 'SECOND_HALF' | 'EXTRA_TIME' | 'FINISHED'
-  events_json?: string | null;
-  updated_at: string; // ISO timestamp
-}
-
 export interface FootballTipsCacheSchema {
   id: string; // Primary Key e.g. 'latest_tips'
   tips_json: string;
@@ -491,28 +449,6 @@ export interface TacticalContextBreakdownSchema {
   fatigue_adjustment_home: number;
   fatigue_adjustment_away: number;
   tactical_notes_json: string;
-}
-
-export interface MostLikelyOutcomeSchema {
-  selection: string;
-  market_key: string;
-  probability: number;
-  odds: number;
-  expected_value: number;
-  is_profitable: boolean;
-  commentary: string;
-}
-
-export interface ProfitableBetSchema {
-  selection: string;
-  market_key: string;
-  probability: number;
-  odds: number;
-  expected_value: number;
-  edge_percent: number;
-  fair_odds: number;
-  kelly_stake_percent: number;
-  commentary: string;
 }
 
 export interface DixonColesGoalModelSchema {
@@ -682,20 +618,10 @@ export const DDL_STATEMENTS = {
       fthg INTEGER NOT NULL,
       ftag INTEGER NOT NULL,
       ftr TEXT NOT NULL,
-      hthg INTEGER,
-      htag INTEGER,
-      htr TEXT,
       hs INTEGER,
       as_shots INTEGER,
       hst INTEGER,
-      ast INTEGER,
-      b365_h REAL,
-      b365_d REAL,
-      b365_a REAL,
-      b365_over25 REAL,
-      b365_under25 REAL,
-      rest_days_home INTEGER DEFAULT 7,
-      rest_days_away INTEGER DEFAULT 7
+      ast INTEGER
     );
   `,
   createUpcomingFixtures: `
@@ -708,6 +634,9 @@ export const DDL_STATEMENTS = {
       kick_off_time TEXT NOT NULL,
       home_team TEXT NOT NULL,
       away_team TEXT NOT NULL,
+      home_badge TEXT,
+      away_badge TEXT,
+      stage TEXT,
       b365_h REAL NOT NULL,
       b365_d REAL NOT NULL,
       b365_a REAL NOT NULL,
@@ -715,7 +644,16 @@ export const DDL_STATEMENTS = {
       b365_under25 REAL,
       b365_btts_yes REAL,
       b365_btts_no REAL,
-      status TEXT NOT NULL DEFAULT 'SCHEDULED'
+      status TEXT NOT NULL DEFAULT 'SCHEDULED',
+      score_json TEXT,
+      prediction_json TEXT,
+      markets_json TEXT,
+      best_value_market_json TEXT,
+      home_stats_json TEXT,
+      away_stats_json TEXT,
+      measurements_json TEXT,
+      h2h_matches_json TEXT,
+      updated_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);
   `,
@@ -723,19 +661,6 @@ export const DDL_STATEMENTS = {
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
-    );
-  `,
-  createLiveScoresCache: `
-    CREATE TABLE IF NOT EXISTS live_scores_cache (
-      fixture_id TEXT PRIMARY KEY,
-      home_team TEXT NOT NULL,
-      away_team TEXT NOT NULL,
-      home_score INTEGER NOT NULL DEFAULT 0,
-      away_score INTEGER NOT NULL DEFAULT 0,
-      minute INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'FIRST_HALF',
-      events_json TEXT,
-      updated_at TEXT NOT NULL
     );
   `,
   createFootballTipsCache: `
@@ -771,20 +696,6 @@ export const DDL_STATEMENTS = {
     CREATE INDEX IF NOT EXISTS idx_flashscore_matches_date ON flashscore_scraped_matches(match_date);
     CREATE INDEX IF NOT EXISTS idx_flashscore_matches_home ON flashscore_scraped_matches(home_name);
     CREATE INDEX IF NOT EXISTS idx_flashscore_matches_away ON flashscore_scraped_matches(away_name);
-  `,
-  createPrebuiltAccumulatorsCache: `
-    CREATE TABLE IF NOT EXISTS prebuilt_accumulators_cache (
-      id TEXT PRIMARY KEY,
-      category TEXT NOT NULL,
-      date_scope TEXT NOT NULL,
-      combined_odds REAL NOT NULL,
-      combined_prob REAL NOT NULL,
-      risk_level TEXT NOT NULL,
-      unstarted_only INTEGER DEFAULT 1,
-      slip_json TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_prebuilt_cache_scope ON prebuilt_accumulators_cache(date_scope);
   `,
   createPredictionMeasurementsCache: `
     CREATE TABLE IF NOT EXISTS prediction_measurements_cache (
@@ -929,20 +840,6 @@ export const DDL_STATEMENTS = {
     );
       CREATE INDEX IF NOT EXISTS idx_standings_league ON league_standings(league_code);
   `,
-  createTerminalLogsTable: `
-    CREATE TABLE IF NOT EXISTS terminal_logs (
-      id TEXT PRIMARY KEY,
-      timestamp TEXT NOT NULL,
-      level TEXT NOT NULL,
-      category TEXT NOT NULL,
-      source TEXT NOT NULL,
-      message TEXT NOT NULL,
-      details_json TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON terminal_logs(timestamp);
-    CREATE INDEX IF NOT EXISTS idx_logs_level ON terminal_logs(level);
-    CREATE INDEX IF NOT EXISTS idx_logs_category ON terminal_logs(category);
-  `,
   createRawFeedDataTable: `
     CREATE TABLE IF NOT EXISTS raw_feed_data (
       fixture_id TEXT PRIMARY KEY,
@@ -953,16 +850,6 @@ export const DDL_STATEMENTS = {
     CREATE INDEX IF NOT EXISTS idx_raw_feed_path ON raw_feed_data(feed_path);
   `,
 };
-
-export interface TerminalLogSchema {
-  id: string;
-  timestamp: string;
-  level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR';
-  category: 'DATA_FETCH' | 'PREDICTION' | 'SCRAPER' | 'ENGINE' | 'DATABASE';
-  source: string;
-  message: string;
-  details_json?: string | null;
-}
 
 export interface Unified5PillarPredictionSchema {
   fixture_id: string;
