@@ -139,32 +139,37 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     }
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
-    // Update live predictions if any live games are active
+    // Update live matches (Read-Only Enrichment)
     const liveScores = await flashscoreScraperService.getLiveScores().catch(() => []);
-    let livePredCount = 0;
+    let liveEnrichedCount = 0;
     if (liveScores && liveScores.length > 0) {
-      const liveFixtures: Fixture[] = liveScores.map((s) => ({
-        id: s.fixtureId,
-        providerId: 'FLASHSCORE',
-        league: s.league || 'ALL',
-        leagueName: s.leagueName || 'Live In-Play',
-        matchDate: getRelativeDateStr(0),
-        kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
-        homeTeam: s.homeTeam,
-        awayTeam: s.awayTeam,
-        status: 'LIVE' as const,
-        minute: s.minute,
-        score: { home: s.homeScore, away: s.awayScore },
-        odds: {
-          homeWin: 2.10,
-          draw: 3.30,
-          awayWin: 3.40,
-          over25: 1.85,
-          under25: 1.95,
-        },
-      }));
-      const liveRes = await ServerEngine.predictAndStoreLiveFixtures(liveFixtures);
-      livePredCount = liveRes.count;
+      const enrichedLive: Fixture[] = liveScores.map((s) => {
+        const lf: Fixture = {
+          id: s.fixtureId,
+          providerId: 'FLASHSCORE',
+          league: s.league || 'ALL',
+          leagueName: s.leagueName || 'Live In-Play',
+          matchDate: getRelativeDateStr(0),
+          kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+          homeTeam: s.homeTeam,
+          awayTeam: s.awayTeam,
+          status: 'LIVE' as const,
+          minute: s.minute,
+          score: { home: s.homeScore, away: s.awayScore },
+          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
+        };
+
+        // Attach pre-existing prediction if it exists in DB
+        const cleanId = (lf.id || '').replace(/^fs_/, '');
+        const stored = predictionsDb.getPredictionById(lf.id) || predictionsDb.getPredictionById(cleanId);
+        if (stored && stored.prediction) {
+          return { ...lf, prediction: stored.prediction };
+        }
+        return lf;
+      });
+
+      await db.saveUpcomingFixtures(enrichedLive);
+      liveEnrichedCount = enrichedLive.length;
     }
 
     const updatedStats = {
@@ -178,19 +183,19 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
       level: 'SUCCESS',
       category: 'DATA_FETCH',
       source: 'SyncEngine',
-      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${histPredCount} historical, ${livePredCount} live predicted`,
+      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${histPredCount} historical, ${liveEnrichedCount} live enriched`,
     });
 
     return {
       success: true,
       message: options.resetDatabase || options.resetRawFeeds
-        ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${livePredCount} live, ${histPredCount} historical predictions)`
-        : `Predictions updated in database (${predRes.count} upcoming, ${livePredCount} live, ${histPredCount} historical)`,
+        ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical predictions)`
+        : `Predictions updated in database (${predRes.count} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical)`,
       matchesCount: syncRes.matchesCount,
       upcomingCount: upcoming.length,
       predictionsCount: predRes.count,
       historicalPredictionsCount: histPredCount,
-      livePredictionsCount: livePredCount,
+      livePredictionsCount: liveEnrichedCount,
       stats: updatedStats,
     };
   } catch (err: any) {

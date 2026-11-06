@@ -550,66 +550,6 @@ export class ServerEngine {
     };
   }
 
-  public static async predictAndStoreLiveFixtures(
-    liveFixtures: Fixture[]
-  ): Promise<{ count: number; fixtures: Fixture[] }> {
-    const settings: EngineSettings = db.getSettings() || {
-      
-      rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
-      safeWinThreshold: 0.72,
-      homeAdvantageFactor: 1.12,
-      formDecayRate: 0.85,
-      autoSyncDaily: true,
-    };
-
-    const allMatches = this.getUnifiedHistoricalUniverse();
-    const cachedH2HMap = db.getAllPredictionMeasurements();
-
-    const enrichedLive: Fixture[] = liveFixtures.map((f) => {
-      const cleanId = (f.id || '').replace(/^fs_/, '');
-      const cachedH2H =
-        cachedH2HMap.get(cleanId) ||
-        cachedH2HMap.get(f.id) ||
-        (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0
-          ? f.prediction.measurements.h2h
-          : null);
-
-      const tacticalInput = {
-        information: f.information,
-        restDaysHome: f.restDaysHome,
-        restDaysAway: f.restDaysAway,
-        stage: f.stage,
-      };
-
-      const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput);
-      return {
-        ...enriched,
-        status: 'LIVE' as const,
-      };
-    });
-
-    await db.saveUpcomingFixtures(enrichedLive);
-    try {
-      await predictionsDb.init();
-      predictionsDb.saveLivePredictions(enrichedLive);
-    } catch {
-      // ignore
-    }
-
-    loggerService.addLog({
-      level: 'SUCCESS',
-      category: 'PREDICTION',
-      source: 'ServerEngine',
-      message: `Unified 5-Pillar Engine updated predictions for ${enrichedLive.length} live matches`,
-      details: { count: enrichedLive.length },
-    });
-
-    return {
-      count: enrichedLive.length,
-      fixtures: enrichedLive,
-    };
-  }
 
   public static async predictAndStoreAll(): Promise<void> {
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
