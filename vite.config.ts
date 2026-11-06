@@ -13,7 +13,7 @@ export default defineConfig(() => {
     },
     build: {
       rollupOptions: {
-        external: ['playwright', 'fs', 'path'],
+        external: ['playwright'],
       },
     },
     server: {

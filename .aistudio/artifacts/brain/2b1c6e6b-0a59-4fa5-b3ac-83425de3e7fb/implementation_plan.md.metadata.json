@@ -1,6 +1,6 @@
 {
-  "summary": "Architectural refactoring plan for a strict read-only prediction model. Eliminates dynamic prediction calculations across all client and standard server API routes, isolates manual updates to the Settings modal Predictions tab with a 90% data availability gatekeeper, and gracefully falls back to displaying live scores without on-demand calculation.",
-  "updatedAt": "2026-11-05T10:30:15.933233293Z",
+  "summary": "Root cause analysis and resolution plan for the blank page on Vercel deployment. Identifies accidental server-side Node.js module leakage (fs, path, OnDemandParser) into the Vite client-side bundle and provides a clear decoupling strategy via EngineService.",
+  "updatedAt": "2026-11-06T12:52:00.000000000Z",
   "requestFeedback": true,
   "userFacing": true
 }
