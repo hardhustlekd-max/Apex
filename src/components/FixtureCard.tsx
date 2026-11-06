@@ -2,6 +2,7 @@ import React from 'react';
 import { Info, ArrowRight } from 'lucide-react';
 import { Fixture } from '../core/types.js';
 import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
+import { formatMatchDateTime } from '../core/dateUtils.js';
 
 interface FixtureCardProps {
   fixture: Fixture;
@@ -21,6 +22,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     : null;
 
   const isPositiveEv = pick && pick.probabilityPercent >= 55;
+  const { dateStr: localDate, timeStr: localTime } = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp);
 
   return (
     <div
@@ -41,7 +43,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             </span>
             <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
             <span className="text-xs font-mono tabular-nums whitespace-nowrap shrink-0">
-              {fixture.status === 'LIVE' ? (fixture.minute ? `${fixture.minute}'` : 'Live') : fixture.status === 'FINISHED' ? 'FT' : `${fixture.matchDate} · ${fixture.kickOffTime}`}
+              {fixture.status === 'LIVE' ? (fixture.minute ? `${fixture.minute}'` : 'Live') : fixture.status === 'FINISHED' ? 'FT' : `${localDate} · ${localTime}`}
             </span>
           </div>
 
@@ -54,6 +56,10 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             ) : isPositiveEv ? (
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FF001F]/10 text-[#FF001F] font-mono tracking-wide">
                 VALUE PICK
+              </span>
+            ) : !pred && fixture.status !== 'FINISHED' ? (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 font-mono tracking-wide">
+                UNPREDICTED
               </span>
             ) : null}
           </div>

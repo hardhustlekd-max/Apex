@@ -169,8 +169,6 @@ export class PredictionsDB {
                 const f: Fixture = JSON.parse(String(row.full_fixture_json));
                 if (f && f.id) {
                   this.memoryFallback.set(f.id, f);
-                  const clean = f.id.replace(/^fs_/, '');
-                  this.memoryFallback.set(clean, f);
                 }
               }
             } catch {}
@@ -350,7 +348,16 @@ export class PredictionsDB {
     endDate?: string;
     unstartedOnly?: boolean;
   }): Fixture[] {
-    let fixtures = Array.from(this.memoryFallback.values());
+    const seen = new Set<string>();
+    let fixtures: Fixture[] = [];
+    for (const f of this.memoryFallback.values()) {
+      if (!f || !f.id) continue;
+      const cleanId = f.id.replace(/^fs_/, '');
+      if (seen.has(cleanId)) continue;
+      seen.add(cleanId);
+      fixtures.push(f);
+    }
+
     if (filters?.league && filters.league !== 'ALL') {
       fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
     }
@@ -377,8 +384,11 @@ export class PredictionsDB {
 
     if (this.memoryFallback.has(fixtureId)) return this.memoryFallback.get(fixtureId)!;
     if (this.memoryFallback.has(cleanId)) return this.memoryFallback.get(cleanId)!;
+    if (this.memoryFallback.has(`fs_${cleanId}`)) return this.memoryFallback.get(`fs_${cleanId}`)!;
     if (this.liveMemoryFallback.has(fixtureId)) return this.liveMemoryFallback.get(fixtureId)!;
+    if (this.liveMemoryFallback.has(cleanId)) return this.liveMemoryFallback.get(cleanId)!;
     if (this.historyMemoryFallback.has(fixtureId)) return this.historyMemoryFallback.get(fixtureId)!;
+    if (this.historyMemoryFallback.has(cleanId)) return this.historyMemoryFallback.get(cleanId)!;
 
     return null;
   }
@@ -388,7 +398,36 @@ export class PredictionsDB {
   }
 
   count(): number {
-    return this.memoryFallback.size;
+    const seen = new Set<string>();
+    for (const f of this.memoryFallback.values()) {
+      if (f && f.id) {
+        seen.add(f.id.replace(/^fs_/, ''));
+      }
+    }
+    return seen.size;
+  }
+
+  async removePredictions(fixtureIds: string[]): Promise<void> {
+    if (!fixtureIds || fixtureIds.length === 0) return;
+    for (const id of fixtureIds) {
+      const cleanId = id.replace(/^fs_/, '');
+      this.memoryFallback.delete(id);
+      this.memoryFallback.delete(cleanId);
+      this.memoryFallback.delete(`fs_${cleanId}`);
+    }
+
+    if (predictionsTurso) {
+      try {
+        const allIdsToDel = fixtureIds.flatMap((id) => [id, id.replace(/^fs_/, ''), `fs_${id.replace(/^fs_/, '')}`]);
+        const placeholders = allIdsToDel.map(() => '?').join(',');
+        await predictionsTurso.execute({
+          sql: `DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`,
+          args: allIdsToDel,
+        });
+      } catch (err: any) {
+        console.warn('[PredictionsDB] Error removing predictions from Turso:', err?.message);
+      }
+    }
   }
 
   clearPredictions(): void {

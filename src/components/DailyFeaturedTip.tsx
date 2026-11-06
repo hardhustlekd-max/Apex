@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Target, TrendingUp, Award, ChevronRight, Loader2 } from 'lucide-react';
 import { Fixture } from '../core/types.js';
+import { formatMatchDateTime } from '../core/dateUtils.js';
 
 interface DailyFeaturedTipProps {
   onSelectDetail?: (fixture: Fixture) => void;
@@ -83,7 +84,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
       >
         <div className="flex-1 min-w-0">
           <div className="text-xs font-bold text-slate-500 dark:text-neutral-400 mb-1">
-            {fixture.leagueName} · {fixture.kickOffTime}
+            {fixture.leagueName} · {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
           </div>
           <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
             {fixture.homeTeam} vs {fixture.awayTeam}

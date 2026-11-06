@@ -183,6 +183,28 @@ class IndexedDBStorage {
 
     return null;
   }
+
+  /**
+   * Clear all object stores and local storage cache to zero
+   */
+  async clearAll(): Promise<void> {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('apex_cached_todays_fixtures');
+        localStorage.removeItem('apex_cached_live_scores');
+      }
+    } catch {}
+
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction(['todays_fixtures', 'live_scores', 'app_cache'], 'readwrite');
+      tx.objectStore('todays_fixtures').clear();
+      tx.objectStore('live_scores').clear();
+      tx.objectStore('app_cache').clear();
+    } catch (err) {
+      console.warn('[IndexedDB] clearAll note:', err);
+    }
+  }
 }
 
 export const indexedDbClient = new IndexedDBStorage();

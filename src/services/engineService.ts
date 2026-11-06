@@ -11,6 +11,7 @@ import {
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
+import { indexedDbClient } from '../core/indexedDbClient.js';
 
 let localSettings: EngineSettings = {
   
@@ -101,13 +102,16 @@ export class EngineService {
     } catch (err: any) {
       clearTimeout(timeoutId);
       const errObj = err instanceof Error ? err : new Error(String(err));
-      loggerService.addLog({
-        level: 'WARN',
-        category: 'DATA_FETCH',
-        source: 'EngineService',
-        message: `Network fetch retry/fallback on ${url}: ${errObj.message}`,
-        details: { url, error: errObj.message },
-      });
+      const isAbort = errObj.name === 'AbortError' || errObj.message.toLowerCase().includes('abort');
+      if (!isAbort) {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'DATA_FETCH',
+          source: 'EngineService',
+          message: `Network fetch retry/fallback on ${url}: ${errObj.message}`,
+          details: { url, error: errObj.message },
+        });
+      }
       return null;
     }
   }
@@ -208,6 +212,8 @@ export class EngineService {
     count?: number;
     skippedCount?: number;
     totalPredictionsCount?: number;
+    upcomingCount?: number;
+    stats?: any;
     message?: string;
     error?: string;
   }> {
@@ -244,6 +250,8 @@ export class EngineService {
           count: job.matchesCount || 0,
           skippedCount: job.skippedCount || 0,
           totalPredictionsCount: job.predictionsCount || 0,
+          upcomingCount: job.upcomingCount || 0,
+          stats: job.stats,
           message: job.message || `Successfully recalculated predictions for ${job.matchesCount || 0} upcoming matches.`,
         };
       }
@@ -297,6 +305,7 @@ export class EngineService {
   }
 
   public static async clearClientStorage(): Promise<void> {
+    await indexedDbClient.clearAll().catch(() => {});
     if (typeof localStorage !== 'undefined') {
       const theme = localStorage.getItem('theme');
       localStorage.clear();

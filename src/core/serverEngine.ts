@@ -12,6 +12,7 @@ import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
+import { OnDemandParser } from './onDemandParser.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -409,15 +410,32 @@ export class ServerEngine {
     for (let i = 0; i < validFixtures.length; i += chunkSize) {
       const chunk = validFixtures.slice(i, i + chunkSize);
       const predictedChunk: Fixture[] = [];
+      const unpredictedChunk: Fixture[] = [];
+      const skippedIds: string[] = [];
 
       for (const f of chunk) {
         const cleanId = (f.id || '').replace(/^fs_/, '');
-        const cachedH2H =
+        let cachedH2H =
           cachedH2HMap.get(cleanId) ||
           cachedH2HMap.get(f.id) ||
+          db.getPredictionMeasurement(cleanId) ||
+          db.getPredictionMeasurement(f.id) ||
           (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0
             ? f.prediction.measurements.h2h
             : null);
+
+        if (!cachedH2H) {
+          const rawH2H = db.getRawFeed(cleanId);
+          if (rawH2H && rawH2H.rawText && (rawH2H.rawText.includes('KB÷') || rawH2H.rawText.includes('KC÷'))) {
+            try {
+              cachedH2H = await OnDemandParser.getParsedH2H(cleanId, f.homeTeam, f.awayTeam);
+              if (cachedH2H) {
+                db.savePredictionMeasurement(cleanId, cachedH2H);
+                cachedH2HMap.set(cleanId, cachedH2H);
+              }
+            } catch {}
+          }
+        }
 
         const tacticalInput = {
           information: f.information,
@@ -434,17 +452,33 @@ export class ServerEngine {
           allEnriched.push(enriched);
           predictedCount++;
         } else {
+          const unpredicted: Fixture = {
+            ...f,
+            prediction: undefined,
+            bestValueMarket: undefined,
+          };
+          unpredictedChunk.push(unpredicted);
+          allEnriched.push(unpredicted);
+          skippedIds.push(f.id);
           skippedCount++;
         }
       }
 
       if (predictedChunk.length > 0) {
-        await db.saveUpcomingFixtures(predictedChunk);
+        db.saveUpcomingFixtures(predictedChunk);
         try {
-          predictionsDb.savePredictions(predictedChunk);
-        } catch {
-          // ignore
-        }
+          await predictionsDb.savePredictions(predictedChunk);
+        } catch {}
+      }
+
+      if (unpredictedChunk.length > 0) {
+        db.saveUpcomingFixtures(unpredictedChunk);
+      }
+
+      if (skippedIds.length > 0) {
+        try {
+          await predictionsDb.removePredictions(skippedIds);
+        } catch {}
       }
 
       processed += chunk.length;
@@ -506,8 +540,10 @@ export class ServerEngine {
     }
 
     const cachedH2HMap = db.getAllPredictionMeasurements();
+    let predictedCount = 0;
+    const processedFixtures: Fixture[] = [];
 
-    const enrichedFixtures: Fixture[] = validFixtures.map((f) => {
+    for (const f of validFixtures) {
       const cleanId = (f.id || '').replace(/^fs_/, '');
       const cachedH2H =
         cachedH2HMap.get(cleanId) ||
@@ -523,13 +559,27 @@ export class ServerEngine {
         stage: f.stage,
       };
 
-      return this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
-    });
+      const availability = this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
 
-    await db.saveUpcomingFixtures(enrichedFixtures);
+      if (availability.isEligible) {
+        const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
+        processedFixtures.push(enriched);
+        predictedCount++;
+      } else {
+        const unpredicted: Fixture = {
+          ...f,
+          prediction: undefined,
+          bestValueMarket: undefined,
+        };
+        processedFixtures.push(unpredicted);
+      }
+    }
+
+    await db.saveUpcomingFixtures(processedFixtures);
     try {
       await predictionsDb.init();
-      predictionsDb.savePredictions(enrichedFixtures);
+      const predictedOnly = processedFixtures.filter((f) => f.prediction !== undefined);
+      predictionsDb.savePredictions(predictedOnly);
     } catch {
       // ignore
     }
@@ -538,13 +588,13 @@ export class ServerEngine {
       level: 'SUCCESS',
       category: 'PREDICTION',
       source: 'ServerEngine',
-      message: `Unified 5-Pillar Engine generated predictions for ${enrichedFixtures.length} upcoming fixtures`,
-      details: { count: enrichedFixtures.length, universeSize: allMatches.length },
+      message: `5-Pillar Engine evaluated ${validFixtures.length} upcoming fixtures: ${predictedCount} predicted (>=90% data), ${validFixtures.length - predictedCount} left unpredicted`,
+      details: { count: predictedCount, total: validFixtures.length, universeSize: allMatches.length },
     });
 
     return {
-      count: enrichedFixtures.length,
-      fixtures: enrichedFixtures,
+      count: predictedCount,
+      fixtures: processedFixtures,
     };
   }
 

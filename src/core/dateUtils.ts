@@ -17,12 +17,18 @@ export function getCurrentSeason(): string {
 }
 
 /**
- * Gets a standardized Flashscore date string (YYYY-MM-DD) in UTC.
+ * Gets a standardized date string (YYYY-MM-DD) in local browser/system timezone or UTC.
  */
-export function getStandardDateStr(d: Date | string | number = new Date()): string {
+export function getStandardDateStr(d: Date | string | number = new Date(), preferLocal = true): string {
   const dateObj = typeof d === 'object' ? d : new Date(d);
   if (isNaN(dateObj.getTime())) {
-    return new Date().toISOString().slice(0, 10);
+    return getLocalDateStr(0);
+  }
+  if (preferLocal) {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
   const year = dateObj.getUTCFullYear();
   const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
@@ -31,37 +37,65 @@ export function getStandardDateStr(d: Date | string | number = new Date()): stri
 }
 
 /**
- * Gets a standardized Flashscore time string (HH:mm) in 24h UTC.
+ * Gets a standardized time string (HH:mm) in 24h format.
  */
-export function getStandardTimeStr(d: Date | string | number = new Date()): string {
+export function getStandardTimeStr(d: Date | string | number = new Date(), preferLocal = true): string {
   const dateObj = typeof d === 'object' ? d : new Date(d);
   if (isNaN(dateObj.getTime())) return '12:00';
+  if (preferLocal) {
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
   const hours = String(dateObj.getUTCHours()).padStart(2, '0');
   const minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
 
 /**
- * Gets a date string relative to today in Flashscore UTC standard (YYYY-MM-DD).
+ * Gets date string in local browser/system timezone (YYYY-MM-DD).
  */
-export function getRelativeDateStr(offsetDays = 0): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + offsetDays);
-  return getStandardDateStr(d);
+export function getLocalDateStr(offsetDays = 0, baseDate: Date = new Date()): string {
+  const d = new Date(baseDate.getTime());
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
  * Gets current UTC date string (YYYY-MM-DD).
  */
-export function getUtcDateStr(offsetDays = 0): string {
-  return getRelativeDateStr(offsetDays);
+export function getUtcDateStr(offsetDays = 0, baseDate: Date = new Date()): string {
+  const d = new Date(baseDate.getTime());
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
- * Returns possible date strings for today (Deduplicated Flashscore UTC date).
+ * Gets a date string relative to today in standard YYYY-MM-DD format.
+ */
+export function getRelativeDateStr(offsetDays = 0, preferLocal = true): string {
+  if (preferLocal) {
+    return getLocalDateStr(offsetDays);
+  }
+  return getUtcDateStr(offsetDays);
+}
+
+/**
+ * Returns possible date strings for a relative day offset (includes both local timezone date and UTC date).
  */
 export function getPossibleDateStrs(offsetDays = 0): string[] {
-  return [getRelativeDateStr(offsetDays)];
+  const localDate = getLocalDateStr(offsetDays);
+  const utcDate = getUtcDateStr(offsetDays);
+  if (localDate === utcDate) {
+    return [localDate];
+  }
+  return [localDate, utcDate];
 }
 
 /**
@@ -192,13 +226,95 @@ export function hasMatchStarted(matchDate: string, kickOffTime: string, epochTim
 }
 
 /**
- * Formats match date and time for UI display in standard Flashscore format.
+ * Formats match date and time for UI display in standard Flashscore format, converted to user browser local timezone.
  */
-export function formatMatchDateTime(matchDate: string, kickOffTime: string): { dateStr: string; timeStr: string } {
+export function formatMatchDateTime(
+  matchDate: string,
+  kickOffTime: string,
+  epochTimestamp?: number
+): { dateStr: string; timeStr: string } {
+  // If we have an epoch timestamp (seconds or ms), format in browser local time
+  if (epochTimestamp && epochTimestamp > 0) {
+    const d = new Date(epochTimestamp > 1e11 ? epochTimestamp : epochTimestamp * 1000);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return {
+        dateStr: `${year}-${month}-${day}`,
+        timeStr: `${hours}:${minutes}`,
+      };
+    }
+  }
+
+  const normTime = normalizeTimeStr(kickOffTime);
+  const upperTime = normTime.toUpperCase();
+  if (
+    ['FT', 'HT', 'AET', 'AP', 'LIVE', 'FINISHED', 'IN_PLAY', 'TBD', 'POSTPONED', 'PST', 'CANCELLED', 'CAN'].includes(upperTime) ||
+    upperTime.endsWith("'")
+  ) {
+    return {
+      dateStr: normalizeDateStr(matchDate),
+      timeStr: normTime,
+    };
+  }
+
+  // Convert UTC matchDate + kickOffTime into browser local timezone
+  if (matchDate && normTime && /^\d{1,2}:\d{2}$/.test(normTime)) {
+    const normDate = normalizeDateStr(matchDate);
+    const timeParts = normTime.split(':');
+    const hh = timeParts[0].padStart(2, '0');
+    const mm = timeParts[1];
+    const d = new Date(`${normDate}T${hh}:${mm}:00Z`);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return {
+        dateStr: `${year}-${month}-${day}`,
+        timeStr: `${hours}:${minutes}`,
+      };
+    }
+  }
+
   return {
     dateStr: normalizeDateStr(matchDate),
-    timeStr: normalizeTimeStr(kickOffTime),
+    timeStr: normTime,
   };
+}
+
+/**
+ * Convenience helper to return formatted local kickoff time (HH:mm or status string).
+ */
+export function formatLocalKickoffTime(
+  fixtureOrTime: { matchDate?: string; kickOffTime?: string; timestamp?: number } | string,
+  matchDate?: string
+): string {
+  if (typeof fixtureOrTime === 'string') {
+    return formatMatchDateTime(matchDate || '', fixtureOrTime).timeStr;
+  }
+  return formatMatchDateTime(
+    fixtureOrTime.matchDate || '',
+    fixtureOrTime.kickOffTime || '',
+    fixtureOrTime.timestamp
+  ).timeStr;
+}
+
+/**
+ * Convenience helper to return formatted local match date (YYYY-MM-DD).
+ */
+export function getFixtureLocalDate(
+  fixture: { matchDate?: string; kickOffTime?: string; timestamp?: number }
+): string {
+  return formatMatchDateTime(
+    fixture.matchDate || '',
+    fixture.kickOffTime || '',
+    fixture.timestamp
+  ).dateStr;
 }
 
 

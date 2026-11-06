@@ -239,6 +239,7 @@ export interface Fixture {
   leagueName: string;
   matchDate: string;
   kickOffTime: string;
+  timestamp?: number;
   homeTeam: string;
   awayTeam: string;
   homeBadge?: string;

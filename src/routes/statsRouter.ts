@@ -15,7 +15,7 @@ statsRouter.get('/', (req, res) => {
     const stats = {
       ...baseStats,
       rawFeedsCount,
-      upcomingCount: Math.max(upcomingDbCount, predCount),
+      upcomingCount: upcomingDbCount > 0 ? upcomingDbCount : predCount,
       predictionsCount: predCount,
       totalMatches: Math.max(baseStats.totalMatches, histPredCount),
     };

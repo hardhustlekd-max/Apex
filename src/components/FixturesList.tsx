@@ -3,7 +3,7 @@ import { Filter, ChevronDown, Search, X, RefreshCw } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { Fixture } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
-import { getRelativeDateStr, getPossibleDateStrs, getStandardDateStr, normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
+import { getRelativeDateStr, getPossibleDateStrs, getStandardDateStr, getLocalDateStr, getUtcDateStr, getFixtureLocalDate, normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
 import { FixtureCard } from './FixtureCard.js';
 import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe.js';
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
@@ -142,9 +142,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const baseToday = useMemo(() => {
-    const localToday = getStandardDateStr();
-    const utcToday = new Date().toISOString().slice(0, 10);
-    if (fixtures.some((f) => normalizeDateStr(f.matchDate) === localToday)) {
+    const localToday = getLocalDateStr(0);
+    const utcToday = getUtcDateStr(0);
+    if (fixtures.some((f) => {
+      const nd = normalizeDateStr(f.matchDate);
+      const ld = normalizeDateStr(getFixtureLocalDate(f));
+      return nd === localToday || ld === localToday;
+    })) {
       return localToday;
     }
     if (fixtures.some((f) => normalizeDateStr(f.matchDate) === utcToday)) {
@@ -235,7 +239,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [activeScope, selectedLeague]);
 
   const getOffsetDate = (offsetDays: number) => {
-    return getRelativeDateStr(offsetDays);
+    return getLocalDateStr(offsetDays);
   };
 
   const uniqueFixtures = useMemo(() => {
@@ -248,32 +252,39 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [fixtures]);
 
   const filteredUpcomingFixtures = useMemo(() => {
-    const todayStr = getRelativeDateStr(0);
-    const tomorrowStr = getRelativeDateStr(1);
-    const day2Str = getRelativeDateStr(2);
-    const day3Str = getRelativeDateStr(3);
-    const next3Max = getRelativeDateStr(2);
-    const weekMax = getRelativeDateStr(6);
+    const todayStrs = getPossibleDateStrs(0);
+    const tomorrowStrs = getPossibleDateStrs(1);
+    const day2Strs = getPossibleDateStrs(2);
+    const day3Strs = getPossibleDateStrs(3);
+    const next3Max = getLocalDateStr(2);
+    const weekMax = getLocalDateStr(6);
 
     let matches = uniqueFixtures.filter((f) => {
       const matchDateNorm = normalizeDateStr(f.matchDate);
+      const localMatchDateNorm = normalizeDateStr(getFixtureLocalDate(f));
 
-      // Date filtering strictly matching Flashscore UTC standard dates
+      // Date filtering matching Flashscore UTC standard dates or local dates
       if (dateFilter === 'TODAY') {
-        if (matchDateNorm !== todayStr && matchDateNorm !== baseToday) return false;
+        if (!todayStrs.includes(matchDateNorm) && !todayStrs.includes(localMatchDateNorm) && matchDateNorm !== baseToday) return false;
       } else if (dateFilter === 'TOMORROW') {
-        if (matchDateNorm !== tomorrowStr) return false;
+        if (!tomorrowStrs.includes(matchDateNorm) && !tomorrowStrs.includes(localMatchDateNorm)) return false;
       } else if (dateFilter === 'DAY_2') {
-        if (matchDateNorm !== day2Str) return false;
+        if (!day2Strs.includes(matchDateNorm) && !day2Strs.includes(localMatchDateNorm)) return false;
       } else if (dateFilter === 'DAY_3') {
-        if (matchDateNorm !== day3Str) return false;
+        if (!day3Strs.includes(matchDateNorm) && !day3Strs.includes(localMatchDateNorm)) return false;
       } else if (dateFilter === 'NEXT_3_DAYS') {
-        if (matchDateNorm < todayStr || matchDateNorm > next3Max) return false;
+        const inNext3 = todayStrs.includes(matchDateNorm) || todayStrs.includes(localMatchDateNorm) ||
+          tomorrowStrs.includes(matchDateNorm) || tomorrowStrs.includes(localMatchDateNorm) ||
+          day2Strs.includes(matchDateNorm) || day2Strs.includes(localMatchDateNorm);
+        if (!inNext3) return false;
       } else if (dateFilter === 'THIS_WEEK') {
-        if (matchDateNorm < todayStr || matchDateNorm > weekMax) return false;
+        const inWeek = (matchDateNorm >= todayStrs[0] && matchDateNorm <= weekMax) ||
+          (localMatchDateNorm >= todayStrs[0] && localMatchDateNorm <= weekMax);
+        if (!inWeek) return false;
       } else if (dateFilter !== 'ALL') {
         // Specific calendar date filter
-        if (matchDateNorm !== normalizeDateStr(dateFilter)) return false;
+        const targetDate = normalizeDateStr(dateFilter);
+        if (matchDateNorm !== targetDate && localMatchDateNorm !== targetDate) return false;
       }
 
       // League filter
@@ -463,10 +474,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const calendarDays = useMemo(() => {
     const days = [];
     for (let i = 0; i < 6; i++) {
-      const dateStr = getRelativeDateStr(i);
+      const dateStr = getLocalDateStr(i);
       const [y, m, dNum] = dateStr.split('-').map((p) => parseInt(p, 10));
-      const utcDate = new Date(Date.UTC(y, m - 1, dNum));
-      const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : utcDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+      const localDateObj = new Date(y, m - 1, dNum);
+      const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : localDateObj.toLocaleDateString('en-US', { weekday: 'short' });
       days.push({ dayName, dayNum: dNum, dateStr, index: i });
     }
     return days;

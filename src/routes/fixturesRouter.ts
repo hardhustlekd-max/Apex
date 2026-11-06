@@ -7,7 +7,7 @@ import { EngineSettings, Fixture } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { isMatchStarted } from '../core/accumulator.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
-import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
+import { flashscoreScraperService, convertHistoricalMatchToFixture } from '../services/flashscoreScraperService.js';
 import { loggerService } from '../services/loggerService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
 import { ServerPredictionGeneratorService } from '../services/serverPredictionGeneratorService.js';
@@ -158,52 +158,84 @@ fixturesRouter.get('/history', async (req, res) => {
 
     await predictionsDb.init();
 
-    // Migrate finished scraped matches to historical predictions db
-    const scrapedMatches = db.getFlashscoreScrapedMatches(50);
-    const finishedScraped = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm, idx) => {
-        const homeScore = parseInt(String(sm.result!.home), 10) || 0;
-        const awayScore = parseInt(String(sm.result!.away), 10) || 0;
-        return {
-          id: sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${idx}`,
-          providerId: 'FLASHSCORE',
-          league: sm.leagueName || sm.stage || 'FLASHSCORE',
-          leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-          matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
-          kickOffTime: 'FT',
-          homeTeam: sm.home.name,
-          awayTeam: sm.away.name,
-          status: 'FINISHED' as const,
-          score: { home: homeScore, away: awayScore },
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
-          prediction: {
-            homeXG: 1.35,
-            awayXG: 1.15,
-            homeWinProb: 0.45,
-            drawProb: 0.28,
-            awayWinProb: 0.27,
-            over25Prob: 0.52,
-            bttsProb: 0.50,
-            mostLikelyOutcome: homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw',
-          },
-          bestValueMarket: {
-            key: 'HOME_WIN',
-            name: homeScore > awayScore ? `${sm.home.name} Win` : 'Match Result',
-            odds: 2.10,
-            probability: 0.45,
-            expectedValue: 1.05,
-            isPositiveEV: true,
-            isBanker: false,
-          }
-        };
-      });
-    if (finishedScraped.length > 0) {
-      await predictionsDb.saveHistoricalPredictions(finishedScraped as unknown as Fixture[]);
-    }
+    // Query predictions from predictionsDb
+    let matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
 
-    // Load predictions from predictions db asynchronously
-    const matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
+    // If predictionsDb has no matches for this request, convert and migrate from SQLite database
+    if (!matches || matches.length === 0) {
+      const sqliteHistorical = db.getAllHistoricalMatches(limit);
+      const scrapedMatches = db.getFlashscoreScrapedMatches(50);
+      const convertedFixtures: Fixture[] = sqliteHistorical.map((m) => convertHistoricalMatchToFixture(m));
+
+      for (const sm of scrapedMatches) {
+        if (sm.result?.home !== undefined && sm.result?.away !== undefined) {
+          const homeScore = parseInt(String(sm.result.home), 10) || 0;
+          const awayScore = parseInt(String(sm.result.away), 10) || 0;
+          const id = sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${convertedFixtures.length}`;
+          if (!convertedFixtures.some((f) => f.id === id || f.id === `fs_hist_${sm.matchId}`)) {
+            convertedFixtures.push({
+              id,
+              providerId: 'FLASHSCORE',
+              league: sm.leagueName || sm.stage || 'FLASHSCORE',
+              leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
+              matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
+              kickOffTime: 'FT',
+              homeTeam: sm.home.name,
+              awayTeam: sm.away.name,
+              status: 'FINISHED' as const,
+              score: { home: homeScore, away: awayScore },
+              odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
+              prediction: {
+                homeXG: 1.35,
+                awayXG: 1.15,
+                homeWinProb: 0.45,
+                drawProb: 0.28,
+                awayWinProb: 0.27,
+                over15Prob: 0.75,
+                over25Prob: 0.52,
+                over35Prob: 0.28,
+                bttsProb: 0.50,
+                mostLikelyOutcome: {
+                  selection: homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw',
+                  marketKey: homeScore > awayScore ? 'HOME_WIN' : homeScore < awayScore ? 'AWAY_WIN' : 'DRAW',
+                  probability: 0.55,
+                  odds: 2.10,
+                  expectedValue: 1.15,
+                  isProfitable: true,
+                  commentary: `Result: ${homeScore}-${awayScore}`,
+                },
+                topCorrectScores: [],
+                homeAttackStrength: 1.0,
+                homeDefenseStrength: 1.0,
+                awayAttackStrength: 1.0,
+                awayDefenseStrength: 1.0,
+                homeFormMultiplier: 1.0,
+                awayFormMultiplier: 1.0,
+                probabilityMatrix: [],
+              },
+              bestValueMarket: {
+                key: 'HOME_WIN',
+                name: homeScore > awayScore ? `${sm.home.name} Win` : 'Match Result',
+                odds: 2.10,
+                probability: 0.45,
+                impliedProb: 0.47,
+                expectedValue: 1.05,
+                isPositiveEV: true,
+                isBanker: false,
+              }
+            });
+          }
+        }
+      }
+
+      if (convertedFixtures.length > 0) {
+        await predictionsDb.saveHistoricalPredictions(convertedFixtures);
+        matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
+        if (matches.length === 0) {
+          matches = convertedFixtures;
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -274,152 +306,37 @@ fixturesRouter.get('/:id', async (req, res) => {
   try {
     const fixtureId = req.params.id;
     await db.init();
-    let stored = db.getFixtureById(fixtureId);
+    await predictionsDb.init();
+
+    const cleanId = fixtureId.replace(/^fs_/, '');
+    const stored =
+      predictionsDb.getPredictionById(fixtureId) ||
+      predictionsDb.getPredictionById(cleanId) ||
+      db.getFixtureById(fixtureId) ||
+      db.getFixtureById(cleanId);
+
     if (!stored) {
-      try {
-        await predictionsDb.init();
-        stored = predictionsDb.getPredictionById(fixtureId);
-      } catch {
-        // ignore
-      }
-    }
-
-    if (stored) {
-      // Enrich with real scraped H2H details and on-demand parsed raw match statistics
-      const cleanId = (stored.id || fixtureId).replace(/^fs_/, '');
-      const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
-      const parsedMatch = await OnDemandParser.getParsedMatch(cleanId);
-
-      const settings: EngineSettings = db.getSettings() || {
-        
-        rollingMatchWindow: 15,
-        minEVThreshold: 1.10,
-        safeWinThreshold: 0.72,
-        homeAdvantageFactor: 1.12,
-        formDecayRate: 0.85,
-        autoSyncDaily: true,
-      };
-
-      const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
-      const restDaysHome = ServerEngine.calculateDynamicRestDays(
-        stored.homeTeam,
-        stored.matchDate,
-        allMatches,
-        realH2H?.homeRecentMatches
-      );
-      const restDaysAway = ServerEngine.calculateDynamicRestDays(
-        stored.awayTeam,
-        stored.matchDate,
-        allMatches,
-        realH2H?.awayRecentMatches
-      );
-
-      const tacticalInput = {
-        information: stored.information,
-        restDaysHome,
-        restDaysAway,
-        stage: stored.stage,
-      };
-
-      const enrichedStored = ServerEngine.predictFixtureUnified(
-        {
-          ...stored,
-          statistics: parsedMatch?.statistics && parsedMatch.statistics.length > 0 ? parsedMatch.statistics : stored.statistics,
-          score: (parsedMatch?.homeScore !== undefined && parsedMatch?.awayScore !== undefined)
-            ? { home: parsedMatch.homeScore, away: parsedMatch.awayScore }
-            : stored.score,
-        },
-        allMatches,
-        settings,
-        realH2H,
-        tacticalInput
-      );
-
-      db.saveUpcomingFixtures([enrichedStored]);
-      try {
-        predictionsDb.savePredictions([enrichedStored]);
-      } catch {
-        // safe persistence
-      }
-
       loggerService.addLog({
-        level: 'INFO',
+        level: 'WARN',
         category: 'DATA_FETCH',
         source: 'MatchDetail',
-        message: `Retrieved authoritative prediction for ${stored.homeTeam} vs ${stored.awayTeam} with dynamic rest days (${restDaysHome}d vs ${restDaysAway}d)`,
+        message: `Fixture ${fixtureId} not found in database for match detail`,
       });
-
-      return res.json({
-        success: true,
-        fixture: {
-          ...enrichedStored,
-          measurements: {
-            ...enrichedStored.measurements,
-            h2h: realH2H && realH2H.matchesCount > 0 ? realH2H : enrichedStored.measurements?.h2h,
-          },
-          h2hMatches: realH2H?.recentH2H || [],
-        },
-      });
-    }
-
-    // If fixture was not yet predicted, load from active provider and run through unified engine
-    let f = db.getUpcomingFixtures().find(
-      (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
-    ) || predictionsDb.getPredictionById(fixtureId) || null;
-
-    if (!f) {
-      const fixtures = await flashscoreScraperService.getUpcomingFixtures();
-      f = fixtures.find(
-        (item) => item.id === fixtureId || item.id === `fs_${fixtureId}` || item.id.replace('fs_', '') === fixtureId
-      ) || null;
-    }
-
-    if (!f) {
-      return res.status(404).json({ success: false, error: 'Fixture not found' });
-    }
-
-    const settings: EngineSettings = db.getSettings() || {
-      
-      rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
-      safeWinThreshold: 0.72,
-      homeAdvantageFactor: 1.12,
-      formDecayRate: 0.85,
-      autoSyncDaily: true,
-    };
-
-    const allMatches = ServerEngine.getUnifiedHistoricalUniverse();
-    const cleanId = (f.id || fixtureId).replace(/^fs_/, '');
-    const realH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
-
-    const tacticalInput = {
-      information: f.information,
-      restDaysHome: f.restDaysHome,
-      restDaysAway: f.restDaysAway,
-      stage: f.stage,
-    };
-
-    const enrichedFixture = ServerEngine.predictFixtureUnified(f, allMatches, settings, realH2H, tacticalInput);
-
-    db.saveUpcomingFixtures([enrichedFixture]);
-    try {
-      predictionsDb.savePredictions([enrichedFixture]);
-    } catch {
-      // safe persistence
+      return res.status(404).json({ success: false, error: 'Fixture not found in database' });
     }
 
     loggerService.addLog({
-      level: 'SUCCESS',
-      category: 'PREDICTION',
-      source: 'ApexEngine',
-      message: `Generated unified 5-pillar prediction for unpredicted match ${f.homeTeam} vs ${f.awayTeam}`,
+      level: 'INFO',
+      category: 'DATA_FETCH',
+      source: 'MatchDetail',
+      message: `Retrieved authoritative DB record for match detail: ${stored.homeTeam} vs ${stored.awayTeam}`,
     });
 
-    res.json({
+    return res.json({
       success: true,
       fixture: {
-        ...enrichedFixture,
-        h2hMatches: realH2H.recentH2H,
+        ...stored,
+        h2hMatches: stored.measurements?.h2h?.recentH2H || stored.h2hMatches || [],
       },
     });
   } catch (err: any) {

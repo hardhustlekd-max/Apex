@@ -12,6 +12,7 @@ export class FootballDB {
   private fallbackHistoricalMatches: HistoricalMatch[] = [];
   private fallbackUpcomingFixtures: Fixture[] = [];
   private rawFeedsMemory: Map<string, string> = new Map();
+  private rawFeedsDbCount = 0;
   private measurementsMemory: Map<string, HeadToHeadMeasurement> = new Map();
   private standingsMemory: Map<string, any> = new Map();
   private fallbackSettings: EngineSettings = {
@@ -202,6 +203,67 @@ export class FootballDB {
         console.warn('[FootballDB] Note hydrating upcoming fixtures:', err?.message);
       }
     }
+
+    if (footballTurso && this.measurementsMemory.size === 0) {
+      try {
+        const res = await footballTurso.execute('SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 1500;');
+        if (res.rows && res.rows.length > 0) {
+          for (const row of res.rows) {
+            try {
+              if (row.fixture_id && row.h2h_json) {
+                const parsed = JSON.parse(String(row.h2h_json));
+                const fid = String(row.fixture_id);
+                this.measurementsMemory.set(fid, parsed);
+                this.measurementsMemory.set(`fs_${fid}`, parsed);
+              }
+            } catch {}
+          }
+        }
+      } catch (err: any) {
+        console.warn('[FootballDB] Note hydrating measurements:', err?.message);
+      }
+    }
+
+    if (footballTurso && this.scrapedMatchesMemory.size === 0) {
+      try {
+        const res = await footballTurso.execute('SELECT * FROM flashscore_scraped_matches LIMIT 500;');
+        if (res.rows && res.rows.length > 0) {
+          for (const row of res.rows) {
+            try {
+              const sm = {
+                matchId: String(row.match_id),
+                stage: row.stage ? String(row.stage) : undefined,
+                status: String(row.status || 'FINISHED'),
+                date: String(row.match_date || ''),
+                country: row.country ? String(row.country) : undefined,
+                leagueName: row.league_name ? String(row.league_name) : undefined,
+                home: { name: String(row.home_name || ''), image: row.home_image ? String(row.home_image) : undefined },
+                away: { name: String(row.away_name || ''), image: row.away_image ? String(row.away_image) : undefined },
+                result: (row.home_score !== null && row.away_score !== null) ? { home: Number(row.home_score), away: Number(row.away_score) } : undefined,
+                regulation_time: row.regulation_time ? String(row.regulation_time) : undefined,
+                information: row.information_json ? JSON.parse(String(row.information_json)) : undefined,
+                statistics: row.statistics_json ? JSON.parse(String(row.statistics_json)) : undefined,
+                scraped_at: row.scraped_at ? String(row.scraped_at) : undefined,
+              };
+              this.scrapedMatchesMemory.set(sm.matchId, sm);
+            } catch {}
+          }
+        }
+      } catch (err: any) {
+        console.warn('[FootballDB] Note hydrating scraped matches:', err?.message);
+      }
+    }
+
+    if (footballTurso && this.rawFeedsMemory.size === 0) {
+      try {
+        const res = await footballTurso.execute('SELECT COUNT(*) as count FROM raw_feed_data;');
+        if (res.rows && res.rows.length > 0 && res.rows[0].count !== undefined) {
+          this.rawFeedsDbCount = Number(res.rows[0].count);
+        }
+      } catch (err: any) {
+        console.warn('[FootballDB] Note checking raw_feed_data count:', err?.message);
+      }
+    }
   }
 
   async clearAllData(clearRaw = true): Promise<void> {
@@ -281,8 +343,17 @@ export class FootballDB {
       return true;
     });
 
-    this.fallbackUpcomingFixtures = unique;
     if (unique.length === 0) return;
+
+    // Merge into this.fallbackUpcomingFixtures by ID so partial/chunked saves don't erase existing fixtures
+    const fixtureMap = new Map<string, Fixture>();
+    for (const f of this.fallbackUpcomingFixtures) {
+      if (f.id) fixtureMap.set(f.id, f);
+    }
+    for (const f of unique) {
+      if (f.id) fixtureMap.set(f.id, f);
+    }
+    this.fallbackUpcomingFixtures = Array.from(fixtureMap.values());
 
     if (footballTurso) {
       const statements = unique.map((f) => ({
@@ -336,7 +407,7 @@ export class FootballDB {
   }
 
   getUpcomingFixturesCount(): number {
-    return this.fallbackUpcomingFixtures.length;
+    return this.fallbackUpcomingFixtures.filter((f) => f.status !== 'FINISHED').length;
   }
 
   getFixtureById(id: string): Fixture | null {
@@ -360,16 +431,40 @@ export class FootballDB {
     },
     _dateFilterLegacy?: string
   ): Fixture[] {
-    let filtered = [...this.fallbackUpcomingFixtures];
+    let filtered = this.fallbackUpcomingFixtures.filter((f) => f.status !== 'FINISHED');
+
     let leagueFilter: string | undefined;
+    let dateFilter: string | undefined;
+    let dateParam: string | undefined;
+
     if (typeof filterOrLeague === 'object' && filterOrLeague !== null) {
       leagueFilter = filterOrLeague.league;
+      dateFilter = filterOrLeague.dateFilter;
+      dateParam = filterOrLeague.date;
     } else {
       leagueFilter = typeof filterOrLeague === 'string' ? filterOrLeague : undefined;
+      dateFilter = _dateFilterLegacy;
     }
+
     if (leagueFilter && leagueFilter !== 'ALL') {
       filtered = filtered.filter((f) => (f.league || '').toUpperCase() === leagueFilter!.toUpperCase());
     }
+
+    if (dateParam) {
+      const targetDate = normalizeDateStr(dateParam);
+      filtered = filtered.filter((f) => normalizeDateStr(f.matchDate) === targetDate);
+    } else if (dateFilter && dateFilter !== 'ALL') {
+      const todayStrs = getPossibleDateStrs(0);
+      const tomorrowStrs = getPossibleDateStrs(1);
+      const df = dateFilter.toUpperCase();
+      filtered = filtered.filter((f) => {
+        const norm = normalizeDateStr(f.matchDate);
+        if (df === 'TODAY') return todayStrs.includes(norm);
+        if (df === 'TOMORROW') return tomorrowStrs.includes(norm);
+        return true;
+      });
+    }
+
     return filtered;
   }
 
@@ -613,7 +708,7 @@ export class FootballDB {
   }
 
   getRawFeedsCount(): number {
-    return this.rawFeedsMemory.size;
+    return Math.max(this.rawFeedsMemory.size, this.rawFeedsDbCount);
   }
 
   saveMatchStatistics(matchId: string, statistics: any[]): void {

@@ -128,14 +128,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsUpdatingPredictions(true);
     setPredictionResultMsg(null);
     setPredictionErrMsg(null);
-    setPredictionProgress(null);
+    setPredictionProgress({
+      progress: 10,
+      currentStep: 'Querying upcoming fixtures from Turso database...',
+      stepIndex: 1,
+      totalSteps: 2,
+      matchesCount: 0,
+      skippedCount: 0,
+      upcomingCount: localStats?.upcomingCount ?? stats?.upcomingCount ?? 0,
+      predictionsCount: localStats?.predictionsCount ?? stats?.predictionsCount ?? 0,
+    });
     try {
       const res = await EngineService.updateUpcomingPredictions((job) => {
-        setPredictionProgress(job);
+        setPredictionProgress({
+          progress: job.progress ?? 15,
+          currentStep: job.currentStep || 'Recalculating predictions...',
+          stepIndex: job.stepIndex || 2,
+          totalSteps: job.totalSteps || 2,
+          matchesCount: job.matchesCount || 0,
+          skippedCount: job.skippedCount || 0,
+          upcomingCount: job.upcomingCount ?? localStats?.upcomingCount ?? 0,
+          predictionsCount: job.predictionsCount ?? localStats?.predictionsCount ?? 0,
+        });
       });
       if (res.success) {
-        setPredictionResultMsg(res.message || `Updated predictions for upcoming games in database.`);
+        setPredictionResultMsg(res.message || `Successfully recalculated predictions for upcoming matches.`);
         setPredictionProgress(null);
+        if (res.stats) {
+          setLocalStats(res.stats);
+        } else if (localStats) {
+          setLocalStats({
+            ...localStats,
+            upcomingCount: res.upcomingCount ?? localStats.upcomingCount,
+            predictionsCount: res.totalPredictionsCount ?? localStats.predictionsCount,
+          });
+        }
         await Promise.all([fetchTursoStatus(), fetchScraperStatus(), fetchFreshStats()]);
         if (onRefreshMetrics) {
           await onRefreshMetrics();
@@ -152,7 +179,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isResettingDatabase);
+  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isResettingDatabase || isUpdatingPredictions);
 
   useEffect(() => {
     if (isOpen && (activeTab === 'DATA' || activeTab === 'PREDICTIONS')) {
@@ -610,13 +637,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Upcoming Fixtures</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
-                      {localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
+                      {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Stored Model Predictions</span>
                     <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
-                      {localStats?.predictionsCount ?? stats?.predictionsCount ?? '—'}
+                      {predictionProgress?.predictionsCount ?? localStats?.predictionsCount ?? stats?.predictionsCount ?? '—'}
                     </span>
                   </div>
                 </div>

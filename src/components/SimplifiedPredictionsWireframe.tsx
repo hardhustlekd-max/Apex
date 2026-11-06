@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Fixture, MarketOption } from '../core/types.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
+import { formatMatchDateTime } from '../core/dateUtils.js';
 import {
   ChevronDown,
   ChevronLeft,
@@ -168,7 +169,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean) => {
     const isLive = fixture.status === 'LIVE';
-    const kickOff = fixture.kickOffTime || '19:00';
+    const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
     const pick = getAuthoritative1X2Pick(fixture);
     const valueBet = getAuthoritativeValueBet(fixture);
 

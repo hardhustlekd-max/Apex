@@ -28,16 +28,58 @@ export class ServerPredictionGeneratorService {
     await db.init();
     await predictionsDb.init();
 
-    // 1. First retrieve existing predictions from predictionsDb
-    let predictions = predictionsDb.getPredictions(filters);
+    // 1. Retrieve all upcoming fixtures from db
+    const upcomingList = db.getUpcomingFixtures(filters);
 
-    // 2. Fallback to db.getUpcomingFixtures if predictionsDb was empty for this query
-    if (predictions.length === 0) {
-      predictions = db.getUpcomingFixtures(filters);
+    // 2. Retrieve calculated predictions from predictionsDb
+    const predictionsList = predictionsDb.getPredictions(filters);
+    const predMap = new Map<string, Fixture>();
+    for (const p of predictionsList) {
+      if (p.id) {
+        predMap.set(p.id, p);
+        predMap.set(p.id.replace(/^fs_/, ''), p);
+      }
     }
 
-    // 3. Return static database records (empty array if no records exist)
-    return predictions;
+    // 3. If upcomingList has fixtures, combine them: attach prediction if eligible/stored, or leave unpredicted
+    if (upcomingList.length > 0) {
+      const mergedMap = new Map<string, Fixture>();
+      for (const f of upcomingList) {
+        const cleanId = (f.id || '').replace(/^fs_/, '');
+        const p = predMap.get(f.id) || predMap.get(cleanId);
+        if (p && p.prediction) {
+          mergedMap.set(cleanId, {
+            ...f,
+            prediction: p.prediction,
+            markets: p.markets || f.markets,
+            bestValueMarket: p.bestValueMarket || f.bestValueMarket,
+            homeStats: p.homeStats || f.homeStats,
+            awayStats: p.awayStats || f.awayStats,
+            measurements: p.measurements || f.measurements,
+          });
+        } else {
+          // Ineligible / not yet predicted fixture -> strictly leave unpredicted
+          mergedMap.set(cleanId, {
+            ...f,
+            prediction: undefined,
+            bestValueMarket: undefined,
+          });
+        }
+      }
+
+      // Also ensure any standalone stored predictions not in upcomingList are included
+      for (const p of predictionsList) {
+        const cleanId = (p.id || '').replace(/^fs_/, '');
+        if (!mergedMap.has(cleanId)) {
+          mergedMap.set(cleanId, p);
+        }
+      }
+
+      return Array.from(mergedMap.values());
+    }
+
+    // Fallback: Return stored predictions if upcoming fixtures table is not populated
+    return predictionsList;
   }
 
   /**

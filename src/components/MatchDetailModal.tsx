@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, MarketOption } from '../core/types.js';
+import { formatMatchDateTime } from '../core/dateUtils.js';
 import { PoissonMatrixView } from './PoissonMatrixView.js';
 import { ApexEngine } from '../core/poisson.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -274,7 +275,6 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       {/* Modal Header */}
       <div className="bg-white dark:bg-[#121216] px-4 sm:px-5 pt-3 pb-2.5 shrink-0">
         <div className="flex items-center justify-between gap-2 min-w-0">
-          {/* Typographic Metadata Header (Zero-Pill Discipline) */}
           <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-[11px] text-slate-500 dark:text-neutral-400">
             <span className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap">
               {fixture.stage || fixture.leagueName}
@@ -282,12 +282,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
             <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
             <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] whitespace-nowrap shrink-0">
               <Calendar className="w-3 h-3 text-slate-400" />
-              <span>{fixture.matchDate}</span>
+              <span>{formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}</span>
             </span>
             <span aria-hidden="true" className="text-slate-300 dark:text-neutral-700 shrink-0">·</span>
             <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] whitespace-nowrap shrink-0">
               <Clock className="w-3 h-3 text-slate-400" />
-              <span>{fixture.kickOffTime}</span>
+              <span>{formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}</span>
             </span>
             {fixture.status === 'LIVE' && (
               <>
@@ -375,7 +375,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     VS
                   </span>
                   <span className="block text-[10px] font-mono tabular-nums text-white/80 mt-0.5">
-                    {fixture.kickOffTime}
+                    {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
                   </span>
                 </div>
               )}
