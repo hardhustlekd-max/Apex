@@ -1,21 +1,27 @@
 import { createClient, Client, InStatement } from '@libsql/client';
 
-const groupToken = process.env.group_token;
+const groupToken = process.env.group_token || process.env.TURSO_AUTH_TOKEN || '';
 
-const footballUrl = process.env.football_turso_url;
-const predictionsUrl = process.env.predictions_turso_url;
+// 100% Turso Cloud Database Connections
+const footballUrl =
+  process.env.football_turso_url ||
+  process.env.TURSO_DATABASE_URL ||
+  'libsql://football-db.turso.io';
 
-const isVercel = process.env.VERCEL === '1';
-const localDbPath = isVercel ? '/tmp' : 'data';
+const predictionsUrl =
+  process.env.predictions_turso_url ||
+  process.env.TURSO_PREDICTIONS_URL ||
+  process.env.TURSO_DATABASE_URL ||
+  'libsql://predictions-db.turso.io';
 
 export const footballTurso = createClient({
-  url: footballUrl || `file:${localDbPath}/football.sqlite`,
-  authToken: groupToken || '',
+  url: footballUrl,
+  authToken: groupToken,
 });
 
 export const predictionsTurso = createClient({
-  url: predictionsUrl || `file:${localDbPath}/predictions.sqlite`,
-  authToken: groupToken || '',
+  url: predictionsUrl,
+  authToken: groupToken,
 });
 
 // Circuit breaker tracking: stops repetitive network attempts when remote Turso is unreachable

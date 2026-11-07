@@ -32,7 +32,7 @@ export class ServerPredictionGeneratorService {
     const upcomingList = db.getUpcomingFixtures(filters);
 
     // 2. Retrieve calculated predictions from predictionsDb
-    const predictionsList = predictionsDb.getPredictions(filters);
+    const predictionsList = await predictionsDb.getPredictionsAsync(filters);
     const predMap = new Map<string, Fixture>();
     for (const p of predictionsList) {
       if (p.id) {
@@ -327,114 +327,5 @@ export class ServerPredictionGeneratorService {
       HIGH_GOALS: goalsSlip,
       MEGA_COMBO: megaSlip,
     };
-  }
-
-  /**
-   * Internal helper: Synthesizes initial predictions from SQLite historical database if predictions DB is totally empty
-   */
-  public static async generateAndStorePredictionsFromDb(settings?: EngineSettings, daysAhead = 7): Promise<Fixture[]> {
-    return this.synthesizeAndStorePredictionsFromDb(daysAhead);
-  }
-
-  private static async synthesizeAndStorePredictionsFromDb(daysAhead = 7): Promise<Fixture[]> {
-    const historicalUniverse = ServerEngine.getUnifiedHistoricalUniverse();
-    if (historicalUniverse.length === 0) return [];
-
-    const activeSettings: EngineSettings = db.getSettings() || {
-      
-      rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
-      safeWinThreshold: 0.72,
-      homeAdvantageFactor: 1.12,
-      formDecayRate: 0.85,
-      autoSyncDaily: true,
-    };
-
-    const leagueTeamsMap = new Map<string, { code: string; leagueName: string; teams: Set<string> }>();
-    const leagueNameMap: Record<string, string> = {
-      'E0': 'England: Premier League',
-      'england_premier_league': 'England: Premier League',
-      'E1': 'England: Championship',
-      'england_championship': 'England: Championship',
-      'SP1': 'Spain: La Liga',
-      'spain_la_liga': 'Spain: La Liga',
-      'D1': 'Germany: Bundesliga',
-      'germany_bundesliga': 'Germany: Bundesliga',
-      'I1': 'Italy: Serie A',
-      'italy_serie_a': 'Italy: Serie A',
-      'F1': 'France: Ligue 1',
-      'france_ligue_1': 'France: Ligue 1',
-      'N1': 'Netherlands: Eredivisie',
-      'netherlands_eredivisie': 'Netherlands: Eredivisie',
-      'P1': 'Portugal: Primeira Liga',
-      'portugal_primeira_liga': 'Portugal: Primeira Liga',
-      'europe_champions_league': 'Europe: UEFA Champions League',
-    };
-
-    for (const m of historicalUniverse) {
-      const rawDiv = m.div || 'E0';
-      const divCode = rawDiv.toLowerCase();
-      const friendlyName = (m as any).leagueName || leagueNameMap[rawDiv] || leagueNameMap[divCode] || `League: ${rawDiv}`;
-
-      if (!leagueTeamsMap.has(divCode)) {
-        leagueTeamsMap.set(divCode, {
-          code: divCode,
-          leagueName: friendlyName,
-          teams: new Set<string>(),
-        });
-      }
-
-      const leagueEntry = leagueTeamsMap.get(divCode)!;
-      if (m.homeTeam && m.homeTeam.trim().length > 1) leagueEntry.teams.add(m.homeTeam.trim());
-      if (m.awayTeam && m.awayTeam.trim().length > 1) leagueEntry.teams.add(m.awayTeam.trim());
-    }
-
-    const generatedFixtures: Fixture[] = [];
-    let fixtureCounter = 1000;
-    const timeSlots = ['12:30', '15:00', '17:30', '19:45', '20:00', '21:00'];
-
-    for (const [divCode, entry] of leagueTeamsMap.entries()) {
-      const teamList = Array.from(entry.teams);
-      if (teamList.length < 2) continue;
-
-      for (let i = 0; i < teamList.length - 1; i += 2) {
-        const homeTeam = teamList[i];
-        const awayTeam = teamList[i + 1];
-        if (!homeTeam || !awayTeam || homeTeam === awayTeam) continue;
-
-        const dayOffset = (generatedFixtures.length % daysAhead);
-        const matchDate = getRelativeDateStr(dayOffset);
-        const kickOffTime = timeSlots[generatedFixtures.length % timeSlots.length];
-
-        fixtureCounter++;
-        const fixtureId = `db_gen_${divCode}_${fixtureCounter}`;
-
-        generatedFixtures.push({
-          id: fixtureId,
-          providerId: 'DB_GENERATOR',
-          league: divCode,
-          leagueName: entry.leagueName,
-          matchDate,
-          kickOffTime,
-          homeTeam,
-          awayTeam,
-          stage: entry.leagueName,
-          status: 'SCHEDULED',
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95, bttsYes: 1.80, bttsNo: 2.00 },
-        });
-      }
-    }
-
-    const cachedH2HMap = db.getAllPredictionMeasurements();
-    const enrichedPredictions: Fixture[] = generatedFixtures.map((f) => {
-      const cleanId = f.id.replace(/^fs_/, '');
-      const cachedH2H = cachedH2HMap.get(cleanId) || cachedH2HMap.get(f.id);
-      return ServerEngine.predictFixtureUnified(f, historicalUniverse, activeSettings, cachedH2H);
-    });
-
-    await db.saveUpcomingFixtures(enrichedPredictions);
-    await predictionsDb.savePredictions(enrichedPredictions);
-
-    return enrichedPredictions;
   }
 }

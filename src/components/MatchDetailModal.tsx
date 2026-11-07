@@ -130,8 +130,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
   // Scraped Head to Head sync
   const initialH2H =
-    pred?.measurements?.h2h &&
-    pred.measurements.h2h.homeRecentMatches &&
+    pred?.measurements?.h2h?.homeRecentMatches &&
     pred.measurements.h2h.homeRecentMatches.length > 0
       ? pred.measurements.h2h
       : null;
@@ -140,8 +139,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
   useEffect(() => {
     const h2h =
-      pred?.measurements?.h2h &&
-      pred.measurements.h2h.homeRecentMatches &&
+      pred?.measurements?.h2h?.homeRecentMatches &&
       pred.measurements.h2h.homeRecentMatches.length > 0
         ? pred.measurements.h2h
         : null;
@@ -639,13 +637,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
                       <span className="font-sans text-slate-600 dark:text-neutral-300">Expected Goals (xG)</span>
                       <div className="font-bold text-slate-900 dark:text-white">
-                        <span className="text-slate-900 dark:text-[#CCFF00]">{pred.homeXG}</span>
+                        <span className="text-slate-900 dark:text-[#CCFF00]">{pred?.homeXG ?? '-'}</span>
                         <span aria-hidden="true" className="text-slate-400 px-1 font-normal">vs</span>
-                        <span className="text-cyan-600 dark:text-cyan-400">{pred.awayXG}</span>
+                        <span className="text-cyan-600 dark:text-cyan-400">{pred?.awayXG ?? '-'}</span>
                       </div>
                     </div>
 
-                    {pred.teamStrength ? (
+                    {pred?.teamStrength ? (
                       <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
                         <span className="font-sans text-slate-600 dark:text-neutral-300">Team Strength Index</span>
                         <div className="font-bold text-slate-900 dark:text-white">
@@ -654,7 +652,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                           <span className="text-cyan-600 dark:text-cyan-400">{pred.teamStrength.awayStrengthRating}</span>
                         </div>
                       </div>
-                    ) : pred.eloRatings ? (
+                    ) : pred?.eloRatings ? (
                       <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
                         <span className="font-sans text-slate-600 dark:text-neutral-300">Elo Ratings</span>
                         <div className="font-bold text-slate-900 dark:text-white">
@@ -665,7 +663,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       </div>
                     ) : null}
 
-                    {pred.tacticalContext && (
+                    {pred?.tacticalContext && (
                       <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
                         <span className="font-sans text-slate-600 dark:text-neutral-300">Rest Days</span>
                         <div className="font-bold text-slate-900 dark:text-white">
@@ -996,7 +994,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   </span>
                 </div>
                 <span className="text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-[#09090B] text-slate-900 dark:text-[#CCFF00] font-mono tabular-nums font-bold shrink-0">
-                  x{pred.homeFormMultiplier} Form
+                  x{pred?.homeFormMultiplier ?? 1.0} Form
                 </span>
               </div>
 
@@ -1033,13 +1031,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
                   <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Attack Rating</span>
                   <span className="text-sm font-black text-slate-900 dark:text-[#CCFF00] block mt-0.5">
-                    {pred.homeAttackStrength}
+                    {pred?.homeAttackStrength ?? 1.0}
                   </span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
                   <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Defense Rating</span>
                   <span className="text-sm font-black text-slate-900 dark:text-[#CCFF00] block mt-0.5">
-                    {pred.homeDefenseStrength}
+                    {pred?.homeDefenseStrength ?? 1.0}
                   </span>
                 </div>
               </div>
@@ -1118,7 +1116,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   </span>
                 </div>
                 <span className="text-xs px-2 py-1 rounded-md bg-cyan-50 dark:bg-[#09090B] text-cyan-700 dark:text-cyan-400 font-mono tabular-nums font-bold shrink-0">
-                  x{pred.awayFormMultiplier} Form
+                  x{pred?.awayFormMultiplier ?? 1.0} Form
                 </span>
               </div>
 
@@ -1155,13 +1153,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
                   <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Attack Rating</span>
                   <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block mt-0.5">
-                    {pred.awayAttackStrength}
+                    {pred?.awayAttackStrength ?? 1.0}
                   </span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
                   <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Defense Rating</span>
                   <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block mt-0.5">
-                    {pred.awayDefenseStrength}
+                    {pred?.awayDefenseStrength ?? 1.0}
                   </span>
                 </div>
               </div>

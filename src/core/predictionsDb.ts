@@ -303,7 +303,10 @@ export class PredictionsDB {
             if (row.full_fixture_json) {
               try {
                 const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
-                fixtures.push(parsed);
+                if (parsed && parsed.id) {
+                  fixtures.push(parsed);
+                  this.memoryFallback.set(parsed.id, parsed);
+                }
               } catch {}
             }
           }
@@ -407,6 +410,20 @@ export class PredictionsDB {
     return seen.size;
   }
 
+  async countAsync(): Promise<number> {
+    if (predictionsTurso) {
+      try {
+        const res = await predictionsTurso.execute('SELECT COUNT(*) as count FROM upcoming_predictions;');
+        if (res.rows && res.rows.length > 0 && res.rows[0].count !== undefined) {
+          return Number(res.rows[0].count);
+        }
+      } catch (err: any) {
+        console.warn('[PredictionsDB] Error querying Turso prediction count:', err?.message);
+      }
+    }
+    return this.count();
+  }
+
   async removePredictions(fixtureIds: string[]): Promise<void> {
     if (!fixtureIds || fixtureIds.length === 0) return;
     for (const id of fixtureIds) {
@@ -430,10 +447,14 @@ export class PredictionsDB {
     }
   }
 
-  clearPredictions(): void {
+  async clearPredictions(): Promise<void> {
     this.memoryFallback.clear();
     if (predictionsTurso) {
-      predictionsTurso.execute('DELETE FROM upcoming_predictions;').catch(() => {});
+      try {
+        await predictionsTurso.execute('DELETE FROM upcoming_predictions;');
+      } catch (err: any) {
+        console.warn('[PredictionsDB] Error clearing upcoming predictions from Turso:', err?.message);
+      }
     }
   }
 

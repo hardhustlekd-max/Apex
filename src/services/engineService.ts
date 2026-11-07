@@ -217,6 +217,18 @@ export class EngineService {
     message?: string;
     error?: string;
   }> {
+    // Purge browser IndexedDB and LocalStorage prediction cache as the first step
+    try {
+      await indexedDbClient.clearAll();
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('apex_cached_todays_fixtures');
+        localStorage.removeItem('apex_cached_predictions');
+        localStorage.removeItem('apex_cached_live_scores');
+      }
+    } catch (cacheErr) {
+      console.warn('[EngineService] Note clearing local browser cache before prediction update:', cacheErr);
+    }
+
     const startRes = await this.safeJsonFetch('/api/settings/update-predictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

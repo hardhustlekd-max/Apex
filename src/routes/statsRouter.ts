@@ -4,12 +4,12 @@ import { predictionsDb } from '../core/predictionsDb.js';
 
 export const statsRouter = Router();
 
-statsRouter.get('/', (req, res) => {
+statsRouter.get('/', async (req, res) => {
   try {
     const baseStats = db.getStatsSummary();
     const rawFeedsCount = db.getRawFeedsCount();
     const upcomingDbCount = db.getUpcomingFixturesCount();
-    const predCount = predictionsDb.count();
+    const predCount = await predictionsDb.countAsync();
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     const stats = {

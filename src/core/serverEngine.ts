@@ -475,14 +475,14 @@ export class ServerEngine {
       }
 
       if (predictedChunk.length > 0) {
-        db.saveUpcomingFixtures(predictedChunk);
+        await db.saveUpcomingFixtures(predictedChunk);
         try {
           await predictionsDb.savePredictions(predictedChunk);
         } catch {}
       }
 
       if (unpredictedChunk.length > 0) {
-        db.saveUpcomingFixtures(unpredictedChunk);
+        await db.saveUpcomingFixtures(unpredictedChunk);
       }
 
       if (skippedIds.length > 0) {
@@ -589,7 +589,7 @@ export class ServerEngine {
     try {
       await predictionsDb.init();
       const predictedOnly = processedFixtures.filter((f) => f.prediction !== undefined);
-      predictionsDb.savePredictions(predictedOnly);
+      await predictionsDb.savePredictions(predictedOnly);
     } catch {
       // ignore
     }

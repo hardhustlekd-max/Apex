@@ -319,7 +319,7 @@ export class FlashscoreScraperService {
           }
 
           if (upcomingFixturesToSave.length > 0) {
-            db.saveUpcomingFixtures(upcomingFixturesToSave);
+            await db.saveUpcomingFixtures(upcomingFixturesToSave);
           }
           if (historicalMatchesToSave.length > 0) {
             db.insertHistoricalMatches(historicalMatchesToSave);
@@ -478,7 +478,7 @@ export class FlashscoreScraperService {
       this.cacheUpcoming = scrapedFixtures;
       this.lastFetchTime = now;
       // Persist to database
-      db.saveUpcomingFixtures(scrapedFixtures);
+      await db.saveUpcomingFixtures(scrapedFixtures);
       db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
 
       loggerService.addLog({
@@ -637,22 +637,35 @@ export class FlashscoreScraperService {
       // @ts-ignore
       const pwImport = new Function('m', 'return import(m)');
       const { chromium } = await pwImport('playwright');
-      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      if (!chromium) return matches;
+      
+      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] }).catch(() => null);
+      if (!browser) return matches;
+
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      });
-      const page = await context.newPage();
+      }).catch(() => null);
+      if (!context) {
+        await browser.close().catch(() => {});
+        return matches;
+      }
 
-      await page.goto(seasonUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      const page = await context.newPage().catch(() => null);
+      if (!page) {
+        await browser.close().catch(() => {});
+        return matches;
+      }
+
+      await page.goto(seasonUrl, { waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {});
 
       // Click "Show more matches" if available
       const loadMoreSelector = '[data-testid="wcl-buttonLink"]';
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 3; i++) {
         try {
           const btn = await page.$(loadMoreSelector);
           if (!btn) break;
           await btn.click();
-          await page.waitForTimeout(600);
+          await page.waitForTimeout(400);
         } catch {
           break;
         }
@@ -669,9 +682,9 @@ export class FlashscoreScraperService {
           const scoreAway = el.querySelector('.event__score--away')?.textContent?.trim() || '';
           return { id, home, away, scoreHome, scoreAway };
         });
-      });
+      }).catch(() => []);
 
-      await browser.close();
+      await browser.close().catch(() => {});
 
       for (const m of rawDOMMatches) {
         if (!m.id || !m.home || !m.away) continue;
@@ -693,18 +706,20 @@ export class FlashscoreScraperService {
         });
       }
 
-      loggerService.addLog({
-        level: 'SUCCESS',
-        category: 'SCRAPER',
-        source: 'FlashscoreScraperService',
-        message: `Playwright headless fallback successfully retrieved ${matches.length} matches from ${seasonUrl}`,
-      });
+      if (matches.length > 0) {
+        loggerService.addLog({
+          level: 'SUCCESS',
+          category: 'SCRAPER',
+          source: 'FlashscoreScraperService',
+          message: `Playwright headless fallback successfully retrieved ${matches.length} matches from ${seasonUrl}`,
+        });
+      }
     } catch (err: any) {
       loggerService.addLog({
         level: 'WARN',
         category: 'SCRAPER',
         source: 'FlashscoreScraperService',
-        message: `Playwright headless fallback unavailable or encountered error: ${err?.message || err}. Falling back to cached feeds.`,
+        message: `Playwright headless fallback skipped for ${seasonUrl}: ${err?.message || err}`,
       });
     }
 
@@ -725,7 +740,7 @@ export class FlashscoreScraperService {
 
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
+        const timeout = setTimeout(() => controller.abort(), 4000);
         const res = await fetch(archiveUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -736,7 +751,6 @@ export class FlashscoreScraperService {
 
         if (res.ok) {
           const html = await res.text();
-          // Match archive season URLs e.g. /football/england/premier-league-2023-2024/results/
           const seasonMatches = Array.from(html.matchAll(/href=["'](\/football\/[a-z0-9-]+\/[a-z0-9-]+-[0-9]{4}-[0-9]{4}\/results\/)["']/g));
           const extractedUrls = Array.from(new Set(seasonMatches.map((m) => `https://www.flashscore.com${m[1]}`)));
           if (extractedUrls.length > 0) {
@@ -757,7 +771,7 @@ export class FlashscoreScraperService {
         let seasonMatchesExtracted = 0;
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 6000);
+          const timeout = setTimeout(() => controller.abort(), 4000);
           const res = await fetch(seasonUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -812,7 +826,7 @@ export class FlashscoreScraperService {
             }
           }
         } catch (err) {
-          // Trigger Playwright fallback if direct HTTP fails
+          // Playwright fallback
           const fallbackResults = await this.runPlaywrightScraperFallback(seasonUrl);
           for (const fm of fallbackResults) {
             if (!seenMatchIds.has(fm.id)) {
@@ -822,7 +836,6 @@ export class FlashscoreScraperService {
           }
         }
 
-        // If HTTP returned 0 matches, run Playwright fallback to ensure resilience
         if (seasonMatchesExtracted === 0) {
           const fallbackResults = await this.runPlaywrightScraperFallback(seasonUrl);
           for (const fm of fallbackResults) {
@@ -833,12 +846,12 @@ export class FlashscoreScraperService {
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       loggerService.addLog({
         level: 'WARN',
         category: 'SCRAPER',
         source: 'FlashscoreScraperService',
-        message: `Failed multi-year archive scrape for ${leagueCode}: ${err}`,
+        message: `Skipped archive scrape for ${leagueCode}: ${err?.message || err}`,
       });
     }
 

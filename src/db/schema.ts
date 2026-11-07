@@ -326,8 +326,8 @@ export interface ServerlessDeploymentConfigSchema {
   api_prefix: string;
   is_serverless: boolean;
   process_type: 'persistent_node_process' | 'serverless';
-  db_storage_mode: 'file' | 'in_memory' | 'temp_volume';
-  db_file_path: './data/football.sqlite';
+  db_storage_mode: 'turso_cloud';
+  turso_engine: 'TURSO_LIBSQL_CLOUD';
   auto_seed_on_boot: boolean;
   historical_records_count: number; // 3,600+ real Flashscore scraped matches
   upcoming_fixtures_count: number; // 3,500+ live Flashscore scraped fixtures
@@ -596,9 +596,8 @@ export interface HistoricalPredictionRecordSchema {
 }
 
 export interface PredictionsDatabaseConfigSchema {
-  database_file: './data/predictions.sqlite';
+  storage_target: 'TURSO_CLOUD_PREDICTIONS_DB';
   is_separate_db: true;
-  storage_target: 'SEPARATE_PREDICTIONS_SQLITE';
   sync_triggers_recalculation: true;
   serve_display_from_db: true;
   serve_live_from_db: true;

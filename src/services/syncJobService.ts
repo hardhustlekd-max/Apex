@@ -113,10 +113,10 @@ export class SyncJobService {
     const job: SyncJobState = {
       id: jobId,
       status: 'RUNNING',
-      progress: 10,
-      currentStep: 'Querying upcoming fixtures from Turso database...',
+      progress: 5,
+      currentStep: 'Purging existing predictions from Turso database & memory cache...',
       stepIndex: 1,
-      totalSteps: 2,
+      totalSteps: 3,
       matchesCount: 0,
       skippedCount: 0,
       upcomingCount: 0,
@@ -199,9 +199,26 @@ export class SyncJobService {
         progress: 35,
         stepIndex: 3,
         totalSteps: 6,
-        currentStep: 'Scraping historical match results and multi-year tournament archive feeds...',
+        currentStep: 'Parsing historical match results and multi-year tournament feeds...',
       });
-      const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
+      
+      let syncRes = { success: true, matchesCount: 0, message: '' };
+      try {
+        syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
+      } catch (histErr: any) {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'DATABASE',
+          source: 'SyncJobService',
+          message: `Step 3 historical sync note: ${histErr?.message || histErr}. Continuing to upcoming fixtures...`,
+        });
+        const currentHist = db.getAllHistoricalMatches(1500);
+        syncRes = {
+          success: true,
+          matchesCount: currentHist.length,
+          message: `Loaded ${currentHist.length} historical matches from database.`,
+        };
+      }
 
       if (this.isCancelled(jobId)) return;
 
@@ -400,11 +417,22 @@ export class SyncJobService {
     });
 
     try {
-      // Step 1: Query upcoming fixtures strictly from local Turso DB
+      // Step 1: Purge existing predictions from Turso DB and memory cache as the first step
       this.updateProgress(jobId, {
-        progress: 10,
+        progress: 5,
         stepIndex: 1,
-        totalSteps: 2,
+        totalSteps: 3,
+        currentStep: 'Purging existing predictions from Turso database & memory cache...',
+      });
+      await predictionsDb.clearPredictions();
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 2: Query upcoming fixtures strictly from local Turso DB
+      this.updateProgress(jobId, {
+        progress: 15,
+        stepIndex: 2,
+        totalSteps: 3,
         currentStep: 'Querying upcoming fixtures from Turso database...',
       });
 
@@ -416,12 +444,12 @@ export class SyncJobService {
 
       const totalCount = upcoming ? upcoming.length : 0;
       this.updateProgress(jobId, {
-        progress: 15,
+        progress: 25,
         upcomingCount: totalCount,
         matchesCount: 0,
         skippedCount: 0,
         currentStep: totalCount > 0
-          ? `Loaded ${totalCount} upcoming matches from Turso DB. Filtering by 90% data availability...`
+          ? `Loaded ${totalCount} upcoming matches from Turso DB. Preparing 90% data availability recalculation...`
           : 'No upcoming matches found in database. Run full sync to populate matches.',
       });
 
@@ -442,9 +470,10 @@ export class SyncJobService {
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 2: Recalculate predictions in chunks using the 90% Data Availability Gatekeeper
+      // Step 3: Recalculate predictions in chunks using the 90% Data Availability Gatekeeper
       this.updateProgress(jobId, {
-        stepIndex: 2,
+        stepIndex: 3,
+        totalSteps: 3,
         currentStep: `Recalculating predictions for ${totalCount} matches in chunks (90% data availability threshold)...`,
       });
 
@@ -467,7 +496,7 @@ export class SyncJobService {
 
       if (this.isCancelled(jobId)) return;
 
-      const totalPredictionsCount = predictionsDb.count();
+      const totalPredictionsCount = await predictionsDb.countAsync();
       const finalMessage = `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <90% data completeness).`;
 
       const finalStats = {

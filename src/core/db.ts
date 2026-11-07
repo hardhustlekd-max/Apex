@@ -335,7 +335,7 @@ export class FootballDB {
     return matches.length;
   }
 
-  saveUpcomingFixtures(fixtures: Fixture[]): void {
+  async saveUpcomingFixtures(fixtures: Fixture[]): Promise<void> {
     const seen = new Set<string>();
     const unique = fixtures.filter((f) => {
       if (!f.id || seen.has(f.id)) return false;
@@ -397,12 +397,16 @@ export class FootballDB {
         ],
       }));
 
-      safeTursoBatch(footballTurso, statements, 25);
+      try {
+        await safeTursoBatch(footballTurso, statements, 25);
+      } catch (err: any) {
+        console.error('[FootballDB] Error saving upcoming fixtures batch to Turso:', err?.message);
+      }
     }
   }
 
-  insertUpcomingFixtures(fixtures: Fixture[]): number {
-    this.saveUpcomingFixtures(fixtures);
+  async insertUpcomingFixtures(fixtures: Fixture[]): Promise<number> {
+    await this.saveUpcomingFixtures(fixtures);
     return fixtures.length;
   }
 
