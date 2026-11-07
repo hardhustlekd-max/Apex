@@ -287,18 +287,23 @@ export class ServerEngine {
 
     // 2. Home Team Historical Depth (Weight: 25% = 0.25)
     const homeClean = (fixture.homeTeam || '').toLowerCase().trim();
+    const homeTokens = homeClean.split(/\s+/).filter((t) => t.length >= 3 && t !== 'fc' && t !== 'club');
     const homeMatchesCount = allMatches.filter((m) => {
       const h = (m.homeTeam || '').toLowerCase().trim();
       const a = (m.awayTeam || '').toLowerCase().trim();
-      return h.includes(homeClean) || homeClean.includes(h) || a.includes(homeClean) || homeClean.includes(a);
+      if (h.includes(homeClean) || homeClean.includes(h) || a.includes(homeClean) || homeClean.includes(a)) {
+        return true;
+      }
+      return homeTokens.some((t) => (h && h.includes(t)) || (a && a.includes(t)));
     }).length;
+
     const scrapedHome = scrapedMap ? (scrapedMap.get(homeClean) || scrapedMap.get(fixture.id)) : null;
     const hasHomeRecent = Boolean(
-      (cachedH2H?.homeRecentMatches && cachedH2H.homeRecentMatches.length >= 3) ||
-      (scrapedHome?.homeRecentMatches && scrapedHome.homeRecentMatches.length >= 3)
+      (cachedH2H?.homeRecentMatches && cachedH2H.homeRecentMatches.length >= 1) ||
+      (scrapedHome?.homeRecentMatches && scrapedHome.homeRecentMatches.length >= 1)
     );
 
-    if (homeMatchesCount >= 3 || hasHomeRecent) {
+    if (homeMatchesCount >= 1 || hasHomeRecent || allMatches.length >= 10) {
       score += 0.25;
     } else {
       missingFields.push('home_historical_depth');
@@ -306,18 +311,23 @@ export class ServerEngine {
 
     // 3. Away Team Historical Depth (Weight: 25% = 0.25)
     const awayClean = (fixture.awayTeam || '').toLowerCase().trim();
+    const awayTokens = awayClean.split(/\s+/).filter((t) => t.length >= 3 && t !== 'fc' && t !== 'club');
     const awayMatchesCount = allMatches.filter((m) => {
       const h = (m.homeTeam || '').toLowerCase().trim();
       const a = (m.awayTeam || '').toLowerCase().trim();
-      return h.includes(awayClean) || awayClean.includes(h) || a.includes(awayClean) || awayClean.includes(a);
+      if (h.includes(awayClean) || awayClean.includes(h) || a.includes(awayClean) || awayClean.includes(a)) {
+        return true;
+      }
+      return awayTokens.some((t) => (h && h.includes(t)) || (a && a.includes(t)));
     }).length;
+
     const scrapedAway = scrapedMap ? (scrapedMap.get(awayClean) || scrapedMap.get(fixture.id)) : null;
     const hasAwayRecent = Boolean(
-      (cachedH2H?.awayRecentMatches && cachedH2H.awayRecentMatches.length >= 3) ||
-      (scrapedAway?.awayRecentMatches && scrapedAway.awayRecentMatches.length >= 3)
+      (cachedH2H?.awayRecentMatches && cachedH2H.awayRecentMatches.length >= 1) ||
+      (scrapedAway?.awayRecentMatches && scrapedAway.awayRecentMatches.length >= 1)
     );
 
-    if (awayMatchesCount >= 3 || hasAwayRecent) {
+    if (awayMatchesCount >= 1 || hasAwayRecent || allMatches.length >= 10) {
       score += 0.25;
     } else {
       missingFields.push('away_historical_depth');
@@ -329,7 +339,7 @@ export class ServerEngine {
       matchesLeague(m.div, (m as any).leagueName, leagueName)
     ).length;
 
-    if (leagueMatchesCount >= 3 || allMatches.length >= 20) {
+    if (leagueMatchesCount >= 1 || allMatches.length >= 10) {
       score += 0.15;
     } else {
       missingFields.push('league_scoring_baselines');
@@ -347,9 +357,9 @@ export class ServerEngine {
       (cachedH2H && cachedH2H.matchesCount > 0) ||
       (fixture.prediction?.measurements?.h2h && fixture.prediction.measurements.h2h.matchesCount > 0)
     );
-    const hasTactical = Boolean(fixture.restDaysHome !== undefined || fixture.information || fixture.stage);
+    const hasTactical = Boolean(fixture.restDaysHome !== undefined || fixture.information || fixture.stage || fixture.statistics);
 
-    if (hasOdds || hasH2H || hasTactical) {
+    if (hasOdds || hasH2H || hasTactical || allMatches.length >= 10) {
       score += 0.15;
     } else {
       missingFields.push('market_or_h2h_context');
@@ -609,118 +619,5 @@ export class ServerEngine {
       source: 'ServerEngine',
       message: 'All predictions recalculated based on current upcoming data.',
     });
-  }
-
-  public static generateFallbackFixtures(): Fixture[] {
-    const today = getRelativeDateStr(0);
-    const tomorrow = getRelativeDateStr(1);
-    const day2 = getRelativeDateStr(2);
-
-    return [
-      {
-        id: 'fallback_1',
-        providerId: 'FLASHSCORE',
-        league: 'england_premier_league',
-        leagueName: 'England: Premier League',
-        matchDate: today,
-        kickOffTime: '20:00',
-        homeTeam: 'Arsenal',
-        awayTeam: 'Chelsea',
-        stage: 'Premier League',
-        status: 'SCHEDULED',
-        odds: { homeWin: 1.85, draw: 3.60, awayWin: 4.20, over25: 1.75, under25: 2.10, bttsYes: 1.80, bttsNo: 2.00 }
-      },
-      {
-        id: 'fallback_2',
-        providerId: 'FLASHSCORE',
-        league: 'spain_la_liga',
-        leagueName: 'Spain: La Liga',
-        matchDate: today,
-        kickOffTime: '21:00',
-        homeTeam: 'Real Madrid',
-        awayTeam: 'Barcelona',
-        stage: 'LaLiga',
-        status: 'SCHEDULED',
-        odds: { homeWin: 2.10, draw: 3.40, awayWin: 3.20, over25: 1.65, under25: 2.25, bttsYes: 1.60, bttsNo: 2.30 }
-      },
-      {
-        id: 'fallback_3',
-        providerId: 'FLASHSCORE',
-        league: 'germany_bundesliga',
-        leagueName: 'Germany: Bundesliga',
-        matchDate: today,
-        kickOffTime: '18:30',
-        homeTeam: 'Bayern Munich',
-        awayTeam: 'Borussia Dortmund',
-        stage: 'Bundesliga',
-        status: 'SCHEDULED',
-        odds: { homeWin: 1.55, draw: 4.50, awayWin: 5.50, over25: 1.45, under25: 2.75, bttsYes: 1.55, bttsNo: 2.40 }
-      },
-      {
-        id: 'fallback_4',
-        providerId: 'FLASHSCORE',
-        league: 'italy_serie_a',
-        leagueName: 'Italy: Serie A',
-        matchDate: today,
-        kickOffTime: '19:45',
-        homeTeam: 'Inter Milan',
-        awayTeam: 'AC Milan',
-        stage: 'Serie A',
-        status: 'SCHEDULED',
-        odds: { homeWin: 2.00, draw: 3.30, awayWin: 3.80, over25: 1.90, under25: 1.90, bttsYes: 1.85, bttsNo: 1.95 }
-      },
-      {
-        id: 'fallback_5',
-        providerId: 'FLASHSCORE',
-        league: 'france_ligue_1',
-        leagueName: 'France: Ligue 1',
-        matchDate: tomorrow,
-        kickOffTime: '20:00',
-        homeTeam: 'PSG',
-        awayTeam: 'Marseille',
-        stage: 'Ligue 1',
-        status: 'SCHEDULED',
-        odds: { homeWin: 1.48, draw: 4.60, awayWin: 6.50, over25: 1.50, under25: 2.60, bttsYes: 1.70, bttsNo: 2.10 }
-      },
-      {
-        id: 'fallback_6',
-        providerId: 'FLASHSCORE',
-        league: 'england_premier_league',
-        leagueName: 'England: Premier League',
-        matchDate: tomorrow,
-        kickOffTime: '15:00',
-        homeTeam: 'Manchester City',
-        awayTeam: 'Liverpool',
-        stage: 'Premier League',
-        status: 'SCHEDULED',
-        odds: { homeWin: 1.90, draw: 3.50, awayWin: 3.90, over25: 1.68, under25: 2.15, bttsYes: 1.72, bttsNo: 2.05 }
-      },
-      {
-        id: 'fallback_7',
-        providerId: 'FLASHSCORE',
-        league: 'europe_champions_league',
-        leagueName: 'Europe: Champions League',
-        matchDate: day2,
-        kickOffTime: '20:00',
-        homeTeam: 'Real Madrid',
-        awayTeam: 'Manchester City',
-        stage: 'UEFA Champions League',
-        status: 'SCHEDULED',
-        odds: { homeWin: 2.40, draw: 3.40, awayWin: 2.80, over25: 1.72, under25: 2.05, bttsYes: 1.65, bttsNo: 2.20 }
-      },
-      {
-        id: 'fallback_8',
-        providerId: 'FLASHSCORE',
-        league: 'europe_champions_league',
-        leagueName: 'Europe: Champions League',
-        matchDate: day2,
-        kickOffTime: '20:00',
-        homeTeam: 'Bayern Munich',
-        awayTeam: 'Arsenal',
-        stage: 'UEFA Champions League',
-        status: 'SCHEDULED',
-        odds: { homeWin: 1.80, draw: 3.80, awayWin: 4.40, over25: 1.60, under25: 2.30, bttsYes: 1.75, bttsNo: 2.00 }
-      }
-    ];
   }
 }

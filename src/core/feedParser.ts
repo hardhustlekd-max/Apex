@@ -100,14 +100,36 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
             matchData.statistics.push({ category: val });
             break;
           case 'SJ':
-            if (matchData.statistics.length > 0) matchData.statistics[matchData.statistics.length - 1].homeValue = val;
+            if (matchData.statistics.length > 0) {
+              matchData.statistics[matchData.statistics.length - 1].homeValue = val;
+            }
             break;
           case 'SK':
-            if (matchData.statistics.length > 0) matchData.statistics[matchData.statistics.length - 1].awayValue = val;
+            if (matchData.statistics.length > 0) {
+              matchData.statistics[matchData.statistics.length - 1].awayValue = val;
+            }
             break;
           case 'DE':
             const matchMinute = val.split('+')[0];
             matchData.minute = parseInt(matchMinute, 10);
+            break;
+          // Support for direct statistic keys from Flashscore feeds
+          case 'SF':
+            matchData.statistics.push({ category: 'Possession', homeValue: val });
+            break;
+          case 'SG':
+            if (matchData.statistics.length > 0 && matchData.statistics[matchData.statistics.length - 1].category === 'Possession') {
+              matchData.statistics[matchData.statistics.length - 1].awayValue = val;
+            } else {
+              matchData.statistics.push({ category: 'Shots', homeValue: val });
+            }
+            break;
+          case 'SH':
+            if (matchData.statistics.length > 0 && matchData.statistics[matchData.statistics.length - 1].category === 'Shots') {
+              matchData.statistics[matchData.statistics.length - 1].awayValue = val;
+            } else {
+              matchData.statistics.push({ category: 'Shots on Goal', homeValue: val });
+            }
             break;
         }
       }

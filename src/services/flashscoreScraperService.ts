@@ -193,7 +193,8 @@ export class FlashscoreScraperService {
 
             if (res.ok) {
               const text = await res.text();
-              if (text && text.length > 50) {
+              // Flashscore responses can sometimes be very short (e.g., A1÷¬~)
+              if (text && text.length > 0) {
                 return text;
               }
               lastError = new Error(`Flashscore feed response empty on ${url}`);
