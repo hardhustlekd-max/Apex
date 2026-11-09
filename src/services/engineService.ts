@@ -148,7 +148,7 @@ export class EngineService {
     return localSettings;
   }
 
-  public static async getTursoStatus(): Promise<{
+  public static async getStorageStatus(): Promise<{
     footballDb: {
       configured: boolean;
       status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
@@ -163,14 +163,14 @@ export class EngineService {
       latencyMs?: number;
       error?: string;
     };
-    localSqlite: {
-      status: 'ONLINE';
+    storageEngine?: {
+      status: string;
       mode: string;
     };
   } | null> {
-    const serverData = await this.safeJsonFetch('/api/settings/turso-status');
-    if (serverData && serverData.success && serverData.turso) {
-      return serverData.turso;
+    const serverData = await this.safeJsonFetch('/api/settings/storage-status');
+    if (serverData && serverData.success) {
+      return serverData as any;
     }
     return null;
   }
@@ -243,14 +243,26 @@ export class EngineService {
 
     const jobId = startRes.jobId;
     let pollAttempts = 0;
-    const maxPollAttempts = 300; // Up to 4 minutes of polling
+    const maxPollAttempts = 600; // Up to 8 minutes of polling (800ms * 600)
 
     while (pollAttempts < maxPollAttempts) {
       await new Promise((resolve) => setTimeout(resolve, 800));
       pollAttempts++;
 
       const job = await this.getSyncJobStatus(jobId);
-      if (!job) continue;
+      
+      // If job is not found, the server might have restarted. 
+      // Try to see if there's any active job as a fallback before giving up.
+      if (!job) {
+        const activeJob = await this.getActiveSyncJob();
+        if (!activeJob || activeJob.id !== jobId) {
+          return {
+            success: false,
+            error: 'Prediction update job was lost (server may have restarted). Please try again.',
+          };
+        }
+        continue; // Active job found but status call failed briefly
+      }
 
       if (onProgress) {
         onProgress(job);

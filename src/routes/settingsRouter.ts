@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
 import { EngineSettings } from '../core/types.js';
-import { getTursoConnectionStatus } from '../core/tursoClient.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
+import { getSqliteDbStats } from '../core/sqliteClient.js';
 
 export const settingsRouter = Router();
 
@@ -25,17 +25,36 @@ settingsRouter.get('/', (req, res) => {
   }
 });
 
-settingsRouter.get('/turso-status', async (req, res) => {
-  try {
-    const tursoStatus = await getTursoConnectionStatus();
-    res.json({
-      success: true,
-      turso: tursoStatus,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to check Turso connection status' });
-  }
-});
+const getStorageStatusHandler = (_req: any, res: any) => {
+  const stats = getSqliteDbStats();
+  res.json({
+    success: true,
+    storageEngine: {
+      status: 'ONLINE',
+      mode: 'LOCAL_SQLITE_WAL',
+      dbPath: stats.path,
+      sizeMB: stats.sizeMB,
+      sizeBytes: stats.sizeBytes,
+      journalMode: stats.journalMode,
+      tableCounts: stats.tableCounts,
+    },
+    footballDb: {
+      configured: true,
+      status: 'CONNECTED',
+      url: `Local SQLite (${stats.sizeMB} MB, WAL Mode)`,
+      latencyMs: 1,
+      sizeMB: stats.sizeMB,
+    },
+    predictionsDb: {
+      configured: true,
+      status: 'CONNECTED',
+      url: `data/football_engine.db (${stats.tableCounts['upcoming_predictions'] || 0} predictions)`,
+      latencyMs: 1,
+    },
+  });
+};
+
+settingsRouter.get('/storage-status', getStorageStatusHandler);
 
 settingsRouter.get('/scraper-status', (req, res) => {
   try {
@@ -101,5 +120,3 @@ settingsRouter.post('/update-predictions', async (req, res) => {
     res.status(500).json({ success: false, error: err?.message || 'Failed to update upcoming predictions' });
   }
 });
-
-

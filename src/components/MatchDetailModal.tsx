@@ -262,7 +262,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       className={`bg-white dark:bg-[#121216] text-slate-950 dark:text-neutral-100 flex flex-col overflow-hidden select-none ${
         isPanel
           ? 'h-full w-full'
-          : 'rounded-2xl w-full max-w-2xl max-h-[92vh] shadow-2xl'
+          : 'w-full max-w-2xl h-[88vh] sm:h-[82vh] max-h-[850px] min-h-[540px] rounded-t-3xl sm:rounded-2xl shadow-2xl shrink-0'
       }`}
     >
       {/* Mobile Drag Handle Affordance */}
@@ -312,8 +312,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         </div>
 
         {/* Hero Scoreboard Container - Styled with Red Gradient Card from Reference Image */}
-        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#FF1A35] via-[#FF0D2E] to-[#E6001C] text-white min-w-0 shadow-lg shadow-red-500/20">
-          <div className="grid grid-cols-12 items-center gap-2">
+        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#FF1A35] via-[#FF0D2E] to-[#E6001C] text-white min-w-0 shadow-lg shadow-red-500/20 shrink-0 min-h-[96px] flex items-center">
+          <div className="grid grid-cols-12 items-center gap-2 w-full">
             {/* Home Team */}
             <div className="col-span-5 flex items-center gap-2.5 min-w-0">
               {fixture.homeBadge ? (
@@ -338,17 +338,19 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 >
                   {fixture.homeTeam}
                 </span>
-                {pred && (
-                  <div className="flex items-center gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80">
-                    <span className="font-bold whitespace-nowrap">
-                      {homeWinPct}% Win
-                    </span>
-                    <span aria-hidden="true" className="text-white/60">·</span>
-                    <span className="whitespace-nowrap">
-                      xG {pred.homeXG}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80 min-h-[16px]">
+                  {pred ? (
+                    <>
+                      <span className="font-bold whitespace-nowrap">
+                        {homeWinPct}% Win
+                      </span>
+                      <span aria-hidden="true" className="text-white/60">·</span>
+                      <span className="whitespace-nowrap">
+                        xG {pred.homeXG}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -388,17 +390,19 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 >
                   {fixture.awayTeam}
                 </span>
-                {pred && (
-                  <div className="flex items-center justify-end gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80">
-                    <span className="whitespace-nowrap">
-                      xG {pred.awayXG}
-                    </span>
-                    <span aria-hidden="true" className="text-white/60">·</span>
-                    <span className="font-bold whitespace-nowrap">
-                      {awayWinPct}% Win
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center justify-end gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80 min-h-[16px]">
+                  {pred ? (
+                    <>
+                      <span className="whitespace-nowrap">
+                        xG {pred.awayXG}
+                      </span>
+                      <span aria-hidden="true" className="text-white/60">·</span>
+                      <span className="font-bold whitespace-nowrap">
+                        {awayWinPct}% Win
+                      </span>
+                    </>
+                  ) : null}
+                </div>
               </div>
               {fixture.awayBadge ? (
                 <img
@@ -508,7 +512,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       </div>
 
       {/* Scrollable Content Body */}
-      <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-w-0">
+      <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain space-y-4 flex-1 min-h-0 min-w-0">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'OVERVIEW' && (
           <div className="space-y-4">
@@ -1299,7 +1303,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 dark:bg-black/75 backdrop-blur-md font-sans">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md font-sans overflow-hidden">
       {panelContainer}
     </div>
   );

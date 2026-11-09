@@ -266,12 +266,14 @@ export class ApexEngine {
     const rawStrength = (0.55 * formDominance) + (0.20 * tableMomentum) + (0.25 * shotEfficiency);
     const strengthRating = Number(Math.max(10.0, Math.min(95.0, rawStrength)).toFixed(1));
 
+    /* Silencing per-team strength profile logging to avoid flooding logs during batch updates
     loggerService.addLog({
       level: 'INFO',
       category: 'ENGINE',
       source: 'ApexEngine',
       message: `Calculated CSF Index for ${teamName} (${isHomeVenue ? 'Home' : 'Away'}): TSR ${strengthRating} [Form: ${formDominance}, Table: ${tableMomentum}, Shots: ${shotEfficiency}, Venue: x${venueModifier}]`,
     });
+    */
 
     return {
       strengthRating,
@@ -647,14 +649,15 @@ export class ApexEngine {
     realScrapedH2H?: HeadToHeadMeasurement | null,
     allHistoricalMatches?: HistoricalMatch[],
     tacticalInput?: MatchTacticalContextInput,
-    standings?: LeagueStandingTable | null
+    standings?: LeagueStandingTable | null,
+    eloRatingsMapOverride?: Map<string, number>
   ): { prediction: PoissonPrediction; homeStats: TeamStatsSummary; awayStats: TeamStatsSummary } {
     const historicalUniverse = allHistoricalMatches && allHistoricalMatches.length > 0
       ? allHistoricalMatches
       : leagueHistoricalMatches;
 
     // 1. Composite Team Strength & Form Momentum (CSF) Index & Augmented Elo Ratings
-    const eloRatingsMap = this.computeAugmentedEloRatings(historicalUniverse);
+    const eloRatingsMap = eloRatingsMapOverride || this.computeAugmentedEloRatings(historicalUniverse);
     const homeElo = this.getTeamElo(homeTeam, eloRatingsMap);
     const awayElo = this.getTeamElo(awayTeam, eloRatingsMap);
     const homeAdvantageElo = 65;

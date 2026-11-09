@@ -8,8 +8,8 @@ import { app } from './src/app.js';
 async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Initialize Turso cloud database
-  console.log('Initializing Turso LibSQL Cloud Database engine...');
+  // Initialize local SQLite database engine
+  console.log('Initializing local SQLite database engine (better-sqlite3 WAL Mode)...');
   await db.init();
   try {
     await predictionsDb.init();

@@ -381,6 +381,14 @@ export class FlashscoreScraperService {
       return this.cacheUpcoming;
     }
 
+    // 1. Primary lookup: Check local SQLite database for stored upcoming fixtures
+    const sqliteUpcoming = db.getUpcomingFixtures(undefined, dateFilter);
+    if (sqliteUpcoming && sqliteUpcoming.length > 0) {
+      this.cacheUpcoming = sqliteUpcoming;
+      this.lastFetchTime = now;
+      return sqliteUpcoming;
+    }
+
     const scrapedFixtures: Fixture[] = [];
     const scrapedMatchesForDb: any[] = [];
     const seenMatchIds = new Set<string>();
@@ -433,11 +441,8 @@ export class FlashscoreScraperService {
           score: (m.homeScore !== undefined && m.awayScore !== undefined)
             ? { home: m.homeScore, away: m.awayScore }
             : undefined,
-        };
-
-        // Save raw feed under both matchId and fs_matchId so getRawFeed(matchId) resolves instantly
-        db.saveRawFeedData(m.matchId, feedPath, feedText);
-        db.saveRawFeedData(`fs_${m.matchId}`, feedPath, feedText);
+          feed_path: feedPath,
+        } as any;
 
         if (m.statistics && m.statistics.length > 0) {
           db.saveMatchStatistics(m.matchId, m.statistics);
@@ -979,10 +984,27 @@ export class FlashscoreScraperService {
     // Refresh upcoming fixtures as well
     const upcoming = await this.getUpcomingFixtures();
 
+    // Scrape and save standings into SQLite database table during fullsync process
+    const popularLeagues = [
+      'england_premier_league',
+      'spain_la_liga',
+      'germany_bundesliga',
+      'italy_serie_a',
+      'france_ligue_1',
+      'europe_champions_league_league_phase',
+      'europe_europa_league_league_phase',
+      'england_championship',
+      'netherlands_eredivisie',
+      'portugal_primeira_liga',
+      'brazil_serie_a',
+      'usa_major_league_soccer',
+    ];
+    await Promise.allSettled(popularLeagues.map((code) => this.fetchAndSaveLeagueStandings(code)));
+
     return {
       success: true,
       matchesCount: allStoredHistorical.length + upcoming.length,
-      message: `FlashscoreScraping synchronized ${allStoredHistorical.length} real historical multi-year results and ${upcoming.length} upcoming fixtures into database.`,
+      message: `FlashscoreScraping synchronized ${allStoredHistorical.length} real historical multi-year results, ${upcoming.length} upcoming fixtures, and league standings into database.`,
     };
   }
 
@@ -1071,11 +1093,8 @@ export class FlashscoreScraperService {
           level: 'INFO',
           category: 'DATABASE',
           source: 'FlashscoreScraper',
-          message: `Loaded raw H2H feed from database for match ${cleanId}`,
+          message: `Loaded raw H2H feed from local SQLite database for match ${cleanId}`,
         });
-      } else {
-        const feedPath = `df_hh_1_${cleanId}`;
-        feedText = await this.fetchAndPersistRawFeed(feedPath, cleanId);
       }
 
       if (feedText) {
@@ -1545,29 +1564,11 @@ export class FlashscoreScraperService {
   }
 
   /**
-   * Scrapes or retrieves league standings table for a specific league
+   * Scrapes standings from Flashscore during fullsync process and saves to SQLite database table
    */
-  async getLeagueStandings(leagueCode: string, _tournamentSlug?: string): Promise<LeagueStandingTable> {
+  async fetchAndSaveLeagueStandings(leagueCode: string): Promise<LeagueStandingTable | null> {
     const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const now = Date.now();
 
-    // 1. Check in-memory cache (< 5 min TTL)
-    const cached = this.cacheStandings.get(cleanCode);
-    if (cached && now - cached.timestamp < 300000 && cached.data.table.length > 0) {
-      return cached.data;
-    }
-
-    // 2. Check SQLite persistence cache (< 15 min TTL)
-    const dbStandings = db.getLeagueStandings(cleanCode);
-    if (dbStandings && dbStandings.table.length > 0) {
-      this.cacheStandings.set(cleanCode, { data: dbStandings, timestamp: now });
-      const updatedTime = new Date(dbStandings.updatedAt).getTime();
-      if (!isNaN(updatedTime) && now - updatedTime < 900000) {
-        return dbStandings;
-      }
-    }
-
-    // 3. Map competition to Flashscore tournament standings URL path
     const urlMap: Record<string, { path: string; name: string; country: string }> = {
       'europe_champions_league': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
       'europe_champions_league_league_phase': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
@@ -1604,7 +1605,6 @@ export class FlashscoreScraperService {
 
     let target = urlMap[cleanCode];
     if (!target) {
-      // Fallback: Infer path from code structure if not mapped
       const parts = cleanCode.split('_');
       if (parts.length >= 2) {
         const country = parts[0];
@@ -1666,7 +1666,6 @@ export class FlashscoreScraperService {
               if (k && v !== undefined) data[k] = v;
             }
 
-            // Only completed matches (AB === '3') with valid scores
             if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
 
             const homeTeam = (data['AE'] || '').trim();
@@ -1722,7 +1721,6 @@ export class FlashscoreScraperService {
               form: (s.form.slice(-5) as ('W' | 'D' | 'L')[]) || undefined,
             }));
 
-            // Sort according to official football rules: Points DESC, Goal Difference DESC, Goals Scored DESC
             entries.sort((a, b) => {
               if (b.points !== a.points) return b.points - a.points;
               if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
@@ -1745,13 +1743,13 @@ export class FlashscoreScraperService {
             };
 
             db.saveLeagueStandings(liveTable);
-            this.cacheStandings.set(cleanCode, { data: liveTable, timestamp: now });
+            this.cacheStandings.set(cleanCode, { data: liveTable, timestamp: Date.now() });
             return liveTable;
           }
         }
       }
     } catch (err) {
-      // Data not available - cleanly continue without terminal log
+      // Catch cleanly
     } finally {
       if (standingsTimeout) {
         clearTimeout(standingsTimeout);
@@ -1759,17 +1757,55 @@ export class FlashscoreScraperService {
       }
     }
 
-    // 5. If specific tournament page scraping returned 0 matches, return empty table structure
+    return null;
+  }
+
+  /**
+   * Retrieves league standings table strictly 100% from SQLite database saved data
+   */
+  async getLeagueStandings(leagueCode: string, _tournamentSlug?: string): Promise<LeagueStandingTable> {
+    const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // 1. Check in-memory cache
+    const cached = this.cacheStandings.get(cleanCode);
+    if (cached && cached.data && Array.isArray(cached.data.table) && cached.data.table.length > 0) {
+      return cached.data;
+    }
+
+    // 2. Query 100% strictly from SQLite database table
+    const dbStandings = db.getLeagueStandings(cleanCode);
+    if (dbStandings) {
+      const tableData = Array.isArray(dbStandings.table)
+        ? dbStandings.table
+        : Array.isArray(dbStandings.standings)
+        ? dbStandings.standings
+        : [];
+
+      if (tableData.length > 0) {
+        const formatted: LeagueStandingTable = {
+          leagueCode: cleanCode,
+          leagueName: dbStandings.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
+          country: dbStandings.country || 'LEAGUE',
+          season: dbStandings.season || getCurrentSeason(),
+          updatedAt: dbStandings.updatedAt || new Date().toISOString(),
+          source: 'FLASHSCORE_SCRAPED',
+          table: tableData,
+        };
+        this.cacheStandings.set(cleanCode, { data: formatted, timestamp: Date.now() });
+        return formatted;
+      }
+    }
+
+    // 3. Fallback: Empty table structure if not yet populated into SQLite table via fullsync
     const emptyTable: LeagueStandingTable = {
       leagueCode: cleanCode,
-      leagueName: target.name,
-      country: target.country,
+      leagueName: cleanCode.replace(/_/g, ' ').toUpperCase(),
+      country: cleanCode.split('_')[0]?.toUpperCase() || 'LEAGUE',
       season: getCurrentSeason(),
       updatedAt: new Date().toISOString(),
       source: 'FLASHSCORE_SCRAPED',
       table: [],
     };
-    this.cacheStandings.set(cleanCode, { data: emptyTable, timestamp: now });
     return emptyTable;
   }
   public getProviderStatus(): ProviderStatus {

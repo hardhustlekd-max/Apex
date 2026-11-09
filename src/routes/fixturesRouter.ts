@@ -161,11 +161,11 @@ fixturesRouter.get('/history', async (req, res) => {
     // Query predictions from predictionsDb
     let matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
 
-    // If predictionsDb has no matches for this request, convert and migrate from Turso database
+    // If predictionsDb has no matches for this request, convert and migrate from local database
     if (!matches || matches.length === 0) {
-      const tursoHistorical = db.getAllHistoricalMatches(limit);
+      const historicalMatches = db.getAllHistoricalMatches(limit);
       const scrapedMatches = db.getFlashscoreScrapedMatches(50);
-      const convertedFixtures: Fixture[] = tursoHistorical.map((m) => convertHistoricalMatchToFixture(m));
+      const convertedFixtures: Fixture[] = historicalMatches.map((m) => convertHistoricalMatchToFixture(m));
 
       for (const sm of scrapedMatches) {
         if (sm.result?.home !== undefined && sm.result?.away !== undefined) {

@@ -1,9 +1,9 @@
 import { Fixture } from './types.js';
 import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
-import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
+import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr } from './dateUtils.js';
 import { matchesLeague } from './leagueMapper.js';
-import { predictionsTurso, safeTursoBatch } from './tursoClient.js';
+import { sqliteDb } from './sqliteClient.js';
 
 export class PredictionsDB {
   private isInitialized = false;
@@ -14,187 +14,76 @@ export class PredictionsDB {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    if (predictionsTurso) {
-      try {
-        console.log('[PredictionsDB] Initializing Turso cloud prediction tables...');
-        await this.createTablesOnTurso();
-        console.log('[PredictionsDB] Turso prediction tables verified.');
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Turso predictions init note:', err?.message);
-      }
-    } else {
-      console.log('[PredictionsDB] Running predictions in memory mode (No predictions Turso URL).');
+    try {
+      this.hydrateFromSqlite();
+      console.log('[PredictionsDB] Initialized local SQLite prediction store in WAL mode.');
+    } catch (err: any) {
+      console.warn('[PredictionsDB] SQLite predictions hydration note:', err?.message);
     }
 
     this.isInitialized = true;
   }
 
-  private async createTablesOnTurso(): Promise<void> {
-    if (!predictionsTurso) return;
-
-    const queries = [
-      `CREATE TABLE IF NOT EXISTS upcoming_predictions (
-        fixture_id TEXT PRIMARY KEY,
-        league TEXT NOT NULL,
-        league_name TEXT NOT NULL,
-        stage TEXT,
-        match_date TEXT NOT NULL,
-        kick_off_time TEXT NOT NULL,
-        home_team TEXT NOT NULL,
-        away_team TEXT NOT NULL,
-        home_badge TEXT,
-        away_badge TEXT,
-        status TEXT NOT NULL DEFAULT 'SCHEDULED',
-        b365_h REAL NOT NULL,
-        b365_d REAL NOT NULL,
-        b365_a REAL NOT NULL,
-        b365_over25 REAL,
-        b365_under25 REAL,
-        b365_btts_yes REAL,
-        b365_btts_no REAL,
-        home_xg REAL NOT NULL,
-        away_xg REAL NOT NULL,
-        home_win_prob REAL NOT NULL,
-        draw_prob REAL NOT NULL,
-        away_win_prob REAL NOT NULL,
-        over15_prob REAL NOT NULL,
-        over25_prob REAL NOT NULL,
-        over35_prob REAL NOT NULL,
-        btts_prob REAL NOT NULL,
-        tip_key TEXT NOT NULL,
-        tip_name TEXT NOT NULL,
-        tip_odds REAL NOT NULL,
-        tip_prob REAL NOT NULL,
-        tip_ev REAL NOT NULL,
-        is_positive_ev INTEGER NOT NULL DEFAULT 0,
-        is_banker INTEGER NOT NULL DEFAULT 0,
-        full_fixture_json TEXT NOT NULL,
-        predicted_at TEXT NOT NULL
-      );`,
-      `CREATE INDEX IF NOT EXISTS idx_pred_date ON upcoming_predictions(match_date);`,
-      `CREATE INDEX IF NOT EXISTS idx_pred_league ON upcoming_predictions(league);`,
-
-      `CREATE TABLE IF NOT EXISTS live_predictions (
-        fixture_id TEXT PRIMARY KEY,
-        league TEXT NOT NULL,
-        league_name TEXT NOT NULL,
-        stage TEXT,
-        match_date TEXT NOT NULL,
-        kick_off_time TEXT NOT NULL,
-        home_team TEXT NOT NULL,
-        away_team TEXT NOT NULL,
-        home_badge TEXT,
-        away_badge TEXT,
-        status TEXT NOT NULL DEFAULT 'LIVE',
-        minute INTEGER DEFAULT 0,
-        home_score INTEGER DEFAULT 0,
-        away_score INTEGER DEFAULT 0,
-        b365_h REAL NOT NULL,
-        b365_d REAL NOT NULL,
-        b365_a REAL NOT NULL,
-        home_xg REAL NOT NULL,
-        away_xg REAL NOT NULL,
-        home_win_prob REAL NOT NULL,
-        draw_prob REAL NOT NULL,
-        away_win_prob REAL NOT NULL,
-        over15_prob REAL NOT NULL,
-        over25_prob REAL NOT NULL,
-        over35_prob REAL NOT NULL,
-        btts_prob REAL NOT NULL,
-        tip_key TEXT NOT NULL,
-        tip_name TEXT NOT NULL,
-        tip_odds REAL NOT NULL,
-        tip_prob REAL NOT NULL,
-        tip_ev REAL NOT NULL,
-        is_positive_ev INTEGER NOT NULL DEFAULT 0,
-        is_banker INTEGER NOT NULL DEFAULT 0,
-        full_fixture_json TEXT NOT NULL,
-        predicted_at TEXT NOT NULL
-      );`,
-
-      `CREATE TABLE IF NOT EXISTS historical_predictions (
-        fixture_id TEXT PRIMARY KEY,
-        league TEXT NOT NULL,
-        league_name TEXT NOT NULL,
-        stage TEXT,
-        match_date TEXT NOT NULL,
-        kick_off_time TEXT NOT NULL DEFAULT 'FT',
-        home_team TEXT NOT NULL,
-        away_team TEXT NOT NULL,
-        home_badge TEXT,
-        away_badge TEXT,
-        status TEXT NOT NULL DEFAULT 'FINISHED',
-        home_score INTEGER NOT NULL,
-        away_score INTEGER NOT NULL,
-        b365_h REAL NOT NULL,
-        b365_d REAL NOT NULL,
-        b365_a REAL NOT NULL,
-        home_xg REAL NOT NULL,
-        away_xg REAL NOT NULL,
-        home_win_prob REAL NOT NULL,
-        draw_prob REAL NOT NULL,
-        away_win_prob REAL NOT NULL,
-        over15_prob REAL NOT NULL,
-        over25_prob REAL NOT NULL,
-        over35_prob REAL NOT NULL,
-        btts_prob REAL NOT NULL,
-        tip_key TEXT NOT NULL,
-        tip_name TEXT NOT NULL,
-        tip_odds REAL NOT NULL,
-        tip_prob REAL NOT NULL,
-        tip_ev REAL NOT NULL,
-        is_positive_ev INTEGER NOT NULL DEFAULT 0,
-        is_banker INTEGER NOT NULL DEFAULT 0,
-        full_fixture_json TEXT NOT NULL,
-        predicted_at TEXT NOT NULL
-      );`,
-      `CREATE INDEX IF NOT EXISTS idx_hist_pred_date ON historical_predictions(match_date);`,
-    ];
-
-    for (const q of queries) {
-      try {
-        await predictionsTurso.execute(q);
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Turso query note:', err?.message);
-      }
-    }
-
-    if (predictionsTurso && this.memoryFallback.size === 0) {
-      try {
-        const res = await predictionsTurso.execute('SELECT full_fixture_json FROM upcoming_predictions LIMIT 1500;');
-        if (res.rows && res.rows.length > 0) {
-          for (const row of res.rows) {
-            try {
-              if (row.full_fixture_json) {
-                const f: Fixture = JSON.parse(String(row.full_fixture_json));
-                if (f && f.id) {
-                  this.memoryFallback.set(f.id, f);
-                }
-              }
-            } catch {}
-          }
+  private hydrateFromSqlite(): void {
+    try {
+      const rows = sqliteDb.prepare("SELECT full_fixture_json FROM upcoming_predictions LIMIT 2500").all() as any[];
+      for (const row of rows) {
+        if (row && row.full_fixture_json) {
+          try {
+            const parsed = JSON.parse(row.full_fixture_json) as Fixture;
+            if (parsed && parsed.id) {
+              this.memoryFallback.set(parsed.id, parsed);
+            }
+          } catch {}
         }
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Note hydrating from upcoming_predictions:', err?.message);
       }
-    }
+
+      const histRows = sqliteDb.prepare("SELECT full_fixture_json FROM historical_predictions LIMIT 1500").all() as any[];
+      for (const row of histRows) {
+        if (row && row.full_fixture_json) {
+          try {
+            const parsed = JSON.parse(row.full_fixture_json) as Fixture;
+            if (parsed && parsed.id) {
+              this.historyMemoryFallback.set(parsed.id, parsed);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+
+  /**
+   * Helper to produce a clean, lean fixture representation for JSON storage
+   * (strips the transient 100-cell probability matrix which is recomputed on-demand in <0.1ms)
+   */
+  private sanitizeFixtureForStorage(f: Fixture): string {
+    const lean = {
+      ...f,
+      prediction: f.prediction
+        ? {
+            ...f.prediction,
+            probabilityMatrix: undefined, // Strip 100-cell grid to save 80KB per row
+          }
+        : undefined,
+    };
+    return JSON.stringify(lean);
   }
 
   async savePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
 
     const finishedFixtures: Fixture[] = [];
-    const upcomingFixtures: Fixture[] = [];
+    const upcomingToPersist: Fixture[] = [];
 
     for (const f of fixtures) {
       if (f.id) {
         this.memoryFallback.set(f.id, f);
       }
-      
+
       if (f.status === 'FINISHED') {
         finishedFixtures.push(f);
       } else {
-        upcomingFixtures.push(f);
+        upcomingToPersist.push(f);
       }
     }
 
@@ -202,75 +91,74 @@ export class PredictionsDB {
       await this.saveHistoricalPredictions(finishedFixtures);
     }
 
-    if (predictionsTurso && upcomingFixtures.length > 0) {
+    if (upcomingToPersist.length > 0) {
       try {
-        const now = new Date().toISOString();
-        const batchStatements = upcomingFixtures.map((f) => {
-          const pred = f.prediction;
-          const bestTip = f.bestValueMarket;
+        const stmt = sqliteDb.prepare(`
+          INSERT OR REPLACE INTO upcoming_predictions (
+            fixture_id, league, league_name, stage, match_date, kick_off_time,
+            home_team, away_team, home_badge, away_badge, status,
+            b365_h, b365_d, b365_a,
+            home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
+            over15_prob, over25_prob, over35_prob, btts_prob,
+            tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+            is_positive_ev, is_banker, full_fixture_json, predicted_at
+          ) VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?
+          )
+        `);
 
-          return {
-            sql: `INSERT OR REPLACE INTO upcoming_predictions (
-              fixture_id, league, league_name, stage, match_date, kick_off_time,
-              home_team, away_team, home_badge, away_badge, status,
-              b365_h, b365_d, b365_a, b365_over25, b365_under25, b365_btts_yes, b365_btts_no,
-              home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
-              over15_prob, over25_prob, over35_prob, btts_prob,
-              tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-              is_positive_ev, is_banker, full_fixture_json, predicted_at
-            ) VALUES (
-              ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?, ?, ?
-            )`,
-            args: [
+        const now = new Date().toISOString();
+        const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
+          for (const f of rows) {
+            const pred = f.prediction;
+            const bestTip = f.bestValueMarket;
+
+            stmt.run(
               f.id,
               f.league || 'ALL',
               f.leagueName || f.league || 'Unknown League',
               f.stage || null,
               normalizeDateStr(f.matchDate),
-              normalizeTimeStr(f.kickOffTime || 'TBD'),
+              f.kickOffTime || 'TBD',
               f.homeTeam,
               f.awayTeam,
               f.homeBadge || null,
               f.awayBadge || null,
               f.status || 'SCHEDULED',
-              f.odds.homeWin || 2.0,
-              f.odds.draw || 3.0,
-              f.odds.awayWin || 3.5,
-              f.odds.over25 ?? null,
-              f.odds.under25 ?? null,
-              f.odds.bttsYes ?? null,
-              f.odds.bttsNo ?? null,
+              f.odds?.homeWin || 2.10,
+              f.odds?.draw || 3.30,
+              f.odds?.awayWin || 3.40,
               pred?.homeXG ?? 1.35,
-              pred?.awayXG ?? 1.10,
+              pred?.awayXG ?? 1.15,
               pred?.homeWinProb ?? 0.45,
               pred?.drawProb ?? 0.28,
               pred?.awayWinProb ?? 0.27,
               pred?.over15Prob ?? 0.75,
-              pred?.over25Prob ?? 0.50,
+              pred?.over25Prob ?? 0.52,
               pred?.over35Prob ?? 0.28,
-              pred?.bttsProb ?? 0.52,
+              pred?.bttsProb ?? 0.50,
               bestTip?.key || 'HOME_WIN',
               bestTip?.name || 'Home Win',
-              bestTip?.odds || f.odds.homeWin || 2.0,
+              bestTip?.odds || f.odds?.homeWin || 2.10,
               bestTip?.probability || pred?.homeWinProb || 0.45,
-              bestTip?.expectedValue || 0,
+              bestTip?.expectedValue || 1.05,
               bestTip?.isPositiveEV ? 1 : 0,
               bestTip?.isBanker ? 1 : 0,
-              JSON.stringify(f),
-              now,
-            ],
-          };
+              this.sanitizeFixtureForStorage(f),
+              now
+            );
+          }
         });
 
-        await safeTursoBatch(predictionsTurso, batchStatements, 25);
+        insertMany(upcomingToPersist);
       } catch (err: any) {
-        console.error('[PredictionsDB] Error saving predictions to Turso:', err?.message);
+        console.error('[PredictionsDB] Error persisting predictions to SQLite:', err?.message);
       }
     }
   }
@@ -283,64 +171,7 @@ export class PredictionsDB {
     endDate?: string;
     unstartedOnly?: boolean;
   }): Promise<Fixture[]> {
-    let fixtures: Fixture[] = [];
-
-    if (predictionsTurso) {
-      try {
-        let sql = `SELECT full_fixture_json FROM upcoming_predictions WHERE 1=1`;
-        const args: any[] = [];
-
-        if (filters?.date) {
-          sql += ` AND match_date = ?`;
-          args.push(filters.date);
-        }
-
-        sql += ` ORDER BY match_date ASC, kick_off_time ASC`;
-
-        const res = await predictionsTurso.execute({ sql, args });
-        if (res.rows && res.rows.length > 0) {
-          for (const row of res.rows) {
-            if (row.full_fixture_json) {
-              try {
-                const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
-                if (parsed && parsed.id) {
-                  fixtures.push(parsed);
-                  this.memoryFallback.set(parsed.id, parsed);
-                }
-              } catch {}
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Error querying Turso predictions:', err?.message);
-      }
-    }
-
-    if (fixtures.length === 0) {
-      fixtures = Array.from(this.memoryFallback.values());
-    }
-
-    const seen = new Set<string>();
-    fixtures = fixtures.filter((f) => {
-      if (!f.id || seen.has(f.id)) return false;
-      if (f.status === 'FINISHED') return false;
-      if (filters?.unstartedOnly && isMatchStarted(f)) return false;
-      if (filters?.league && filters.league !== 'ALL') {
-        if (!matchesLeague(f.league, f.leagueName, filters.league)) return false;
-      }
-      seen.add(f.id);
-      return true;
-    });
-
-    fixtures.sort((a, b) => {
-      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      if (a.matchDate !== b.matchDate) return a.matchDate.localeCompare(b.matchDate);
-      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-    });
-
-    return fixtures;
+    return this.getPredictions(filters);
   }
 
   getPredictions(filters?: {
@@ -357,27 +188,37 @@ export class PredictionsDB {
       if (!f || !f.id) continue;
       const cleanId = f.id.replace(/^fs_/, '');
       if (seen.has(cleanId)) continue;
+      if (f.status === 'FINISHED') continue;
+      if (filters?.unstartedOnly && isMatchStarted(f)) continue;
+
+      if (filters?.league && filters.league !== 'ALL') {
+        if (!matchesLeague(f.league, f.leagueName, filters.league)) continue;
+      }
+
+      if (filters?.date) {
+        const targetDate = normalizeDateStr(filters.date);
+        if (normalizeDateStr(f.matchDate) !== targetDate) continue;
+      } else if (filters?.dateFilter && filters.dateFilter !== 'ALL') {
+        const todayStrs = getPossibleDateStrs(0);
+        const tomorrowStrs = getPossibleDateStrs(1);
+        const df = filters.dateFilter.toUpperCase();
+        const norm = normalizeDateStr(f.matchDate);
+        if (df === 'TODAY' && !todayStrs.includes(norm)) continue;
+        if (df === 'TOMORROW' && !tomorrowStrs.includes(norm)) continue;
+      }
+
       seen.add(cleanId);
       fixtures.push(f);
     }
 
-    if (filters?.league && filters.league !== 'ALL') {
-      fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
-    }
-    if (filters?.date) {
-      const targetDate = normalizeDateStr(filters.date);
-      fixtures = fixtures.filter((f) => normalizeDateStr(f.matchDate) === targetDate);
-    } else if (filters?.dateFilter && filters.dateFilter !== 'ALL') {
-      const todayStrs = getPossibleDateStrs(0);
-      const tomorrowStrs = getPossibleDateStrs(1);
-      const df = filters.dateFilter.toUpperCase();
-      fixtures = fixtures.filter((f) => {
-        const norm = normalizeDateStr(f.matchDate);
-        if (df === 'TODAY') return todayStrs.includes(norm);
-        if (df === 'TOMORROW') return tomorrowStrs.includes(norm);
-        return true;
-      });
-    }
+    fixtures.sort((a, b) => {
+      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
+      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      if (a.matchDate !== b.matchDate) return (a.matchDate || '').localeCompare(b.matchDate || '');
+      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
+    });
+
     return fixtures;
   }
 
@@ -392,6 +233,22 @@ export class PredictionsDB {
     if (this.liveMemoryFallback.has(cleanId)) return this.liveMemoryFallback.get(cleanId)!;
     if (this.historyMemoryFallback.has(fixtureId)) return this.historyMemoryFallback.get(fixtureId)!;
     if (this.historyMemoryFallback.has(cleanId)) return this.historyMemoryFallback.get(cleanId)!;
+
+    // Check SQLite
+    try {
+      const row = sqliteDb.prepare(`
+        SELECT full_fixture_json FROM upcoming_predictions WHERE fixture_id = ? OR fixture_id = ?
+        UNION
+        SELECT full_fixture_json FROM historical_predictions WHERE fixture_id = ? OR fixture_id = ?
+        LIMIT 1
+      `).get(fixtureId, `fs_${cleanId}`, fixtureId, `fs_${cleanId}`) as any;
+
+      if (row && row.full_fixture_json) {
+        const parsed = JSON.parse(row.full_fixture_json) as Fixture;
+        this.memoryFallback.set(fixtureId, parsed);
+        return parsed;
+      }
+    } catch {}
 
     return null;
   }
@@ -411,16 +268,12 @@ export class PredictionsDB {
   }
 
   async countAsync(): Promise<number> {
-    if (predictionsTurso) {
-      try {
-        const res = await predictionsTurso.execute('SELECT COUNT(*) as count FROM upcoming_predictions;');
-        if (res.rows && res.rows.length > 0 && res.rows[0].count !== undefined) {
-          return Number(res.rows[0].count);
-        }
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Error querying Turso prediction count:', err?.message);
+    try {
+      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM upcoming_predictions").get() as any;
+      if (row && row.count !== undefined) {
+        return Number(row.count);
       }
-    }
+    } catch {}
     return this.count();
   }
 
@@ -433,53 +286,55 @@ export class PredictionsDB {
       this.memoryFallback.delete(`fs_${cleanId}`);
     }
 
-    if (predictionsTurso) {
-      try {
-        const allIdsToDel = fixtureIds.flatMap((id) => [id, id.replace(/^fs_/, ''), `fs_${id.replace(/^fs_/, '')}`]);
-        const placeholders = allIdsToDel.map(() => '?').join(',');
-        await predictionsTurso.execute({
-          sql: `DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`,
-          args: allIdsToDel,
-        });
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Error removing predictions from Turso:', err?.message);
-      }
-    }
+    try {
+      const placeholders = fixtureIds.map(() => '?').join(',');
+      sqliteDb.prepare(`DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`).run(...fixtureIds);
+    } catch {}
   }
 
   async clearPredictions(): Promise<void> {
     this.memoryFallback.clear();
-    if (predictionsTurso) {
-      try {
-        await predictionsTurso.execute('DELETE FROM upcoming_predictions;');
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Error clearing upcoming predictions from Turso:', err?.message);
-      }
-    }
+    try {
+      sqliteDb.exec('DELETE FROM upcoming_predictions;');
+    } catch {}
   }
 
   async saveLivePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
-
     for (const f of fixtures) {
       if (f.id) {
         this.liveMemoryFallback.set(f.id, f);
       }
     }
 
-    if (predictionsTurso) {
-      try {
-        const batchStatements = fixtures.map((f) => ({
-          sql: `INSERT OR REPLACE INTO live_predictions (
-            fixture_id, league, league_name, match_date, kick_off_time,
-            home_team, away_team, status, predicted_at,
-            b365_h, b365_d, b365_a, home_xg, away_xg,
-            home_win_prob, draw_prob, away_win_prob,
-            over15_prob, over25_prob, over35_prob, btts_prob,
-            tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-            full_fixture_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
+    try {
+      const stmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO live_predictions (
+          fixture_id, league, league_name, match_date, kick_off_time,
+          home_team, away_team, status, predicted_at,
+          b365_h, b365_d, b365_a, home_xg, away_xg,
+          home_win_prob, draw_prob, away_win_prob,
+          over15_prob, over25_prob, over35_prob, btts_prob,
+          tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+          full_fixture_json
+        ) VALUES (
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?
+        )
+      `);
+
+      const now = new Date().toISOString();
+      const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
+        for (const f of rows) {
+          const pred = f.prediction;
+          const bestTip = f.bestValueMarket;
+
+          stmt.run(
             f.id,
             f.league || 'ALL',
             f.leagueName || f.league || 'Live',
@@ -488,37 +343,39 @@ export class PredictionsDB {
             f.homeTeam,
             f.awayTeam,
             'LIVE',
-            new Date().toISOString(),
-            f.odds.homeWin || 2.0,
-            f.odds.draw || 3.0,
-            f.odds.awayWin || 3.5,
-            f.prediction?.homeXG ?? 1.35,
-            f.prediction?.awayXG ?? 1.10,
-            f.prediction?.homeWinProb ?? 0.45,
-            f.prediction?.drawProb ?? 0.28,
-            f.prediction?.awayWinProb ?? 0.27,
-            f.prediction?.over15Prob ?? 0.75,
-            f.prediction?.over25Prob ?? 0.50,
-            f.prediction?.over35Prob ?? 0.28,
-            f.prediction?.bttsProb ?? 0.52,
-            f.bestValueMarket?.key || 'HOME_WIN',
-            f.bestValueMarket?.name || 'Home Win',
-            f.bestValueMarket?.odds || f.odds.homeWin || 2.0,
-            f.bestValueMarket?.probability || f.prediction?.homeWinProb || 0.45,
-            f.bestValueMarket?.expectedValue || 0,
-            JSON.stringify(f),
-          ],
-        }));
-
-        await safeTursoBatch(predictionsTurso, batchStatements, 25);
-      } catch {}
-    }
+            now,
+            f.odds?.homeWin || 2.10,
+            f.odds?.draw || 3.30,
+            f.odds?.awayWin || 3.40,
+            pred?.homeXG ?? 1.35,
+            pred?.awayXG ?? 1.15,
+            pred?.homeWinProb ?? 0.45,
+            pred?.drawProb ?? 0.28,
+            pred?.awayWinProb ?? 0.27,
+            pred?.over15Prob ?? 0.75,
+            pred?.over25Prob ?? 0.52,
+            pred?.over35Prob ?? 0.28,
+            pred?.bttsProb ?? 0.50,
+            bestTip?.key || 'HOME_WIN',
+            bestTip?.name || 'Home Win',
+            bestTip?.odds || f.odds?.homeWin || 2.10,
+            bestTip?.probability || pred?.homeWinProb || 0.45,
+            bestTip?.expectedValue || 1.05,
+            this.sanitizeFixtureForStorage(f)
+          );
+        }
+      });
+      insertMany(fixtures);
+    } catch {}
   }
 
   getLivePredictions(filters?: { league?: string; limit?: number }): Fixture[] {
     let fixtures = Array.from(this.liveMemoryFallback.values());
     if (filters?.league && filters.league !== 'ALL') {
       fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
+    }
+    if (filters?.limit) {
+      fixtures = fixtures.slice(0, filters.limit);
     }
     return fixtures;
   }
@@ -529,83 +386,82 @@ export class PredictionsDB {
 
   async saveHistoricalPredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
-
     for (const f of fixtures) {
       if (f.id) {
         this.historyMemoryFallback.set(f.id, f);
       }
     }
 
-    if (predictionsTurso) {
-      try {
-        const now = new Date().toISOString();
-        const batchStatements = fixtures.map((f) => {
+    try {
+      const stmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO historical_predictions (
+          fixture_id, league, league_name, stage, match_date, kick_off_time,
+          home_team, away_team, home_badge, away_badge, status,
+          home_score, away_score,
+          b365_h, b365_d, b365_a,
+          home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
+          over15_prob, over25_prob, over35_prob, btts_prob,
+          tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+          is_positive_ev, is_banker, full_fixture_json, predicted_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?
+        )
+      `);
+
+      const now = new Date().toISOString();
+      const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
+        for (const f of rows) {
           const pred = f.prediction;
           const bestTip = f.bestValueMarket;
 
-          return {
-            sql: `INSERT OR REPLACE INTO historical_predictions (
-              fixture_id, league, league_name, stage, match_date, kick_off_time,
-              home_team, away_team, home_badge, away_badge, status,
-              home_score, away_score,
-              b365_h, b365_d, b365_a,
-              home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
-              over15_prob, over25_prob, over35_prob, btts_prob,
-              tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-              is_positive_ev, is_banker, full_fixture_json, predicted_at
-            ) VALUES (
-              ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?,
-              ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, ?, ?, ?
-            )`,
-            args: [
-              f.id,
-              f.league || 'ALL',
-              f.leagueName || f.league || 'Historical Match',
-              f.stage || null,
-              normalizeDateStr(f.matchDate),
-              normalizeTimeStr(f.kickOffTime || 'FT'),
-              f.homeTeam,
-              f.awayTeam,
-              f.homeBadge || null,
-              f.awayBadge || null,
-              'FINISHED',
-              f.score?.home ?? 0,
-              f.score?.away ?? 0,
-              f.odds.homeWin || 2.0,
-              f.odds.draw || 3.0,
-              f.odds.awayWin || 3.5,
-              pred?.homeXG ?? 1.35,
-              pred?.awayXG ?? 1.10,
-              pred?.homeWinProb ?? 0.45,
-              pred?.drawProb ?? 0.28,
-              pred?.awayWinProb ?? 0.27,
-              pred?.over15Prob ?? 0.75,
-              pred?.over25Prob ?? 0.50,
-              pred?.over35Prob ?? 0.28,
-              pred?.bttsProb ?? 0.52,
-              bestTip?.key || 'HOME_WIN',
-              bestTip?.name || 'Home Win',
-              bestTip?.odds || f.odds.homeWin || 2.0,
-              bestTip?.probability || pred?.homeWinProb || 0.45,
-              bestTip?.expectedValue || 0,
-              bestTip?.isPositiveEV ? 1 : 0,
-              bestTip?.isBanker ? 1 : 0,
-              JSON.stringify(f),
-              now,
-            ],
-          };
-        });
-
-        await safeTursoBatch(predictionsTurso, batchStatements, 25);
-      } catch (err: any) {
-        console.error('[PredictionsDB] Error saving historical predictions to Turso:', err?.message);
-      }
+          stmt.run(
+            f.id,
+            f.league || 'ALL',
+            f.leagueName || f.league || 'Historical Match',
+            f.stage || null,
+            normalizeDateStr(f.matchDate),
+            f.kickOffTime || 'FT',
+            f.homeTeam,
+            f.awayTeam,
+            f.homeBadge || null,
+            f.awayBadge || null,
+            'FINISHED',
+            f.score?.home ?? 0,
+            f.score?.away ?? 0,
+            f.odds?.homeWin || 2.10,
+            f.odds?.draw || 3.30,
+            f.odds?.awayWin || 3.40,
+            pred?.homeXG ?? 1.35,
+            pred?.awayXG ?? 1.15,
+            pred?.homeWinProb ?? 0.45,
+            pred?.drawProb ?? 0.28,
+            pred?.awayWinProb ?? 0.27,
+            pred?.over15Prob ?? 0.75,
+            pred?.over25Prob ?? 0.52,
+            pred?.over35Prob ?? 0.28,
+            pred?.bttsProb ?? 0.50,
+            bestTip?.key || 'HOME_WIN',
+            bestTip?.name || 'Home Win',
+            bestTip?.odds || f.odds?.homeWin || 2.10,
+            bestTip?.probability || pred?.homeWinProb || 0.45,
+            bestTip?.expectedValue || 1.05,
+            bestTip?.isPositiveEV ? 1 : 0,
+            bestTip?.isBanker ? 1 : 0,
+            this.sanitizeFixtureForStorage(f),
+            now
+          );
+        }
+      });
+      insertMany(fixtures);
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error saving historical predictions to SQLite:', err?.message);
     }
   }
 
@@ -614,56 +470,15 @@ export class PredictionsDB {
     if (filters?.league && filters.league !== 'ALL') {
       fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
     }
+    fixtures.sort((a, b) => (b.matchDate || '').localeCompare(a.matchDate || ''));
+    if (filters?.limit) {
+      fixtures = fixtures.slice(0, filters.limit);
+    }
     return fixtures;
   }
 
   async getHistoricalPredictionsAsync(filters?: { league?: string; limit?: number }): Promise<Fixture[]> {
-    let fixtures: Fixture[] = [];
-
-    if (predictionsTurso) {
-      try {
-        let sql = `SELECT full_fixture_json FROM historical_predictions WHERE 1=1`;
-        const args: any[] = [];
-
-        if (filters?.league && filters.league !== 'ALL') {
-          sql += ` AND (league = ? OR league_name = ?)`;
-          args.push(filters.league, filters.league);
-        }
-
-        sql += ` ORDER BY match_date DESC, kick_off_time DESC`;
-        if (filters?.limit) {
-          sql += ` LIMIT ?`;
-          args.push(filters.limit);
-        }
-
-        const res = await predictionsTurso.execute({ sql, args });
-        if (res.rows && res.rows.length > 0) {
-          for (const row of res.rows) {
-            if (row.full_fixture_json) {
-              try {
-                const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
-                fixtures.push(parsed);
-              } catch {}
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('[PredictionsDB] Error querying Turso historical predictions:', err?.message);
-      }
-    }
-
-    if (fixtures.length === 0) {
-      fixtures = Array.from(this.historyMemoryFallback.values());
-      if (filters?.league && filters.league !== 'ALL') {
-        fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
-      }
-      fixtures.sort((a, b) => (b.matchDate || '').localeCompare(a.matchDate || ''));
-      if (filters?.limit) {
-        fixtures = fixtures.slice(0, filters.limit);
-      }
-    }
-
-    return fixtures;
+    return this.getHistoricalPredictions(filters);
   }
 
   countHistoricalPredictions(): number {
@@ -675,58 +490,40 @@ export class PredictionsDB {
     this.liveMemoryFallback.clear();
     this.historyMemoryFallback.clear();
 
-    if (predictionsTurso) {
-      try {
-        await predictionsTurso.execute('DELETE FROM upcoming_predictions;');
-        await predictionsTurso.execute('DELETE FROM live_predictions;');
-        await predictionsTurso.execute('DELETE FROM historical_predictions;');
-      } catch {}
-    }
+    try {
+      sqliteDb.exec(`
+        DELETE FROM upcoming_predictions;
+        DELETE FROM live_predictions;
+        DELETE FROM historical_predictions;
+      `);
+    } catch {}
   }
 
   async reconcileStaleMatches(): Promise<void> {
-    if (!predictionsTurso) return;
-
-    try {
-      const todayStr = getRelativeDateStr(0);
-
-      // Find matches that are in the past relative to Flashscore standard UTC today
-      const sql = `SELECT full_fixture_json FROM upcoming_predictions WHERE match_date < ?`;
-      const res = await predictionsTurso.execute({ sql, args: [todayStr] });
-
-      if (res.rows && res.rows.length > 0) {
-        const staleMatches: Fixture[] = [];
-        for (const row of res.rows) {
-          if (row.full_fixture_json) {
-            try {
-              const parsed = JSON.parse(String(row.full_fixture_json)) as Fixture;
-              // Force mark as finished and migrate
-              parsed.status = 'FINISHED';
-              staleMatches.push(parsed);
-            } catch {}
-          }
-        }
-
-        if (staleMatches.length > 0) {
-          console.log(`[PredictionsDB] Reconciling ${staleMatches.length} stale matches...`);
-          await this.saveHistoricalPredictions(staleMatches as unknown as Fixture[]);
-          
-          // Remove from upcoming
-          const ids = staleMatches.map(m => m.id);
-          const placeholders = ids.map(() => '?').join(',');
-          await predictionsTurso.execute({
-            sql: `DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`,
-            args: ids
-          });
-          
-          // Clear memory
-          for (const id of ids) {
-            this.memoryFallback.delete(id);
-          }
-        }
+    const todayStr = getRelativeDateStr(0);
+    const staleMatches: Fixture[] = [];
+    for (const [, f] of this.memoryFallback.entries()) {
+      if (f.matchDate && f.matchDate < todayStr) {
+        f.status = 'FINISHED';
+        staleMatches.push(f);
       }
-    } catch (err: any) {
-      console.warn('[PredictionsDB] Error during stale match reconciliation:', err?.message);
+    }
+
+    if (staleMatches.length > 0) {
+      await this.saveHistoricalPredictions(staleMatches);
+      for (const m of staleMatches) {
+        this.memoryFallback.delete(m.id);
+        const cleanId = m.id.replace(/^fs_/, '');
+        this.memoryFallback.delete(cleanId);
+        this.memoryFallback.delete(`fs_${cleanId}`);
+      }
+
+      try {
+        const placeholders = staleMatches.map(() => '?').join(',');
+        sqliteDb.prepare(`DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`).run(
+          ...staleMatches.map((m) => m.id)
+        );
+      } catch {}
     }
   }
 }

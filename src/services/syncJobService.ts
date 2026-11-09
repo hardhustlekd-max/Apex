@@ -38,10 +38,10 @@ export class SyncJobService {
   public getActiveJob(): SyncJobState | null {
     for (const job of this.jobs.values()) {
       if (job.status === 'RUNNING' || job.status === 'PENDING') {
-        // If a job has been running for over 5 minutes, consider it timed out
-        if (Date.now() - job.startTime > 300000) {
+        // If a job has been running for over 15 minutes, consider it timed out
+        if (Date.now() - job.startTime > 900000) {
           job.status = 'FAILED';
-          job.error = 'Job execution timed out after 5 minutes';
+          job.error = 'Job execution timed out after 15 minutes';
           job.endTime = Date.now();
           continue;
         }
@@ -114,7 +114,7 @@ export class SyncJobService {
       id: jobId,
       status: 'RUNNING',
       progress: 5,
-      currentStep: 'Purging existing predictions from Turso database & memory cache...',
+      currentStep: 'Purging existing predictions from database & memory cache...',
       stepIndex: 1,
       totalSteps: 3,
       matchesCount: 0,
@@ -413,27 +413,27 @@ export class SyncJobService {
       level: 'INFO',
       category: 'PREDICTION',
       source: 'SyncJobService',
-      message: `Initiating pure Turso database prediction update job ${jobId} (zero external scraper calls)`,
+      message: `Initiating pure database prediction update job ${jobId} (zero external scraper calls)`,
     });
 
     try {
-      // Step 1: Purge existing predictions from Turso DB and memory cache as the first step
+      // Step 1: Purge existing predictions from DB and memory cache as the first step
       this.updateProgress(jobId, {
         progress: 5,
         stepIndex: 1,
         totalSteps: 3,
-        currentStep: 'Purging existing predictions from Turso database & memory cache...',
+        currentStep: 'Purging existing predictions from database & memory cache...',
       });
       await predictionsDb.clearPredictions();
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 2: Query upcoming fixtures strictly from local Turso DB
+      // Step 2: Query upcoming fixtures strictly from local DB
       this.updateProgress(jobId, {
         progress: 15,
         stepIndex: 2,
         totalSteps: 3,
-        currentStep: 'Querying upcoming fixtures from Turso database...',
+        currentStep: 'Querying upcoming fixtures from database...',
       });
 
       let upcoming = db.getUpcomingFixtures();
@@ -449,7 +449,7 @@ export class SyncJobService {
         matchesCount: 0,
         skippedCount: 0,
         currentStep: totalCount > 0
-          ? `Loaded ${totalCount} upcoming matches from Turso DB. Preparing 90% data availability recalculation...`
+          ? `Loaded ${totalCount} upcoming matches from database. Preparing 90% data availability recalculation...`
           : 'No upcoming matches found in database. Run full sync to populate matches.',
       });
 
@@ -524,7 +524,7 @@ export class SyncJobService {
         level: 'SUCCESS',
         category: 'PREDICTION',
         source: 'SyncJobService',
-        message: `Prediction update job ${jobId} completed from Turso DB: ${predictedCount} predicted, ${skippedCount} skipped`,
+        message: `Prediction update job ${jobId} completed: ${predictedCount} predicted, ${skippedCount} skipped`,
         details: { predictedCount, skippedCount, totalUpcoming: totalCount, totalPredictionsCount },
       });
     } catch (err: any) {

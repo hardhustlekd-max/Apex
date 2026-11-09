@@ -112,7 +112,8 @@ export class ServerEngine {
     cachedH2H?: HeadToHeadMeasurement | null,
     tacticalInput?: any,
     scrapedMap?: Map<string, any>,
-    historicalContextOverride?: HistoricalMatch[]
+    historicalContextOverride?: HistoricalMatch[],
+    eloRatingsMap?: Map<string, number>
   ): Fixture {
     // Standardize date/time for the incoming fixture
     const f = {
@@ -161,7 +162,9 @@ export class ServerEngine {
       settings,
       cachedH2H,
       allMatches,
-      mergedTacticalInput
+      mergedTacticalInput,
+      undefined,
+      eloRatingsMap
     );
 
     let odds = f.odds;
@@ -410,6 +413,10 @@ export class ServerEngine {
     }
 
     const cachedH2HMap = db.getAllPredictionMeasurements();
+    
+    // Pre-calculate Elo map once for the entire batch to avoid O(N^2) complexity
+    const eloRatingsMap = ApexEngine.computeAugmentedEloRatings(allMatches);
+    
     let predictedCount = 0;
     let skippedCount = 0;
     let processed = 0;
@@ -457,7 +464,7 @@ export class ServerEngine {
         const availability = this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
 
         if (availability.isEligible) {
-          const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
+          const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap, undefined, eloRatingsMap);
           predictedChunk.push(enriched);
           allEnriched.push(enriched);
           predictedCount++;
@@ -550,6 +557,10 @@ export class ServerEngine {
     }
 
     const cachedH2HMap = db.getAllPredictionMeasurements();
+    
+    // Pre-calculate Elo map once for the entire batch
+    const eloRatingsMap = ApexEngine.computeAugmentedEloRatings(allMatches);
+    
     let predictedCount = 0;
     const processedFixtures: Fixture[] = [];
 
@@ -572,7 +583,7 @@ export class ServerEngine {
       const availability = this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
 
       if (availability.isEligible) {
-        const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap);
+        const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap, undefined, eloRatingsMap);
         processedFixtures.push(enriched);
         predictedCount++;
       } else {

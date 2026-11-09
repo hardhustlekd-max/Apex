@@ -1,22 +1,32 @@
-import fs from 'fs';
-import path from 'path';
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement } from './types.js';
 import { getPossibleDateStrs, normalizeDateStr } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
-import { footballTurso, safeTursoBatch } from './tursoClient.js';
-
-
+import {
+  sqliteDb,
+  initSqliteSchema,
+  compressString,
+  decompressBuffer,
+  getSqliteDbStats,
+} from './sqliteClient.js';
 
 export class FootballDB {
   private isInitialized = false;
   private fallbackHistoricalMatches: HistoricalMatch[] = [];
   private fallbackUpcomingFixtures: Fixture[] = [];
   private rawFeedsMemory: Map<string, string> = new Map();
-  private rawFeedsDbCount = 0;
+  private rawFeedHashesMemory: Map<string, string> = new Map();
   private measurementsMemory: Map<string, HeadToHeadMeasurement> = new Map();
   private standingsMemory: Map<string, any> = new Map();
+  private scrapedMatchesMemory: Map<string, any> = new Map();
+  private matchStatsMemory: Map<string, any[]> = new Map();
+  private tipsCache: {
+    tipsJson: string;
+    headlineSummary: string;
+    rawMarkdown: string;
+    sourcesJson: string;
+    updatedAt: string;
+  } | null = null;
   private fallbackSettings: EngineSettings = {
-    
     rollingMatchWindow: 15,
     minEVThreshold: 1.10,
     safeWinThreshold: 0.72,
@@ -28,241 +38,111 @@ export class FootballDB {
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-
-
-    if (footballTurso) {
-      try {
-        console.log('[FootballDB] Initializing Turso cloud database tables...');
-        await this.createTablesOnTurso();
-        console.log('[FootballDB] Turso cloud database tables verified.');
-      } catch (err: any) {
-        console.warn('[FootballDB] Turso initialization warning:', err?.message);
-      }
-    } else {
-      console.log('[FootballDB] Running in-memory mode (No Turso URL provided).');
+    try {
+      initSqliteSchema();
+      this.hydrateFromSqlite();
+      console.log('[FootballDB] Initialized persistent SQLite database (data/football_engine.db) in WAL mode.');
+    } catch (err: any) {
+      console.warn('[FootballDB] SQLite initialization notice:', err?.message);
     }
 
     this.isInitialized = true;
   }
 
-  private async createTablesOnTurso(): Promise<void> {
-    if (!footballTurso) return;
-
-    const queries = [
-      `CREATE TABLE IF NOT EXISTS historical_matches (
-        id TEXT PRIMARY KEY,
-        div TEXT NOT NULL,
-        season TEXT NOT NULL,
-        match_date TEXT NOT NULL,
-        home_team TEXT NOT NULL,
-        away_team TEXT NOT NULL,
-        fthg INTEGER NOT NULL,
-        ftag INTEGER NOT NULL,
-        ftr TEXT NOT NULL,
-        hs INTEGER,
-        as_shots INTEGER,
-        hst INTEGER,
-        ast INTEGER
-      );`,
-      `CREATE INDEX IF NOT EXISTS idx_matches_div ON historical_matches(div);`,
-      `CREATE INDEX IF NOT EXISTS idx_matches_date ON historical_matches(match_date);`,
-      `CREATE TABLE IF NOT EXISTS upcoming_fixtures (
-        id TEXT PRIMARY KEY,
-        provider_id TEXT NOT NULL,
-        league TEXT NOT NULL,
-        league_name TEXT NOT NULL,
-        match_date TEXT NOT NULL,
-        kick_off_time TEXT NOT NULL,
-        home_team TEXT NOT NULL,
-        away_team TEXT NOT NULL,
-        home_badge TEXT,
-        away_badge TEXT,
-        stage TEXT,
-        b365_h REAL NOT NULL,
-        b365_d REAL NOT NULL,
-        b365_a REAL NOT NULL,
-        b365_over25 REAL,
-        b365_under25 REAL,
-        b365_btts_yes REAL,
-        b365_btts_no REAL,
-        status TEXT NOT NULL DEFAULT 'SCHEDULED',
-        score_json TEXT,
-        prediction_json TEXT,
-        markets_json TEXT,
-        best_value_market_json TEXT,
-        home_stats_json TEXT,
-        away_stats_json TEXT,
-        measurements_json TEXT,
-        h2h_matches_json TEXT,
-        updated_at TEXT
-      );`,
-      `CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);`,
-      `CREATE TABLE IF NOT EXISTS app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );`,
-      `CREATE TABLE IF NOT EXISTS football_tips_cache (
-        id TEXT PRIMARY KEY,
-        tips_json TEXT NOT NULL,
-        headline_summary TEXT NOT NULL,
-        raw_markdown TEXT NOT NULL,
-        sources_json TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );`,
-      `CREATE TABLE IF NOT EXISTS flashscore_scraped_matches (
-        match_id TEXT PRIMARY KEY,
-        stage TEXT,
-        status TEXT NOT NULL,
-        match_date TEXT NOT NULL,
-        country TEXT,
-        league_name TEXT,
-        home_name TEXT NOT NULL,
-        home_image TEXT,
-        away_name TEXT NOT NULL,
-        away_image TEXT,
-        home_score INTEGER,
-        away_score INTEGER,
-        regulation_time TEXT,
-        penalties TEXT,
-        information_json TEXT,
-        statistics_json TEXT,
-        scraped_at TEXT NOT NULL
-      );`,
-      `CREATE TABLE IF NOT EXISTS prediction_measurements_cache (
-        fixture_id TEXT PRIMARY KEY,
-        h2h_json TEXT NOT NULL,
-        calculated_at TEXT NOT NULL
-      );`,
-      `CREATE TABLE IF NOT EXISTS raw_feed_data (
-        fixture_id TEXT PRIMARY KEY,
-        feed_path TEXT NOT NULL,
-        raw_text TEXT NOT NULL,
-        scraped_at TEXT NOT NULL
-      );`,
-      `CREATE TABLE IF NOT EXISTS league_standings (
-        league_code TEXT PRIMARY KEY,
-        league_name TEXT NOT NULL,
-        country TEXT,
-        standings_json TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'FLASHSCORE_SCRAPED',
-        updated_at TEXT NOT NULL
-      );`,
-    ];
-
-    for (const q of queries) {
-      try {
-        await footballTurso.execute(q);
-      } catch (err: any) {
-        console.warn(`[FootballDB] Turso table creation note:`, err?.message);
+  private hydrateFromSqlite(): void {
+    try {
+      // 1. Hydrate settings
+      const settingsRow = sqliteDb.prepare("SELECT value FROM app_settings WHERE key = 'engine_settings'").get() as any;
+      if (settingsRow && settingsRow.value) {
+        try {
+          this.fallbackSettings = JSON.parse(settingsRow.value);
+        } catch {}
       }
-    }
 
-    if (footballTurso && this.fallbackUpcomingFixtures.length === 0) {
-      try {
-        const res = await footballTurso.execute('SELECT * FROM upcoming_fixtures LIMIT 1500;');
-        if (res.rows && res.rows.length > 0) {
-          const loaded: Fixture[] = [];
-          for (const row of res.rows) {
-            try {
-              loaded.push({
-                id: String(row.id),
-                providerId: (row.provider_id as any) || 'FLASHSCORE',
-                league: String(row.league || ''),
-                leagueName: String(row.league_name || row.league || ''),
-                matchDate: String(row.match_date || ''),
-                kickOffTime: String(row.kick_off_time || ''),
-                homeTeam: String(row.home_team || ''),
-                awayTeam: String(row.away_team || ''),
-                homeBadge: row.home_badge ? String(row.home_badge) : undefined,
-                awayBadge: row.away_badge ? String(row.away_badge) : undefined,
-                stage: row.stage ? String(row.stage) : undefined,
-                odds: {
-                  homeWin: Number(row.b365_h || 2.10),
-                  draw: Number(row.b365_d || 3.30),
-                  awayWin: Number(row.b365_a || 3.40),
-                  over25: row.b365_over25 ? Number(row.b365_over25) : 1.85,
-                  under25: row.b365_under25 ? Number(row.b365_under25) : 1.95,
-                  bttsYes: row.b365_btts_yes ? Number(row.b365_btts_yes) : undefined,
-                  bttsNo: row.b365_btts_no ? Number(row.b365_btts_no) : undefined,
-                },
-                status: (row.status as any) || 'SCHEDULED',
-                prediction: row.prediction_json ? JSON.parse(String(row.prediction_json)) : undefined,
-                markets: row.markets_json ? JSON.parse(String(row.markets_json)) : undefined,
-                bestValueMarket: row.best_value_market_json ? JSON.parse(String(row.best_value_market_json)) : undefined,
-                homeStats: row.home_stats_json ? JSON.parse(String(row.home_stats_json)) : undefined,
-                awayStats: row.away_stats_json ? JSON.parse(String(row.away_stats_json)) : undefined,
-                measurements: row.measurements_json ? JSON.parse(String(row.measurements_json)) : undefined,
-              });
-            } catch {}
+      // 2. Hydrate historical matches count
+      const histRows = sqliteDb.prepare("SELECT * FROM historical_matches LIMIT 2000").all() as any[];
+      if (histRows && histRows.length > 0) {
+        this.fallbackHistoricalMatches = histRows.map((r) => ({
+          id: String(r.id),
+          div: String(r.div),
+          season: String(r.season),
+          matchDate: String(r.match_date),
+          homeTeam: String(r.home_team),
+          awayTeam: String(r.away_team),
+          fthg: Number(r.fthg),
+          ftag: Number(r.ftag),
+          ftr: (r.ftr as 'H' | 'D' | 'A') || 'D',
+          hs: r.hs !== null ? Number(r.hs) : undefined,
+          asShots: r.as_shots !== null ? Number(r.as_shots) : undefined,
+          hst: r.hst !== null ? Number(r.hst) : undefined,
+          ast: r.ast !== null ? Number(r.ast) : undefined,
+        }));
+      }
+
+      // 3. Hydrate upcoming fixtures
+      const upRows = sqliteDb.prepare("SELECT * FROM upcoming_fixtures LIMIT 2000").all() as any[];
+      if (upRows && upRows.length > 0) {
+        this.fallbackUpcomingFixtures = upRows.map((r) => ({
+          id: String(r.id),
+          providerId: (r.provider_id as any) || 'FLASHSCORE',
+          league: String(r.league || ''),
+          leagueName: String(r.league_name || r.league || ''),
+          matchDate: String(r.match_date || ''),
+          kickOffTime: String(r.kick_off_time || ''),
+          homeTeam: String(r.home_team || ''),
+          awayTeam: String(r.away_team || ''),
+          homeBadge: r.home_badge ? String(r.home_badge) : undefined,
+          awayBadge: r.away_badge ? String(r.away_badge) : undefined,
+          stage: r.stage ? String(r.stage) : undefined,
+          restDaysHome: r.rest_days_home !== null ? Number(r.rest_days_home) : 7,
+          restDaysAway: r.rest_days_away !== null ? Number(r.rest_days_away) : 7,
+          odds: {
+            homeWin: Number(r.b365_h || 2.10),
+            draw: Number(r.b365_d || 3.30),
+            awayWin: Number(r.b365_a || 3.40),
+            over25: r.b365_over25 ? Number(r.b365_over25) : 1.85,
+            under25: r.b365_under25 ? Number(r.b365_under25) : 1.95,
+            bttsYes: r.b365_btts_yes ? Number(r.b365_btts_yes) : undefined,
+            bttsNo: r.b365_btts_no ? Number(r.b365_btts_no) : undefined,
+          },
+          status: (r.status as any) || 'SCHEDULED',
+          score: r.score_json ? JSON.parse(r.score_json) : undefined,
+          prediction: r.prediction_json ? JSON.parse(r.prediction_json) : undefined,
+          markets: r.markets_json ? JSON.parse(r.markets_json) : undefined,
+          bestValueMarket: r.best_value_market_json ? JSON.parse(r.best_value_market_json) : undefined,
+          homeStats: r.home_stats_json ? JSON.parse(r.home_stats_json) : undefined,
+          awayStats: r.away_stats_json ? JSON.parse(r.away_stats_json) : undefined,
+          measurements: r.measurements_json ? JSON.parse(r.measurements_json) : undefined,
+          h2hMatches: r.h2h_matches_json ? JSON.parse(r.h2h_matches_json) : undefined,
+        }));
+      }
+
+      // 4. Hydrate prediction measurements cache
+      const measRows = sqliteDb.prepare("SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 1500").all() as any[];
+      for (const m of measRows) {
+        try {
+          if (m.fixture_id && m.h2h_json) {
+            const parsed = JSON.parse(m.h2h_json);
+            const fid = String(m.fixture_id);
+            this.measurementsMemory.set(fid, parsed);
+            this.measurementsMemory.set(`fs_${fid}`, parsed);
           }
-          if (loaded.length > 0) {
-            this.fallbackUpcomingFixtures = loaded;
-          }
-        }
-      } catch (err: any) {
-        console.warn('[FootballDB] Note hydrating upcoming fixtures:', err?.message);
+        } catch {}
       }
-    }
 
-    if (footballTurso && this.measurementsMemory.size === 0) {
-      try {
-        const res = await footballTurso.execute('SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 1500;');
-        if (res.rows && res.rows.length > 0) {
-          for (const row of res.rows) {
-            try {
-              if (row.fixture_id && row.h2h_json) {
-                const parsed = JSON.parse(String(row.h2h_json));
-                const fid = String(row.fixture_id);
-                this.measurementsMemory.set(fid, parsed);
-                this.measurementsMemory.set(`fs_${fid}`, parsed);
-              }
-            } catch {}
-          }
-        }
-      } catch (err: any) {
-        console.warn('[FootballDB] Note hydrating measurements:', err?.message);
+      // 5. Hydrate tips cache
+      const tipsRow = sqliteDb.prepare("SELECT * FROM football_tips_cache WHERE id = 'latest_tips'").get() as any;
+      if (tipsRow) {
+        this.tipsCache = {
+          tipsJson: String(tipsRow.tips_json),
+          headlineSummary: String(tipsRow.headline_summary),
+          rawMarkdown: String(tipsRow.raw_markdown),
+          sourcesJson: String(tipsRow.sources_json),
+          updatedAt: String(tipsRow.updated_at),
+        };
       }
-    }
-
-    if (footballTurso && this.scrapedMatchesMemory.size === 0) {
-      try {
-        const res = await footballTurso.execute('SELECT * FROM flashscore_scraped_matches LIMIT 500;');
-        if (res.rows && res.rows.length > 0) {
-          for (const row of res.rows) {
-            try {
-              const sm = {
-                matchId: String(row.match_id),
-                stage: row.stage ? String(row.stage) : undefined,
-                status: String(row.status || 'FINISHED'),
-                date: String(row.match_date || ''),
-                country: row.country ? String(row.country) : undefined,
-                leagueName: row.league_name ? String(row.league_name) : undefined,
-                home: { name: String(row.home_name || ''), image: row.home_image ? String(row.home_image) : undefined },
-                away: { name: String(row.away_name || ''), image: row.away_image ? String(row.away_image) : undefined },
-                result: (row.home_score !== null && row.away_score !== null) ? { home: Number(row.home_score), away: Number(row.away_score) } : undefined,
-                regulation_time: row.regulation_time ? String(row.regulation_time) : undefined,
-                information: row.information_json ? JSON.parse(String(row.information_json)) : undefined,
-                statistics: row.statistics_json ? JSON.parse(String(row.statistics_json)) : undefined,
-                scraped_at: row.scraped_at ? String(row.scraped_at) : undefined,
-              };
-              this.scrapedMatchesMemory.set(sm.matchId, sm);
-            } catch {}
-          }
-        }
-      } catch (err: any) {
-        console.warn('[FootballDB] Note hydrating scraped matches:', err?.message);
-      }
-    }
-
-    if (footballTurso && this.rawFeedsMemory.size === 0) {
-      try {
-        const res = await footballTurso.execute('SELECT COUNT(*) as count FROM raw_feed_data;');
-        if (res.rows && res.rows.length > 0 && res.rows[0].count !== undefined) {
-          this.rawFeedsDbCount = Number(res.rows[0].count);
-        }
-      } catch (err: any) {
-        console.warn('[FootballDB] Note checking raw_feed_data count:', err?.message);
-      }
+    } catch (err: any) {
+      console.warn('[FootballDB] SQLite hydration note:', err?.message);
     }
   }
 
@@ -271,30 +151,36 @@ export class FootballDB {
     this.fallbackUpcomingFixtures = [];
     this.measurementsMemory.clear();
     this.standingsMemory.clear();
+    this.scrapedMatchesMemory.clear();
+    this.matchStatsMemory.clear();
+    this.tipsCache = null;
+
     if (clearRaw) {
       this.rawFeedsMemory.clear();
+      this.rawFeedHashesMemory.clear();
     }
 
-    if (footballTurso) {
-      try {
-        await footballTurso.execute('DELETE FROM historical_matches;');
-        await footballTurso.execute('DELETE FROM upcoming_fixtures;');
-        await footballTurso.execute('DELETE FROM flashscore_scraped_matches;');
-        await footballTurso.execute('DELETE FROM prediction_measurements_cache;');
-        await footballTurso.execute('DELETE FROM league_standings;');
+    try {
+      const runDelete = sqliteDb.transaction(() => {
+        sqliteDb.exec('DELETE FROM historical_matches;');
+        sqliteDb.exec('DELETE FROM upcoming_fixtures;');
+        sqliteDb.exec('DELETE FROM flashscore_scraped_matches;');
+        sqliteDb.exec('DELETE FROM prediction_measurements_cache;');
+        sqliteDb.exec('DELETE FROM league_standings;');
         if (clearRaw) {
-          await footballTurso.execute('DELETE FROM raw_feed_data;');
+          sqliteDb.exec('DELETE FROM raw_feed_data;');
         }
-      } catch (err: any) {
-        console.error('[FootballDB] Error clearing Turso database:', err?.message);
-      }
+      });
+      runDelete();
+    } catch (err: any) {
+      console.error('[FootballDB] Error clearing SQLite tables:', err?.message);
     }
 
     loggerService.addLog({
       level: 'SUCCESS',
       category: 'DATABASE',
       source: 'FootballDB',
-      message: `Database tables ${clearRaw ? 'and raw feeds ' : ''}cleared on Turso`,
+      message: `Database tables ${clearRaw ? 'and compressed raw feeds ' : ''}cleared from SQLite`,
     });
   }
 
@@ -306,30 +192,37 @@ export class FootballDB {
     if (matches.length === 0) return 0;
     this.fallbackHistoricalMatches = matches;
 
-    if (footballTurso) {
-      const statements = matches.map((m) => ({
-        sql: `INSERT OR REPLACE INTO historical_matches (
+    try {
+      const insertStmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO historical_matches (
           id, div, season, match_date, home_team, away_team,
           fthg, ftag, ftr, hs, as_shots, hst, ast
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          m.id,
-          m.div,
-          m.season,
-          m.matchDate,
-          m.homeTeam,
-          m.awayTeam,
-          m.fthg,
-          m.ftag,
-          m.ftr,
-          m.hs ?? null,
-          m.asShots ?? null,
-          m.hst ?? null,
-          m.ast ?? null,
-        ],
-      }));
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-      safeTursoBatch(footballTurso, statements, 25);
+      const insertMany = sqliteDb.transaction((rows: HistoricalMatch[]) => {
+        for (const m of rows) {
+          insertStmt.run(
+            m.id,
+            m.div,
+            m.season,
+            m.matchDate,
+            m.homeTeam,
+            m.awayTeam,
+            m.fthg,
+            m.ftag,
+            m.ftr,
+            m.hs ?? null,
+            m.asShots ?? null,
+            m.hst ?? null,
+            m.ast ?? null
+          );
+        }
+      });
+
+      insertMany(matches);
+    } catch (err: any) {
+      console.error('[FootballDB] Error inserting historical matches into SQLite:', err?.message);
     }
 
     return matches.length;
@@ -355,53 +248,71 @@ export class FootballDB {
     }
     this.fallbackUpcomingFixtures = Array.from(fixtureMap.values());
 
-    if (footballTurso) {
-      const statements = unique.map((f) => ({
-        sql: `INSERT OR REPLACE INTO upcoming_fixtures (
+    try {
+      const insertStmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO upcoming_fixtures (
           id, provider_id, league, league_name, match_date, kick_off_time,
           home_team, away_team, home_badge, away_badge, stage,
+          rest_days_home, rest_days_away,
           b365_h, b365_d, b365_a, b365_over25, b365_under25,
           b365_btts_yes, b365_btts_no, status, score_json,
           prediction_json, markets_json, best_value_market_json,
-          home_stats_json, away_stats_json, measurements_json, h2h_matches_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          f.id,
-          f.providerId || 'FLASHSCORE',
-          String(f.league),
-          f.leagueName,
-          f.matchDate,
-          f.kickOffTime,
-          f.homeTeam,
-          f.awayTeam,
-          f.homeBadge || null,
-          f.awayBadge || null,
-          f.stage || null,
-          f.odds.homeWin,
-          f.odds.draw,
-          f.odds.awayWin,
-          f.odds.over25 || 1.95,
-          f.odds.under25 || 1.85,
-          f.odds.bttsYes || 1.90,
-          f.odds.bttsNo || 1.80,
-          f.status || 'SCHEDULED',
-          f.score ? JSON.stringify(f.score) : null,
-          f.prediction ? JSON.stringify(f.prediction) : null,
-          f.markets ? JSON.stringify(f.markets) : null,
-          f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
-          f.homeStats ? JSON.stringify(f.homeStats) : null,
-          f.awayStats ? JSON.stringify(f.awayStats) : null,
-          f.measurements ? JSON.stringify(f.measurements) : null,
-          f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
-          new Date().toISOString(),
-        ],
-      }));
+          home_stats_json, away_stats_json, measurements_json, h2h_matches_json,
+          feed_path, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
+      `);
 
-      try {
-        await safeTursoBatch(footballTurso, statements, 25);
-      } catch (err: any) {
-        console.error('[FootballDB] Error saving upcoming fixtures batch to Turso:', err?.message);
-      }
+      const now = new Date().toISOString();
+      const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
+        for (const f of rows) {
+          insertStmt.run(
+            f.id,
+            f.providerId || 'FLASHSCORE',
+            String(f.league),
+            f.leagueName,
+            f.matchDate,
+            f.kickOffTime,
+            f.homeTeam,
+            f.awayTeam,
+            f.homeBadge || null,
+            f.awayBadge || null,
+            f.stage || null,
+            f.restDaysHome ?? 7,
+            f.restDaysAway ?? 7,
+            f.odds?.homeWin ?? 2.10,
+            f.odds?.draw ?? 3.30,
+            f.odds?.awayWin ?? 3.40,
+            f.odds?.over25 ?? 1.85,
+            f.odds?.under25 ?? 1.95,
+            f.odds?.bttsYes ?? 1.90,
+            f.odds?.bttsNo ?? 1.80,
+            f.status || 'SCHEDULED',
+            f.score ? JSON.stringify(f.score) : null,
+            f.prediction ? JSON.stringify(f.prediction) : null,
+            f.markets ? JSON.stringify(f.markets) : null,
+            f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
+            f.homeStats ? JSON.stringify(f.homeStats) : null,
+            f.awayStats ? JSON.stringify(f.awayStats) : null,
+            f.measurements ? JSON.stringify(f.measurements) : null,
+            f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
+            (f as any).feed_path || null,
+            now
+          );
+        }
+      });
+
+      insertMany(unique);
+    } catch (err: any) {
+      console.error('[FootballDB] Error saving upcoming fixtures to SQLite:', err?.message);
     }
   }
 
@@ -489,9 +400,12 @@ export class FootballDB {
   }
 
   getStatsSummary() {
+    const sqliteStats = getSqliteDbStats();
     return {
       totalMatches: this.fallbackHistoricalMatches.length,
       totalTeams: 78,
+      dbSizeMB: sqliteStats.sizeMB,
+      sqliteStats,
       leagues: [
         { div: 'E0', matches: 80, avgHomeGoals: 1.65, avgAwayGoals: 1.35 },
         { div: 'SP1', matches: 80, avgHomeGoals: 1.55, avgAwayGoals: 1.15 },
@@ -507,19 +421,18 @@ export class FootballDB {
 
   saveSettings(settings: EngineSettings): void {
     this.fallbackSettings = settings;
-    if (footballTurso) {
-      footballTurso.execute({
-        sql: `INSERT OR REPLACE INTO app_settings (key, value) VALUES ('engine_settings', ?)`,
-        args: [JSON.stringify(settings)],
-      }).catch(() => {});
-    }
+    try {
+      sqliteDb.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('engine_settings', ?)").run(
+        JSON.stringify(settings)
+      );
+    } catch {}
   }
 
   clearHistoricalData(): void {
     this.fallbackHistoricalMatches = [];
-    if (footballTurso) {
-      footballTurso.execute('DELETE FROM historical_matches;').catch(() => {});
-    }
+    try {
+      sqliteDb.exec('DELETE FROM historical_matches;');
+    } catch {}
   }
 
   saveTipsCache(
@@ -528,18 +441,32 @@ export class FootballDB {
     rawMarkdown: string,
     sourcesJson: string
   ): void {
-    if (footballTurso) {
-      footballTurso.execute({
-        sql: `INSERT OR REPLACE INTO football_tips_cache (
+    const now = new Date().toISOString();
+    this.tipsCache = {
+      tipsJson,
+      headlineSummary,
+      rawMarkdown,
+      sourcesJson,
+      updatedAt: now,
+    };
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO football_tips_cache (
           id, tips_json, headline_summary, raw_markdown, sources_json, updated_at
-        ) VALUES ('latest_tips', ?, ?, ?, ?, ?)`,
-        args: [tipsJson, headlineSummary, rawMarkdown, sourcesJson, new Date().toISOString()],
-      }).catch(() => {});
-    }
+        ) VALUES ('latest_tips', ?, ?, ?, ?, ?)
+      `).run(tipsJson, headlineSummary, rawMarkdown, sourcesJson, now);
+    } catch {}
   }
 
-  private scrapedMatchesMemory: Map<string, any> = new Map();
-  private matchStatsMemory: Map<string, any[]> = new Map();
+  getTipsCache(): {
+    tipsJson: string;
+    headlineSummary: string;
+    rawMarkdown: string;
+    sourcesJson: string;
+    updatedAt: string;
+  } | null {
+    return this.tipsCache;
+  }
 
   saveFlashscoreScrapedMatches(matches: Array<any>): void {
     if (matches.length === 0) return;
@@ -549,36 +476,41 @@ export class FootballDB {
       }
     }
 
-    if (!footballTurso) return;
     try {
-      const statements = matches.map((m) => ({
-        sql: `INSERT OR REPLACE INTO flashscore_scraped_matches (
+      const stmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO flashscore_scraped_matches (
           match_id, stage, status, match_date, country, league_name,
           home_name, home_image, away_name, away_image,
           home_score, away_score, regulation_time, penalties,
           information_json, statistics_json, scraped_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          m.matchId,
-          m.stage || null,
-          m.status || 'SCHEDULED',
-          m.date || '',
-          m.country || null,
-          m.leagueName || null,
-          m.home?.name || m.homeTeam || '',
-          m.home?.image || m.homeBadge || null,
-          m.away?.name || m.awayTeam || '',
-          m.away?.image || m.awayBadge || null,
-          m.result?.home ? parseInt(m.result.home, 10) : null,
-          m.result?.away ? parseInt(m.result.away, 10) : null,
-          m.result?.regulationTime || null,
-          m.result?.penalties || null,
-          m.information ? JSON.stringify(m.information) : null,
-          m.statistics ? JSON.stringify(m.statistics) : null,
-          new Date().toISOString(),
-        ],
-      }));
-      safeTursoBatch(footballTurso, statements, 25);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const now = new Date().toISOString();
+      const insertMany = sqliteDb.transaction((rows: any[]) => {
+        for (const m of rows) {
+          stmt.run(
+            m.matchId,
+            m.stage || null,
+            m.status || 'SCHEDULED',
+            m.date || '',
+            m.country || null,
+            m.leagueName || null,
+            m.home?.name || m.homeTeam || '',
+            m.home?.image || m.homeBadge || null,
+            m.away?.name || m.awayTeam || '',
+            m.away?.image || m.awayBadge || null,
+            m.result?.home ? parseInt(m.result.home, 10) : null,
+            m.result?.away ? parseInt(m.result.away, 10) : null,
+            m.result?.regulationTime || null,
+            m.result?.penalties || null,
+            m.information ? JSON.stringify(m.information) : null,
+            m.statistics ? JSON.stringify(m.statistics) : null,
+            now
+          );
+        }
+      });
+      insertMany(matches);
     } catch {}
   }
 
@@ -594,25 +526,36 @@ export class FootballDB {
     this.measurementsMemory.set(cleanId, h2h);
     this.measurementsMemory.set(`fs_${cleanId}`, h2h);
 
-    if (footballTurso) {
-      footballTurso.execute({
-        sql: `INSERT OR REPLACE INTO prediction_measurements_cache (fixture_id, h2h_json, calculated_at) VALUES (?, ?, ?)`,
-        args: [cleanId, JSON.stringify(h2h), new Date().toISOString()],
-      }).catch(() => {});
-    }
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO prediction_measurements_cache (fixture_id, h2h_json, calculated_at)
+        VALUES (?, ?, ?)
+      `).run(cleanId, JSON.stringify(h2h), new Date().toISOString());
+    } catch {}
   }
 
   getPredictionMeasurement(fixtureId: string): HeadToHeadMeasurement | null {
     if (!fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').trim();
-    return this.measurementsMemory.get(fixtureId) || this.measurementsMemory.get(cleanId) || this.measurementsMemory.get(`fs_${cleanId}`) || null;
+    const mem = this.measurementsMemory.get(fixtureId) || this.measurementsMemory.get(cleanId) || this.measurementsMemory.get(`fs_${cleanId}`);
+    if (mem) return mem;
+
+    try {
+      const row = sqliteDb.prepare("SELECT h2h_json FROM prediction_measurements_cache WHERE fixture_id = ?").get(cleanId) as any;
+      if (row && row.h2h_json) {
+        const parsed = JSON.parse(row.h2h_json);
+        this.measurementsMemory.set(cleanId, parsed);
+        this.measurementsMemory.set(fixtureId, parsed);
+        return parsed;
+      }
+    } catch {}
+
+    return null;
   }
 
   getAllPredictionMeasurements(): Map<string, HeadToHeadMeasurement> {
     return this.measurementsMemory;
   }
-
-  private rawFeedHashesMemory: Map<string, string> = new Map();
 
   private computeFeedHash(text: string): string {
     if (!text) return 'empty_0';
@@ -625,10 +568,14 @@ export class FootballDB {
     return `${text.length}_${hash}`;
   }
 
+  /**
+   * Saves a raw feed into memory and compressed SQLite BLOB storage.
+   * Feeds are keyed STRICTLY by their canonical feedPath to prevent multi-gigabyte bloat!
+   */
   saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): { hasChanged: boolean } {
     if (!rawText) return { hasChanged: false };
     const newHash = this.computeFeedHash(rawText);
-    const key = fixtureId || feedPath;
+    const key = feedPath || fixtureId;
     const existingHash = this.rawFeedHashesMemory.get(key);
     const hasChanged = existingHash !== newHash;
 
@@ -636,25 +583,31 @@ export class FootballDB {
       this.rawFeedHashesMemory.set(key, newHash);
     }
 
-    if (fixtureId) {
-      this.rawFeedsMemory.set(fixtureId, rawText);
+    // Cache in memory for instant synchronous access
+    if (feedPath) {
+      this.rawFeedsMemory.set(feedPath, rawText);
+    }
+    if (fixtureId && (fixtureId.includes('df_hh_') || !feedPath)) {
       const cleanId = fixtureId.replace(/^fs_/, '').trim();
       this.rawFeedsMemory.set(cleanId, rawText);
       this.rawFeedsMemory.set(`fs_${cleanId}`, rawText);
-      this.rawFeedHashesMemory.set(cleanId, newHash);
-      this.rawFeedHashesMemory.set(`fs_${cleanId}`, newHash);
-    }
-    if (feedPath) {
-      this.rawFeedsMemory.set(feedPath, rawText);
-      this.rawFeedHashesMemory.set(feedPath, newHash);
     }
 
-    if (footballTurso && fixtureId && hasChanged) {
-      const cleanId = fixtureId.replace(/^fs_/, '').trim();
-      footballTurso.execute({
-        sql: `INSERT OR REPLACE INTO raw_feed_data (fixture_id, feed_path, raw_text, scraped_at) VALUES (?, ?, ?, ?)`,
-        args: [cleanId, feedPath || fixtureId, rawText, new Date().toISOString()],
-      }).catch(() => {});
+    // Persist to SQLite as compressed GZIP BLOB strictly under canonical feedPath or on-demand H2H ID
+    if (hasChanged) {
+      try {
+        const canonicalKey = feedPath || fixtureId;
+        const compressed = compressString(rawText);
+        const matchesCount = (rawText.match(/AA÷/g) || []).length;
+
+        sqliteDb.prepare(`
+          INSERT OR REPLACE INTO raw_feed_data (
+            feed_path, compressed_data, uncompressed_length, matches_count, scraped_at
+          ) VALUES (?, ?, ?, ?, ?)
+        `).run(canonicalKey, compressed, rawText.length, matchesCount, new Date().toISOString());
+      } catch (err: any) {
+        console.warn('[FootballDB] SQLite compressed raw feed insert note:', err?.message);
+      }
     }
 
     return { hasChanged };
@@ -669,50 +622,55 @@ export class FootballDB {
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
 
     // 1. Direct key match in rawFeedsMemory
-    let directText = this.rawFeedsMemory.get(fixtureId) || this.rawFeedsMemory.get(cleanId) || this.rawFeedsMemory.get(`fs_${cleanId}`);
+    const directText = this.rawFeedsMemory.get(fixtureId) || this.rawFeedsMemory.get(cleanId) || this.rawFeedsMemory.get(`fs_${cleanId}`);
     if (directText) {
       return { rawText: directText };
     }
 
     // 2. Search daily raw feeds stored in memory for section containing this match ID (AA÷matchId)
-    for (const [key, rawText] of this.rawFeedsMemory.entries()) {
+    for (const [, rawText] of this.rawFeedsMemory.entries()) {
       if (rawText && (rawText.includes(`AA÷${cleanId}`) || rawText.includes(`AA÷${fixtureId}`))) {
         return { rawText };
       }
     }
 
+    // 3. Check SQLite compressed raw_feed_data
+    try {
+      // Check direct feed_path match
+      const directRow = sqliteDb.prepare("SELECT compressed_data FROM raw_feed_data WHERE feed_path = ? OR feed_path = ?").get(cleanId, `df_hh_1_${cleanId}`) as any;
+      if (directRow && directRow.compressed_data) {
+        const decompressed = decompressBuffer(directRow.compressed_data);
+        this.rawFeedsMemory.set(cleanId, decompressed);
+        return { rawText: decompressed };
+      }
+
+      // Check daily feeds stored in SQLite
+      const dailyRows = sqliteDb.prepare("SELECT feed_path, compressed_data FROM raw_feed_data WHERE feed_path LIKE 'f_1_%'").all() as any[];
+      for (const row of dailyRows) {
+        if (row.compressed_data) {
+          const decompressed = decompressBuffer(row.compressed_data);
+          this.rawFeedsMemory.set(row.feed_path, decompressed);
+          if (decompressed.includes(`AA÷${cleanId}`) || decompressed.includes(`AA÷${fixtureId}`)) {
+            return { rawText: decompressed };
+          }
+        }
+      }
+    } catch {}
+
     return null;
   }
 
   async getRawFeedAsync(fixtureId: string): Promise<{ rawText: string } | null> {
-    const memRes = this.getRawFeed(fixtureId);
-    if (memRes) return memRes;
-
-    if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
-
-    if (footballTurso) {
-      try {
-        const res = await footballTurso.execute({
-          sql: `SELECT raw_text FROM raw_feed_data WHERE fixture_id = ? OR feed_path = ? OR feed_path = ? LIMIT 1`,
-          args: [cleanId, cleanId, `df_hh_1_${cleanId}`],
-        });
-        if (res.rows && res.rows.length > 0 && res.rows[0].raw_text) {
-          const rawText = String(res.rows[0].raw_text);
-          this.rawFeedsMemory.set(cleanId, rawText);
-          this.rawFeedsMemory.set(`fs_${cleanId}`, rawText);
-          return { rawText };
-        }
-      } catch (err: any) {
-        console.warn('[FootballDB] Turso raw_feed_data query note:', err?.message);
-      }
-    }
-
-    return null;
+    return this.getRawFeed(fixtureId);
   }
 
   getRawFeedsCount(): number {
-    return Math.max(this.rawFeedsMemory.size, this.rawFeedsDbCount);
+    try {
+      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM raw_feed_data").get() as any;
+      return row ? Number(row.count) : this.rawFeedsMemory.size;
+    } catch {
+      return this.rawFeedsMemory.size;
+    }
   }
 
   saveMatchStatistics(matchId: string, statistics: any[]): void {
@@ -753,18 +711,40 @@ export class FootballDB {
       tableData = standings || [];
     }
 
-    const data = { leagueCode, leagueName: name, country: ctry, standings: tableData, source, updatedAt: new Date().toISOString() };
+    const data = { leagueCode, leagueName: name, country: ctry, standings: tableData, table: tableData, source, updatedAt: new Date().toISOString() };
     this.standingsMemory.set(leagueCode, data);
-    if (footballTurso) {
-      footballTurso.execute({
-        sql: `INSERT OR REPLACE INTO league_standings (league_code, league_name, country, standings_json, source, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [leagueCode, name, ctry || null, JSON.stringify(tableData), source, data.updatedAt],
-      }).catch(() => {});
-    }
+
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO league_standings (league_code, league_name, country, standings_json, source, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(leagueCode, name, ctry || null, JSON.stringify(tableData), source, data.updatedAt);
+    } catch {}
   }
 
   getLeagueStandings(leagueCode: string): any {
-    return this.standingsMemory.get(leagueCode) || null;
+    const mem = this.standingsMemory.get(leagueCode);
+    if (mem) return mem;
+
+    try {
+      const row = sqliteDb.prepare("SELECT * FROM league_standings WHERE league_code = ?").get(leagueCode) as any;
+      if (row && row.standings_json) {
+        const parsedTable = JSON.parse(row.standings_json);
+        const parsed = {
+          leagueCode: row.league_code,
+          leagueName: row.league_name,
+          country: row.country,
+          table: parsedTable,
+          standings: parsedTable,
+          source: row.source,
+          updatedAt: row.updated_at,
+        };
+        this.standingsMemory.set(leagueCode, parsed);
+        return parsed;
+      }
+    } catch {}
+
+    return null;
   }
 }
 

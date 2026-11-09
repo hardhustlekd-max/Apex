@@ -326,8 +326,8 @@ export interface ServerlessDeploymentConfigSchema {
   api_prefix: string;
   is_serverless: boolean;
   process_type: 'persistent_node_process' | 'serverless';
-  db_storage_mode: 'turso_cloud';
-  turso_engine: 'TURSO_LIBSQL_CLOUD';
+  db_storage_mode: 'in_memory_high_speed';
+  db_engine: 'HIGH_PERFORMANCE_MEMORY';
   auto_seed_on_boot: boolean;
   historical_records_count: number; // 3,600+ real Flashscore scraped matches
   upcoming_fixtures_count: number; // 3,500+ live Flashscore scraped fixtures
@@ -596,7 +596,7 @@ export interface HistoricalPredictionRecordSchema {
 }
 
 export interface PredictionsDatabaseConfigSchema {
-  storage_target: 'TURSO_CLOUD_PREDICTIONS_DB';
+  storage_target: 'IN_MEMORY_PREDICTIONS_STORE';
   is_separate_db: true;
   sync_triggers_recalculation: true;
   serve_display_from_db: true;
