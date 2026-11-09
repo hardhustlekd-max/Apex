@@ -185,44 +185,8 @@ fixturesRouter.get('/history', async (req, res) => {
               status: 'FINISHED' as const,
               score: { home: homeScore, away: awayScore },
               odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
-              prediction: {
-                homeXG: 1.35,
-                awayXG: 1.15,
-                homeWinProb: 0.45,
-                drawProb: 0.28,
-                awayWinProb: 0.27,
-                over15Prob: 0.75,
-                over25Prob: 0.52,
-                over35Prob: 0.28,
-                bttsProb: 0.50,
-                mostLikelyOutcome: {
-                  selection: homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw',
-                  marketKey: homeScore > awayScore ? 'HOME_WIN' : homeScore < awayScore ? 'AWAY_WIN' : 'DRAW',
-                  probability: 0.55,
-                  odds: 2.10,
-                  expectedValue: 1.15,
-                  isProfitable: true,
-                  commentary: `Result: ${homeScore}-${awayScore}`,
-                },
-                topCorrectScores: [],
-                homeAttackStrength: 1.0,
-                homeDefenseStrength: 1.0,
-                awayAttackStrength: 1.0,
-                awayDefenseStrength: 1.0,
-                homeFormMultiplier: 1.0,
-                awayFormMultiplier: 1.0,
-                probabilityMatrix: [],
-              },
-              bestValueMarket: {
-                key: 'HOME_WIN',
-                name: homeScore > awayScore ? `${sm.home.name} Win` : 'Match Result',
-                odds: 2.10,
-                probability: 0.45,
-                impliedProb: 0.47,
-                expectedValue: 1.05,
-                isPositiveEV: true,
-                isBanker: false,
-              }
+              prediction: undefined,
+              bestValueMarket: undefined
             });
           }
         }

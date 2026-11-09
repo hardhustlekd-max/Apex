@@ -6,26 +6,6 @@ import { predictionsDb } from '../core/predictionsDb.js';
 export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
   const homeScore = m.fthg ?? 0;
   const awayScore = m.ftag ?? 0;
-  const outcomeStr = homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw';
-  const winnerKey = homeScore > awayScore ? 'HOME_WIN' : homeScore < awayScore ? 'AWAY_WIN' : 'DRAW';
-
-  const homeWinProb = homeScore > awayScore ? 0.55 : homeScore < awayScore ? 0.25 : 0.30;
-  const drawProb = 0.28;
-  const awayWinProb = awayScore > homeScore ? 0.55 : awayScore < homeScore ? 0.25 : 0.30;
-  const over15Prob = (homeScore + awayScore) >= 2 ? 0.75 : 0.45;
-  const over25Prob = (homeScore + awayScore) >= 3 ? 0.65 : 0.35;
-  const over35Prob = (homeScore + awayScore) >= 4 ? 0.45 : 0.20;
-  const bttsProb = (homeScore > 0 && awayScore > 0) ? 0.65 : 0.35;
-
-  const mostLikelyOutcomeObj = {
-    selection: outcomeStr,
-    marketKey: winnerKey as any,
-    probability: 0.55,
-    odds: 2.10,
-    expectedValue: 1.15,
-    isProfitable: true,
-    commentary: `Result: ${homeScore}-${awayScore}`,
-  };
 
   return {
     id: m.id ? (m.id.startsWith('hist_') || m.id.startsWith('fs_hist_') ? m.id : `fs_hist_${m.id}`) : `fs_hist_${Math.random()}`,
@@ -39,36 +19,8 @@ export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
     status: 'FINISHED' as const,
     score: { home: homeScore, away: awayScore },
     odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
-    prediction: {
-      homeXG: homeScore > awayScore ? 1.65 : homeScore < awayScore ? 0.95 : 1.20,
-      awayXG: awayScore > homeScore ? 1.65 : awayScore < homeScore ? 0.95 : 1.20,
-      homeWinProb,
-      drawProb,
-      awayWinProb,
-      over15Prob,
-      over25Prob,
-      over35Prob,
-      bttsProb,
-      mostLikelyOutcome: mostLikelyOutcomeObj,
-      topCorrectScores: [],
-      homeAttackStrength: 1.0,
-      homeDefenseStrength: 1.0,
-      awayAttackStrength: 1.0,
-      awayDefenseStrength: 1.0,
-      homeFormMultiplier: 1.0,
-      awayFormMultiplier: 1.0,
-      probabilityMatrix: [],
-    },
-    bestValueMarket: {
-      key: winnerKey as any,
-      name: homeScore > awayScore ? `${m.homeTeam} Win` : awayScore > homeScore ? `${m.awayTeam} Win` : 'Draw',
-      odds: 2.10,
-      probability: 0.55,
-      impliedProb: 0.47,
-      expectedValue: 1.15,
-      isPositiveEV: true,
-      isBanker: false,
-    }
+    prediction: undefined,
+    bestValueMarket: undefined
   };
 }
 
@@ -1640,6 +1592,29 @@ export class FlashscoreScraperService {
 
       if (res.ok) {
         const html = await res.text();
+        
+        // 1. Try to extract direct 'standings' feed if available (Optimized On-Demand Method)
+        const standingsMatch = html.match(/cjs\.initialFeeds\['standings'\]\s*=\s*\{\s*data:\s*[\`\"']([\s\S]*?)[\`\"']\s*\}/);
+        if (standingsMatch && standingsMatch[1]) {
+          const feedText = standingsMatch[1];
+          const entries = this.parseStandingsFeed(feedText);
+          if (entries.length > 0) {
+            const table: LeagueStandingTable = {
+              leagueCode: cleanCode,
+              leagueName: target.name,
+              country: target.country,
+              season: getCurrentSeason(),
+              updatedAt: new Date().toISOString(),
+              source: 'FLASHSCORE_SCRAPED',
+              table: entries,
+            };
+            db.saveLeagueStandings(table);
+            this.cacheStandings.set(cleanCode, { data: table, timestamp: Date.now() });
+            return table;
+          }
+        }
+
+        // 2. Fallback: Extract 'results' feed and calculate standings manually (Local Engine Method)
         const resultsMatch = html.match(/cjs\.initialFeeds\['results'\]\s*=\s*\{\s*data:\s*[\`\"']([\s\S]*?)[\`\"']\s*\}/);
 
         if (resultsMatch && resultsMatch[1]) {
