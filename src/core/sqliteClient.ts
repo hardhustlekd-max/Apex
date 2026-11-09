@@ -105,7 +105,23 @@ export const sqliteDb: Database.Database = new Proxy({} as any, {
 
     if (typeof value === 'function') {
       return function (...args: any[]) {
-        return value.apply(db, args);
+        try {
+          return value.apply(db, args);
+        } catch (err: any) {
+          const msg = String(err?.message || '').toLowerCase();
+          if (msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk image')) {
+            console.error('[SQLite] Malformed database error detected during execution:', err?.message);
+            try {
+              fs.appendFileSync('sqlite_debug.log', `[${new Date().toISOString()}] Malformed error caught during ${String(prop)}: ${err?.message}\n`);
+            } catch {}
+            const freshDb = resetCorruptedSqliteDb();
+            const freshMethod = (freshDb as any)[prop];
+            if (typeof freshMethod === 'function') {
+              return freshMethod.apply(freshDb, args);
+            }
+          }
+          throw err;
+        }
       };
     }
     return value;

@@ -106,35 +106,69 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   const [enrichedFixture, setEnrichedFixture] = useState<Fixture>(fixture);
   const [isParsing, setIsParsing] = useState<boolean>(false);
 
+  // Scraped Head to Head sync state
+  const initialH2H =
+    fixture.measurements?.h2h ||
+    fixture.prediction?.measurements?.h2h ||
+    null;
+
+  const [scrapedH2H, setScrapedH2H] = useState<HeadToHeadMeasurement | null>(initialH2H);
+  const [isLoadingH2H, setIsLoadingH2H] = useState<boolean>(!initialH2H || !initialH2H.homeRecentMatches?.length);
+
+  // Sync when fixture ID changes
   useEffect(() => {
     let isCancelled = false;
 
-    async function parseOnDemand() {
-      // If we already have statistics, we don't need to fetch on-demand again for this specific component instance/ID
-      if (fixture.id && !enrichedFixture.statistics) {
+    async function loadDetailsAndH2H() {
+      if (!fixture.id) return;
+
+      // Initialize or update enriched fixture if ID changed
+      setEnrichedFixture((prev) => {
+        if (prev.id !== fixture.id) {
+          return fixture;
+        }
+        return {
+          ...prev,
+          ...fixture,
+          statistics: prev.statistics?.length ? prev.statistics : fixture.statistics,
+          information: prev.information?.length ? prev.information : fixture.information,
+          measurements: {
+            ...fixture.measurements,
+            ...prev.measurements,
+          }
+        };
+      });
+
+      const existingH2H = fixture.measurements?.h2h || fixture.prediction?.measurements?.h2h;
+      if (existingH2H && existingH2H.homeRecentMatches && existingH2H.homeRecentMatches.length > 0) {
+        setScrapedH2H(existingH2H);
+        setIsLoadingH2H(false);
+      } else if (!scrapedH2H || !scrapedH2H.homeRecentMatches?.length) {
+        setIsLoadingH2H(true);
+      }
+
+      // 1. Fetch match detail if statistics missing
+      if (!fixture.statistics || fixture.statistics.length === 0) {
         setIsParsing(true);
         try {
           const detail = await EngineService.getMatchDetail(fixture.id);
           if (detail && !isCancelled) {
-            setEnrichedFixture((prev) => {
-              // Ensure we are still looking at the same fixture ID
-              if (prev.id !== fixture.id) return prev;
-              
-              return {
-                ...prev,
-                ...detail,
-                // Prioritize detail statistics but fallback to previous if empty
-                statistics: (detail.statistics && detail.statistics.length > 0) 
-                  ? detail.statistics 
-                  : prev.statistics,
-                score: detail.score || prev.score,
-                // Merge measurements if present
-                measurements: {
-                  ...prev.measurements,
-                  ...(detail.measurements || {})
-                }
-              };
-            });
+            setEnrichedFixture((prev) => ({
+              ...prev,
+              ...detail,
+              statistics: detail.statistics?.length ? detail.statistics : prev.statistics,
+              information: detail.information?.length ? detail.information : prev.information,
+              score: detail.score || prev.score,
+              measurements: {
+                ...prev.measurements,
+                ...(detail.measurements || {})
+              }
+            }));
+            const detailH2H = detail.measurements?.h2h || detail.prediction?.measurements?.h2h;
+            if (detailH2H && detailH2H.homeRecentMatches?.length > 0) {
+              setScrapedH2H(detailH2H);
+              setIsLoadingH2H(false);
+            }
           }
         } catch (err) {
           console.warn('[MatchDetail] Detail fetch failed:', err);
@@ -142,32 +176,42 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           if (!isCancelled) setIsParsing(false);
         }
       }
-    }
 
-    // Reset local state ONLY if the ID actually changed
-    if (enrichedFixture.id !== fixture.id) {
-      setEnrichedFixture(fixture);
-      setScrapedH2H(null);
-      setIsLoadingH2H(true);
-      parseOnDemand();
-    } else {
-      // If ID is the same, but the parent updated (e.g. live score change),
-      // we merge the prop updates into our local enriched state without losing our enriched fields.
-      setEnrichedFixture(prev => ({
-        ...prev,
-        ...fixture,
-        // Preserve local enriched fields
-        statistics: prev.statistics || fixture.statistics,
-        information: prev.information || fixture.information,
-        measurements: {
-          ...prev.measurements,
-          ...(fixture.measurements || {})
+      // 2. Fetch H2H if missing
+      const currentH2H = existingH2H || scrapedH2H;
+      if (!currentH2H || !currentH2H.homeRecentMatches || currentH2H.homeRecentMatches.length === 0) {
+        try {
+          setIsLoadingH2H(true);
+          const data = await EngineService.getMatchHeadToHead(fixture.id, fixture.homeTeam, fixture.awayTeam);
+          if (!isCancelled && data && data.homeRecentMatches && data.homeRecentMatches.length > 0) {
+            setScrapedH2H(data);
+            setEnrichedFixture((prev) => ({
+              ...prev,
+              measurements: {
+                ...prev.measurements,
+                h2h: data,
+              },
+              h2hMatches: data.recentH2H || prev.h2hMatches,
+            }));
+          }
+        } catch (err) {
+          console.warn('Unable to load live H2H:', err);
+        } finally {
+          if (!isCancelled) {
+            setIsLoadingH2H(false);
+          }
         }
-      }));
+      } else {
+        setIsLoadingH2H(false);
+      }
     }
 
-    return () => { isCancelled = true; };
-  }, [fixture.id, fixture]); // Added fixture.id explicitly for clarity
+    loadDetailsAndH2H();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [fixture.id]);
 
   const currentFixture = enrichedFixture;
   const pred = currentFixture.prediction || null;
@@ -190,73 +234,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
     return Object.entries(groups).map(([groupName, market]) => ({ groupName, ...market }));
   }, [currentFixture.markets]);
 
-  // Scraped Head to Head sync
-  const initialH2H =
-    pred?.measurements?.h2h?.homeRecentMatches &&
-    pred.measurements.h2h.homeRecentMatches.length > 0
-      ? pred.measurements.h2h
-      : null;
-  const [scrapedH2H, setScrapedH2H] = useState<HeadToHeadMeasurement | null>(initialH2H);
-  const [isLoadingH2H, setIsLoadingH2H] = useState<boolean>(!initialH2H);
 
-  // Synchronize H2H if it becomes available in the enriched fixture (e.g. from detail fetch)
-  useEffect(() => {
-    const fixtureH2H = enrichedFixture.measurements?.h2h || enrichedFixture.prediction?.measurements?.h2h;
-    const hasData = fixtureH2H?.homeRecentMatches && fixtureH2H.homeRecentMatches.length > 0;
-    
-    if (hasData) {
-      setScrapedH2H(fixtureH2H);
-      setIsLoadingH2H(false);
-    }
-  }, [enrichedFixture.measurements, enrichedFixture.prediction]);
-
-  useEffect(() => {
-    let isCancelled = false;
-    async function loadRealH2H() {
-      // Check if we already have H2H in our local state
-      if (scrapedH2H && scrapedH2H.homeRecentMatches && scrapedH2H.homeRecentMatches.length > 0) {
-        setIsLoadingH2H(false);
-        return;
-      }
-
-      // Check if it's already in the enriched fixture
-      const existingH2H = enrichedFixture.measurements?.h2h || enrichedFixture.prediction?.measurements?.h2h;
-      if (existingH2H && existingH2H.homeRecentMatches && existingH2H.homeRecentMatches.length > 0) {
-        setScrapedH2H(existingH2H);
-        setIsLoadingH2H(false);
-        return;
-      }
-
-      try {
-        setIsLoadingH2H(true);
-        const data = await EngineService.getMatchHeadToHead(fixture.id, fixture.homeTeam, fixture.awayTeam);
-        if (!isCancelled) {
-          if (data && data.homeRecentMatches && data.homeRecentMatches.length > 0) {
-            setScrapedH2H(data);
-            setEnrichedFixture((prev) => ({
-              ...prev,
-              measurements: {
-                ...prev.measurements,
-                h2h: data,
-              },
-              h2hMatches: data.recentH2H || prev.h2hMatches,
-            }));
-          }
-        }
-      } catch (err) {
-        console.warn('Unable to load live H2H:', err);
-      } finally {
-        if (!isCancelled) {
-          setIsLoadingH2H(false);
-        }
-      }
-    }
-
-    loadRealH2H();
-    return () => {
-      isCancelled = true;
-    };
-  }, [fixture.id, fixture.homeTeam, fixture.awayTeam]);
 
   // Derived real recent matches
   const homeRecentMatchesList = useMemo(() => {

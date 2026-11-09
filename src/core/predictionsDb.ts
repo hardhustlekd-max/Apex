@@ -80,45 +80,52 @@ export class PredictionsDB {
 
         const now = new Date().toISOString();
         const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
+          let savedCount = 0;
           for (const f of rows) {
-            const pred = f.prediction;
-            const bestTip = f.bestValueMarket;
+            try {
+              const pred = f.prediction;
+              const bestTip = f.bestValueMarket;
 
-            stmt.run(
-              f.id,
-              f.league || 'ALL',
-              f.leagueName || f.league || 'Unknown League',
-              f.stage || null,
-              normalizeDateStr(f.matchDate),
-              f.kickOffTime || 'TBD',
-              f.homeTeam,
-              f.awayTeam,
-              f.homeBadge || null,
-              f.awayBadge || null,
-              f.status || 'SCHEDULED',
-              f.odds?.homeWin || 2.10,
-              f.odds?.draw || 3.30,
-              f.odds?.awayWin || 3.40,
-              pred?.homeXG ?? 1.35,
-              pred?.awayXG ?? 1.15,
-              pred?.homeWinProb ?? 0.45,
-              pred?.drawProb ?? 0.28,
-              pred?.awayWinProb ?? 0.27,
-              pred?.over15Prob ?? 0.75,
-              pred?.over25Prob ?? 0.52,
-              pred?.over35Prob ?? 0.28,
-              pred?.bttsProb ?? 0.50,
-              bestTip?.key || 'HOME_WIN',
-              bestTip?.name || 'Home Win',
-              bestTip?.odds || f.odds?.homeWin || 2.10,
-              bestTip?.probability || pred?.homeWinProb || 0.45,
-              bestTip?.expectedValue || 1.05,
-              bestTip?.isPositiveEV ? 1 : 0,
-              bestTip?.isBanker ? 1 : 0,
-              this.sanitizeFixtureForStorage(f),
-              now
-            );
+              stmt.run(
+                f.id,
+                f.league || 'ALL',
+                f.leagueName || f.league || 'Unknown League',
+                f.stage || null,
+                normalizeDateStr(f.matchDate),
+                f.kickOffTime || 'TBD',
+                f.homeTeam,
+                f.awayTeam,
+                f.homeBadge || null,
+                f.awayBadge || null,
+                f.status || 'SCHEDULED',
+                f.odds?.homeWin || 2.10,
+                f.odds?.draw || 3.30,
+                f.odds?.awayWin || 3.40,
+                pred?.homeXG ?? 1.35,
+                pred?.awayXG ?? 1.15,
+                pred?.homeWinProb ?? 0.45,
+                pred?.drawProb ?? 0.28,
+                pred?.awayWinProb ?? 0.27,
+                pred?.over15Prob ?? 0.75,
+                pred?.over25Prob ?? 0.52,
+                pred?.over35Prob ?? 0.28,
+                pred?.bttsProb ?? 0.50,
+                bestTip?.key || 'HOME_WIN',
+                bestTip?.name || 'Home Win',
+                bestTip?.odds || f.odds?.homeWin || 2.10,
+                bestTip?.probability || pred?.homeWinProb || 0.45,
+                bestTip?.expectedValue || 1.05,
+                bestTip?.isPositiveEV ? 1 : 0,
+                bestTip?.isBanker ? 1 : 0,
+                this.sanitizeFixtureForStorage(f),
+                now
+              );
+              savedCount++;
+            } catch (rowErr: any) {
+              console.warn(`[PredictionsDB] Failed to save fixture ${f.id} (${f.homeTeam} vs ${f.awayTeam}):`, rowErr?.message);
+            }
           }
+          console.log(`[PredictionsDB] Successfully saved ${savedCount}/${rows.length} predictions to SQLite.`);
         });
 
         insertMany(upcomingToPersist);
