@@ -235,8 +235,8 @@ fixturesRouter.get('/:id/recent-matches', async (req, res) => {
     const fixtureId = req.params.id;
     const homeTeam = req.query.home as string | undefined;
     const awayTeam = req.query.away as string | undefined;
-    const cleanId = fixtureId.replace(/^fs_/, '');
-    const h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
+    const h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam) || await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
     res.json({
       success: true,
       fixtureId,
@@ -256,9 +256,11 @@ fixturesRouter.get('/:id/h2h', async (req, res) => {
     const fixtureId = req.params.id;
     const homeTeam = req.query.home as string | undefined;
     const awayTeam = req.query.away as string | undefined;
-    const cleanId = fixtureId.replace(/^fs_/, '');
-    const h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
-    // h2h is already saved by the service
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
+    let h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
+    if (!h2h || !h2h.matchesCount) {
+      h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
+    }
     res.json({ success: true, h2h });
   } catch (err: any) {
     console.error('Error fetching fixture H2H:', err);
@@ -272,12 +274,72 @@ fixturesRouter.get('/:id', async (req, res) => {
     await db.init();
     await predictionsDb.init();
 
-    const cleanId = fixtureId.replace(/^fs_/, '');
-    const stored =
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
+    let stored =
       predictionsDb.getPredictionById(fixtureId) ||
       predictionsDb.getPredictionById(cleanId) ||
       db.getFixtureById(fixtureId) ||
       db.getFixtureById(cleanId);
+
+    if (!stored) {
+      const scrapedList = db.getFlashscoreScrapedMatches(2000);
+      const foundScraped = scrapedList.find(
+        (m) => m.matchId === fixtureId || m.matchId === cleanId || `fs_${m.matchId}` === fixtureId || `hist_${m.matchId}` === fixtureId
+      );
+      if (foundScraped) {
+        const homeScore = foundScraped.result?.home !== undefined ? parseInt(foundScraped.result.home, 10) : undefined;
+        const awayScore = foundScraped.result?.away !== undefined ? parseInt(foundScraped.result.away, 10) : undefined;
+        stored = {
+          id: `fs_${foundScraped.matchId}`,
+          providerId: 'FLASHSCORE',
+          league: foundScraped.leagueName || foundScraped.stage || 'FLASHSCORE',
+          leagueName: foundScraped.leagueName || foundScraped.stage || 'FLASHSCORE',
+          matchDate: normalizeDateStr(foundScraped.date ? foundScraped.date.slice(0, 10) : getRelativeDateStr(0)),
+          kickOffTime: foundScraped.date && foundScraped.date.length > 10 ? foundScraped.date.slice(11, 16) : 'FT',
+          homeTeam: foundScraped.home.name,
+          awayTeam: foundScraped.away.name,
+          status: foundScraped.status === 'FINISHED' ? 'FINISHED' : foundScraped.status === 'LIVE' ? 'LIVE' : 'SCHEDULED',
+          score: homeScore !== undefined && awayScore !== undefined ? { home: homeScore, away: awayScore } : undefined,
+          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
+          statistics: foundScraped.statistics || [],
+          information: foundScraped.information || [],
+        };
+      }
+    }
+
+    if (!stored) {
+      const histList = db.getAllHistoricalMatches(5000);
+      const foundHist = histList.find(
+        (m) => m.id === fixtureId || m.id === cleanId || m.id === `fs_hist_${cleanId}` || m.id === `hist_${cleanId}`
+      );
+      if (foundHist) {
+        stored = convertHistoricalMatchToFixture(foundHist);
+      }
+    }
+
+    if (!stored) {
+      const parsedMatch = await OnDemandParser.getParsedMatch(fixtureId);
+      if (parsedMatch) {
+        const homeScore = parsedMatch.homeScore;
+        const awayScore = parsedMatch.awayScore;
+        const isFin = parsedMatch.statusCode === '3';
+        const isLive = parsedMatch.statusCode === '2';
+        stored = {
+          id: `fs_${parsedMatch.matchId}`,
+          providerId: 'FLASHSCORE',
+          league: parsedMatch.tournament || 'FLASHSCORE',
+          leagueName: parsedMatch.tournament || 'FLASHSCORE',
+          matchDate: normalizeDateStr(parsedMatch.timestamp ? new Date(parsedMatch.timestamp * 1000).toISOString().slice(0, 10) : getRelativeDateStr(0)),
+          kickOffTime: isFin ? 'FT' : '19:00',
+          homeTeam: parsedMatch.homeTeam,
+          awayTeam: parsedMatch.awayTeam,
+          status: isFin ? 'FINISHED' : isLive ? 'LIVE' : 'SCHEDULED',
+          score: homeScore !== undefined && awayScore !== undefined ? { home: homeScore, away: awayScore } : undefined,
+          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
+          statistics: parsedMatch.statistics || [],
+        };
+      }
+    }
 
     if (!stored) {
       loggerService.addLog({
@@ -287,6 +349,17 @@ fixturesRouter.get('/:id', async (req, res) => {
         message: `Fixture ${fixtureId} not found in database for match detail`,
       });
       return res.status(404).json({ success: false, error: 'Fixture not found in database' });
+    }
+
+    if (!stored.prediction) {
+      const predStored = predictionsDb.getPredictionById(fixtureId) || predictionsDb.getPredictionById(cleanId);
+      if (predStored && predStored.prediction) {
+        stored.prediction = predStored.prediction;
+        stored.markets = predStored.markets;
+        stored.homeStats = predStored.homeStats;
+        stored.awayStats = predStored.awayStats;
+        stored.measurements = predStored.measurements;
+      }
     }
 
     loggerService.addLog({
