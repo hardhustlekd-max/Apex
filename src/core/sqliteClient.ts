@@ -171,6 +171,8 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       away_stats_json TEXT,
       measurements_json TEXT,
       h2h_matches_json TEXT,
+      information_json TEXT,
+      statistics_json TEXT,
       feed_path TEXT,
       updated_at TEXT NOT NULL
     );
@@ -354,6 +356,36 @@ export function initSqliteSchema(): void {
   try {
     const db = getSqliteDb();
     initSqliteSchemaInternal(db);
+
+    // Schema Migration: Ensure new columns exist in upcoming_fixtures
+    try {
+      const columns = db.prepare("PRAGMA table_info(upcoming_fixtures)").all() as any[];
+      const columnNames = columns.map(c => c.name);
+      
+      if (!columnNames.includes('information_json')) {
+        console.log('[SQLite] Migrating upcoming_fixtures: Adding information_json column');
+        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN information_json TEXT;");
+      }
+      if (!columnNames.includes('statistics_json')) {
+        console.log('[SQLite] Migrating upcoming_fixtures: Adding statistics_json column');
+        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN statistics_json TEXT;");
+      }
+    } catch (migErr: any) {
+      console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
+    }
+
+    // Ensure flashscore_scraped_matches also has these columns
+    try {
+      const columns = db.prepare("PRAGMA table_info(flashscore_scraped_matches)").all() as any[];
+      const columnNames = columns.map(c => c.name);
+      if (!columnNames.includes('information_json')) {
+        db.exec("ALTER TABLE flashscore_scraped_matches ADD COLUMN information_json TEXT;");
+      }
+      if (!columnNames.includes('statistics_json')) {
+        db.exec("ALTER TABLE flashscore_scraped_matches ADD COLUMN statistics_json TEXT;");
+      }
+    } catch {}
+
     checkAndRepairSqliteIntegrity(db);
   } catch (err: any) {
     console.warn('[SQLite] Error during schema init, auto-recovering clean database:', err?.message);

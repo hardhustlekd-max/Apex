@@ -56,13 +56,20 @@ export class ServerPredictionGeneratorService {
             homeStats: p.homeStats || f.homeStats,
             awayStats: p.awayStats || f.awayStats,
             measurements: p.measurements || f.measurements,
+            h2hMatches: p.h2hMatches || f.h2hMatches,
+            information: p.information || f.information,
+            statistics: p.statistics || f.statistics,
           });
         } else {
           // Ineligible / not yet predicted fixture -> strictly leave unpredicted
+          // But still preserve details from upcoming_fixtures table if they exist
           mergedMap.set(cleanId, {
             ...f,
             prediction: undefined,
             bestValueMarket: undefined,
+            h2hMatches: f.h2hMatches,
+            information: f.information,
+            statistics: f.statistics,
           });
         }
       }

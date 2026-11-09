@@ -96,9 +96,6 @@ export class ScraperCircuitBreaker {
 export const scraperCircuitBreaker = new ScraperCircuitBreaker();
 
 export class FlashscoreScraperService {
-  private cacheUpcoming: Fixture[] = [];
-  private cacheH2H = new Map<string, HeadToHeadMeasurement>();
-  private cacheStandings = new Map<string, { data: LeagueStandingTable; timestamp: number }>();
   private lastFetchTime = 0;
   private CACHE_TTL_MS = 60000; // 1 minute in-memory cache
 
@@ -245,6 +242,12 @@ export class FlashscoreScraperService {
                 odds,
                 score: (m.homeScore !== undefined && m.awayScore !== undefined) ? { home: m.homeScore, away: m.awayScore } : undefined,
                 minute: m.minute,
+                information: [
+                  { category: 'Source', value: 'Flashscore Scraping Feed Auto-Parser' },
+                  { category: 'Country', value: m.country },
+                  { category: 'Competition', value: name },
+                ],
+                statistics: m.statistics || [],
               });
             }
 
@@ -325,19 +328,9 @@ export class FlashscoreScraperService {
    * Scrapes upcoming and scheduled fixtures from Flashscore feeds
    */
   async getUpcomingFixtures(dateFilter?: string): Promise<Fixture[]> {
-    const now = Date.now();
-    if (this.cacheUpcoming.length > 0 && now - this.lastFetchTime < this.CACHE_TTL_MS) {
-      if (dateFilter) {
-        return this.cacheUpcoming.filter((f) => f.matchDate === dateFilter);
-      }
-      return this.cacheUpcoming;
-    }
-
     // 1. Primary lookup: Check local SQLite database for stored upcoming fixtures
     const sqliteUpcoming = db.getUpcomingFixtures(undefined, dateFilter);
     if (sqliteUpcoming && sqliteUpcoming.length > 0) {
-      this.cacheUpcoming = sqliteUpcoming;
-      this.lastFetchTime = now;
       return sqliteUpcoming;
     }
 
@@ -394,6 +387,12 @@ export class FlashscoreScraperService {
             ? { home: m.homeScore, away: m.awayScore }
             : undefined,
           feed_path: feedPath,
+          information: [
+            { category: 'Source', value: 'Flashscore Scraping Feed' },
+            { category: 'Country', value: m.country },
+            { category: 'Competition', value: name },
+          ],
+          statistics: m.statistics || [],
         } as any;
 
         if (m.statistics && m.statistics.length > 0) {
@@ -432,8 +431,6 @@ export class FlashscoreScraperService {
     }
 
     if (scrapedFixtures.length > 0) {
-      this.cacheUpcoming = scrapedFixtures;
-      this.lastFetchTime = now;
       // Persist to database
       await db.saveUpcomingFixtures(scrapedFixtures);
       db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
@@ -571,9 +568,6 @@ export class FlashscoreScraperService {
    * Clears in-memory caches for fresh scraping
    */
   public clearCaches(): void {
-    this.cacheUpcoming = [];
-    this.cacheH2H.clear();
-    this.cacheStandings.clear();
     this.lastFetchTime = 0;
   }
 
@@ -1032,9 +1026,10 @@ export class FlashscoreScraperService {
    */
   async getMatchHeadToHead(matchId: string, fixtureHomeTeam?: string, fixtureAwayTeam?: string): Promise<HeadToHeadMeasurement> {
     const cleanId = matchId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
-    if (this.cacheH2H.has(cleanId)) {
-      return this.cacheH2H.get(cleanId)!;
-    }
+    
+    // Check DB first
+    const existing = db.getPredictionMeasurement(cleanId);
+    if (existing) return existing;
 
     try {
       let feedText: string | null = null;
@@ -1213,7 +1208,7 @@ export class FlashscoreScraperService {
             awayRecentMatches,
           };
 
-          this.cacheH2H.set(cleanId, measurement);
+          db.savePredictionMeasurement(cleanId, measurement);
           db.savePredictionMeasurement(cleanId, measurement);
           db.savePredictionMeasurement(matchId, measurement); // Save original ID too
           db.saveH2HRecord(cleanId, measurement);
@@ -1326,7 +1321,7 @@ export class FlashscoreScraperService {
         awayRecentMatches,
       };
 
-      this.cacheH2H.set(cleanId, fallbackMeasurement);
+      db.savePredictionMeasurement(cleanId, fallbackMeasurement);
       db.savePredictionMeasurement(cleanId, fallbackMeasurement);
       return fallbackMeasurement;
     }
@@ -1347,7 +1342,7 @@ export class FlashscoreScraperService {
       homeRecentMatches: [],
       awayRecentMatches: [],
     };
-    this.cacheH2H.set(cleanId, cleanZeroH2H);
+    return cleanZeroH2H;
     return cleanZeroH2H;
   }
 
@@ -1396,8 +1391,9 @@ export class FlashscoreScraperService {
       }
     }
 
-    // 2. Check in cached H2H entries
-    for (const cached of this.cacheH2H.values()) {
+    // 2. Check DB entries
+    const allMeas = db.getAllPredictionMeasurements();
+    for (const cached of allMeas.values()) {
       if (cached.homeClub?.toLowerCase().includes(target) && cached.homeRecentMatches?.length) {
         return cached.homeRecentMatches;
       }
@@ -1609,7 +1605,6 @@ export class FlashscoreScraperService {
               table: entries,
             };
             db.saveLeagueStandings(table);
-            this.cacheStandings.set(cleanCode, { data: table, timestamp: Date.now() });
             return table;
           }
         }
@@ -1718,7 +1713,6 @@ export class FlashscoreScraperService {
             };
 
             db.saveLeagueStandings(liveTable);
-            this.cacheStandings.set(cleanCode, { data: liveTable, timestamp: Date.now() });
             return liveTable;
           }
         }
@@ -1741,12 +1735,6 @@ export class FlashscoreScraperService {
   async getLeagueStandings(leagueCode: string, _tournamentSlug?: string): Promise<LeagueStandingTable> {
     const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // 1. Check in-memory cache
-    const cached = this.cacheStandings.get(cleanCode);
-    if (cached && cached.data && Array.isArray(cached.data.table) && cached.data.table.length > 0) {
-      return cached.data;
-    }
-
     // 2. Query 100% strictly from SQLite database table
     const dbStandings = db.getLeagueStandings(cleanCode);
     if (dbStandings) {
@@ -1766,7 +1754,6 @@ export class FlashscoreScraperService {
           source: 'FLASHSCORE_SCRAPED',
           table: tableData,
         };
-        this.cacheStandings.set(cleanCode, { data: formatted, timestamp: Date.now() });
         return formatted;
       }
     }

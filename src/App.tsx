@@ -19,7 +19,6 @@ import {
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
 import { getRelativeDateStr, getPossibleDateStrs, normalizeDateStr } from './core/dateUtils.js';
-import { indexedDbClient } from './core/indexedDbClient.js';
 
 import { RefreshCw } from 'lucide-react';
 
@@ -142,25 +141,6 @@ export default function App() {
     }
   }, [theme]);
 
-  // Load cached data from IndexedDB immediately on mount for fast offline/instant rendering
-  useEffect(() => {
-    async function loadCachedIndexedDB() {
-      try {
-        const cachedFixtures = await indexedDbClient.getTodaysFixtures();
-        if (cachedFixtures && cachedFixtures.length > 0) {
-          setFixtures(cachedFixtures);
-          setIsLoadingFixtures(false);
-        }
-        const cachedScores = await indexedDbClient.getLiveScores();
-        if (cachedScores && cachedScores.length > 0) {
-          setLiveScores(cachedScores);
-        }
-      } catch (err) {
-        // Safe catch for IndexedDB initialization
-      }
-    }
-    loadCachedIndexedDB();
-  }, []);
 
   // Fetch initial fixtures and settings
   const fetchFixtures = useCallback(async () => {
@@ -168,10 +148,6 @@ export default function App() {
       setIsLoadingFixtures(true);
       const data = await EngineService.getFixtures('ALL');
       setFixtures(data);
-      if (data && data.length > 0) {
-        // Asynchronously persist to browser IndexedDB and LocalStorage
-        indexedDbClient.saveTodaysFixtures(data).catch(() => {});
-      }
 
       const todayStrs = getPossibleDateStrs(0);
       const tomorrowStrs = getPossibleDateStrs(1);
@@ -186,15 +162,8 @@ export default function App() {
       }
     } catch (e: any) {
       console.error('Failed to fetch fixtures:', e);
-      // Fallback to IndexedDB cached data if server fetch failed
-      const cached = await indexedDbClient.getTodaysFixtures();
-      if (cached && cached.length > 0) {
-        setFixtures(cached);
-        showNotification('Using cached data from IndexedDB', 'info');
-      } else {
-        showNotification('Server Error: ' + (e?.message || 'Failed to fetch fixtures from server'), 'info');
-        setFixtures([]);
-      }
+      showNotification('Server Error: ' + (e?.message || 'Failed to fetch fixtures from server'), 'info');
+      setFixtures([]);
     } finally {
       setIsLoadingFixtures(false);
     }
@@ -220,37 +189,9 @@ export default function App() {
     try {
       const scores = await EngineService.getLiveScores();
       if (!scores || !Array.isArray(scores)) return;
-
-      // Asynchronously persist to browser IndexedDB and LocalStorage
-      indexedDbClient.saveLiveScores(scores).catch(() => {});
-
-      setLiveScores((prev) => {
-        if (prev.length !== scores.length) return scores;
-        let changed = false;
-        for (let i = 0; i < scores.length; i++) {
-          const s = scores[i];
-          const p = prev[i];
-          if (
-            !p ||
-            s.fixtureId !== p.fixtureId ||
-            s.homeScore !== p.homeScore ||
-            s.awayScore !== p.awayScore ||
-            s.minute !== p.minute ||
-            s.status !== p.status
-          ) {
-            changed = true;
-            break;
-          }
-        }
-        return changed ? scores : prev;
-      });
+      setLiveScores(scores);
     } catch (e) {
-      // Non-blocking fallback to IndexedDB cached scores
-      indexedDbClient.getLiveScores().then((cached) => {
-        if (cached && cached.length > 0) {
-          setLiveScores(cached);
-        }
-      }).catch(() => {});
+      console.error('Failed to fetch live scores:', e);
     }
   }, []);
 

@@ -277,6 +277,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           ? 'h-full w-full'
           : 'w-full max-w-2xl h-[88vh] sm:h-[82vh] max-h-[850px] min-h-[540px] rounded-t-3xl sm:rounded-2xl shadow-2xl shrink-0'
       }`}
+      style={{ scrollbarGutter: 'stable' }}
     >
       {/* Mobile Drag Handle Affordance */}
       {!isPanel && (
@@ -824,9 +825,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               </span>
 
               {isLoadingH2H ? (
-                <div className="py-8 text-center text-xs text-slate-500 font-mono tabular-nums flex flex-col items-center justify-center gap-2">
-                  <div className="w-5 h-5 rounded-full border-2 border-slate-500 dark:border-[#CCFF00] border-t-transparent animate-spin shrink-0" />
-                  <span>Loading H2H record...</span>
+                <div className="space-y-1.5">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-[42px] w-full rounded-xl bg-white dark:bg-[#09090B] animate-pulse" />
+                  ))}
                 </div>
               ) : h2h.recentH2H && h2h.recentH2H.length > 0 ? (
                 <div className="space-y-1.5 font-mono tabular-nums text-xs">

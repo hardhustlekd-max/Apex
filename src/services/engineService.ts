@@ -11,7 +11,6 @@ import {
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
-import { indexedDbClient } from '../core/indexedDbClient.js';
 
 let localSettings: EngineSettings = {
   
@@ -217,9 +216,8 @@ export class EngineService {
     message?: string;
     error?: string;
   }> {
-    // Purge browser IndexedDB and LocalStorage prediction cache as the first step
+    // Purge browser LocalStorage prediction cache as the first step
     try {
-      await indexedDbClient.clearAll();
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('apex_cached_todays_fixtures');
         localStorage.removeItem('apex_cached_predictions');
@@ -329,7 +327,6 @@ export class EngineService {
   }
 
   public static async clearClientStorage(): Promise<void> {
-    await indexedDbClient.clearAll().catch(() => {});
     if (typeof localStorage !== 'undefined') {
       const theme = localStorage.getItem('theme');
       localStorage.clear();

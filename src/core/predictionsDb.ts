@@ -4,52 +4,21 @@ import { isMatchStarted } from './accumulator.js';
 import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr } from './dateUtils.js';
 import { matchesLeague } from './leagueMapper.js';
 import { sqliteDb } from './sqliteClient.js';
+import { loggerService } from '../services/loggerService.js';
 
 export class PredictionsDB {
   private isInitialized = false;
-  private memoryFallback: Map<string, Fixture> = new Map();
-  private liveMemoryFallback: Map<string, Fixture> = new Map();
-  private historyMemoryFallback: Map<string, Fixture> = new Map();
 
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      this.hydrateFromSqlite();
       console.log('[PredictionsDB] Initialized local SQLite prediction store in WAL mode.');
     } catch (err: any) {
-      console.warn('[PredictionsDB] SQLite predictions hydration note:', err?.message);
+      console.warn('[PredictionsDB] SQLite predictions initialization notice:', err?.message);
     }
 
     this.isInitialized = true;
-  }
-
-  private hydrateFromSqlite(): void {
-    try {
-      const rows = sqliteDb.prepare("SELECT full_fixture_json FROM upcoming_predictions LIMIT 2500").all() as any[];
-      for (const row of rows) {
-        if (row && row.full_fixture_json) {
-          try {
-            const parsed = JSON.parse(row.full_fixture_json) as Fixture;
-            if (parsed && parsed.id) {
-              this.memoryFallback.set(parsed.id, parsed);
-            }
-          } catch {}
-        }
-      }
-
-      const histRows = sqliteDb.prepare("SELECT full_fixture_json FROM historical_predictions LIMIT 1500").all() as any[];
-      for (const row of histRows) {
-        if (row && row.full_fixture_json) {
-          try {
-            const parsed = JSON.parse(row.full_fixture_json) as Fixture;
-            if (parsed && parsed.id) {
-              this.historyMemoryFallback.set(parsed.id, parsed);
-            }
-          } catch {}
-        }
-      }
-    } catch {}
   }
 
   /**
@@ -76,10 +45,6 @@ export class PredictionsDB {
     const upcomingToPersist: Fixture[] = [];
 
     for (const f of fixtures) {
-      if (f.id) {
-        this.memoryFallback.set(f.id, f);
-      }
-
       if (f.status === 'FINISHED') {
         finishedFixtures.push(f);
       } else {
@@ -159,6 +124,12 @@ export class PredictionsDB {
         insertMany(upcomingToPersist);
       } catch (err: any) {
         console.error('[PredictionsDB] Error persisting predictions to SQLite:', err?.message);
+        loggerService.addLog({
+          level: 'ERROR',
+          category: 'DATABASE',
+          source: 'PredictionsDB',
+          message: `Error persisting predictions: ${err?.message}`,
+        });
       }
     }
   }
@@ -182,59 +153,58 @@ export class PredictionsDB {
     endDate?: string;
     unstartedOnly?: boolean;
   }): Fixture[] {
-    const seen = new Set<string>();
-    let fixtures: Fixture[] = [];
-    for (const f of this.memoryFallback.values()) {
-      if (!f || !f.id) continue;
-      const cleanId = f.id.replace(/^fs_/, '');
-      if (seen.has(cleanId)) continue;
-      if (f.status === 'FINISHED') continue;
-      if (filters?.unstartedOnly && isMatchStarted(f)) continue;
+    try {
+      let query = "SELECT full_fixture_json FROM upcoming_predictions WHERE status != 'FINISHED'";
+      const params: any[] = [];
 
       if (filters?.league && filters.league !== 'ALL') {
-        if (!matchesLeague(f.league, f.leagueName, filters.league)) continue;
+        query += " AND UPPER(league) = ?";
+        params.push(filters.league.toUpperCase());
       }
 
       if (filters?.date) {
-        const targetDate = normalizeDateStr(filters.date);
-        if (normalizeDateStr(f.matchDate) !== targetDate) continue;
+        query += " AND match_date = ?";
+        params.push(normalizeDateStr(filters.date));
       } else if (filters?.dateFilter && filters.dateFilter !== 'ALL') {
         const todayStrs = getPossibleDateStrs(0);
         const tomorrowStrs = getPossibleDateStrs(1);
         const df = filters.dateFilter.toUpperCase();
-        const norm = normalizeDateStr(f.matchDate);
-        if (df === 'TODAY' && !todayStrs.includes(norm)) continue;
-        if (df === 'TOMORROW' && !tomorrowStrs.includes(norm)) continue;
+        
+        if (df === 'TODAY') {
+          query += ` AND match_date IN (${todayStrs.map(() => '?').join(',')})`;
+          params.push(...todayStrs);
+        } else if (df === 'TOMORROW') {
+          query += ` AND match_date IN (${tomorrowStrs.map(() => '?').join(',')})`;
+          params.push(...tomorrowStrs);
+        }
       }
 
-      seen.add(cleanId);
-      fixtures.push(f);
+      const rows = sqliteDb.prepare(query).all(...params) as any[];
+      let fixtures: Fixture[] = rows.map(r => JSON.parse(r.full_fixture_json));
+
+      if (filters?.unstartedOnly) {
+        fixtures = fixtures.filter(f => !isMatchStarted(f));
+      }
+
+      fixtures.sort((a, b) => {
+        const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
+        const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        if (a.matchDate !== b.matchDate) return (a.matchDate || '').localeCompare(b.matchDate || '');
+        return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
+      });
+
+      return fixtures;
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error getting predictions:', err?.message);
+      return [];
     }
-
-    fixtures.sort((a, b) => {
-      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      if (a.matchDate !== b.matchDate) return (a.matchDate || '').localeCompare(b.matchDate || '');
-      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-    });
-
-    return fixtures;
   }
 
   getPredictionById(fixtureId: string): Fixture | null {
     if (!fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '');
 
-    if (this.memoryFallback.has(fixtureId)) return this.memoryFallback.get(fixtureId)!;
-    if (this.memoryFallback.has(cleanId)) return this.memoryFallback.get(cleanId)!;
-    if (this.memoryFallback.has(`fs_${cleanId}`)) return this.memoryFallback.get(`fs_${cleanId}`)!;
-    if (this.liveMemoryFallback.has(fixtureId)) return this.liveMemoryFallback.get(fixtureId)!;
-    if (this.liveMemoryFallback.has(cleanId)) return this.liveMemoryFallback.get(cleanId)!;
-    if (this.historyMemoryFallback.has(fixtureId)) return this.historyMemoryFallback.get(fixtureId)!;
-    if (this.historyMemoryFallback.has(cleanId)) return this.historyMemoryFallback.get(cleanId)!;
-
-    // Check SQLite
     try {
       const row = sqliteDb.prepare(`
         SELECT full_fixture_json FROM upcoming_predictions WHERE fixture_id = ? OR fixture_id = ?
@@ -244,11 +214,11 @@ export class PredictionsDB {
       `).get(fixtureId, `fs_${cleanId}`, fixtureId, `fs_${cleanId}`) as any;
 
       if (row && row.full_fixture_json) {
-        const parsed = JSON.parse(row.full_fixture_json) as Fixture;
-        this.memoryFallback.set(fixtureId, parsed);
-        return parsed;
+        return JSON.parse(row.full_fixture_json) as Fixture;
       }
-    } catch {}
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error getting prediction by ID:', err?.message);
+    }
 
     return null;
   }
@@ -258,54 +228,40 @@ export class PredictionsDB {
   }
 
   count(): number {
-    const seen = new Set<string>();
-    for (const f of this.memoryFallback.values()) {
-      if (f && f.id) {
-        seen.add(f.id.replace(/^fs_/, ''));
-      }
+    try {
+      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM upcoming_predictions").get() as any;
+      return row ? Number(row.count) : 0;
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error counting predictions:', err?.message);
+      return 0;
     }
-    return seen.size;
   }
 
   async countAsync(): Promise<number> {
-    try {
-      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM upcoming_predictions").get() as any;
-      if (row && row.count !== undefined) {
-        return Number(row.count);
-      }
-    } catch {}
     return this.count();
   }
 
   async removePredictions(fixtureIds: string[]): Promise<void> {
     if (!fixtureIds || fixtureIds.length === 0) return;
-    for (const id of fixtureIds) {
-      const cleanId = id.replace(/^fs_/, '');
-      this.memoryFallback.delete(id);
-      this.memoryFallback.delete(cleanId);
-      this.memoryFallback.delete(`fs_${cleanId}`);
-    }
 
     try {
       const placeholders = fixtureIds.map(() => '?').join(',');
       sqliteDb.prepare(`DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`).run(...fixtureIds);
-    } catch {}
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error removing predictions:', err?.message);
+    }
   }
 
   async clearPredictions(): Promise<void> {
-    this.memoryFallback.clear();
     try {
       sqliteDb.exec('DELETE FROM upcoming_predictions;');
-    } catch {}
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error clearing predictions:', err?.message);
+    }
   }
 
   async saveLivePredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
-    for (const f of fixtures) {
-      if (f.id) {
-        this.liveMemoryFallback.set(f.id, f);
-      }
-    }
 
     try {
       const stmt = sqliteDb.prepare(`
@@ -366,31 +322,45 @@ export class PredictionsDB {
         }
       });
       insertMany(fixtures);
-    } catch {}
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error saving live predictions:', err?.message);
+    }
   }
 
   getLivePredictions(filters?: { league?: string; limit?: number }): Fixture[] {
-    let fixtures = Array.from(this.liveMemoryFallback.values());
-    if (filters?.league && filters.league !== 'ALL') {
-      fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
+    try {
+      let query = "SELECT full_fixture_json FROM live_predictions";
+      const params: any[] = [];
+      if (filters?.league && filters.league !== 'ALL') {
+        query += " WHERE UPPER(league) = ?";
+        params.push(filters.league.toUpperCase());
+      }
+      query += " ORDER BY predicted_at DESC";
+      if (filters?.limit) {
+        query += " LIMIT ?";
+        params.push(filters.limit);
+      }
+
+      const rows = sqliteDb.prepare(query).all(...params) as any[];
+      return rows.map(r => JSON.parse(r.full_fixture_json));
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error getting live predictions:', err?.message);
+      return [];
     }
-    if (filters?.limit) {
-      fixtures = fixtures.slice(0, filters.limit);
-    }
-    return fixtures;
   }
 
   countLivePredictions(): number {
-    return this.liveMemoryFallback.size;
+    try {
+      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM live_predictions").get() as any;
+      return row ? Number(row.count) : 0;
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error counting live predictions:', err?.message);
+      return 0;
+    }
   }
 
   async saveHistoricalPredictions(fixtures: Fixture[]): Promise<void> {
     if (!fixtures || fixtures.length === 0) return;
-    for (const f of fixtures) {
-      if (f.id) {
-        this.historyMemoryFallback.set(f.id, f);
-      }
-    }
 
     try {
       const stmt = sqliteDb.prepare(`
@@ -462,19 +432,35 @@ export class PredictionsDB {
       insertMany(fixtures);
     } catch (err: any) {
       console.error('[PredictionsDB] Error saving historical predictions to SQLite:', err?.message);
+      loggerService.addLog({
+        level: 'ERROR',
+        category: 'DATABASE',
+        source: 'PredictionsDB',
+        message: `Error saving historical predictions: ${err?.message}`,
+      });
     }
   }
 
   getHistoricalPredictions(filters?: { league?: string; limit?: number }): Fixture[] {
-    let fixtures = Array.from(this.historyMemoryFallback.values());
-    if (filters?.league && filters.league !== 'ALL') {
-      fixtures = fixtures.filter((f) => matchesLeague(f.league, f.leagueName, filters.league!));
+    try {
+      let query = "SELECT full_fixture_json FROM historical_predictions";
+      const params: any[] = [];
+      if (filters?.league && filters.league !== 'ALL') {
+        query += " WHERE UPPER(league) = ?";
+        params.push(filters.league.toUpperCase());
+      }
+      query += " ORDER BY match_date DESC";
+      if (filters?.limit) {
+        query += " LIMIT ?";
+        params.push(filters.limit);
+      }
+
+      const rows = sqliteDb.prepare(query).all(...params) as any[];
+      return rows.map(r => JSON.parse(r.full_fixture_json));
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error getting historical predictions:', err?.message);
+      return [];
     }
-    fixtures.sort((a, b) => (b.matchDate || '').localeCompare(a.matchDate || ''));
-    if (filters?.limit) {
-      fixtures = fixtures.slice(0, filters.limit);
-    }
-    return fixtures;
   }
 
   async getHistoricalPredictionsAsync(filters?: { league?: string; limit?: number }): Promise<Fixture[]> {
@@ -482,48 +468,46 @@ export class PredictionsDB {
   }
 
   countHistoricalPredictions(): number {
-    return this.historyMemoryFallback.size;
+    try {
+      const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM historical_predictions").get() as any;
+      return row ? Number(row.count) : 0;
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error counting historical predictions:', err?.message);
+      return 0;
+    }
   }
 
   async clearAll(): Promise<void> {
-    this.memoryFallback.clear();
-    this.liveMemoryFallback.clear();
-    this.historyMemoryFallback.clear();
-
     try {
       sqliteDb.exec(`
         DELETE FROM upcoming_predictions;
         DELETE FROM live_predictions;
         DELETE FROM historical_predictions;
       `);
-    } catch {}
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error clearing all predictions:', err?.message);
+    }
   }
 
   async reconcileStaleMatches(): Promise<void> {
     const todayStr = getRelativeDateStr(0);
-    const staleMatches: Fixture[] = [];
-    for (const [, f] of this.memoryFallback.entries()) {
-      if (f.matchDate && f.matchDate < todayStr) {
-        f.status = 'FINISHED';
-        staleMatches.push(f);
-      }
-    }
+    try {
+      const rows = sqliteDb.prepare("SELECT full_fixture_json FROM upcoming_predictions WHERE match_date < ?").all(todayStr) as any[];
+      if (rows.length > 0) {
+        const staleMatches = rows.map(r => {
+          const f = JSON.parse(r.full_fixture_json) as Fixture;
+          f.status = 'FINISHED';
+          return f;
+        });
 
-    if (staleMatches.length > 0) {
-      await this.saveHistoricalPredictions(staleMatches);
-      for (const m of staleMatches) {
-        this.memoryFallback.delete(m.id);
-        const cleanId = m.id.replace(/^fs_/, '');
-        this.memoryFallback.delete(cleanId);
-        this.memoryFallback.delete(`fs_${cleanId}`);
-      }
-
-      try {
+        await this.saveHistoricalPredictions(staleMatches);
         const placeholders = staleMatches.map(() => '?').join(',');
         sqliteDb.prepare(`DELETE FROM upcoming_predictions WHERE fixture_id IN (${placeholders})`).run(
           ...staleMatches.map((m) => m.id)
         );
-      } catch {}
+      }
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error reconciling stale matches:', err?.message);
     }
   }
 }
