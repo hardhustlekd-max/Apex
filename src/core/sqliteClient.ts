@@ -374,6 +374,25 @@ export function initSqliteSchema(): void {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
 
+    // Schema Migration: Ensure upcoming_predictions has full_fixture_json and other recent columns
+    try {
+      const columns = db.prepare("PRAGMA table_info(upcoming_predictions)").all() as any[];
+      const columnNames = columns.map(c => c.name);
+      
+      if (columnNames.length > 0) {
+        if (!columnNames.includes('full_fixture_json')) {
+          console.log('[SQLite] Migrating upcoming_predictions: Adding full_fixture_json column');
+          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN full_fixture_json TEXT;");
+        }
+        if (!columnNames.includes('is_banker')) {
+          console.log('[SQLite] Migrating upcoming_predictions: Adding is_banker column');
+          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN is_banker INTEGER DEFAULT 0;");
+        }
+      }
+    } catch (migErr: any) {
+      console.warn('[SQLite] Migration note for upcoming_predictions:', migErr?.message);
+    }
+
     // Ensure flashscore_scraped_matches also has these columns
     try {
       const columns = db.prepare("PRAGMA table_info(flashscore_scraped_matches)").all() as any[];

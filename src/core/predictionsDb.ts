@@ -129,7 +129,9 @@ export class PredictionsDB {
           category: 'DATABASE',
           source: 'PredictionsDB',
           message: `Error persisting predictions: ${err?.message}`,
+          details: { count: upcomingToPersist.length, firstId: upcomingToPersist[0]?.id },
         });
+        throw err; // Re-throw to let caller handle it
       }
     }
   }

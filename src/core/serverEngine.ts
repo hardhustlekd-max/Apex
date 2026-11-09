@@ -369,9 +369,15 @@ export class ServerEngine {
     }
 
     const roundedScore = Number(score.toFixed(2));
+    const isEligible = roundedScore >= 0.90;
+
+    if (!isEligible && fixture.id) {
+      console.warn(`[ServerEngine] Match ${fixture.id} (${fixture.homeTeam} vs ${fixture.awayTeam}) ineligible for prediction: score ${roundedScore}, missing: ${missingFields.join(', ')}`);
+    }
+
     return {
       score: roundedScore,
-      isEligible: roundedScore >= 0.90,
+      isEligible,
       missingFields,
     };
   }
@@ -400,6 +406,8 @@ export class ServerEngine {
 
     const allMatches = this.getUnifiedHistoricalUniverse();
     const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+
+    console.log(`[ServerEngine] Recalculating with ${allMatches.length} historical matches in universe.`);
 
     const scrapedMap = new Map<string, any>();
     for (const sm of scrapedMatches) {
@@ -482,20 +490,34 @@ export class ServerEngine {
       }
 
       if (predictedChunk.length > 0) {
-        await db.saveUpcomingFixtures(predictedChunk);
         try {
+          await db.saveUpcomingFixtures(predictedChunk);
           await predictionsDb.savePredictions(predictedChunk);
-        } catch {}
+        } catch (saveErr: any) {
+          loggerService.addLog({
+            level: 'ERROR',
+            category: 'DATABASE',
+            source: 'ServerEngine',
+            message: `Failed to save chunk of ${predictedChunk.length} predictions: ${saveErr?.message}`,
+          });
+          console.error('[ServerEngine] Prediction save error:', saveErr);
+        }
       }
 
       if (unpredictedChunk.length > 0) {
-        await db.saveUpcomingFixtures(unpredictedChunk);
+        try {
+          await db.saveUpcomingFixtures(unpredictedChunk);
+        } catch (err) {
+          console.warn('[ServerEngine] Failed to update upcoming_fixtures for unpredicted chunk:', err);
+        }
       }
 
       if (skippedIds.length > 0) {
         try {
           await predictionsDb.removePredictions(skippedIds);
-        } catch {}
+        } catch (err) {
+          console.warn('[ServerEngine] Failed to remove stale predictions for skipped IDs:', err);
+        }
       }
 
       processed += chunk.length;

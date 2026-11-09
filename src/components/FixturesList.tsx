@@ -16,7 +16,9 @@ import { getSlugForCode, getCodeForSlug, matchesLeague } from '../core/leagueMap
 interface FixturesListProps {
   fixtures: Fixture[];
   liveScores?: LiveScore[];
+  livePredictions?: Fixture[];
   isLoading: boolean;
+  isLoadingLive?: boolean;
   onSelectDetail: (fixture: Fixture) => void;
   selectedLeague: string;
   onSelectLeague: (league: string) => void;
@@ -59,7 +61,9 @@ function getAwayProb(fixture: Fixture): number {
 export const FixturesList: React.FC<FixturesListProps> = ({
   fixtures,
   liveScores,
+  livePredictions = [],
   isLoading,
+  isLoadingLive = false,
   onSelectDetail,
   selectedLeague,
   onSelectLeague,
@@ -81,9 +85,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 }) => {
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [historyFixtures, setHistoryFixtures] = useState<Fixture[]>([]);
-  const [livePredictionsFixtures, setLivePredictionsFixtures] = useState<Fixture[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
-  const [isLoadingLive, setIsLoadingLive] = useState<boolean>(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -161,55 +163,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     return datasetDates[datasetDates.length - 1] || localToday;
   }, [fixtures, datasetDates]);
 
-  const hasLoadedLiveRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    hasLoadedLiveRef.current = false;
-  }, [selectedLeague]);
-
-  // Load predictions for live games directly from predictions db without periodic reload flicker
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function fetchLivePredictions(showSpinner: boolean) {
-      try {
-        if (showSpinner) {
-          setIsLoadingLive(true);
-        }
-        const data = await EngineService.getLivePredictions(selectedLeague, 100);
-        if (!isCancelled) {
-          setLivePredictionsFixtures(data || []);
-          hasLoadedLiveRef.current = true;
-        }
-      } catch (err) {
-        console.error('Failed to load live predictions from db:', err);
-      } finally {
-        if (!isCancelled && showSpinner) {
-          setIsLoadingLive(false);
-        }
-      }
-    }
-
-    if (activeScope === 'LIVE') {
-      const needsInitialSpinner = !hasLoadedLiveRef.current && livePredictionsFixtures.length === 0;
-      fetchLivePredictions(needsInitialSpinner);
-
-      // Silent background polling every 60s that never toggles isLoadingLive or flashes the UI
-      const timer = setInterval(() => {
-        fetchLivePredictions(false);
-      }, 60000);
-
-      return () => {
-        isCancelled = true;
-        clearInterval(timer);
-      };
-    }
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [activeScope, selectedLeague]);
-
   // Load history predictions from predictions db when history tab is active or selected league changes
   useEffect(() => {
     let isCancelled = false;
@@ -238,10 +191,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     };
   }, [activeScope, selectedLeague]);
 
-  const getOffsetDate = (offsetDays: number) => {
-    return getLocalDateStr(offsetDays);
-  };
-
   const uniqueFixtures = useMemo(() => {
     const seen = new Set<string>();
     return fixtures.filter((f) => {
@@ -251,19 +200,33 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     });
   }, [fixtures]);
 
+  // Create a fast lookup set for live IDs to filter upcoming
+  const liveIdSet = useMemo(() => {
+    const set = new Set<string>();
+    if (liveScores) {
+      liveScores.forEach(s => {
+        set.add(s.fixtureId);
+        set.add(`fs_${s.fixtureId}`);
+      });
+    }
+    return set;
+  }, [liveScores]);
+
   const filteredUpcomingFixtures = useMemo(() => {
     const todayStrs = getPossibleDateStrs(0);
     const tomorrowStrs = getPossibleDateStrs(1);
     const day2Strs = getPossibleDateStrs(2);
     const day3Strs = getPossibleDateStrs(3);
-    const next3Max = getLocalDateStr(2);
     const weekMax = getLocalDateStr(6);
 
     let matches = uniqueFixtures.filter((f) => {
+      // 1. FILTER OUT LIVE MATCHES
+      if (f.status === 'LIVE' || liveIdSet.has(f.id)) return false;
+
       const matchDateNorm = normalizeDateStr(f.matchDate);
       const localMatchDateNorm = normalizeDateStr(getFixtureLocalDate(f));
 
-      // Date filtering matching Flashscore UTC standard dates or local dates
+      // Date filtering
       if (dateFilter === 'TODAY') {
         if (!todayStrs.includes(matchDateNorm) && !todayStrs.includes(localMatchDateNorm) && matchDateNorm !== baseToday) return false;
       } else if (dateFilter === 'TOMORROW') {
@@ -282,7 +245,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           (localMatchDateNorm >= todayStrs[0] && localMatchDateNorm <= weekMax);
         if (!inWeek) return false;
       } else if (dateFilter !== 'ALL') {
-        // Specific calendar date filter
         const targetDate = normalizeDateStr(dateFilter);
         if (matchDateNorm !== targetDate && localMatchDateNorm !== targetDate) return false;
       }
@@ -299,9 +261,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         if (!matchName.includes(query)) return false;
       }
 
-      // Exclude live matches from upcoming list
-      if (f.status === 'LIVE') return false;
-
       return true;
     });
 
@@ -312,44 +271,39 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       if (a.matchDate !== b.matchDate) return a.matchDate.localeCompare(b.matchDate);
       return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
     });
-  }, [fixtures, uniqueFixtures, dateFilter, selectedLeague, searchQuery, baseToday]);
+  }, [uniqueFixtures, liveIdSet, dateFilter, selectedLeague, searchQuery, baseToday]);
 
   const liveFixtures: Fixture[] = useMemo(() => {
-    // 1. Predictions loaded directly from separate predictions db
-    const fromPredictionsDb = livePredictionsFixtures || [];
+    if (!liveScores || liveScores.length === 0) return [];
 
-      // 2. Fixtures present in upcoming that are NOT marked LIVE (handled by liveFromScores)
-    const liveFromFixtures = uniqueFixtures.filter((f) => f.status === 'LIVE');
-
-    // 3. Fixtures derived from active live scores
-    const liveFromScores: Fixture[] = (liveScores || []).map((s) => {
-      const matchInPredictionsDb = fromPredictionsDb.find(
+    // The source of truth for "which matches are live" is the liveScores feed from provider
+    const combined: Fixture[] = liveScores.map((s) => {
+      // Find matching prediction data passed from App
+      const matchInPredictions = livePredictions.find(
         (f) => f.id === s.fixtureId || f.id === `fs_${s.fixtureId}` || f.id.replace('fs_', '') === s.fixtureId
       );
-      if (matchInPredictionsDb) {
-        return {
-          ...matchInPredictionsDb,
-          minute: s.minute,
-          score: { home: s.homeScore, away: s.awayScore },
-          kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
-        };
-      }
-
+      
+      // Find matching fixture in upcoming (in case prediction not found yet)
       const matchInUpcoming = uniqueFixtures.find(
         (f) => f.id === s.fixtureId || f.id === `fs_${s.fixtureId}` || f.id.replace('fs_', '') === s.fixtureId
       );
-      if (matchInUpcoming) {
+
+      const base = matchInPredictions || matchInUpcoming;
+
+      if (base) {
         return {
-          ...matchInUpcoming,
+          ...base,
           status: 'LIVE' as const,
           minute: s.minute,
           score: { home: s.homeScore, away: s.awayScore },
           kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         };
       }
+
+      // Fallback for live matches not in our local DB yet
       const defaultOdds = { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 };
       return {
-        id: s.fixtureId,
+        id: s.fixtureId.startsWith('fs_') ? s.fixtureId : `fs_${s.fixtureId}`,
         providerId: 'FLASHSCORE',
         league: s.league || 'ALL',
         leagueName: s.leagueName || 'Live In-Play',
@@ -364,16 +318,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       };
     });
 
-    const seen = new Set<string>();
-    const combined: Fixture[] = [];
-    // Prioritize liveFromScores so updated score and minute take precedence, then fromPredictionsDb, then liveFromFixtures
-    for (const f of [...liveFromScores, ...fromPredictionsDb, ...liveFromFixtures]) {
-      if (!seen.has(f.id)) {
-        seen.add(f.id);
-        combined.push(f);
-      }
-    }
-
     combined.sort((a, b) => {
       const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
       const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
@@ -382,7 +326,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     });
 
     return combined;
-  }, [livePredictionsFixtures, uniqueFixtures, liveScores, baseToday]);
+  }, [liveScores, livePredictions, uniqueFixtures, baseToday]);
 
   const displayedFixtures = useMemo(() => {
     const applySort = (list: Fixture[]) => {
@@ -426,17 +370,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           return true;
         })
         .sort((a, b) => {
-          // Primary: Date Descending (Newest dates first)
           const dateA = normalizeDateStr(a.matchDate);
           const dateB = normalizeDateStr(b.matchDate);
           if (dateA !== dateB) return dateB.localeCompare(dateA);
-
-          // Secondary: League Priority (Major leagues top within that date)
           const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
           const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
           if (priorityA !== priorityB) return priorityA - priorityB;
-
-          // Tertiary: Time Descending
           const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
           const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
           return timeB.localeCompare(timeA);

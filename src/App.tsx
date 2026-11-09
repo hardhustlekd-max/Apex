@@ -47,6 +47,8 @@ export default function App() {
     leagues: [],
   });
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
+  const [livePredictions, setLivePredictions] = useState<Fixture[]>([]);
+  const [isLoadingLivePredictions, setIsLoadingLivePredictions] = useState<boolean>(false);
 
   // Modals & Detail
   const [selectedDetailFixture, setSelectedDetailFixture] = useState<Fixture | null>(null);
@@ -104,6 +106,7 @@ export default function App() {
           fetchFixtures(),
           fetchSettingsAndProviders(),
           fetchLiveScores(),
+          fetchLivePredictions(),
         ]);
         showNotification(res.message || 'Full data, historical archives, upcoming feeds, and H2H records synchronized!', 'success');
       } else {
@@ -195,6 +198,18 @@ export default function App() {
     }
   }, []);
 
+  const fetchLivePredictions = useCallback(async () => {
+    try {
+      setIsLoadingLivePredictions(true);
+      const data = await EngineService.getLivePredictions(selectedLeague, 100);
+      setLivePredictions(data || []);
+    } catch (err) {
+      console.error('Failed to load live predictions from db:', err);
+    } finally {
+      setIsLoadingLivePredictions(false);
+    }
+  }, [selectedLeague]);
+
   const checkActiveSyncJob = useCallback(async () => {
     try {
       const active = await EngineService.getActiveSyncJob();
@@ -203,7 +218,7 @@ export default function App() {
       } else if (activeSyncJob && (activeSyncJob.status === 'RUNNING' || activeSyncJob.status === 'PENDING')) {
         setActiveSyncJob(null);
         setIsSyncingData(false);
-        await Promise.all([fetchFixtures(), fetchSettingsAndProviders(), fetchLiveScores()]);
+        await Promise.all([fetchFixtures(), fetchSettingsAndProviders(), fetchLiveScores(), fetchLivePredictions()]);
         showNotification('Synchronization & prediction recalculation complete!', 'success');
       } else {
         setActiveSyncJob(null);
@@ -217,14 +232,18 @@ export default function App() {
     fetchSettingsAndProviders();
     fetchFixtures();
     fetchLiveScores();
+    fetchLivePredictions();
 
     // Adaptive polling: 15s for live scores
     const liveInterval = setInterval(fetchLiveScores, 15000);
+    // Predictions update less frequently (every 1 min)
+    const predInterval = setInterval(fetchLivePredictions, 60000);
 
     return () => {
       clearInterval(liveInterval);
+      clearInterval(predInterval);
     };
-  }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores]);
+  }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores, fetchLivePredictions]);
 
   const handleSelectLeague = (league: string) => {
     setSelectedLeague(league);
@@ -256,7 +275,8 @@ export default function App() {
     await Promise.all([
       fetchSettingsAndProviders(),
       fetchFixtures(),
-      fetchLiveScores()
+      fetchLiveScores(),
+      fetchLivePredictions()
     ]);
   };
 
@@ -357,7 +377,9 @@ export default function App() {
                     <FixturesList
                       fixtures={fixtures}
                       liveScores={liveScores}
+                      livePredictions={livePredictions}
                       isLoading={isLoadingFixtures}
+                      isLoadingLive={isLoadingLivePredictions}
                       onSelectDetail={handleSelectFixture}
                       selectedLeague={selectedLeague}
                       onSelectLeague={setSelectedLeague}
