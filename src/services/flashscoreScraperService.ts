@@ -297,16 +297,27 @@ export class FlashscoreScraperService {
    */
   private mapToLeagueCode(tournament: string, country: string): { code: LeagueCode; name: string } {
     const cleanedTournament = tournament.replace(/^[A-Z\s]+:\s*/, '').trim();
+    
+    // Attempt lookup in Global Leagues Dataset
+    const match = GLOBAL_LEAGUES_DATASET.find(l => 
+        l.name.toLowerCase().includes(cleanedTournament.toLowerCase()) && 
+        (l.country?.toLowerCase() === country.toLowerCase() || country.toLowerCase() === 'international')
+    );
+
+    if (match) {
+        return { code: match.code as LeagueCode, name: match.name };
+    }
+
     const countryPrefix = country ? country.trim() : 'International';
     
-    // Generate native Flashscore naming/slug code e.g. "england_premier_league", "spain_la_liga"
+    // Fallback: Generate native Flashscore naming/slug code
     const nativeCode = `${countryPrefix}_${cleanedTournament}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
 
     const name = country ? `${country}: ${cleanedTournament}` : cleanedTournament;
-    return { code: nativeCode, name };
+    return { code: nativeCode as LeagueCode, name };
   }
 
   /**
@@ -338,95 +349,98 @@ export class FlashscoreScraperService {
     const scrapedMatchesForDb: any[] = [];
     const seenMatchIds = new Set<string>();
 
-    // Scrape Day 0 (today), Day 1 (tomorrow), Day 2, and Day 3 to cover next days and this week
-    const dayOffsets = [0, 1, 2, 3];
+    // Scrape Day 0 (today) through Day 9 to cover a broader range, using multiple feed types (1, 2, 3)
+    const dayOffsets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const feedTypes = [1, 2, 3];
 
     for (const offset of dayOffsets) {
-      const feedPath = `f_1_${offset}_3_en_1`;
-      const feedText = await this.fetchAndPersistRawFeed(feedPath);
-      if (!feedText) continue;
+      for (const type of feedTypes) {
+        const feedPath = `f_1_${offset}_${type}_en_1`;
+        const feedText = await this.fetchAndPersistRawFeed(feedPath);
+        if (!feedText) continue;
 
-      const rawMatches = parseFeedText(feedText);
+        const rawMatches = parseFeedText(feedText);
 
-      for (const m of rawMatches) {
-        // Feed already persisted via fetchAndPersistRawFeed(feedPath)
+        for (const m of rawMatches) {
+          // Feed already persisted via fetchAndPersistRawFeed(feedPath)
 
-        // Skip finished matches for upcoming fixtures view
-        if (m.statusCode === '3') continue;
+          // Skip finished matches for upcoming fixtures view
+          if (m.statusCode === '3') continue;
 
-        // Guarantee unique fixture ID
-        if (seenMatchIds.has(m.matchId)) continue;
-        seenMatchIds.add(m.matchId);
+          // Guarantee unique fixture ID
+          if (seenMatchIds.has(m.matchId)) continue;
+          seenMatchIds.add(m.matchId);
 
-        const matchDateObj = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
-        const dateStr = normalizeDateStr(matchDateObj.toISOString().slice(0, 10));
-        const hours = String(matchDateObj.getUTCHours()).padStart(2, '0');
-        const minutes = String(matchDateObj.getUTCMinutes()).padStart(2, '0');
-        const kickOffTime = `${hours}:${minutes}`;
+          const matchDateObj = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
+          const dateStr = normalizeDateStr(matchDateObj.toISOString().slice(0, 10));
+          const hours = String(matchDateObj.getUTCHours()).padStart(2, '0');
+          const minutes = String(matchDateObj.getUTCMinutes()).padStart(2, '0');
+          const kickOffTime = `${hours}:${minutes}`;
 
-        const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
-        const odds = this.generateMatchOdds();
+          const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
+          const odds = this.generateMatchOdds();
 
-        const isLive = m.statusCode === '2';
-        const fixture: Fixture = {
-          id: `fs_${m.matchId}`,
-          providerId: 'FLASHSCORE',
-          league: code,
-          leagueName: name,
-          matchDate: dateStr,
-          kickOffTime,
-          timestamp: m.timestamp,
-          homeTeam: m.homeTeam,
-          awayTeam: m.awayTeam,
-          homeBadge: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
-          awayBadge: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
-          status: isLive ? 'LIVE' : 'SCHEDULED',
-          stage: m.tournament,
-          odds,
-          score: (m.homeScore !== undefined && m.awayScore !== undefined)
-            ? { home: m.homeScore, away: m.awayScore }
-            : undefined,
-          feed_path: feedPath,
-          information: [
-            { category: 'Source', value: 'Flashscore Scraping Feed' },
-            { category: 'Country', value: m.country },
-            { category: 'Competition', value: name },
-          ],
-          statistics: m.statistics || [],
-        } as any;
+          const isLive = m.statusCode === '2';
+          const fixture: Fixture = {
+            id: `fs_${m.matchId}`,
+            providerId: 'FLASHSCORE',
+            league: code,
+            leagueName: name,
+            matchDate: dateStr,
+            kickOffTime,
+            timestamp: m.timestamp,
+            homeTeam: m.homeTeam,
+            awayTeam: m.awayTeam,
+            homeBadge: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
+            awayBadge: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
+            status: isLive ? 'LIVE' : 'SCHEDULED',
+            stage: m.tournament,
+            odds,
+            score: (m.homeScore !== undefined && m.awayScore !== undefined)
+              ? { home: m.homeScore, away: m.awayScore }
+              : undefined,
+            feed_path: feedPath,
+            information: [
+              { category: 'Source', value: 'Flashscore Scraping Feed' },
+              { category: 'Country', value: m.country },
+              { category: 'Competition', value: name },
+            ],
+            statistics: m.statistics || [],
+          } as any;
 
-        if (m.statistics && m.statistics.length > 0) {
-          db.saveMatchStatistics(m.matchId, m.statistics);
+          if (m.statistics && m.statistics.length > 0) {
+            db.saveMatchStatistics(m.matchId, m.statistics);
+          }
+
+          scrapedFixtures.push(fixture);
+
+          scrapedMatchesForDb.push({
+            matchId: m.matchId,
+            stage: m.tournament,
+            status: isLive ? 'LIVE' : 'SCHEDULED',
+            date: `${dateStr} ${kickOffTime}`,
+            country: m.country,
+            leagueName: name,
+            home: {
+              name: m.homeTeam,
+              image: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
+            },
+            away: {
+              name: m.awayTeam,
+              image: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
+            },
+            result: {
+              home: m.homeScore !== undefined ? String(m.homeScore) : undefined,
+              away: m.awayScore !== undefined ? String(m.awayScore) : undefined,
+            },
+            information: [
+              { category: 'Source', value: 'Flashscore Scraping Feed' },
+              { category: 'Country', value: m.country },
+              { category: 'Competition', value: name },
+            ],
+            statistics: [],
+          });
         }
-
-        scrapedFixtures.push(fixture);
-
-        scrapedMatchesForDb.push({
-          matchId: m.matchId,
-          stage: m.tournament,
-          status: isLive ? 'LIVE' : 'SCHEDULED',
-          date: `${dateStr} ${kickOffTime}`,
-          country: m.country,
-          leagueName: name,
-          home: {
-            name: m.homeTeam,
-            image: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
-          },
-          away: {
-            name: m.awayTeam,
-            image: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
-          },
-          result: {
-            home: m.homeScore !== undefined ? String(m.homeScore) : undefined,
-            away: m.awayScore !== undefined ? String(m.awayScore) : undefined,
-          },
-          information: [
-            { category: 'Source', value: 'Flashscore Scraping Feed' },
-            { category: 'Country', value: m.country },
-            { category: 'Competition', value: name },
-          ],
-          statistics: [],
-        });
       }
     }
 
@@ -890,7 +904,7 @@ export class FlashscoreScraperService {
       }
     }
 
-    // Scrape multi-year completed season results for the last 2 complete seasons across global leagues
+    // Expanded multi-year completed season results for the last 3 complete seasons across global leagues
     const tournamentPages = [
       { path: '/football/england/premier-league/results/', code: 'england_premier_league' },
       { path: '/football/spain/laliga/results/', code: 'spain_la_liga' },
@@ -904,11 +918,30 @@ export class FlashscoreScraperService {
       { path: '/football/portugal/liga-portugal/results/', code: 'portugal_primeira_liga' },
       { path: '/football/brazil/serie-a/results/', code: 'brazil_serie_a' },
       { path: '/football/usa/mls/results/', code: 'usa_major_league_soccer' },
+      { path: '/football/germany/2-bundesliga/results/', code: 'germany_2_bundesliga' },
+      { path: '/football/france/ligue-2/results/', code: 'france_ligue_2' },
+      { path: '/football/italy/serie-b/results/', code: 'italy_serie_b' },
+      { path: '/football/spain/laliga2/results/', code: 'spain_la_liga_2' },
+      { path: '/football/turkey/super-lig/results/', code: 'turkey_super_lig' },
+      { path: '/football/belgium/jupiler-pro-league/results/', code: 'belgium_jupiler_pro_league' },
+      { path: '/football/scotland/premiership/results/', code: 'scotland_premiership' },
+      { path: '/football/austria/bundesliga/results/', code: 'austria_bundesliga' },
+      { path: '/football/switzerland/super-league/results/', code: 'switzerland_super_league' },
+      { path: '/football/denmark/superliga/results/', code: 'denmark_superliga' },
+      { path: '/football/norway/eliteserien/results/', code: 'norway_eliteserien' },
+      { path: '/football/sweden/allsvenskan/results/', code: 'sweden_allsvenskan' },
+      { path: '/football/greece/super-league/results/', code: 'greece_super_league' },
+      { path: '/football/poland/ekstraklasa/results/', code: 'poland_ekstraklasa' },
+      { path: '/football/mexico/liga-mx/results/', code: 'mexico_liga_mx' },
+      { path: '/football/argentina/liga-profesional/results/', code: 'argentina_liga_profesional' },
+      { path: '/football/japan/j1-league/results/', code: 'japan_j1_league' },
+      { path: '/football/south-korea/k-league-1/results/', code: 'south_korea_k_league_1' },
+      { path: '/football/saudi-arabia/saudi-professional-league/results/', code: 'saudi_arabia_saudi_professional_league' },
     ];
 
     await Promise.allSettled(
       tournamentPages.map(async (t) => {
-        const archivedMatches = await this.scrapeLeagueArchive(t.path, t.code, 2);
+        const archivedMatches = await this.scrapeLeagueArchive(t.path, t.code, 3);
         for (const am of archivedMatches) {
           if (!seenHistIds.has(am.id)) {
             seenHistIds.add(am.id);
@@ -921,7 +954,7 @@ export class FlashscoreScraperService {
     if (historicalMatches.length > 0) {
       inserted = db.insertHistoricalMatches(historicalMatches);
     }
-    const allStoredHistorical = db.getAllHistoricalMatches(1500);
+    const allStoredHistorical = db.getAllHistoricalMatches(5000);
     if (allStoredHistorical.length > 0) {
       const converted = allStoredHistorical.map((m) => convertHistoricalMatchToFixture(m));
       await predictionsDb.saveHistoricalPredictions(converted);
@@ -944,6 +977,25 @@ export class FlashscoreScraperService {
       'portugal_primeira_liga',
       'brazil_serie_a',
       'usa_major_league_soccer',
+      'germany_2_bundesliga',
+      'france_ligue_2',
+      'italy_serie_b',
+      'spain_la_liga_2',
+      'turkey_super_lig',
+      'belgium_jupiler_pro_league',
+      'scotland_premiership',
+      'austria_bundesliga',
+      'switzerland_super_league',
+      'denmark_superliga',
+      'norway_eliteserien',
+      'sweden_allsvenskan',
+      'greece_super_league',
+      'poland_ekstraklasa',
+      'mexico_liga_mx',
+      'argentina_liga_profesional',
+      'japan_j1_league',
+      'south_korea_k_league_1',
+      'saudi_arabia_saudi_professional_league',
     ];
     await Promise.allSettled(popularLeagues.map((code) => this.fetchAndSaveLeagueStandings(code)));
 
@@ -959,7 +1011,7 @@ export class FlashscoreScraperService {
    */
   async getMatchData(matchId: string): Promise<FlashscoreScrapedMatch | null> {
     const cleanId = matchId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
-    const matches = db.getFlashscoreScrapedMatches(500);
+    const matches = db.getFlashscoreScrapedMatches(1000);
     const existing = matches.find((m) => m.matchId === matchId || m.matchId === cleanId || `fs_${m.matchId}` === matchId);
     if (existing) {
       return existing;

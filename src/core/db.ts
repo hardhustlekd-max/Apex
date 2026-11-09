@@ -331,7 +331,7 @@ export class FootballDB {
         }
       }
 
-      query += " ORDER BY match_date ASC, kick_off_time ASC LIMIT 1000";
+      query += " ORDER BY match_date ASC, kick_off_time ASC LIMIT 5000";
 
       const rows = sqliteDb.prepare(query).all(...params) as any[];
       return rows.map((row) => ({
@@ -433,7 +433,7 @@ export class FootballDB {
     }
   }
 
-  getAllHistoricalMatches(limit = 1500): HistoricalMatch[] {
+  getAllHistoricalMatches(limit = 5000): HistoricalMatch[] {
     try {
       const rows = sqliteDb.prepare(`
         SELECT * FROM historical_matches 
@@ -591,7 +591,7 @@ export class FootballDB {
     }
   }
 
-  getFlashscoreScrapedMatches(limit = 100): any[] {
+  getFlashscoreScrapedMatches(limit = 1000): any[] {
     try {
       const rows = sqliteDb.prepare("SELECT * FROM flashscore_scraped_matches ORDER BY scraped_at DESC LIMIT ?").all(limit) as any[];
       return rows.map(row => ({

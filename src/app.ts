@@ -18,16 +18,6 @@ export function createApp(): Express {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // Middleware to ensure DB is initialized on incoming requests
-  app.use(async (_req, _res, next) => {
-    try {
-      await db.init();
-      await predictionsDb.init();
-      next();
-    } catch (err) {
-      next(err);
-    }
-  });
 
   // Health check endpoint
   const healthHandler = (_req: express.Request, res: express.Response) => {

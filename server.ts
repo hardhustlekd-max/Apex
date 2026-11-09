@@ -17,15 +17,6 @@ async function startServer() {
     console.warn('predictionsDb init notice:', err);
   }
 
-  // Initialize database tables on server start (strictly no fake/fallback seeding)
-  (async () => {
-    try {
-      await db.init();
-      await predictionsDb.init();
-    } catch (err: any) {
-      console.warn('Database init notice:', err?.message);
-    }
-  })();
 
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {

@@ -13,11 +13,12 @@ function createRawDbInstance(): Database.Database {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  const db = new Database(DB_PATH);
+  const db = new Database(DB_PATH, { timeout: 10000 });
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('temp_store = MEMORY');
   db.pragma('cache_size = -64000'); // 64 MB memory page cache
+  db.pragma('wal_autocheckpoint = 1000');
   db.pragma('foreign_keys = ON');
   return db;
 }
@@ -28,6 +29,9 @@ function createRawDbInstance(): Database.Database {
 export function resetCorruptedSqliteDb(): Database.Database {
   console.warn('[SQLite] Resetting malformed or corrupted database file...');
   if (rawDbInstance) {
+    try {
+      rawDbInstance.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {}
     try {
       rawDbInstance.close();
     } catch {}
@@ -49,7 +53,7 @@ export function resetCorruptedSqliteDb(): Database.Database {
 }
 
 /**
- * Verifies SQLite B-Tree integrity on disk and resets if malformed
+ * Verifies SQLite B-Tree integrity on disk and resets only if confirmed unrecoverable
  */
 export function checkAndRepairSqliteIntegrity(dbInstance?: Database.Database): boolean {
   try {
@@ -58,13 +62,17 @@ export function checkAndRepairSqliteIntegrity(dbInstance?: Database.Database): b
     const resultStr = String(row?.integrity_check || '');
     if (resultStr !== 'ok') {
       console.warn('[SQLite] Integrity check failed:', resultStr.slice(0, 120));
-      resetCorruptedSqliteDb();
+      try {
+        fs.appendFileSync('sqlite_debug.log', `[${new Date().toISOString()}] Integrity check failed: ${resultStr}\n`);
+      } catch {}
       return false;
     }
     return true;
   } catch (err: any) {
     console.warn('[SQLite] Exception during integrity check:', err?.message);
-    resetCorruptedSqliteDb();
+    try {
+      fs.appendFileSync('sqlite_debug.log', `[${new Date().toISOString()}] Exception during integrity check: ${err?.message}\n`);
+    } catch {}
     return false;
   }
 }
@@ -88,7 +96,7 @@ export function getSqliteDb(): Database.Database {
 }
 
 /**
- * Proxy wrapper for sqliteDb that transparently auto-recovers on disk corruption or malformed image errors
+ * Proxy wrapper for sqliteDb
  */
 export const sqliteDb: Database.Database = new Proxy({} as any, {
   get(_target, prop, receiver) {
@@ -97,20 +105,7 @@ export const sqliteDb: Database.Database = new Proxy({} as any, {
 
     if (typeof value === 'function') {
       return function (...args: any[]) {
-        try {
-          return value.apply(db, args);
-        } catch (err: any) {
-          const msg = String(err?.message || '').toLowerCase();
-          if (msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk image')) {
-            console.error('[SQLite] Malformed database error detected:', err?.message);
-            const freshDb = resetCorruptedSqliteDb();
-            const freshMethod = (freshDb as any)[prop];
-            if (typeof freshMethod === 'function') {
-              return freshMethod.apply(freshDb, args);
-            }
-          }
-          throw err;
-        }
+        return value.apply(db, args);
       };
     }
     return value;
@@ -349,10 +344,14 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
   `);
 }
 
+let isSchemaInitialized = false;
+
 /**
  * Initializes all database tables and indexes for the unified 5-Pillar Football Engine
  */
 export function initSqliteSchema(): void {
+  if (isSchemaInitialized && rawDbInstance) return;
+
   try {
     const db = getSqliteDb();
     initSqliteSchemaInternal(db);
@@ -405,10 +404,9 @@ export function initSqliteSchema(): void {
       }
     } catch {}
 
-    checkAndRepairSqliteIntegrity(db);
+    isSchemaInitialized = true;
   } catch (err: any) {
-    console.warn('[SQLite] Error during schema init, auto-recovering clean database:', err?.message);
-    resetCorruptedSqliteDb();
+    console.warn('[SQLite] Error during schema init:', err?.message);
   }
 }
 
@@ -488,11 +486,29 @@ export function getSqliteDbStats(): {
   };
 }
 
-// Clean process exit handler to flush WAL and close DB handles cleanly
-process.on('exit', () => {
+export function closeSqliteDb(): void {
   if (rawDbInstance) {
     try {
+      rawDbInstance.pragma('wal_checkpoint(TRUNCATE)');
       rawDbInstance.close();
-    } catch {}
+    } catch (err: any) {
+      console.warn('[SQLite] Notice closing database:', err?.message);
+    }
+    rawDbInstance = null;
   }
+}
+
+// Process exit handlers to flush WAL and close DB handles cleanly
+process.on('SIGINT', () => {
+  closeSqliteDb();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  closeSqliteDb();
+  process.exit(0);
+});
+
+process.on('exit', () => {
+  closeSqliteDb();
 });

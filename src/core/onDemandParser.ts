@@ -37,7 +37,7 @@ export class OnDemandParser {
     }
 
     // 2. Secondary lookup: Local SQLite scraped matches table
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+    const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
     const existingScraped = scrapedMatches.find(
       (m) => m.matchId === cleanId || m.matchId === fixtureId || `fs_${m.matchId}` === fixtureId
     );

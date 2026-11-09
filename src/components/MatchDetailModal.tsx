@@ -72,9 +72,15 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
   fixture,
   onClose,
 }) => {
-  if (!fixture) return null;
-
   // Use a fixed overlay to stabilize the modal and prevent background shifting
+  // Keep track of the last fixture to prevent flickering if fixture becomes null
+  const lastFixtureRef = React.useRef(fixture);
+  React.useEffect(() => {
+    if (fixture) lastFixtureRef.current = fixture;
+  }, [fixture]);
+
+  const displayFixture = fixture || lastFixtureRef.current;
+  if (!displayFixture) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
@@ -83,7 +89,7 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
         aria-hidden="true"
       />
       <div className="relative w-full max-w-2xl mx-auto shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
-        <MatchDetailView fixture={fixture} onClose={onClose} isPanel={false} />
+        <MatchDetailView fixture={displayFixture} onClose={onClose} isPanel={false} />
       </div>
     </div>
   );

@@ -212,7 +212,7 @@ export class SyncJobService {
           source: 'SyncJobService',
           message: `Step 3 historical sync note: ${histErr?.message || histErr}. Continuing to upcoming fixtures...`,
         });
-        const currentHist = db.getAllHistoricalMatches(1500);
+        const currentHist = db.getAllHistoricalMatches(5000);
         syncRes = {
           success: true,
           matchesCount: currentHist.length,
@@ -242,8 +242,8 @@ export class SyncJobService {
         currentStep: 'Fetching Head-to-Head (H2H) raw feeds, team recent form, and encounter statistics...',
       });
       await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
-      const allHistorical = db.getAllHistoricalMatches(1500);
-      const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+      const allHistorical = db.getAllHistoricalMatches(5000);
+      const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
       const historicalFixtures: Fixture[] = allHistorical.map((m) => convertHistoricalMatchToFixture(m));
 
       for (const sm of scrapedMatches) {

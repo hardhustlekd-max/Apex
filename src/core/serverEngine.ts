@@ -16,8 +16,8 @@ import { OnDemandParser } from './onDemandParser.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
-    let rawHist = db.getAllHistoricalMatches(1500);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+    let rawHist = db.getAllHistoricalMatches(5000);
+    const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
     const scrapedAsHistorical: HistoricalMatch[] = scrapedMatches
       .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
       .map((sm, idx) => {
@@ -405,7 +405,7 @@ export class ServerEngine {
     });
 
     const allMatches = this.getUnifiedHistoricalUniverse();
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+    const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
 
     console.log(`[ServerEngine] Recalculating with ${allMatches.length} historical matches in universe.`);
 
@@ -565,7 +565,7 @@ export class ServerEngine {
     });
 
     const allMatches = this.getUnifiedHistoricalUniverse();
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
+    const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
 
     const scrapedMap = new Map<string, any>();
     for (const sm of scrapedMatches) {

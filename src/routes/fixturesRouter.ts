@@ -164,7 +164,7 @@ fixturesRouter.get('/history', async (req, res) => {
     // If predictionsDb has no matches for this request, convert and migrate from local database
     if (!matches || matches.length === 0) {
       const historicalMatches = db.getAllHistoricalMatches(limit);
-      const scrapedMatches = db.getFlashscoreScrapedMatches(50);
+      const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
       const convertedFixtures: Fixture[] = historicalMatches.map((m) => convertHistoricalMatchToFixture(m));
 
       for (const sm of scrapedMatches) {
