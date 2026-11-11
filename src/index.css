@@ -1,90 +1,583 @@
 @import "tailwindcss";
 
-@variant dark (&:where(.dark, .dark *));
+/* Configure Tailwind v4 Dark Variant for both data-theme attribute & .dark class */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
 
 @layer base {
+  /* ==========================================================================
+     TIER 1: PRIMITIVE TOKENS (Raw scales, colorway palettes & metric base)
+     ========================================================================== */
   :root {
-    /* Reference Live-Score App Brand Design Tokens */
-    --font-family-primary: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --font-size-base: 15px;
-    --font-line-height-base: 24px;
+    /* Base Neutral Scales */
+    --primitive-white: #ffffff;
+    --primitive-black: #000000;
 
-    /* Live-Score App Color Palette */
-    --color-primary-red: #FF001F;
-    --color-primary-red-hover: #E6001C;
-    --color-primary-red-gradient: linear-gradient(135deg, #FF0D2E 0%, #E6001C 100%);
-    --color-surface-card: #FFFFFF;
-    --color-surface-bg: #F8F9FA;
-    --color-surface-subtle: #F1F3F5;
-    --color-border-card: #ECEEF2;
-    --color-text-main: #18191F;
-    --color-text-sub: #8F92A1;
-    --color-text-dim: #B0B3C0;
+    /* Slate Neutral Ramp (Opta Kinetic Palette Base) */
+    --primitive-slate-50: #f8fafc;
+    --primitive-slate-100: #f1f5f9;
+    --primitive-slate-200: #e2e8f0;
+    --primitive-slate-300: #cbd5e1;
+    --primitive-slate-400: #94a3b8;
+    --primitive-slate-500: #64748b;
+    --primitive-slate-600: #475569;
+    --primitive-slate-700: #334155;
+    --primitive-slate-800: #1e293b;
+    --primitive-slate-900: #0f172a;
+    --primitive-slate-950: #080c14;
 
-    /* Legacy compatibility tokens pointing to modern palette */
-    --apex-lime: #FF001F;
-    --apex-black: #18191F;
+    /* Midnight Stadium Navy Ramp (Champions Crimson Palette Base) */
+    --primitive-navy-950: #0a0e1a;
+    --primitive-navy-900: #121828;
+    --primitive-navy-850: #1a2136;
+    --primitive-navy-800: #1e2638;
+    --primitive-navy-700: #28334a;
+
+    /* Velvet Gala Onyx Ramp (Ballon d'Or Gold Palette Base) */
+    --primitive-onyx-950: #090a0f;
+    --primitive-onyx-900: #141622;
+    --primitive-onyx-850: #1c1f2e;
+    --primitive-onyx-800: #232738;
+    --primitive-onyx-700: #2d3248;
+
+    /* Cyber Graphite Ramp (Volt Lime Pro Palette Base) */
+    --primitive-graphite-950: #0b0c0e;
+    --primitive-graphite-900: #15161c;
+    --primitive-graphite-850: #1e2027;
+    --primitive-graphite-800: #252832;
+    --primitive-graphite-700: #272a34;
+
+    /* Pitch Emerald Primitive Ramp */
+    --primitive-emerald-600: #009657;
+    --primitive-emerald-500: #00b368;
+    --primitive-emerald-400: #00e687;
+    --primitive-emerald-300: #00c272;
+
+    /* Matchday Crimson & Flare Red Primitive Ramp */
+    --primitive-crimson-700: #c40023;
+    --primitive-crimson-600: #e6002a;
+    --primitive-crimson-500: #ff1a43;
+    --primitive-crimson-400: #ff2e51;
+
+    /* Cyber Mint Primitive Ramp (Generated for Champions Model Value) */
+    --primitive-mint-600: #009e60;
+    --primitive-mint-500: #00b875;
+    --primitive-mint-400: #00f5a0;
+    --primitive-mint-300: #33ffb5;
+
+    /* Championship Trophy Gold Primitive Ramp */
+    --primitive-gold-700: #b45309;
+    --primitive-gold-600: #d97706;
+    --primitive-gold-500: #f59e0b;
+    --primitive-gold-400: #fbbf24;
+
+    /* Gala Trophy Jade & Coral Ramps (Generated for Ballon d'Or System) */
+    --primitive-jade-600: #059669;
+    --primitive-jade-500: #10b981;
+    --primitive-jade-400: #34d399;
+
+    --primitive-coral-600: #e11d48;
+    --primitive-coral-500: #ff385c;
+    --primitive-coral-400: #fb7185;
+
+    /* Volt Lime Primitive Ramp */
+    --primitive-volt-600: #6d8f00;
+    --primitive-volt-500: #85ad00;
+    --primitive-volt-400: #ccff00;
+    --primitive-volt-300: #d4ff33;
+    --primitive-laser-red: #ff334b;
+
+    /* Global Typography & Font Metrics */
+    --font-family-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-size-base: 14px;
+    --font-line-height-base: 21px;
+
+    /* Spatial Radii */
+    --radius-sm: 0.375rem; /* 6px */
+    --radius-md: 0.5rem;   /* 8px */
+    --radius-lg: 0.75rem;  /* 12px */
+    --radius-xl: 1rem;     /* 16px */
+    --radius-2xl: 1.25rem; /* 20px */
+    --radius-full: 9999px;
   }
 
-  .dark {
-    --color-primary-red: #FF2B44;
-    --color-primary-red-hover: #FF1A35;
-    --color-primary-red-gradient: linear-gradient(135deg, #FF2B44 0%, #D8001B 100%);
-    --color-surface-card: #15161C;
-    --color-surface-bg: #0B0C0E;
-    --color-surface-subtle: #1E2027;
-    --color-border-card: #272A34;
-    --color-text-main: #FFFFFF;
-    --color-text-sub: #9E A3B2;
-    --color-text-dim: #646877;
+  /* ==========================================================================
+     TIER 2: SEMANTIC TOKENS - BASELINE / SYSTEM 1: OPTA KINETIC EMERALD
+     ========================================================================== */
 
-    --apex-lime: #FF2B44;
-    --apex-black: #0B0C0E;
+  /* Light Baseline (Opta Kinetic Emerald Light) */
+  :root,
+  [data-theme="light"],
+  :root[data-color-theme="opta-emerald"],
+  [data-theme="light"][data-color-theme="opta-emerald"] {
+    /* Surfaces */
+    --bg-primary: #f4f6fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-elevated: #f8fafc;
+    --bg-subtle: #edf1f7;
+    --bg-overlay: rgba(15, 23, 42, 0.45);
+
+    /* Typography */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --text-inverse: #ffffff;
+
+    /* Borders */
+    --border-default: #e2e8f0;
+    --border-subdued: #f1f5f9;
+    --border-accent: rgba(0, 179, 104, 0.35);
+
+    /* Brand Accents */
+    --accent-default: #00b368;
+    --accent-hover: #009657;
+    --accent-text: #ffffff;
+    --accent-subtle: rgba(0, 179, 104, 0.12);
+    --accent-glow: rgba(0, 179, 104, 0.25);
+
+    /* Domain Colors Matching Opta Emerald */
+    --model-pick: #009657;
+    --status-live: #e63946;
+    --status-success: #00b368;
+    --status-warning: #d97706;
+    --status-danger: #e63946;
+    --status-info: #0284c7;
+
+    /* Backward Compatible Bindings */
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--text-primary);
   }
 
+  /* Dark Baseline (Opta Kinetic Emerald Dark) */
+  [data-theme="dark"],
+  .dark,
+  [data-theme="dark"][data-color-theme="opta-emerald"],
+  .dark[data-color-theme="opta-emerald"] {
+    /* Surfaces */
+    --bg-primary: #080c14;
+    --bg-secondary: #101520;
+    --bg-card: #101520;
+    --bg-card-elevated: #181f2e;
+    --bg-subtle: #1b2232;
+    --bg-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Typography */
+    --text-primary: #ffffff;
+    --text-secondary: #8e9bb0;
+    --text-muted: #64748b;
+    --text-inverse: #080c14;
+
+    /* Borders */
+    --border-default: #232d42;
+    --border-subdued: #1a2234;
+    --border-accent: rgba(0, 230, 135, 0.45);
+
+    /* Brand Accents */
+    --accent-default: #00e687;
+    --accent-hover: #00c272;
+    --accent-text: #080c14;
+    --accent-subtle: rgba(0, 230, 135, 0.16);
+    --accent-glow: rgba(0, 230, 135, 0.30);
+
+    /* Domain Colors Matching Opta Emerald */
+    --model-pick: #00e687;
+    --status-live: #ff3b30;
+    --status-success: #00e687;
+    --status-warning: #fbbf24;
+    --status-danger: #ff453a;
+    --status-info: #38bdf8;
+
+    /* Backward Compatible Bindings */
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--bg-primary);
+  }
+
+  /* ==========================================================================
+     SYSTEM 2: CHAMPIONS CRIMSON & MINT (European Matchday Intensity)
+     ========================================================================== */
+
+  /* Light Mode */
+  :root[data-color-theme="champions-crimson"],
+  [data-theme="light"][data-color-theme="champions-crimson"] {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-elevated: #f1f5f9;
+    --bg-subtle: #e2e8f0;
+    --bg-overlay: rgba(15, 23, 42, 0.50);
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --text-inverse: #ffffff;
+
+    --border-default: #e2e8f0;
+    --border-subdued: #cbd5e1;
+    --border-accent: rgba(230, 0, 42, 0.35);
+
+    --accent-default: #e6002a;
+    --accent-hover: #c40023;
+    --accent-text: #ffffff;
+    --accent-subtle: rgba(230, 0, 42, 0.12);
+    --accent-glow: rgba(230, 0, 42, 0.25);
+
+    /* Generated Distinct Colorway Matching Champions Crimson & Mint */
+    --model-pick: #009e60;
+    --status-live: #e6002a;
+    --status-success: #009e60;
+    --status-warning: #f59e0b;
+    --status-danger: #e6002a;
+    --status-info: #6366f1;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--text-primary);
+  }
+
+  /* Dark Mode */
+  [data-theme="dark"][data-color-theme="champions-crimson"],
+  .dark[data-color-theme="champions-crimson"] {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #121828;
+    --bg-card: #121828;
+    --bg-card-elevated: #1a2136;
+    --bg-subtle: #1e2638;
+    --bg-overlay: rgba(0, 0, 0, 0.80);
+
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-inverse: #ffffff;
+
+    --border-default: #28334a;
+    --border-subdued: #1c2436;
+    --border-accent: rgba(255, 26, 67, 0.45);
+
+    --accent-default: #e6002a;
+    --accent-hover: #ff1a43;
+    --accent-text: #ffffff;
+    --accent-subtle: rgba(230, 0, 42, 0.22);
+    --accent-glow: rgba(255, 26, 67, 0.35);
+
+    /* Generated Distinct Colorway Matching Champions Crimson & Mint */
+    --model-pick: #00f5a0;
+    --status-live: #ff2e51;
+    --status-success: #00f5a0;
+    --status-warning: #fbbf24;
+    --status-danger: #ff2e51;
+    --status-info: #818cf8;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--bg-primary);
+  }
+
+  /* ==========================================================================
+     SYSTEM 3: BALLON D'OR GOLD (Luxury Football Gala & Editorial)
+     ========================================================================== */
+
+  /* Light Mode */
+  :root[data-color-theme="ballon-gold"],
+  [data-theme="light"][data-color-theme="ballon-gold"] {
+    --bg-primary: #fafafc;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-elevated: #f3f4f6;
+    --bg-subtle: #e5e7eb;
+    --bg-overlay: rgba(17, 24, 39, 0.45);
+
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+    --text-inverse: #ffffff;
+
+    --border-default: #e5e7eb;
+    --border-subdued: #d1d5db;
+    --border-accent: rgba(217, 119, 6, 0.35);
+
+    --accent-default: #d97706;
+    --accent-hover: #b45309;
+    --accent-text: #ffffff;
+    --accent-subtle: rgba(217, 119, 6, 0.12);
+    --accent-glow: rgba(217, 119, 6, 0.25);
+
+    /* Generated Distinct Colorway Matching Luxury Gold, Jade & Coral */
+    --model-pick: #059669;
+    --status-live: #e11d48;
+    --status-success: #059669;
+    --status-warning: #d97706;
+    --status-danger: #e11d48;
+    --status-info: #b45309;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--text-primary);
+  }
+
+  /* Dark Mode */
+  [data-theme="dark"][data-color-theme="ballon-gold"],
+  .dark[data-color-theme="ballon-gold"] {
+    --bg-primary: #090a0f;
+    --bg-secondary: #141622;
+    --bg-card: #141622;
+    --bg-card-elevated: #1c1f2e;
+    --bg-subtle: #232738;
+    --bg-overlay: rgba(0, 0, 0, 0.80);
+
+    --text-primary: #ffffff;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --text-inverse: #090a0f;
+
+    --border-default: #2d3248;
+    --border-subdued: #202434;
+    --border-accent: rgba(245, 158, 11, 0.45);
+
+    --accent-default: #f59e0b;
+    --accent-hover: #fbbf24;
+    --accent-text: #090a0f;
+    --accent-subtle: rgba(245, 158, 11, 0.18);
+    --accent-glow: rgba(245, 158, 11, 0.35);
+
+    /* Generated Distinct Colorway Matching Luxury Gold, Jade & Coral */
+    --model-pick: #10b981;
+    --status-live: #ff385c;
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-danger: #ff385c;
+    --status-info: #fbbf24;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--bg-primary);
+  }
+
+  /* ==========================================================================
+     SYSTEM 4: VOLT LIME PRO (High-Energy Volt Cyber)
+     ========================================================================== */
+
+  /* Light Mode */
+  :root[data-color-theme="volt-lime"],
+  [data-theme="light"][data-color-theme="volt-lime"] {
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-elevated: #f1f3f5;
+    --bg-subtle: #eceef2;
+    --bg-overlay: rgba(24, 25, 31, 0.45);
+
+    --text-primary: #18191f;
+    --text-secondary: #555968;
+    --text-muted: #8f92a1;
+    --text-inverse: #ffffff;
+
+    --border-default: #eceef2;
+    --border-subdued: #e2e4e9;
+    --border-accent: rgba(133, 173, 0, 0.35);
+
+    --accent-default: #85ad00;
+    --accent-hover: #6d8f00;
+    --accent-text: #ffffff;
+    --accent-subtle: rgba(133, 173, 0, 0.14);
+    --accent-glow: rgba(133, 173, 0, 0.25);
+
+    /* Generated Distinct Colorway Matching Volt Pro */
+    --model-pick: #85ad00;
+    --status-live: #dc2626;
+    --status-success: #85ad00;
+    --status-warning: #d97706;
+    --status-danger: #dc2626;
+    --status-info: #0284c7;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--text-primary);
+  }
+
+  /* Dark Mode */
+  [data-theme="dark"][data-color-theme="volt-lime"],
+  .dark[data-color-theme="volt-lime"] {
+    --bg-primary: #0b0c0e;
+    --bg-secondary: #15161c;
+    --bg-card: #15161c;
+    --bg-card-elevated: #1e2027;
+    --bg-subtle: #252832;
+    --bg-overlay: rgba(0, 0, 0, 0.80);
+
+    --text-primary: #ffffff;
+    --text-secondary: #9ea3b2;
+    --text-muted: #64748b;
+    --text-inverse: #0b0c0e;
+
+    --border-default: #272a34;
+    --border-subdued: #1e2028;
+    --border-accent: rgba(204, 255, 0, 0.45);
+
+    --accent-default: #ccff00;
+    --accent-hover: #d4ff33;
+    --accent-text: #0b0c0e;
+    --accent-subtle: rgba(204, 255, 0, 0.16);
+    --accent-glow: rgba(204, 255, 0, 0.35);
+
+    /* Generated Distinct Colorway Matching Volt Pro */
+    --model-pick: #ccff00;
+    --status-live: #ff334b;
+    --status-success: #ccff00;
+    --status-warning: #f59e0b;
+    --status-danger: #ff334b;
+    --status-info: #38bdf8;
+
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--bg-primary);
+  }
+
+  /* Base Document Reset */
   html {
-    font-size: 15px;
-    line-height: 24px;
+    font-size: var(--font-size-base);
+    line-height: var(--font-line-height-base);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #18191F;
-    background-color: #F8F9FA;
+    font-family: var(--font-family-sans);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
   }
 
-  .dark html,
-  html.dark,
-  body.dark {
-    color: #FFFFFF;
-    background-color: #0B0C0E;
-  }
-
-  html,
   body {
     max-width: 100vw;
     overflow-x: hidden;
     margin: 0;
     padding: 0;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 
   #root {
     max-width: 100vw;
     overflow-x: hidden;
     min-height: 100vh;
+    background-color: var(--bg-primary);
   }
 
-  /* Live-Score App Brand Card Gradients */
-  .bg-hero-red-gradient {
-    background: linear-gradient(135deg, #FF1A35 0%, #E6001C 100%);
-  }
-
-  .bg-live-tag {
-    background-color: #FF001F;
-  }
-
-  /* Keyboard-first Focus-visible Accessibility */
+  /* Focus rings for keyboard navigation */
   *:focus-visible {
-    outline: 2px solid #FF001F !important;
+    outline: 2px solid var(--accent-default) !important;
     outline-offset: 2px !important;
   }
 
@@ -96,19 +589,56 @@
     scrollbar-width: none;
   }
 
-  /* Sleek Scrollbar */
   ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #E2E4E9;
-    border-radius: 9999px;
+    background: var(--border-default);
+    border-radius: var(--radius-full);
   }
-  .dark ::-webkit-scrollbar-thumb {
-    background: #272A34;
-  }
+}
+
+/* ==========================================================================
+   TIER 3: UTILITY MAPPINGS & COMPONENT UTILITIES
+   ========================================================================== */
+@layer utilities {
+  /* Surface Utilities */
+  .bg-theme-bg { background-color: var(--bg-primary) !important; }
+  .bg-theme-card { background-color: var(--bg-card) !important; }
+  .bg-theme-card-elevated { background-color: var(--bg-card-elevated) !important; }
+  .bg-theme-subtle { background-color: var(--bg-subtle) !important; }
+  .bg-theme-overlay { background-color: var(--bg-overlay) !important; }
+
+  /* Accent & Action Utilities */
+  .bg-theme-primary { background-color: var(--accent-default) !important; }
+  .bg-theme-primary-hover:hover { background-color: var(--accent-hover) !important; }
+  .bg-theme-primary-subtle { background-color: var(--accent-subtle) !important; }
+  .bg-theme-live { background-color: var(--status-live) !important; }
+  .bg-theme-model-pick { background-color: var(--model-pick) !important; }
+  .bg-theme-success { background-color: var(--status-success) !important; }
+  .bg-theme-warning { background-color: var(--status-warning) !important; }
+  .bg-theme-danger { background-color: var(--status-danger) !important; }
+
+  /* Typography Utilities */
+  .text-theme-main { color: var(--text-primary) !important; }
+  .text-theme-sub { color: var(--text-secondary) !important; }
+  .text-theme-dim { color: var(--text-muted) !important; }
+  .text-theme-primary { color: var(--accent-default) !important; }
+  .text-theme-primary-text { color: var(--accent-text) !important; }
+  .text-theme-live { color: var(--status-live) !important; }
+  .text-theme-model-pick { color: var(--model-pick) !important; }
+  .text-theme-success { color: var(--status-success) !important; }
+  .text-theme-warning { color: var(--status-warning) !important; }
+  .text-theme-danger { color: var(--status-danger) !important; }
+
+  /* Border & Ring Utilities */
+  .border-theme { border-color: var(--border-default) !important; }
+  .border-theme-subdued { border-color: var(--border-subdued) !important; }
+  .border-theme-primary { border-color: var(--accent-default) !important; }
+  .border-theme-accent { border-color: var(--border-accent) !important; }
+  .border-theme-model-pick { border-color: var(--model-pick) !important; }
 }

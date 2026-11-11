@@ -84,13 +84,6 @@ fixturesRouter.get('/live', async (req, res) => {
         status: 'LIVE' as const,
         minute: s.minute,
         score: { home: s.homeScore, away: s.awayScore },
-        odds: {
-          homeWin: 2.10,
-          draw: 3.30,
-          awayWin: 3.40,
-          over25: 1.85,
-          under25: 1.95,
-        },
       }));
     }
 
@@ -184,7 +177,6 @@ fixturesRouter.get('/history', async (req, res) => {
               awayTeam: sm.away.name,
               status: 'FINISHED' as const,
               score: { home: homeScore, away: awayScore },
-              odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
               prediction: undefined,
               bestValueMarket: undefined
             });
@@ -254,12 +246,28 @@ fixturesRouter.get('/:id/recent-matches', async (req, res) => {
 fixturesRouter.get('/:id/h2h', async (req, res) => {
   try {
     const fixtureId = req.params.id;
-    const homeTeam = req.query.home as string | undefined;
-    const awayTeam = req.query.away as string | undefined;
+    let homeTeam = req.query.home as string | undefined;
+    let awayTeam = req.query.away as string | undefined;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
-    let h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
-    if (!h2h || !h2h.matchesCount) {
-      h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
+
+    // If home or away team not provided in query params, resolve from DB
+    if (!homeTeam || !awayTeam) {
+      await db.init();
+      await predictionsDb.init();
+      const stored =
+        predictionsDb.getPredictionById(fixtureId) ||
+        predictionsDb.getPredictionById(cleanId) ||
+        db.getFixtureById(fixtureId) ||
+        db.getFixtureById(cleanId);
+      if (stored) {
+        homeTeam = homeTeam || stored.homeTeam;
+        awayTeam = awayTeam || stored.awayTeam;
+      }
+    }
+
+    let h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
+    if (!h2h || (!h2h.matchesCount && !h2h.homeRecentMatches?.length)) {
+      h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
     }
     res.json({ success: true, h2h });
   } catch (err: any) {
@@ -300,7 +308,6 @@ fixturesRouter.get('/:id', async (req, res) => {
           awayTeam: foundScraped.away.name,
           status: foundScraped.status === 'FINISHED' ? 'FINISHED' : foundScraped.status === 'LIVE' ? 'LIVE' : 'SCHEDULED',
           score: homeScore !== undefined && awayScore !== undefined ? { home: homeScore, away: awayScore } : undefined,
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
           statistics: foundScraped.statistics || [],
           information: foundScraped.information || [],
         };
@@ -335,7 +342,6 @@ fixturesRouter.get('/:id', async (req, res) => {
           awayTeam: parsedMatch.awayTeam,
           status: isFin ? 'FINISHED' : isLive ? 'LIVE' : 'SCHEDULED',
           score: homeScore !== undefined && awayScore !== undefined ? { home: homeScore, away: awayScore } : undefined,
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
           statistics: parsedMatch.statistics || [],
         };
       }
@@ -360,6 +366,73 @@ fixturesRouter.get('/:id', async (req, res) => {
         stored.awayStats = predStored.awayStats;
         stored.measurements = predStored.measurements;
       }
+    }
+
+    // Ensure H2H measurement is attached
+    if (!stored.measurements?.h2h || (!stored.measurements.h2h.matchesCount && !stored.measurements.h2h.homeRecentMatches?.length)) {
+      const h2hData = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
+      if (h2hData && (h2hData.matchesCount > 0 || h2hData.homeRecentMatches?.length || h2hData.recentH2H?.length)) {
+        stored.measurements = {
+          ...(stored.measurements || {}),
+          h2h: h2hData,
+        };
+        stored.h2hMatches = h2hData.recentH2H || stored.h2hMatches || [];
+      }
+    }
+
+    // Ensure match information is populated
+    if (!stored.information || stored.information.length === 0) {
+      stored.information = [
+        { category: 'Match Date', value: stored.matchDate },
+        { category: 'Competition', value: stored.leagueName || stored.league || 'League' },
+        { category: 'Status', value: stored.status === 'FINISHED' ? 'Full Time' : stored.status === 'LIVE' ? 'Live' : 'Scheduled' },
+        ...(stored.score ? [{ category: 'Result', value: `${stored.score.home} - ${stored.score.away}` }] : []),
+      ];
+    }
+
+    // Ensure team stats goals summary is populated from recent matches if missing
+    if (!stored.homeStats && stored.measurements?.h2h?.homeRecentMatches?.length) {
+      const homeMatches = stored.measurements.h2h.homeRecentMatches;
+      const goalsScored = homeMatches.reduce((acc, m) => acc + (m.goalsFor || 0), 0);
+      const goalsConceded = homeMatches.reduce((acc, m) => acc + (m.goalsAgainst || 0), 0);
+      const matchesPlayed = homeMatches.length;
+      stored.homeStats = {
+        teamName: stored.homeTeam,
+        homeAttack: 1.0,
+        homeDefense: 1.0,
+        awayAttack: 1.0,
+        awayDefense: 1.0,
+        recentForm: homeMatches.map((m) => m.result).slice(0, 5),
+        formScore: 1.0,
+        matchesPlayed,
+        goalsScored,
+        goalsConceded,
+        avgGoalsScored: matchesPlayed > 0 ? Number((goalsScored / matchesPlayed).toFixed(2)) : 0,
+        avgGoalsConceded: matchesPlayed > 0 ? Number((goalsConceded / matchesPlayed).toFixed(2)) : 0,
+        recentMatches: homeMatches,
+      };
+    }
+
+    if (!stored.awayStats && stored.measurements?.h2h?.awayRecentMatches?.length) {
+      const awayMatches = stored.measurements.h2h.awayRecentMatches;
+      const goalsScored = awayMatches.reduce((acc, m) => acc + (m.goalsFor || 0), 0);
+      const goalsConceded = awayMatches.reduce((acc, m) => acc + (m.goalsAgainst || 0), 0);
+      const matchesPlayed = awayMatches.length;
+      stored.awayStats = {
+        teamName: stored.awayTeam,
+        homeAttack: 1.0,
+        homeDefense: 1.0,
+        awayAttack: 1.0,
+        awayDefense: 1.0,
+        recentForm: awayMatches.map((m) => m.result).slice(0, 5),
+        formScore: 1.0,
+        matchesPlayed,
+        goalsScored,
+        goalsConceded,
+        avgGoalsScored: matchesPlayed > 0 ? Number((goalsScored / matchesPlayed).toFixed(2)) : 0,
+        avgGoalsConceded: matchesPlayed > 0 ? Number((goalsConceded / matchesPlayed).toFixed(2)) : 0,
+        recentMatches: awayMatches,
+      };
     }
 
     loggerService.addLog({

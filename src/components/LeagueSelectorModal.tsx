@@ -29,21 +29,21 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#121216] text-slate-950 dark:text-neutral-100 rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-theme-card border border-theme text-theme-main rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0 border-b border-theme">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-full bg-slate-950 text-[#CCFF00] dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs">
+            <div className="p-2.5 rounded-full bg-theme-primary text-theme-primary-text font-black shadow-xs">
               <Globe className="w-4.5 h-4.5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base sm:text-lg text-slate-950 dark:text-white">Global Leagues Directory</h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 font-semibold">Select from professional football leagues worldwide</p>
+              <h3 className="font-extrabold text-base sm:text-lg text-theme-main">Global Leagues Directory</h3>
+              <p className="text-xs text-theme-sub font-semibold">Select from professional football leagues worldwide</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] w-9 h-9 rounded-full bg-slate-100 hover:bg-[#CCFF00] hover:text-slate-950 dark:bg-[#18181D] dark:hover:bg-[#CCFF00] text-slate-700 dark:text-neutral-300 dark:hover:text-slate-950 transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
+            className="min-h-[44px] min-w-[44px] w-9 h-9 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0"
             aria-label="Close league selector"
           >
             <X className="w-4.5 h-4.5 stroke-[2.5]" />
@@ -51,15 +51,15 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
         </div>
 
         {/* Search Input Box */}
-        <div className="px-4 sm:px-6 pt-1 pb-2 shrink-0">
+        <div className="px-4 sm:px-6 pt-3 pb-2 shrink-0">
           <div className="relative w-full">
-            <Search className="w-4 h-4 text-slate-400 dark:text-neutral-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-theme-sub absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by league name or country..."
-              className="w-full bg-slate-100 dark:bg-[#18181D] rounded-full pl-10 pr-4 py-2.5 text-xs sm:text-sm font-extrabold text-slate-950 dark:text-white placeholder:text-slate-400 outline-none"
+              className="w-full bg-theme-subtle border border-theme rounded-full pl-10 pr-4 py-2.5 text-xs sm:text-sm font-extrabold text-theme-main placeholder:text-theme-sub outline-none"
               autoFocus
             />
           </div>
@@ -74,18 +74,18 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
             }}
             className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all ${
               selectedLeague === 'ALL'
-                ? 'bg-slate-200 dark:bg-[#222228] font-black text-slate-950 dark:text-white shadow-xs'
-                : 'bg-slate-50 dark:bg-[#18181D] hover:bg-slate-100 dark:hover:bg-[#1e1e24] text-slate-800 dark:text-neutral-200'
+                ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-xs'
+                : 'bg-theme-subtle hover:bg-theme-subtle/80 text-theme-main'
             }`}
           >
             <div className="flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#CCFF00] shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-theme-primary shrink-0" />
               <div>
                 <div className="text-xs sm:text-sm font-extrabold">All Leagues Worldwide</div>
-                <div className="text-xs text-slate-500 dark:text-neutral-400">All available global matches</div>
+                <div className="text-xs text-theme-sub">All available global matches</div>
               </div>
             </div>
-            {selectedLeague === 'ALL' && <Check className="w-4 h-4 text-slate-950 dark:text-[#CCFF00] stroke-[3]" />}
+            {selectedLeague === 'ALL' && <Check className="w-4 h-4 text-theme-primary stroke-[3]" />}
           </div>
 
           {filteredLeagues.map((league, idx) => {
@@ -99,18 +99,18 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
                 }}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-full cursor-pointer transition-all ${
                   isSelected
-                    ? 'bg-slate-200 dark:bg-[#222228] font-black text-slate-950 dark:text-white shadow-xs'
-                    : 'bg-slate-50 dark:bg-[#18181D] hover:bg-slate-100 dark:hover:bg-[#1e1e24] text-slate-800 dark:text-slate-200'
+                    ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-xs'
+                    : 'bg-theme-subtle hover:bg-theme-subtle/80 text-theme-main'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-[#CCFF00]' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-theme-primary' : 'bg-theme-sub'}`} />
                   <div className="min-w-0">
                     <div className="text-xs sm:text-sm font-bold truncate">{league.name}</div>
-                    <div className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{league.country || 'International'}</div>
+                    <div className="text-xs font-mono text-theme-sub truncate">{league.country || 'International'}</div>
                   </div>
                 </div>
-                {isSelected && <Check className="w-4 h-4 text-[#CCFF00] shrink-0" />}
+                {isSelected && <Check className="w-4 h-4 text-theme-primary shrink-0" />}
               </div>
             );
           })}

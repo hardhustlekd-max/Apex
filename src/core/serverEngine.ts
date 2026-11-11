@@ -56,10 +56,10 @@ export class ServerEngine {
     allMatches: HistoricalMatch[],
     recentFormMatches?: TeamFormMatch[]
   ): number {
-    if (!fixtureDateStr || !teamName) return 7;
+    if (!fixtureDateStr || !teamName) return undefined as any;
     const fixtureDate = new Date(fixtureDateStr.length === 10 ? `${fixtureDateStr}T12:00:00Z` : fixtureDateStr);
     const fixtureTime = fixtureDate.getTime();
-    if (isNaN(fixtureTime)) return 7;
+    if (isNaN(fixtureTime)) return undefined as any;
 
     // 1. Inspect recent matches from H2H scraped feed (most authoritative & timestamped)
     if (recentFormMatches && recentFormMatches.length > 0) {
@@ -102,7 +102,7 @@ export class ServerEngine {
       }
     }
 
-    return 7;
+    return undefined as any;
   }
 
   public static predictFixtureUnified(
@@ -167,47 +167,8 @@ export class ServerEngine {
       eloRatingsMap
     );
 
-    let odds = f.odds;
-    const isDummyPlaceholder = !odds || !odds.homeWin || !odds.draw || !odds.awayWin ||
-      (odds.homeWin === 2.10 && odds.draw === 3.30 && odds.awayWin === 3.40);
-
-    if (isDummyPlaceholder) {
-      // Calibrate realistic market consensus odds with standard bookmaker overround (~5.5% on 1X2, 6.0% on totals)
-      const margin1x2 = 1.055;
-      const marginTotals = 1.06;
-
-      const pH = Math.max(0.03, Math.min(0.92, prediction.homeWinProb));
-      const pD = Math.max(0.05, Math.min(0.40, prediction.drawProb));
-      const pA = Math.max(0.03, Math.min(0.92, prediction.awayWinProb));
-
-      const hw = Number(Math.max(1.04, Math.min(25.0, 1 / (pH * margin1x2))).toFixed(2));
-      const dr = Number(Math.max(1.50, Math.min(20.0, 1 / (pD * margin1x2))).toFixed(2));
-      const aw = Number(Math.max(1.04, Math.min(25.0, 1 / (pA * margin1x2))).toFixed(2));
-
-      const pOver = Math.max(0.05, Math.min(0.95, prediction.over25Prob));
-      const pUnder = 1 - pOver;
-      const o25 = Number(Math.max(1.10, Math.min(15.0, 1 / (pOver * marginTotals))).toFixed(2));
-      const u25 = Number(Math.max(1.10, Math.min(15.0, 1 / (pUnder * marginTotals))).toFixed(2));
-
-      const pBtts = Math.max(0.05, Math.min(0.95, prediction.bttsProb));
-      const pBttsNo = 1 - pBtts;
-      const bttsY = Number(Math.max(1.10, Math.min(15.0, 1 / (pBtts * marginTotals))).toFixed(2));
-      const bttsN = Number(Math.max(1.10, Math.min(15.0, 1 / (pBttsNo * marginTotals))).toFixed(2));
-
-      odds = {
-        homeWin: hw,
-        draw: dr,
-        awayWin: aw,
-        over25: o25,
-        under25: u25,
-        bttsYes: bttsY,
-        bttsNo: bttsN,
-      };
-    }
-
-    const { markets, bestValueMarket, mostLikelyOutcome, profitableBet } = ApexEngine.calculateMarkets(
+    const { markets, mostLikelyOutcome } = ApexEngine.calculateMarkets(
       prediction,
-      odds,
       settings,
       f.homeTeam,
       f.awayTeam
@@ -234,7 +195,6 @@ export class ServerEngine {
     const enrichedPrediction = {
       ...prediction,
       mostLikelyOutcome,
-      profitableBet,
     };
 
     return {
@@ -247,12 +207,9 @@ export class ServerEngine {
       resultDetails,
       restDaysHome,
       restDaysAway,
-      odds,
       prediction: enrichedPrediction,
       markets,
-      bestValueMarket,
       mostLikelyOutcome,
-      profitableBet,
       homeStats,
       awayStats,
       measurements: prediction.measurements,
@@ -349,13 +306,7 @@ export class ServerEngine {
     }
 
     // 5. Market Odds / Context / H2H Data (Weight: 15% = 0.15)
-    const hasOdds = Boolean(
-      fixture.odds &&
-      typeof fixture.odds.homeWin === 'number' &&
-      fixture.odds.homeWin > 1.0 &&
-      typeof fixture.odds.awayWin === 'number' &&
-      fixture.odds.awayWin > 1.0
-    );
+    const hasOdds = false;
     const hasH2H = Boolean(
       (cachedH2H && cachedH2H.matchesCount > 0) ||
       (fixture.prediction?.measurements?.h2h && fixture.prediction.measurements.h2h.matchesCount > 0)
@@ -390,7 +341,6 @@ export class ServerEngine {
     const settings: EngineSettings = db.getSettings() || {
       
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,
@@ -450,16 +400,12 @@ export class ServerEngine {
             : null);
 
         if (!cachedH2H) {
-          const rawH2H = db.getRawFeed(cleanId);
-          if (rawH2H && rawH2H.rawText && (rawH2H.rawText.includes('KB÷') || rawH2H.rawText.includes('KC÷'))) {
-            try {
-              cachedH2H = await OnDemandParser.getParsedH2H(cleanId, f.homeTeam, f.awayTeam);
-              if (cachedH2H) {
-                db.savePredictionMeasurement(cleanId, cachedH2H);
-                cachedH2HMap.set(cleanId, cachedH2H);
-              }
-            } catch {}
-          }
+          try {
+            cachedH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
+            if (cachedH2H && cachedH2H.matchesCount > 0) {
+              cachedH2HMap.set(cleanId, cachedH2H);
+            }
+          } catch {}
         }
 
         const tacticalInput = {

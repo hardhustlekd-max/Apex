@@ -140,12 +140,20 @@ export class OnDemandParser {
 
     // 1. Check if measurement is already saved in local SQLite cache
     const storedMeasurement = db.getPredictionMeasurement(cleanId) || db.getPredictionMeasurement(fixtureId);
-    if (storedMeasurement) {
+    if (storedMeasurement && (storedMeasurement.matchesCount > 0 || storedMeasurement.homeRecentMatches?.length || storedMeasurement.recentH2H?.length)) {
       return storedMeasurement;
     }
 
-    // 2. Check local raw feed text in SQLite
+    // 2. Check local raw feed text in SQLite, or fetch from Flashscore
     let rawData = await db.getRawFeedAsync(cleanId);
+    if (!rawData || !rawData.rawText || (!rawData.rawText.includes('KB÷') && !rawData.rawText.includes('KC÷'))) {
+      const scraped = await flashscoreScraperService.getMatchHeadToHead(cleanId, fixtureHomeTeam, fixtureAwayTeam);
+      if (scraped && (scraped.matchesCount > 0 || scraped.homeRecentMatches?.length || scraped.recentH2H?.length)) {
+        return scraped;
+      }
+      rawData = await db.getRawFeedAsync(cleanId);
+    }
+
     if (rawData && rawData.rawText && (rawData.rawText.includes('KB÷') || rawData.rawText.includes('KC÷'))) {
       const feedText = rawData.rawText;
       const sections = feedText.split('~');
@@ -165,8 +173,8 @@ export class OnDemandParser {
       const awayRecentMatches: TeamFormMatch[] = [];
 
       for (const s of sections) {
-        if (s.startsWith('KA÷') && !s.startsWith('KA÷Overall') && (foundHomeHeader || foundAwayHeader)) {
-          break;
+        if (s.startsWith('KA÷')) {
+          continue;
         }
 
         if (s.startsWith('KB÷Last matches: ')) {
@@ -198,8 +206,8 @@ export class OnDemandParser {
 
           const rawHome = (d['KJ'] || '').replace(/^\*/, '').trim();
           const rawAway = (d['KK'] || '').replace(/^\*/, '').trim();
-          const hG = parseInt(d['KU'] || '0', 10);
-          const aG = parseInt(d['KT'] || '0', 10);
+          const hG = parseInt(d['KT'] || d['AG'] || '0', 10);
+          const aG = parseInt(d['KU'] || d['AH'] || '0', 10);
           const timestamp = parseInt(d['KC'] || '0', 10);
           const matchDateObj = timestamp > 0 ? new Date(timestamp * 1000) : new Date();
           const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
@@ -244,17 +252,33 @@ export class OnDemandParser {
               });
             }
           } else if (currentSection === 'H2H') {
-            let isHomeFixture = true;
-            if (fixtureHomeTeam) {
-              const fHomeLower = fixtureHomeTeam.toLowerCase();
-              const rHomeLower = rawHome.toLowerCase();
-              const rAwayLower = rawAway.toLowerCase();
-              if (rHomeLower === fHomeLower || fHomeLower.includes(rHomeLower)) {
-                isHomeFixture = true;
-              } else if (rAwayLower === fHomeLower || fHomeLower.includes(rAwayLower)) {
-                isHomeFixture = false;
-              }
+            const matchIdField = d['AA'] || '';
+            const statusCode = d['AB'] || '3';
+            const finishedCodes = ['3', '10', '11', '47', '48', '49'];
+            
+            // SKIP if this is the current upcoming fixture being analyzed OR if the match is not explicitly finished
+            if (matchIdField === cleanId || !finishedCodes.includes(statusCode)) {
+              continue;
             }
+
+            const rHomeLower = rawHome.toLowerCase();
+            const rAwayLower = rawAway.toLowerCase();
+            const hTarget = (fixtureHomeTeam || homeClubName || '').toLowerCase();
+            const aTarget = (fixtureAwayTeam || awayClubName || '').toLowerCase();
+
+            // Strict validation: the match MUST involve both target teams to be a valid H2H encounter
+            const homeInHome = rHomeLower.includes(hTarget) || hTarget.includes(rHomeLower);
+            const homeInAway = rAwayLower.includes(hTarget) || hTarget.includes(rAwayLower);
+            const awayInHome = rHomeLower.includes(aTarget) || aTarget.includes(rHomeLower);
+            const awayInAway = rAwayLower.includes(aTarget) || aTarget.includes(rAwayLower);
+
+            const isStrictH2H = (homeInHome && awayInAway) || (homeInAway && awayInHome);
+            
+            if (!isStrictH2H && (hTarget && aTarget)) {
+              continue;
+            }
+
+            const isHomeFixture = homeInHome;
 
             const goalsForHome = isHomeFixture ? hG : aG;
             const goalsForAway = isHomeFixture ? aG : hG;
@@ -358,12 +382,31 @@ export class OnDemandParser {
         };
       });
 
+      const homeCore = homeTeam
+        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim().toLowerCase();
+      const awayCore = awayTeam
+        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim().toLowerCase();
+
       const allHistorical = db.getAllHistoricalMatches(5000);
-      const directH2H = allHistorical.filter(
-        (m) =>
-          (m.homeTeam.toLowerCase().includes(homeName) && m.awayTeam.toLowerCase().includes(awayName)) ||
-          (m.homeTeam.toLowerCase().includes(awayName) && m.awayTeam.toLowerCase().includes(homeName))
-      );
+      const directH2H = allHistorical.filter((m) => {
+        const mHome = m.homeTeam.toLowerCase();
+        const mAway = m.awayTeam.toLowerCase();
+        const hasHome = (homeName && (mHome.includes(homeName) || homeName.includes(mHome))) ||
+          (homeCore && (mHome.includes(homeCore) || homeCore.includes(mHome)));
+        const hasAway = (awayName && (mAway.includes(awayName) || awayName.includes(mAway))) ||
+          (awayCore && (mAway.includes(awayCore) || awayCore.includes(mAway)));
+
+        const hasHomeReverse = (homeName && (mAway.includes(homeName) || homeName.includes(mAway))) ||
+          (homeCore && (mAway.includes(homeCore) || homeCore.includes(mAway)));
+        const hasAwayReverse = (awayName && (mHome.includes(awayName) || awayName.includes(mHome))) ||
+          (awayCore && (mHome.includes(awayCore) || awayCore.includes(mHome)));
+
+        return (hasHome && hasAway) || (hasHomeReverse && hasAwayReverse);
+      });
 
       let homeWins = 0, draws = 0, awayWins = 0, homeGoalsTotal = 0, awayGoalsTotal = 0;
       const recentH2H: HeadToHeadMatchRecord[] = directH2H.slice(0, 10).map((m) => {

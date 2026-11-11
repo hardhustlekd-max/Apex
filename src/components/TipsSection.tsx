@@ -59,7 +59,7 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
         );
       case 'BETTING_TIP':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#CCFF00] text-slate-950 uppercase tracking-wide">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-theme-primary text-theme-primary-text uppercase tracking-wide">
             <TrendingUp className="w-3.5 h-3.5" />
             Tip
           </span>
@@ -75,11 +75,11 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-[#121216] rounded-2xl p-3.5 sm:p-5 shadow-xs space-y-3 font-sans text-slate-900 dark:text-white">
+    <div className="bg-theme-card border border-theme rounded-2xl p-3.5 sm:p-5 shadow-xs space-y-3 font-sans text-theme-main">
       {/* Header Bar */}
-      <div className="flex items-center justify-between gap-2.5 pb-2">
+      <div className="flex items-center justify-between gap-2.5 pb-2 border-b border-theme">
         <div>
-          <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
+          <h2 className="text-sm sm:text-base font-black text-theme-main uppercase tracking-wider">
             Trends & Tips
           </h2>
         </div>
@@ -88,7 +88,7 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
         <button
           onClick={onRefresh}
           disabled={isRefreshing || isLoading}
-          className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-full text-xs font-black bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b8e600] dark:text-slate-950 shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+          className="flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-full text-xs font-black bg-theme-primary text-theme-primary-text hover:opacity-90 shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary"
           title="Refresh trends"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -99,7 +99,7 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         {/* Category Pills */}
-        <div className="bg-slate-100 dark:bg-[#18181D] p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 flex-nowrap">
+        <div className="bg-theme-subtle border border-theme p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 flex-nowrap">
           {[
             { id: 'ALL' as const, label: 'All' },
             { id: 'BETTING_TIP' as const, label: 'Tips' },
@@ -112,8 +112,8 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
               onClick={() => setSelectedCategory(tab.id)}
               className={`px-3.5 py-1.5 min-h-[36px] rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 selectedCategory === tab.id
-                  ? 'bg-slate-950 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-black shadow-xs'
-                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               {tab.label}
@@ -123,13 +123,13 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
 
         {/* Search Input */}
         <div className="relative min-w-[150px]">
-          <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 shrink-0" />
+          <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sub shrink-0" />
           <input
             type="text"
             placeholder="Search trends..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 bg-slate-100 dark:bg-[#18181D] rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 font-semibold shadow-xs"
+            className="w-full h-10 bg-theme-subtle border border-theme rounded-xl pl-9 pr-3.5 py-2 text-xs text-theme-main placeholder:text-theme-sub focus:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary font-semibold shadow-xs"
           />
         </div>
       </div>
@@ -137,20 +137,20 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
       {/* Content Rendering */}
       {isLoading ? (
         <div className="p-10 text-center rounded-2xl space-y-2">
-          <RefreshCw className="w-6 h-6 text-cyan-600 dark:text-[#CCFF00] animate-spin mx-auto" />
-          <p className="text-xs text-slate-500 dark:text-neutral-400 font-bold">Loading Trends...</p>
+          <RefreshCw className="w-6 h-6 text-theme-primary animate-spin mx-auto" />
+          <p className="text-xs text-theme-sub font-bold">Loading Trends...</p>
         </div>
       ) : filteredTips.length === 0 ? (
         <div className="p-10 text-center rounded-2xl space-y-1.5">
-          <Layers className="w-6 h-6 text-slate-400 mx-auto" />
-          <p className="text-xs font-bold text-slate-500 dark:text-neutral-400">No items found</p>
+          <Layers className="w-6 h-6 text-theme-sub mx-auto" />
+          <p className="text-xs font-bold text-theme-sub">No items found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {filteredTips.map((tip) => (
             <div
               key={tip.id}
-              className="bg-slate-50 dark:bg-[#18181D] rounded-xl p-3.5 shadow-xs flex flex-col justify-between space-y-2.5 transition-all"
+              className="bg-theme-subtle border border-theme rounded-xl p-3.5 shadow-xs flex flex-col justify-between space-y-2.5 transition-all"
             >
               <div className="space-y-1.5">
                 {/* Badge Row */}
@@ -158,33 +158,33 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
                   <div className="flex items-center gap-1.5">
                     {getCategoryBadge(tip.category)}
                     {tip.league && (
-                      <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-neutral-400 px-2 py-0.5 rounded bg-white dark:bg-[#09090B]">
+                      <span className="text-[11px] font-mono font-bold text-theme-sub px-2 py-0.5 rounded bg-theme-card border border-theme">
                         {tip.league}
                       </span>
                     )}
                   </div>
-                  {tip.confidenceOrOdds && (
-                    <span className="text-[11px] font-mono font-black text-slate-950 px-2 py-0.5 rounded bg-[#CCFF00]">
-                      {tip.confidenceOrOdds}
+                  {tip.confidence && (
+                    <span className="text-[11px] font-mono font-black text-theme-primary-text px-2.5 py-0.5 rounded-full bg-theme-primary shadow-xs uppercase tracking-tight">
+                      {tip.confidence}
                     </span>
                   )}
                 </div>
 
                 {/* Title */}
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                <h4 className="text-sm font-bold text-theme-main leading-snug">
                   {tip.title}
                 </h4>
 
                 {/* Recommended Pick */}
                 {tip.predictionOrTip && (
-                  <div className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#09090B] text-[11px] font-bold text-slate-900 dark:text-white flex items-center justify-between gap-2 font-mono">
-                    <span className="text-[10px] uppercase font-black text-slate-400">Pick</span>
-                    <span className="truncate text-cyan-600 dark:text-[#CCFF00] font-black">{tip.predictionOrTip}</span>
+                  <div className="px-3 py-1.5 rounded-lg bg-theme-card border border-theme text-[11px] font-bold text-theme-main flex items-center justify-between gap-2 font-mono">
+                    <span className="text-[10px] uppercase font-black text-theme-sub">Pick</span>
+                    <span className="truncate text-theme-primary font-black">{tip.predictionOrTip}</span>
                   </div>
                 )}
 
                 {/* Brief Analysis */}
-                <p className="text-xs text-slate-600 dark:text-neutral-400 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-theme-sub line-clamp-2 leading-relaxed">
                   {tip.analysis}
                 </p>
               </div>
@@ -196,16 +196,16 @@ export const TipsSection: React.FC<TipsSectionProps> = ({
                     href={tip.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-cyan-600 dark:text-[#CCFF00] hover:underline font-bold transition-colors truncate max-w-[180px]"
+                    className="inline-flex items-center gap-1 text-[11px] text-theme-primary hover:underline font-bold transition-colors truncate max-w-[180px]"
                   >
                     <span className="truncate">{tip.sourceTitle || 'Source'}</span>
                     <ExternalLink className="w-3 h-3 shrink-0" />
                   </a>
                 ) : (
-                  <span className="text-[10px] text-slate-400 font-medium">Live Search</span>
+                  <span className="text-[10px] text-theme-sub font-medium">Live Search</span>
                 )}
                 {tip.match && (
-                  <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-bold truncate max-w-[120px]">
+                  <span className="text-[11px] text-theme-sub font-bold truncate max-w-[120px]">
                     {tip.match}
                   </span>
                 )}

@@ -31,18 +31,17 @@ interface RiskProfile {
 
 function calculateRiskProfile(slip: AccumulatorSlip): RiskProfile {
   const prob = slip.combinedProb;
-  const odds = slip.combinedOdds;
 
-  if (prob >= 0.60 || odds <= 2.5) {
+  if (prob >= 0.40) {
     return {
       level: 'LOW',
-      label: 'Low Risk',
+      label: 'High Confidence',
       badgeBg: 'bg-emerald-500/10',
       textColor: 'text-emerald-700 dark:text-emerald-400',
     };
   }
 
-  if (prob >= 0.35 || odds <= 5.5) {
+  if (prob >= 0.20) {
     return {
       level: 'MEDIUM',
       label: 'Moderate',
@@ -51,10 +50,10 @@ function calculateRiskProfile(slip: AccumulatorSlip): RiskProfile {
     };
   }
 
-  if (prob >= 0.15 || odds <= 15.0) {
+  if (prob >= 0.05) {
     return {
       level: 'HIGH',
-      label: 'High Risk',
+      label: 'Speculative',
       badgeBg: 'bg-orange-500/10',
       textColor: 'text-orange-700 dark:text-orange-400',
     };
@@ -119,8 +118,8 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
       title: 'Banker',
     },
     {
-      id: 'VALUE_HUNTER' as const,
-      title: 'Value',
+      id: 'PROBABILITY_CHASE' as const,
+      title: 'Confidence',
     },
     {
       id: 'HIGH_GOALS' as const,
@@ -134,9 +133,9 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
 
   if (isLoading && (!activeSlip || Object.keys(prebuiltSlips).length === 0)) {
     return (
-      <div className="p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center bg-white dark:bg-[#121216] rounded-3xl space-y-3 font-sans shadow-xs">
-        <Loader2 className="w-8 h-8 text-[#CCFF00] animate-spin shrink-0 mx-auto" />
-        <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+      <div className="p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-3 font-sans shadow-xs border border-theme">
+        <Loader2 className="w-8 h-8 text-theme-primary animate-spin shrink-0 mx-auto" />
+        <h3 className="text-xs font-bold text-theme-main">
           Generating Poisson Accumulators...
         </h3>
       </div>
@@ -145,23 +144,23 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
 
   if (!fixtures || fixtures.length === 0 || !activeSlip) {
     return (
-      <div className="p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center bg-white dark:bg-[#121216] rounded-3xl space-y-4 font-sans shadow-xs">
-        <div className="w-12 h-12 rounded-2xl bg-[#CCFF00]/15 dark:bg-[#CCFF00]/10 flex items-center justify-center text-slate-950 dark:text-[#CCFF00] shadow-xs">
+      <div className="p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-4 font-sans shadow-xs border border-theme">
+        <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shadow-xs">
           <RefreshCw className="w-6 h-6" />
         </div>
         <div className="space-y-1.5 max-w-md">
-          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+          <h3 className="text-sm font-extrabold text-theme-main">
             No Accumulators Available
           </h3>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
-            Accumulator slips require active match fixture predictions. Run a full data sync to calculate high-value parlays.
+          <p className="text-xs text-theme-sub font-medium">
+            Accumulator slips require active match fixture predictions. Run a full data sync to calculate high-confidence parlays.
           </p>
         </div>
         {onTriggerFullSync && (
           <button
             type="button"
             onClick={onTriggerFullSync}
-            className="px-4 py-2.5 bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b8e600] dark:text-slate-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 mt-1"
+            className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 mt-1"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Start Full Sync & Update Data</span>
@@ -172,22 +171,21 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
   }
 
   const risk = activeSlip ? calculateRiskProfile(activeSlip) : null;
-  const potentialPayout = activeSlip ? (stakeBenchmark * activeSlip.combinedOdds).toFixed(2) : '0.00';
 
   return (
-    <div className="bg-white dark:bg-[#121216] rounded-2xl p-4 space-y-3 font-sans flex-1 flex flex-col shadow-xs transition-all">
+    <div className="bg-theme-card rounded-2xl p-4 space-y-3 font-sans flex-1 flex flex-col shadow-xs transition-all border border-theme">
       {/* Header Bar */}
       <div className="flex items-center justify-between gap-2.5 pb-2">
         <div>
           <div className="flex items-center gap-1.5">
-            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <h2 className="text-sm font-extrabold text-theme-main tracking-tight">
               Poisson Accumulators
             </h2>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
-              +EV DB Predictions
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-theme-primary-subtle text-theme-primary font-mono tabular-nums">
+              AI Predictions
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium mt-0.5">Multi-leg parlays compiled from high-value predictions in DB</p>
+          <p className="text-xs text-theme-sub font-medium mt-0.5">Multi-leg parlays compiled from high-confidence predictions</p>
         </div>
 
         {/* Date Filter Dropdown */}
@@ -196,19 +194,19 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
             id="prebuilt-date-scope-dropdown"
             value={dateScope}
             onChange={(e) => setDateScope(e.target.value as any)}
-            className="bg-slate-100/80 dark:bg-[#18181D] text-slate-900 dark:text-white rounded-xl px-3 py-1.5 text-xs font-bold appearance-none cursor-pointer pr-7 focus:outline-none shadow-xs"
+            className="bg-theme-subtle text-theme-main rounded-xl px-3 py-1.5 text-xs font-bold appearance-none cursor-pointer pr-7 focus:outline-none shadow-xs border border-theme"
           >
             <option value="TODAY">Today's Matches</option>
             <option value="TOMORROW">Tomorrow</option>
             <option value="NEXT_3_DAYS">Next 3 Days</option>
             <option value="ALL">All Available Dates</option>
           </select>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" />
+          <ChevronDown className="w-3.5 h-3.5 text-theme-sub absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none shrink-0" />
         </div>
       </div>
 
       {/* Category Pills Switcher */}
-      <div className="bg-slate-100 dark:bg-[#1A1C24] p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs">
+      <div className="bg-theme-subtle p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs">
         {categories.map((cat) => {
           const isSelected = selectedCategory === cat.id;
           const slip = prebuiltSlips[cat.id];
@@ -220,16 +218,16 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               onClick={() => setSelectedCategory(cat.id)}
               className={`flex-1 min-w-[80px] min-h-[35px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 ${
                 isSelected
-                  ? 'bg-[#FF001F] text-white font-extrabold shadow-xs'
-                  : 'text-[#8F92A1] dark:text-[#9EA3B2] hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               <span>{cat.title}</span>
               {slip && (
                 <span className={`text-[10.5px] sm:text-xs font-mono tabular-nums font-bold px-1.5 py-0.2 rounded-full ${
-                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-[#272A34] text-slate-800 dark:text-neutral-300'
+                  isSelected ? 'bg-black/20 text-theme-primary-text font-black' : 'bg-black/10 dark:bg-white/10 text-theme-main'
                 }`}>
-                  {slip.combinedOdds.toFixed(1)}x
+                  {slip.legs.length}L
                 </span>
               )}
             </button>
@@ -241,29 +239,26 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
       {activeSlip && (
         <div className="space-y-3">
           {/* Key Metrics Bar */}
-          <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar flex-nowrap bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] p-2.5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar flex-nowrap bg-theme-card border border-theme p-2.5 rounded-2xl shadow-xs">
             <div className="flex items-center gap-1.5 text-xs flex-nowrap shrink-0 overflow-x-auto no-scrollbar">
-              <span className="bg-[#FF001F] text-white px-2.5 py-1 rounded-full font-mono tabular-nums font-bold text-xs whitespace-nowrap shrink-0 shadow-xs">
-                {activeSlip.combinedOdds.toFixed(2)}x Odds
+              <span className="bg-theme-primary text-theme-primary-text px-2.5 py-1 rounded-full font-mono tabular-nums font-black text-xs whitespace-nowrap shrink-0 shadow-xs">
+                {activeSlip.legs.length} Selections
               </span>
-              <span className="bg-slate-100 dark:bg-[#1E2027] px-2.5 py-1 rounded-full font-mono tabular-nums font-bold text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-                {(activeSlip.combinedProb * 100).toFixed(0)}% Prob
+              <span className="bg-theme-subtle px-2.5 py-1 rounded-full font-mono tabular-nums font-bold text-theme-main whitespace-nowrap shrink-0">
+                {(activeSlip.combinedProb * 100).toFixed(1)}% Combined Prob
               </span>
               {risk && (
                 <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${risk.badgeBg} ${risk.textColor} whitespace-nowrap shrink-0 font-mono tabular-nums`}>
                   {risk.label}
                 </span>
               )}
-              <span className="bg-slate-100 dark:bg-[#1E2027] px-2.5 py-1 rounded-full font-mono tabular-nums font-bold text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-                Est. Return: £{potentialPayout}
-              </span>
             </div>
 
             {/* Copy Slip Button */}
             <button
               type="button"
               onClick={() => handleCopySlip(activeSlip, activeSlip.id)}
-              className="px-3.5 py-1.5 min-h-[35px] rounded-full text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 bg-[#FF001F] text-white hover:bg-[#E6001C] shadow-xs whitespace-nowrap active:scale-95"
+              className="px-3.5 py-1.5 min-h-[35px] rounded-full text-xs font-black flex items-center gap-1 transition-all cursor-pointer shrink-0 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover shadow-xs whitespace-nowrap active:scale-95"
             >
               {copiedId === activeSlip.id ? (
                 <>
@@ -291,28 +286,28 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               return (
                 <div
                   key={`${leg.fixtureId}-${leg.marketKey}`}
-                  className="bg-slate-50 dark:bg-[#18181D] rounded-2xl p-4 transition-all hover:bg-slate-100/80 dark:hover:bg-[#18181D]/80 flex flex-col justify-between group shadow-xs space-y-3"
+                  className="bg-theme-card-elevated rounded-2xl p-4 transition-all hover:bg-theme-subtle flex flex-col justify-between group shadow-xs space-y-3 border border-theme"
                 >
                   <div>
                     {/* Top bar: Leg number, League, Time / Date */}
                     <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
                       <div className="flex items-center gap-2 min-w-0 flex-nowrap overflow-hidden">
-                        <span className="w-5 h-5 rounded-lg bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 font-mono tabular-nums text-xs font-black flex items-center justify-center shrink-0 shadow-xs">
+                        <span className="w-5 h-5 rounded-lg bg-theme-primary text-theme-primary-text font-mono tabular-nums text-xs font-black flex items-center justify-center shrink-0 shadow-xs">
                           {index + 1}
                         </span>
                         <span
-                          className="text-xs font-bold px-2.5 py-1 rounded-xl bg-white dark:bg-[#09090B] text-slate-700 dark:text-neutral-300 truncate whitespace-nowrap max-w-[180px] shadow-xs"
+                          className="text-xs font-bold px-2.5 py-1 rounded-xl bg-theme-subtle text-theme-main truncate whitespace-nowrap max-w-[180px] shadow-xs"
                           title={matchedFixture?.stage || matchedFixture?.leagueName || leg.league}
                         >
                           {matchedFixture?.stage || matchedFixture?.leagueName || leg.league}
                         </span>
-                        <span className="text-xs text-slate-400 dark:text-neutral-400 font-mono tabular-nums whitespace-nowrap shrink-0 font-medium">
+                        <span className="text-xs text-theme-sub font-mono tabular-nums whitespace-nowrap shrink-0 font-medium">
                           {matchedFixture ? formatLocalKickoffTime(matchedFixture) : (leg.fixtureDate === getRelativeDateStr(0) ? 'Today' : leg.fixtureDate === getRelativeDateStr(1) ? 'Tomorrow' : leg.fixtureDate)}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-white dark:bg-[#09090B] text-slate-500 dark:text-neutral-400 whitespace-nowrap shadow-xs font-mono tabular-nums">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-theme-subtle text-theme-sub whitespace-nowrap shadow-xs font-mono tabular-nums">
                           {leg.fixtureDate === getRelativeDateStr(0) ? 'Today' : leg.fixtureDate === getRelativeDateStr(1) ? 'Tomorrow' : leg.fixtureDate}
                         </span>
                       </div>
@@ -333,31 +328,31 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
                           )}
                           <span
                             onClick={() => matchedFixture && onSelectDetail && onSelectDetail(matchedFixture)}
-                            className={`text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate whitespace-nowrap ${matchedFixture ? 'cursor-pointer hover:underline' : ''}`}
+                            className={`text-xs sm:text-sm font-bold text-theme-main truncate whitespace-nowrap ${matchedFixture ? 'cursor-pointer hover:underline' : ''}`}
                             title={leg.homeTeam}
                           >
                             {leg.homeTeam}
                           </span>
                           {pred?.homeWinProb !== undefined && (
-                            <span className="font-mono tabular-nums text-xs font-black px-2 py-0.5 rounded-lg bg-white dark:bg-[#09090B] text-slate-900 dark:text-[#CCFF00] shrink-0 whitespace-nowrap shadow-xs">
+                            <span className="font-mono tabular-nums text-xs font-black px-2 py-0.5 rounded-lg bg-theme-subtle text-theme-primary shrink-0 whitespace-nowrap shadow-xs">
                               {homeProb}%
                             </span>
                           )}
                         </div>
                         {pred && (
-                          <span className="text-xs text-slate-400 dark:text-neutral-400 font-mono tabular-nums whitespace-nowrap shrink-0 mt-1 font-medium">
-                            xG: <strong className="text-slate-900 dark:text-white font-bold">{pred.homeXG}</strong>
+                          <span className="text-xs text-theme-sub font-mono tabular-nums whitespace-nowrap shrink-0 mt-1 font-medium">
+                            xG: <strong className="text-theme-main font-bold">{pred.homeXG}</strong>
                           </span>
                         )}
                       </div>
 
                       {/* VS Divider */}
                       <div className="col-span-2 flex flex-col items-center justify-center shrink-0">
-                        <span className="text-[10px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-wider whitespace-nowrap">VS</span>
+                        <span className="text-[10px] font-black text-theme-sub uppercase tracking-wider whitespace-nowrap">VS</span>
                         {matchedFixture && onSelectDetail && (
                           <button
                             onClick={() => onSelectDetail(matchedFixture)}
-                            className="mt-0.5 text-xs text-[#CCFF00] font-bold hover:underline flex items-center gap-0.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                            className="mt-0.5 text-xs text-theme-primary font-bold hover:underline flex items-center gap-0.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                             title="View Poisson probability matrix"
                           >
                             <Info className="w-3.5 h-3.5" />
@@ -370,13 +365,13 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
                       <div className="col-span-5 flex flex-col items-end text-right min-w-0">
                         <div className="flex items-center justify-end gap-2 min-w-0 flex-nowrap w-full">
                           {pred?.awayWinProb !== undefined && (
-                            <span className="font-mono tabular-nums text-xs font-black px-2 py-0.5 rounded-lg bg-white dark:bg-[#09090B] text-slate-900 dark:text-cyan-400 shrink-0 whitespace-nowrap shadow-xs">
+                            <span className="font-mono tabular-nums text-xs font-black px-2 py-0.5 rounded-lg bg-theme-subtle text-theme-primary shrink-0 whitespace-nowrap shadow-xs">
                               {awayProb}%
                             </span>
                           )}
                           <span
                             onClick={() => matchedFixture && onSelectDetail && onSelectDetail(matchedFixture)}
-                            className={`text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate whitespace-nowrap ${matchedFixture ? 'cursor-pointer hover:underline' : ''}`}
+                            className={`text-xs sm:text-sm font-bold text-theme-main truncate whitespace-nowrap ${matchedFixture ? 'cursor-pointer hover:underline' : ''}`}
                             title={leg.awayTeam}
                           >
                             {leg.awayTeam}
@@ -391,25 +386,22 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
                           )}
                         </div>
                         {pred && (
-                          <span className="text-xs text-slate-400 dark:text-neutral-400 font-mono tabular-nums whitespace-nowrap shrink-0 mt-1 font-medium">
-                            xG: <strong className="text-slate-900 dark:text-white font-bold">{pred.awayXG}</strong>
+                          <span className="text-xs text-theme-sub font-mono tabular-nums whitespace-nowrap shrink-0 mt-1 font-medium">
+                            xG: <strong className="text-theme-main font-bold">{pred.awayXG}</strong>
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Pick Selection Badge */}
-                    <div className="mt-3 p-3 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between text-xs shadow-xs">
+                    <div className="mt-3 p-3 rounded-xl bg-theme-subtle flex items-center justify-between text-xs shadow-xs">
                       <div className="flex items-center gap-2 truncate">
-                        <span className="text-slate-400 dark:text-neutral-400 font-medium">Selected Leg:</span>
-                        <span className="font-bold text-slate-900 dark:text-[#CCFF00]">{leg.selection}</span>
+                        <span className="text-theme-sub font-medium">Selection:</span>
+                        <span className="font-bold text-theme-primary">{leg.selection}</span>
                       </div>
                       <div className="flex items-center gap-2 font-mono tabular-nums shrink-0">
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          {(leg.probability * 100).toFixed(0)}%
-                        </span>
-                        <span className="font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#18181D] text-slate-900 dark:text-white">
-                          {leg.odds.toFixed(2)}
+                        <span className="font-bold text-theme-primary">
+                          {(leg.probability * 100).toFixed(0)}% AI Confidence
                         </span>
                       </div>
                     </div>

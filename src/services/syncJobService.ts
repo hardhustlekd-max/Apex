@@ -263,9 +263,7 @@ export class SyncJobService {
               awayTeam: sm.away.name,
               status: 'FINISHED' as const,
               score: { home: homeScore, away: awayScore },
-              odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
               prediction: undefined,
-              bestValueMarket: undefined
             });
           }
         }
@@ -302,7 +300,6 @@ export class SyncJobService {
             status: 'LIVE' as const,
             minute: s.minute,
             score: { home: s.homeScore, away: s.awayScore },
-            odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
           };
 
           // Attach pre-existing prediction if it exists in DB

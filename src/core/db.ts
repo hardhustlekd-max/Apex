@@ -13,7 +13,7 @@ export class FootballDB {
   private isInitialized = false;
   private fallbackSettings: EngineSettings = {
     rollingMatchWindow: 15,
-    minEVThreshold: 1.10,
+    minEVThreshold: 0,
     safeWinThreshold: 0.72,
     homeAdvantageFactor: 1.12,
     formDecayRate: 0.85,
@@ -144,8 +144,7 @@ export class FootballDB {
           id, provider_id, league, league_name, match_date, kick_off_time,
           home_team, away_team, home_badge, away_badge, stage,
           rest_days_home, rest_days_away,
-          b365_h, b365_d, b365_a, b365_over25, b365_under25,
-          b365_btts_yes, b365_btts_no, status, score_json,
+          status, score_json,
           prediction_json, markets_json, best_value_market_json,
           home_stats_json, away_stats_json, measurements_json, h2h_matches_json,
           information_json, statistics_json,
@@ -154,8 +153,7 @@ export class FootballDB {
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
+          ?, ?,
           ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?,
@@ -178,20 +176,12 @@ export class FootballDB {
             f.homeBadge || null,
             f.awayBadge || null,
             f.stage || null,
-            f.restDaysHome ?? 7,
-            f.restDaysAway ?? 7,
-            f.odds?.homeWin ?? 2.10,
-            f.odds?.draw ?? 3.30,
-            f.odds?.awayWin ?? 3.40,
-            f.odds?.over25 ?? 1.85,
-            f.odds?.under25 ?? 1.95,
-            f.odds?.bttsYes ?? 1.90,
-            f.odds?.bttsNo ?? 1.80,
+            f.restDaysHome ?? null,
+            f.restDaysAway ?? null,
             f.status || 'SCHEDULED',
             f.score ? JSON.stringify(f.score) : null,
             f.prediction ? JSON.stringify(f.prediction) : null,
             f.markets ? JSON.stringify(f.markets) : null,
-            f.bestValueMarket ? JSON.stringify(f.bestValueMarket) : null,
             f.homeStats ? JSON.stringify(f.homeStats) : null,
             f.awayStats ? JSON.stringify(f.awayStats) : null,
             f.measurements ? JSON.stringify(f.measurements) : null,
@@ -236,7 +226,8 @@ export class FootballDB {
     const cleanId = id.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '');
     
     try {
-      const row = sqliteDb.prepare("SELECT * FROM upcoming_fixtures WHERE id = ? OR id = ?").get(id, `fs_${cleanId}`) as any;
+      // 1. Check upcoming_fixtures
+      const row = sqliteDb.prepare("SELECT * FROM upcoming_fixtures WHERE id = ? OR id = ? OR id = ?").get(id, cleanId, `fs_${cleanId}`) as any;
       if (row) {
         return {
           id: String(row.id),
@@ -250,28 +241,63 @@ export class FootballDB {
           homeBadge: row.home_badge ? String(row.home_badge) : undefined,
           awayBadge: row.away_badge ? String(row.away_badge) : undefined,
           stage: row.stage ? String(row.stage) : undefined,
-          restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : 7,
-          restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : 7,
-          odds: {
-            homeWin: Number(row.b365_h || 2.10),
-            draw: Number(row.b365_d || 3.30),
-            awayWin: Number(row.b365_a || 3.40),
-            over25: row.b365_over25 ? Number(row.b365_over25) : 1.85,
-            under25: row.b365_under25 ? Number(row.b365_under25) : 1.95,
-            bttsYes: row.b365_btts_yes ? Number(row.b365_btts_yes) : undefined,
-            bttsNo: row.b365_btts_no ? Number(row.b365_btts_no) : undefined,
-          },
+          restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : undefined,
+          restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : undefined,
           status: (row.status as any) || 'SCHEDULED',
           score: row.score_json ? JSON.parse(row.score_json) : undefined,
           prediction: row.prediction_json ? JSON.parse(row.prediction_json) : undefined,
           markets: row.markets_json ? JSON.parse(row.markets_json) : undefined,
-          bestValueMarket: row.best_value_market_json ? JSON.parse(row.best_value_market_json) : undefined,
           homeStats: row.home_stats_json ? JSON.parse(row.home_stats_json) : undefined,
           awayStats: row.away_stats_json ? JSON.parse(row.away_stats_json) : undefined,
           measurements: row.measurements_json ? JSON.parse(row.measurements_json) : undefined,
           h2hMatches: row.h2h_matches_json ? JSON.parse(row.h2h_matches_json) : undefined,
           information: row.information_json ? JSON.parse(row.information_json) : undefined,
           statistics: row.statistics_json ? JSON.parse(row.statistics_json) : undefined,
+        };
+      }
+
+      // 2. Check historical_matches table
+      const histRow = sqliteDb.prepare(
+        "SELECT * FROM historical_matches WHERE id = ? OR id = ? OR id = ? OR id = ? LIMIT 1"
+      ).get(id, cleanId, `fs_hist_${cleanId}`, `hist_${cleanId}`) as any;
+
+      if (histRow) {
+        const fthg = Number(histRow.fthg) || 0;
+        const ftag = Number(histRow.ftag) || 0;
+        const homeShots = histRow.hs !== null && histRow.hs !== undefined ? Number(histRow.hs) : undefined;
+        const awayShots = histRow.as_shots !== null && histRow.as_shots !== undefined ? Number(histRow.as_shots) : undefined;
+        const homeTarget = histRow.hst !== null && histRow.hst !== undefined ? Number(histRow.hst) : undefined;
+        const awayTarget = histRow.ast !== null && histRow.ast !== undefined ? Number(histRow.ast) : undefined;
+
+        const stats: Array<{ category: string; homeValue?: any; awayValue?: any }> = [];
+        if (homeShots !== undefined && awayShots !== undefined) {
+          stats.push({ category: 'Goal Attempts', homeValue: homeShots, awayValue: awayShots });
+        }
+        if (homeTarget !== undefined && awayTarget !== undefined) {
+          stats.push({ category: 'Shots on Goal', homeValue: homeTarget, awayValue: awayTarget });
+        }
+        stats.push({ category: 'Goals', homeValue: fthg, awayValue: ftag });
+
+        const info = [
+          { category: 'Match Date', value: String(histRow.match_date) },
+          { category: 'Competition', value: String(histRow.div) },
+          { category: 'Status', value: 'Full Time' },
+          { category: 'Result', value: `${fthg} - ${ftag}` },
+        ];
+
+        return {
+          id: String(histRow.id),
+          providerId: 'FLASHSCORE',
+          league: String(histRow.div),
+          leagueName: String(histRow.div),
+          matchDate: normalizeDateStr(String(histRow.match_date)),
+          kickOffTime: 'FT',
+          homeTeam: String(histRow.home_team),
+          awayTeam: String(histRow.away_team),
+          status: 'FINISHED' as const,
+          score: { home: fthg, away: ftag },
+          statistics: stats,
+          information: info,
         };
       }
     } catch (err: any) {
@@ -346,22 +372,13 @@ export class FootballDB {
         homeBadge: row.home_badge ? String(row.home_badge) : undefined,
         awayBadge: row.away_badge ? String(row.away_badge) : undefined,
         stage: row.stage ? String(row.stage) : undefined,
-        restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : 7,
-        restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : 7,
-        odds: {
-          homeWin: Number(row.b365_h || 2.10),
-          draw: Number(row.b365_d || 3.30),
-          awayWin: Number(row.b365_a || 3.40),
-          over25: row.b365_over25 ? Number(row.b365_over25) : 1.85,
-          under25: row.b365_under25 ? Number(row.b365_under25) : 1.95,
-          bttsYes: row.b365_btts_yes ? Number(row.b365_btts_yes) : undefined,
-          bttsNo: row.b365_btts_no ? Number(row.b365_btts_no) : undefined,
-        },
+        restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : undefined,
+        restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : undefined,
         status: (row.status as any) || 'SCHEDULED',
         score: row.score_json ? JSON.parse(row.score_json) : undefined,
         prediction: row.prediction_json ? JSON.parse(row.prediction_json) : undefined,
         markets: row.markets_json ? JSON.parse(row.markets_json) : undefined,
-        bestValueMarket: row.best_value_market_json ? JSON.parse(row.best_value_market_json) : undefined,
+        // bestValueMarket: row.best_value_market_json ? JSON.parse(row.best_value_market_json) : undefined,
         homeStats: row.home_stats_json ? JSON.parse(row.home_stats_json) : undefined,
         awayStats: row.away_stats_json ? JSON.parse(row.away_stats_json) : undefined,
         measurements: row.measurements_json ? JSON.parse(row.measurements_json) : undefined,
@@ -376,12 +393,42 @@ export class FootballDB {
   }
 
   getTeamHistoricalMatches(teamName: string, limit = 20): HistoricalMatch[] {
+    if (!teamName) return [];
     try {
-      const rows = sqliteDb.prepare(`
+      const cleanName = teamName.trim();
+      const lowerName = cleanName.toLowerCase();
+      let rows = sqliteDb.prepare(`
         SELECT * FROM historical_matches 
         WHERE LOWER(home_team) = ? OR LOWER(away_team) = ? 
         ORDER BY match_date DESC LIMIT ?
-      `).all(teamName.toLowerCase(), teamName.toLowerCase(), limit) as any[];
+      `).all(lowerName, lowerName, limit) as any[];
+
+      // If fewer than 5 matches found, use tokenized core matching
+      if (rows.length < 5) {
+        const coreToken = cleanName
+          .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (coreToken.length >= 3) {
+          const coreLower = coreToken.toLowerCase();
+          const likePattern = `%${coreLower}%`;
+          const fuzzyRows = sqliteDb.prepare(`
+            SELECT * FROM historical_matches 
+            WHERE (LOWER(home_team) LIKE ? OR LOWER(away_team) LIKE ?)
+            ORDER BY match_date DESC LIMIT ?
+          `).all(likePattern, likePattern, limit) as any[];
+
+          const existingIds = new Set(rows.map((r) => String(r.id)));
+          for (const fr of fuzzyRows) {
+            if (!existingIds.has(String(fr.id))) {
+              rows.push(fr);
+              existingIds.add(String(fr.id));
+              if (rows.length >= limit) break;
+            }
+          }
+        }
+      }
 
       return rows.map((r) => ({
         id: String(r.id),
@@ -635,12 +682,23 @@ export class FootballDB {
 
   getPredictionMeasurement(fixtureId: string): HeadToHeadMeasurement | null {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
 
     try {
-      const row = sqliteDb.prepare("SELECT h2h_json FROM prediction_measurements_cache WHERE fixture_id = ?").get(cleanId) as any;
+      const row = sqliteDb.prepare(
+        "SELECT h2h_json FROM prediction_measurements_cache WHERE fixture_id = ? OR fixture_id = ?"
+      ).get(cleanId, fixtureId) as any;
       if (row && row.h2h_json) {
-        return JSON.parse(row.h2h_json);
+        const parsed = JSON.parse(row.h2h_json) as HeadToHeadMeasurement;
+        // Only return if it contains actual populated data
+        if (
+          parsed &&
+          (parsed.matchesCount > 0 ||
+            (parsed.homeRecentMatches && parsed.homeRecentMatches.length > 0) ||
+            (parsed.recentH2H && parsed.recentH2H.length > 0))
+        ) {
+          return parsed;
+        }
       }
     } catch (err: any) {
       console.error('[FootballDB] Error getting prediction measurement:', err?.message);

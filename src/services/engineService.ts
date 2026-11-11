@@ -13,9 +13,7 @@ import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
 
 let localSettings: EngineSettings = {
-  
   rollingMatchWindow: 15,
-  minEVThreshold: 1.10,
   safeWinThreshold: 0.72,
   homeAdvantageFactor: 1.12,
   formDecayRate: 0.85,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Settings, Cpu, Check, Sun, Moon, Terminal, Database, RefreshCw, RotateCcw, HardDrive, AlertTriangle, Server, XCircle, AlertCircle, Sparkles, TrendingUp, Target } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
+import { COLOR_THEMES, applyColorTheme, getActiveColorThemeId } from '../core/themeEngine.js';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -55,6 +56,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   syncProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'PREDICTIONS' | 'UI'>('ENGINE');
+  const [activeThemeId, setActiveThemeId] = useState<string>(
+    settings?.colorTheme || getActiveColorThemeId()
+  );
+
+  useEffect(() => {
+    if (settings?.colorTheme) {
+      setActiveThemeId(settings.colorTheme);
+      applyColorTheme(settings.colorTheme);
+    }
+  }, [settings?.colorTheme]);
+
+  const handleSelectColorTheme = (themeId: string) => {
+    setActiveThemeId(themeId);
+    applyColorTheme(themeId);
+    onSaveSettings({ colorTheme: themeId as any });
+  };
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [storageStatus, setStorageStatus] = useState<any>(null);
@@ -217,16 +234,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-white dark:bg-[#121212] text-slate-900 dark:text-slate-100 rounded-2xl w-full max-w-xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-theme-card text-theme-main rounded-2xl w-full max-w-xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col border border-theme">
         {/* Header */}
-        <div className="sticky top-0 bg-white/95 dark:bg-[#121212]/95 backdrop-blur-xl px-4 sm:px-5 py-3 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-theme-card/95 backdrop-blur-xl px-4 sm:px-5 py-3 flex items-center justify-between z-10 border-b border-theme">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-700 dark:text-slate-200">
+            <div className="p-2 rounded-full bg-theme-subtle text-theme-main">
               <Settings className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">Settings</h2>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure engine, data, predictions, and UI</p>
+              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-theme-main">Settings</h2>
+              <p className="text-[10px] text-theme-sub">Configure engine, data, predictions, and UI</p>
             </div>
           </div>
 
@@ -234,10 +251,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Quick Theme Toggle Button */}
             <button
               onClick={onToggleTheme}
-              className="flex items-center justify-center w-7.5 h-7.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-700 dark:text-neutral-200 hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer active:scale-95"
+              className="flex items-center justify-center w-7.5 h-7.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-primary-subtle transition-all cursor-pointer active:scale-95"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-700" />}
+              {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-theme-main" />}
             </button>
 
             {/* Quick Terminal Button */}
@@ -245,7 +262,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 id="settings-open-terminal-btn"
                 onClick={onOpenTerminal}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] text-slate-800 dark:text-neutral-200 hover:bg-[#CCFF00] hover:text-slate-950 dark:hover:bg-[#CCFF00] dark:hover:text-slate-950 transition-all cursor-pointer text-[10.5px] font-black active:scale-95"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-primary hover:text-theme-primary-text transition-all cursor-pointer text-[10.5px] font-black active:scale-95"
                 title="Terminal Logs"
               >
                 <Terminal className="w-3 h-3" />
@@ -256,7 +273,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Close Modal Button */}
             <button
               onClick={onClose}
-              className="w-7.5 h-7.5 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-[#1E1E1E] dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer hover:scale-105 active:scale-95 ml-0.5"
+              className="w-7.5 h-7.5 rounded-full flex items-center justify-center bg-theme-subtle text-theme-sub hover:text-theme-main transition-all cursor-pointer hover:scale-105 active:scale-95 ml-0.5"
               aria-label="Close settings"
             >
               <X className="w-4 h-4" />
@@ -266,13 +283,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Navigation Tabs: Engine, Data Management, Predictions, UI */}
         <div className="px-4 sm:px-5 pb-1.5 pt-1">
-          <div className="p-1 bg-slate-100 dark:bg-[#1E1E1E] rounded-full flex items-center gap-1 text-[10.5px] overflow-x-auto no-scrollbar">
+          <div className="p-1 bg-theme-subtle rounded-full flex items-center gap-1 text-[10.5px] overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveTab('ENGINE')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'ENGINE'
-                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               <Cpu className="w-3 h-3" />
@@ -282,8 +299,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('DATA')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'DATA'
-                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               <Database className="w-3 h-3" />
@@ -293,8 +310,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('PREDICTIONS')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'PREDICTIONS'
-                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400" />
@@ -304,8 +321,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('UI')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'UI'
-                  ? 'bg-slate-900 text-white dark:bg-[#CCFF00] dark:text-slate-950 shadow-xs'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-xs'
+                  : 'text-theme-sub hover:text-theme-main'
               }`}
             >
               <Sun className="w-3 h-3" />
@@ -747,54 +764,154 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'UI' && (
             <div className="space-y-4">
               {/* Appearance / Theme Selector */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-subtle border border-theme space-y-3 shadow-xs">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Theme & Appearance</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Choose between light and dark modes</p>
+                  <h3 className="text-sm font-bold text-theme-main">Theme & Appearance</h3>
+                  <p className="text-xs text-theme-sub">Choose between light and dark modes</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <button
                     type="button"
                     onClick={() => theme !== 'light' && onToggleTheme()}
-                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border ${
                       theme === 'light'
-                        ? 'bg-white text-slate-950 shadow-md'
-                        : 'bg-white/60 dark:bg-[#121212] text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                        ? 'bg-theme-card text-theme-main border-theme-primary shadow-md ring-2 ring-theme-accent'
+                        : 'bg-theme-card/60 text-theme-sub border-theme hover:bg-theme-card hover:text-theme-main'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-full bg-amber-100 text-amber-600">
+                      <div className="p-2 rounded-full bg-amber-500/10 text-amber-500">
                         <Sun className="w-4 h-4" />
                       </div>
                       <div className="text-left">
-                        <span className="text-xs font-bold block text-slate-900 dark:text-white">Light Mode</span>
-                        <span className="text-[10px] text-slate-500">Day visual mode</span>
+                        <span className="text-xs font-bold block text-theme-main">Light Mode</span>
+                        <span className="text-[10px] text-theme-sub">Day visual mode</span>
                       </div>
                     </div>
-                    {theme === 'light' && <Check className="w-4 h-4 text-slate-950" />}
+                    {theme === 'light' && <Check className="w-4 h-4 text-theme-main" />}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => theme !== 'dark' && onToggleTheme()}
-                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border ${
                       theme === 'dark'
-                        ? 'bg-[#18181D] text-white shadow-md'
-                        : 'bg-white/60 dark:bg-[#121212] text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                        ? 'bg-theme-card text-theme-main border-theme-primary shadow-md ring-2 ring-theme-accent'
+                        : 'bg-theme-card/60 text-theme-sub border-theme hover:bg-theme-card hover:text-theme-main'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-full bg-[#1E1E1E] text-amber-400">
+                      <div className="p-2 rounded-full bg-theme-subtle text-amber-400">
                         <Moon className="w-4 h-4" />
                       </div>
                       <div className="text-left">
-                        <span className="text-xs font-bold block text-slate-900 dark:text-white">Dark Mode</span>
-                        <span className="text-[10px] text-slate-400">Night visual mode</span>
+                        <span className="text-xs font-bold block text-theme-main">Dark Mode</span>
+                        <span className="text-[10px] text-theme-sub">Night visual mode</span>
                       </div>
                     </div>
-                    {theme === 'dark' && <Check className="w-4 h-4 text-[#CCFF00]" />}
+                    {theme === 'dark' && <Check className="w-4 h-4 text-theme-primary" />}
                   </button>
+                </div>
+              </div>
+
+              {/* World-Class Color System Theme Selector */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-subtle border border-theme space-y-3 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-theme-main flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-theme-primary" />
+                      <span>Color Palette Systems</span>
+                    </h3>
+                    <span className="text-[10px] font-mono tabular-nums font-bold px-2 py-0.5 rounded-full bg-theme-card border border-theme text-theme-main">
+                      Adaptive Light &amp; Dark
+                    </span>
+                  </div>
+                  <p className="text-xs text-theme-sub mt-0.5">
+                    Select an expert color palette. Each system dynamically adapts all surfaces, typography, model picks, and live status signals to its distinct colorway.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {COLOR_THEMES.map((t) => {
+                    const isSelected = activeThemeId === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => handleSelectColorTheme(t.id)}
+                        className={`group relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-theme-card border-theme-primary shadow-md ring-2 ring-theme-accent'
+                            : 'bg-theme-card/80 border-theme hover:bg-theme-card hover:border-theme-primary/50'
+                        }`}
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-black text-theme-main truncate">
+                              {t.name}
+                            </span>
+                            {isSelected ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-theme-primary text-theme-primary-text shrink-0 shadow-xs">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                                <span>Active</span>
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-[10.5px] font-medium text-theme-sub leading-snug">
+                            {t.description}
+                          </p>
+
+                          {/* Colorway Pills */}
+                          {t.colorways && t.colorways.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {t.colorways.map((cw, i) => (
+                                <span
+                                  key={i}
+                                  className="text-[9.5px] px-1.5 py-0.5 rounded bg-theme-subtle text-theme-sub font-mono font-medium"
+                                >
+                                  {cw}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Color Swatch Bar */}
+                        <div className="pt-2 border-t border-theme flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className="w-4 h-4 rounded-full shadow-xs border border-black/10 shrink-0"
+                              style={{ backgroundColor: t.previewColors.primary }}
+                              title={`Primary Accent: ${t.accentName}`}
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full shadow-xs border border-black/10 shrink-0"
+                              style={{ backgroundColor: t.previewColors.modelPick }}
+                              title={`Model Pick & Value: ${t.modelPickName}`}
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full shadow-xs border border-black/10 shrink-0"
+                              style={{ backgroundColor: t.previewColors.live }}
+                              title="Live Status Signal"
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full shadow-xs border border-black/10 shrink-0"
+                              style={{ backgroundColor: t.previewColors.surfaceDark }}
+                              title="Dark Surface Canvas"
+                            />
+                            <div
+                              className="w-4 h-4 rounded-full shadow-xs border border-black/10 shrink-0"
+                              style={{ backgroundColor: t.previewColors.surfaceLight }}
+                              title="Light Surface Canvas"
+                            />
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-theme-sub truncate">
+                            {t.accentName}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

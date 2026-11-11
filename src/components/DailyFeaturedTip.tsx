@@ -56,8 +56,8 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-[#121216] rounded-2xl p-8 flex items-center justify-center border border-[#ECEEF2] dark:border-[#20232D]">
-        <Loader2 className="w-8 h-8 text-[#FF001F] dark:text-[#CCFF00] animate-spin" />
+      <div className="bg-theme-card rounded-2xl p-8 flex items-center justify-center border border-theme">
+        <Loader2 className="w-8 h-8 text-theme-primary animate-spin" />
       </div>
     );
   }
@@ -67,13 +67,13 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
   const { fixture, market } = featuredTip;
 
   return (
-    <div className="bg-white dark:bg-[#121216] rounded-2xl p-5 shadow-xs border border-[#ECEEF2] dark:border-[#20232D] space-y-4">
+    <div className="bg-theme-card rounded-2xl p-5 shadow-xs border border-theme space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[#FF001F] dark:text-[#CCFF00]">
+        <div className="flex items-center gap-2 text-theme-primary">
           <Award className="w-5 h-5" />
-          <h2 className="text-sm font-black uppercase tracking-wider">Daily Featured Tip</h2>
+          <h2 className="text-sm font-black uppercase tracking-wider text-theme-main">Daily Featured Tip</h2>
         </div>
-        <span className="text-[10px] font-mono tabular-nums font-bold bg-slate-100 dark:bg-[#1A1C24] px-2 py-1 rounded-full">
+        <span className="text-[10px] font-mono tabular-nums font-bold bg-theme-subtle text-theme-main px-2 py-1 rounded-full">
           Highest Confidence
         </span>
       </div>
@@ -83,25 +83,25 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
         onClick={() => onSelectDetail && onSelectDetail(fixture)}
       >
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-slate-500 dark:text-neutral-400 mb-1">
+          <div className="text-xs font-bold text-theme-sub mb-1">
             {fixture.leagueName} · {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
           </div>
-          <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+          <div className="text-sm font-extrabold text-theme-main truncate">
             {fixture.homeTeam} vs {fixture.awayTeam}
           </div>
-          <div className="text-xs font-bold text-[#FF001F] dark:text-[#CCFF00] mt-1">
+          <div className="text-xs font-bold text-theme-model-pick mt-1">
             Pick: {market?.name} @ {market?.odds.toFixed(2)}
           </div>
         </div>
         
         <div className="flex items-center gap-2">
           <div className="text-right">
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tabular-nums">
+            <div className="text-2xl font-black text-theme-main font-mono tabular-nums">
               {(market?.probability! * 100).toFixed(0)}%
             </div>
-            <div className="text-[10px] font-bold text-slate-400">Confidence</div>
+            <div className="text-[10px] font-bold text-theme-sub">Confidence</div>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
+          <ChevronRight className="w-5 h-5 text-theme-sub group-hover:text-theme-main transition-colors" />
         </div>
       </div>
     </div>

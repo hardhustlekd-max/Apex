@@ -62,19 +62,15 @@ export class PredictionsDB {
           INSERT OR REPLACE INTO upcoming_predictions (
             fixture_id, league, league_name, stage, match_date, kick_off_time,
             home_team, away_team, home_badge, away_badge, status,
-            b365_h, b365_d, b365_a,
             home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
             over15_prob, over25_prob, over35_prob, btts_prob,
-            tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-            is_positive_ev, is_banker, full_fixture_json, predicted_at
+            tip_key, tip_name, tip_prob, full_fixture_json, predicted_at
           ) VALUES (
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
-            ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?
+            ?, ?, ?, ?, ?
           )
         `);
 
@@ -84,7 +80,7 @@ export class PredictionsDB {
           for (const f of rows) {
             try {
               const pred = f.prediction;
-              const bestTip = f.bestValueMarket;
+              const bestTip = f.mostLikelyOutcome;
 
               stmt.run(
                 f.id,
@@ -98,25 +94,18 @@ export class PredictionsDB {
                 f.homeBadge || null,
                 f.awayBadge || null,
                 f.status || 'SCHEDULED',
-                f.odds?.homeWin || 2.10,
-                f.odds?.draw || 3.30,
-                f.odds?.awayWin || 3.40,
-                pred?.homeXG ?? 1.35,
-                pred?.awayXG ?? 1.15,
-                pred?.homeWinProb ?? 0.45,
-                pred?.drawProb ?? 0.28,
-                pred?.awayWinProb ?? 0.27,
-                pred?.over15Prob ?? 0.75,
-                pred?.over25Prob ?? 0.52,
-                pred?.over35Prob ?? 0.28,
-                pred?.bttsProb ?? 0.50,
-                bestTip?.key || 'HOME_WIN',
-                bestTip?.name || 'Home Win',
-                bestTip?.odds || f.odds?.homeWin || 2.10,
-                bestTip?.probability || pred?.homeWinProb || 0.45,
-                bestTip?.expectedValue || 1.05,
-                bestTip?.isPositiveEV ? 1 : 0,
-                bestTip?.isBanker ? 1 : 0,
+                pred?.homeXG ?? null,
+                pred?.awayXG ?? null,
+                pred?.homeWinProb ?? null,
+                pred?.drawProb ?? null,
+                pred?.awayWinProb ?? null,
+                pred?.over15Prob ?? null,
+                pred?.over25Prob ?? null,
+                pred?.over35Prob ?? null,
+                pred?.bttsProb ?? null,
+                bestTip?.marketKey || null,
+                (bestTip as any)?.selection || bestTip?.marketKey || null,
+                bestTip?.probability || pred?.homeWinProb || null,
                 this.sanitizeFixtureForStorage(f),
                 now
               );
@@ -212,15 +201,24 @@ export class PredictionsDB {
 
   getPredictionById(fixtureId: string): Fixture | null {
     if (!fixtureId) return null;
-    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '');
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '');
 
     try {
       const row = sqliteDb.prepare(`
-        SELECT full_fixture_json FROM upcoming_predictions WHERE fixture_id = ? OR fixture_id = ?
+        SELECT full_fixture_json FROM upcoming_predictions 
+        WHERE fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ?
         UNION
-        SELECT full_fixture_json FROM historical_predictions WHERE fixture_id = ? OR fixture_id = ?
+        SELECT full_fixture_json FROM live_predictions 
+        WHERE fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ?
+        UNION
+        SELECT full_fixture_json FROM historical_predictions 
+        WHERE fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ? OR fixture_id = ?
         LIMIT 1
-      `).get(fixtureId, `fs_${cleanId}`, fixtureId, `fs_${cleanId}`) as any;
+      `).get(
+        fixtureId, cleanId, `fs_${cleanId}`, `hist_${cleanId}`, `fs_hist_${cleanId}`,
+        fixtureId, cleanId, `fs_${cleanId}`, `hist_${cleanId}`, `fs_hist_${cleanId}`,
+        fixtureId, cleanId, `fs_${cleanId}`, `hist_${cleanId}`, `fs_hist_${cleanId}`
+      ) as any;
 
       if (row && row.full_fixture_json) {
         return JSON.parse(row.full_fixture_json) as Fixture;
@@ -277,18 +275,18 @@ export class PredictionsDB {
         INSERT OR REPLACE INTO live_predictions (
           fixture_id, league, league_name, match_date, kick_off_time,
           home_team, away_team, status, predicted_at,
-          b365_h, b365_d, b365_a, home_xg, away_xg,
+          home_xg, away_xg,
           home_win_prob, draw_prob, away_win_prob,
           over15_prob, over25_prob, over35_prob, btts_prob,
-          tip_key, tip_name, tip_odds, tip_prob, tip_ev,
+          tip_key, tip_name, tip_prob,
           full_fixture_json
         ) VALUES (
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?,
           ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?, ?,
           ?
         )
       `);
@@ -297,7 +295,7 @@ export class PredictionsDB {
       const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
         for (const f of rows) {
           const pred = f.prediction;
-          const bestTip = f.bestValueMarket;
+          const bestTip = f.mostLikelyOutcome;
 
           stmt.run(
             f.id,
@@ -309,23 +307,18 @@ export class PredictionsDB {
             f.awayTeam,
             'LIVE',
             now,
-            f.odds?.homeWin || 2.10,
-            f.odds?.draw || 3.30,
-            f.odds?.awayWin || 3.40,
-            pred?.homeXG ?? 1.35,
-            pred?.awayXG ?? 1.15,
-            pred?.homeWinProb ?? 0.45,
-            pred?.drawProb ?? 0.28,
-            pred?.awayWinProb ?? 0.27,
-            pred?.over15Prob ?? 0.75,
-            pred?.over25Prob ?? 0.52,
-            pred?.over35Prob ?? 0.28,
-            pred?.bttsProb ?? 0.50,
-            bestTip?.key || 'HOME_WIN',
-            bestTip?.name || 'Home Win',
-            bestTip?.odds || f.odds?.homeWin || 2.10,
-            bestTip?.probability || pred?.homeWinProb || 0.45,
-            bestTip?.expectedValue || 1.05,
+            pred?.homeXG ?? null,
+            pred?.awayXG ?? null,
+            pred?.homeWinProb ?? null,
+            pred?.drawProb ?? null,
+            pred?.awayWinProb ?? null,
+            pred?.over15Prob ?? null,
+            pred?.over25Prob ?? null,
+            pred?.over35Prob ?? null,
+            pred?.bttsProb ?? null,
+            bestTip?.marketKey || null,
+            bestTip?.selection || bestTip?.marketKey || null,
+            bestTip?.probability || pred?.homeWinProb || null,
             this.sanitizeFixtureForStorage(f)
           );
         }
@@ -377,20 +370,16 @@ export class PredictionsDB {
           fixture_id, league, league_name, stage, match_date, kick_off_time,
           home_team, away_team, home_badge, away_badge, status,
           home_score, away_score,
-          b365_h, b365_d, b365_a,
           home_xg, away_xg, home_win_prob, draw_prob, away_win_prob,
           over15_prob, over25_prob, over35_prob, btts_prob,
-          tip_key, tip_name, tip_odds, tip_prob, tip_ev,
-          is_positive_ev, is_banker, full_fixture_json, predicted_at
+          tip_key, tip_name, tip_prob, full_fixture_json, predicted_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?,
-          ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?
+          ?, ?, ?, ?, ?
         )
       `);
 
@@ -398,7 +387,7 @@ export class PredictionsDB {
       const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
         for (const f of rows) {
           const pred = f.prediction;
-          const bestTip = f.bestValueMarket;
+          const bestTip = f.mostLikelyOutcome;
 
           stmt.run(
             f.id,
@@ -414,25 +403,18 @@ export class PredictionsDB {
             'FINISHED',
             f.score?.home ?? 0,
             f.score?.away ?? 0,
-            f.odds?.homeWin || 2.10,
-            f.odds?.draw || 3.30,
-            f.odds?.awayWin || 3.40,
-            pred?.homeXG ?? 1.35,
-            pred?.awayXG ?? 1.15,
-            pred?.homeWinProb ?? 0.45,
-            pred?.drawProb ?? 0.28,
-            pred?.awayWinProb ?? 0.27,
-            pred?.over15Prob ?? 0.75,
-            pred?.over25Prob ?? 0.52,
-            pred?.over35Prob ?? 0.28,
-            pred?.bttsProb ?? 0.50,
-            bestTip?.key || 'HOME_WIN',
-            bestTip?.name || 'Home Win',
-            bestTip?.odds || f.odds?.homeWin || 2.10,
-            bestTip?.probability || pred?.homeWinProb || 0.45,
-            bestTip?.expectedValue || 1.05,
-            bestTip?.isPositiveEV ? 1 : 0,
-            bestTip?.isBanker ? 1 : 0,
+            pred?.homeXG ?? null,
+            pred?.awayXG ?? null,
+            pred?.homeWinProb ?? null,
+            pred?.drawProb ?? null,
+            pred?.awayWinProb ?? null,
+            pred?.over15Prob ?? null,
+            pred?.over25Prob ?? null,
+            pred?.over35Prob ?? null,
+            pred?.bttsProb ?? null,
+            bestTip?.marketKey || null,
+            bestTip?.selection || bestTip?.marketKey || null,
+            bestTip?.probability || pred?.homeWinProb || null,
             this.sanitizeFixtureForStorage(f),
             now
           );

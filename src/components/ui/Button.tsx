@@ -13,10 +13,14 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    primary: 'bg-[#CCFF00] hover:bg-[#b8e600] text-slate-950 font-black shadow-xs active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-500',
-    secondary: 'bg-slate-100 dark:bg-[#18181D] hover:bg-slate-200 dark:hover:bg-[#27272A] text-slate-900 dark:text-white font-bold shadow-xs active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-500',
-    danger: 'bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-500',
-    ghost: 'bg-transparent hover:bg-slate-100 dark:hover:bg-[#18181D] text-slate-900 dark:text-neutral-200 font-bold active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-500',
+    primary:
+      'bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-black shadow-xs active:scale-95 focus-visible:ring-2',
+    secondary:
+      'bg-theme-subtle hover:bg-theme-card-elevated text-theme-main border border-theme font-bold shadow-xs active:scale-95 focus-visible:ring-2',
+    danger:
+      'bg-theme-live hover:opacity-90 text-white font-bold shadow-xs active:scale-95 focus-visible:ring-2',
+    ghost:
+      'bg-transparent hover:bg-theme-subtle text-theme-main font-bold active:scale-95 focus-visible:ring-2',
   };
 
   return (

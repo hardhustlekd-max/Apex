@@ -119,21 +119,21 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#121212] text-slate-100 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono text-[10.5px]">
+      <div className="bg-theme-card border border-theme text-theme-main rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono text-[10.5px]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#121212]">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-theme-card border-b border-theme">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-full bg-[#CCFF00] text-slate-950 font-black">
+            <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-black">
               <Terminal className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-xs sm:text-sm tracking-wide font-sans">Terminal Logs</span>
-                <span className="px-2 py-0.5 rounded-full text-[8.5px] bg-neutral-800 text-neutral-200 font-mono tabular-nums font-bold">
+                <span className="font-extrabold text-theme-main text-xs sm:text-sm tracking-wide font-sans">Terminal Logs</span>
+                <span className="px-2 py-0.5 rounded-full text-[8.5px] bg-theme-subtle text-theme-sub font-mono tabular-nums font-bold border border-theme">
                   {filteredLogs.length} events
                 </span>
               </div>
-              <p className="text-[10px] text-neutral-400 font-sans">
+              <p className="text-[10px] text-theme-sub font-sans">
                 Real-time data fetching, prediction engine, and system diagnostics
               </p>
             </div>
@@ -143,21 +143,21 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             <button
               onClick={fetchLogs}
               disabled={isLoading}
-              className="w-7.5 h-7.5 rounded-full bg-neutral-800 hover:bg-[#CCFF00] hover:text-slate-950 text-neutral-200 transition-all cursor-pointer flex items-center justify-center active:scale-95"
+              className="w-7.5 h-7.5 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-all cursor-pointer flex items-center justify-center active:scale-95"
               title="Refresh"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#CCFF00]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-theme-primary' : ''}`} />
             </button>
             <button
               onClick={handleClear}
-              className="w-7.5 h-7.5 rounded-full bg-neutral-800 hover:bg-rose-500 hover:text-white text-neutral-200 transition-all cursor-pointer flex items-center justify-center active:scale-95"
+              className="w-7.5 h-7.5 rounded-full bg-theme-subtle hover:bg-rose-500 hover:text-white text-theme-main transition-all cursor-pointer flex items-center justify-center active:scale-95"
               title="Clear Terminal"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onClose}
-              className="w-7.5 h-7.5 rounded-full bg-neutral-800 hover:bg-[#CCFF00] hover:text-slate-950 text-neutral-200 transition-all cursor-pointer flex items-center justify-center active:scale-95"
+              className="w-7.5 h-7.5 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-all cursor-pointer flex items-center justify-center active:scale-95"
               title="Close"
             >
               <X className="w-4 h-4 stroke-[2.5]" />
@@ -166,7 +166,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Filter bar */}
-        <div className="px-4 py-2.5 bg-[#161616] flex flex-wrap items-center justify-between gap-2 font-sans">
+        <div className="px-4 py-2.5 bg-theme-subtle border-b border-theme flex flex-wrap items-center justify-between gap-2 font-sans">
           {/* Category Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
             {['ALL', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
@@ -175,8 +175,8 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1 rounded-full text-[10px] font-extrabold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
                   selectedCategory === cat
-                    ? 'bg-[#CCFF00] text-slate-950 shadow-xs'
-                    : 'bg-neutral-800 text-neutral-300 hover:text-white'
+                    ? 'bg-theme-primary text-theme-primary-text shadow-xs'
+                    : 'bg-theme-card text-theme-sub hover:text-theme-main border border-theme'
                 }`}
               >
                 {cat === 'ALL'

@@ -4,7 +4,6 @@ import {
   CorrectScoreProb,
   TeamStatsSummary,
   TeamFormMatch,
-  BookmakerOdds,
   MarketOption,
   EngineSettings,
   HeadToHeadMeasurement,
@@ -16,7 +15,6 @@ import {
   XGBreakdown,
   TacticalContextBreakdown,
   MostLikelyOutcome,
-  ProfitableBet,
   DixonColesParams,
   MatchTacticalContextInput,
 } from './types.js';
@@ -188,11 +186,7 @@ export class ApexEngine {
 
     let syntheticBase = 50.0;
     if (formWeightTotal === 0) {
-      let hash = 0;
-      for (let i = 0; i < teamName.length; i++) {
-        hash = (hash * 31 + teamName.charCodeAt(i)) % 1000;
-      }
-      syntheticBase = 42 + (hash % 25); // Deterministic variance between 42 and 66 per team
+      syntheticBase = 50.0; // Strictly neutral baseline
     }
 
     const formDominance = formWeightTotal > 0
@@ -360,11 +354,7 @@ export class ApexEngine {
         return val;
       }
     }
-    let hash = 0;
-    for (let i = 0; i < teamName.length; i++) {
-      hash = (hash * 31 + teamName.charCodeAt(i)) % 1000;
-    }
-    return 1440 + (hash % 130);
+    return 1500; // Strictly neutral baseline for unknown teams
   }
 
   public static getEloWinExpectancy(
@@ -466,17 +456,11 @@ export class ApexEngine {
     }
 
     if (recentMatchesList.length === 0) {
-      let hash = 0;
-      for (let i = 0; i < teamName.length; i++) {
-        hash = (hash * 31 + teamName.charCodeAt(i)) % 1000;
-      }
-      const seedXG = Number((1.15 + ((hash % 50) / 100)).toFixed(2));
-      const seedXGA = Number((1.05 + (((hash * 3) % 45) / 100)).toFixed(2));
       return {
-        rawXG: seedXG,
-        rawXGA: seedXGA,
-        adjustedXG: seedXG,
-        adjustedXGA: seedXGA,
+        rawXG: 0.0,
+        rawXGA: 0.0,
+        adjustedXG: 0.0,
+        adjustedXGA: 0.0,
         opponentAdjustmentFactor: 1.0,
         rollingMatchesCount: 0,
         formattedRecent: [],
@@ -570,27 +554,31 @@ export class ApexEngine {
     awayTeam: string,
     context?: MatchTacticalContextInput
   ): TacticalContextBreakdown {
-    const restHome = context?.restDaysHome ?? 7;
-    const restAway = context?.restDaysAway ?? 7;
-    const restDiff = restHome - restAway;
+    const restHome = context?.restDaysHome;
+    const restAway = context?.restDaysAway;
+    const restDiff = (restHome !== undefined && restAway !== undefined) ? (restHome - restAway) : 0;
 
     let fatigueHome = 1.0;
     let fatigueAway = 1.0;
     const tacticalNotes: string[] = [];
 
     // Rest days impact: matches with <= 3 days rest experience acute fatigue
-    if (restHome <= 3) {
-      fatigueHome *= 0.94;
-      tacticalNotes.push(`${homeTeam} short turnaround (${restHome} days rest)`);
-    } else if (restHome >= 6) {
-      fatigueHome *= 1.02;
+    if (restHome !== undefined) {
+      if (restHome <= 3) {
+        fatigueHome *= 0.94;
+        tacticalNotes.push(`${homeTeam} short turnaround (${restHome} days rest)`);
+      } else if (restHome >= 6) {
+        fatigueHome *= 1.02;
+      }
     }
 
-    if (restAway <= 3) {
-      fatigueAway *= 0.94;
-      tacticalNotes.push(`${awayTeam} short turnaround (${restAway} days rest)`);
-    } else if (restAway >= 6) {
-      fatigueAway *= 1.02;
+    if (restAway !== undefined) {
+      if (restAway <= 3) {
+        fatigueAway *= 0.94;
+        tacticalNotes.push(`${awayTeam} short turnaround (${restAway} days rest)`);
+      } else if (restAway >= 6) {
+        fatigueAway *= 1.02;
+      }
     }
 
     // Evaluate information items (injuries, suspensions, referee, venue)
@@ -985,88 +973,57 @@ export class ApexEngine {
    * As emphasized by football prediction literature:
    * "A team can be the most likely winner and still be a poor bet if the odds are too low."
    */
+  /**
+   * Refactored to remove all odds-related calculations.
+   * Focuses strictly on market probabilities and identifying "Banker" status.
+   */
   public static calculateMarkets(
     prediction: PoissonPrediction,
-    odds: BookmakerOdds,
     settings: EngineSettings,
     homeTeam: string,
     awayTeam: string
   ): {
     markets: MarketOption[];
-    bestValueMarket?: MarketOption;
     mostLikelyOutcome?: MostLikelyOutcome;
-    profitableBet?: ProfitableBet;
   } {
     const markets: MarketOption[] = [];
 
     const addMarket = (
       key: MarketOption['key'],
       name: string,
-      odd: number | undefined,
       prob: number
     ) => {
-      if (!odd || odd <= 1.0) return;
-      const impliedProb = Number((1 / odd).toFixed(4));
-      const expectedValue = Number(((prob * odd) - 1.0).toFixed(4));
-      const fairOdds = prob > 0 ? Number((1 / prob).toFixed(2)) : 99.0;
-      const valueEdge = Number(((prob - impliedProb) * 100).toFixed(2));
-
-      // Kelly Criterion fraction: f* = EV / (odds - 1)
-      const kellyFraction = expectedValue > 0
-        ? Number(Math.max(0, expectedValue / (odd - 1.0)).toFixed(4))
-        : 0;
-
-      // Positive EV threshold from settings (+EV threshold 1.10 -> 0.10 edge)
-      const minEV = settings?.minEVThreshold ? (settings.minEVThreshold - 1.0) : 0.10;
-      const isPositiveEV = expectedValue >= minEV;
       const isBanker = prob >= (settings.safeWinThreshold || 0.70);
 
       markets.push({
         key,
         name,
-        odds: odd,
         probability: prob,
-        impliedProb,
-        expectedValue,
-        isPositiveEV,
         isBanker,
-        fairOdds,
-        valueEdge,
-        kellyFraction,
       });
     };
 
     // 1X2 Match Outcomes
-    addMarket('HOME_WIN', `${homeTeam} to Win`, odds.homeWin, prediction.homeWinProb);
-    addMarket('DRAW', 'Draw', odds.draw, prediction.drawProb);
-    addMarket('AWAY_WIN', `${awayTeam} to Win`, odds.awayWin, prediction.awayWinProb);
+    addMarket('HOME_WIN', `${homeTeam} to Win`, prediction.homeWinProb);
+    addMarket('DRAW', 'Draw', prediction.drawProb);
+    addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
 
     // Goal Totals
-    const over25Odd = odds.over25 && odds.over25 > 1.0 ? odds.over25 : (prediction.over25Prob > 0 ? Number((1 / prediction.over25Prob).toFixed(2)) : undefined);
-    const under25Odd = odds.under25 && odds.under25 > 1.0 ? odds.under25 : (prediction.over25Prob < 1 ? Number((1 / (1 - prediction.over25Prob)).toFixed(2)) : undefined);
-    if (over25Odd) addMarket('OVER_25', 'Over 2.5 Goals', over25Odd, prediction.over25Prob);
-    if (under25Odd) addMarket('UNDER_25', 'Under 2.5 Goals', under25Odd, Number((1 - prediction.over25Prob).toFixed(3)));
+    addMarket('OVER_25', 'Over 2.5 Goals', prediction.over25Prob);
+    addMarket('UNDER_25', 'Under 2.5 Goals', Number((1 - prediction.over25Prob).toFixed(3)));
 
     // Both Teams to Score
-    const bttsYesOdd = odds.bttsYes && odds.bttsYes > 1.0 ? odds.bttsYes : (prediction.bttsProb > 0 ? Number((1 / prediction.bttsProb).toFixed(2)) : undefined);
-    const bttsNoOdd = odds.bttsNo && odds.bttsNo > 1.0 ? odds.bttsNo : (prediction.bttsProb < 1 ? Number((1 / (1 - prediction.bttsProb)).toFixed(2)) : undefined);
-    if (bttsYesOdd) addMarket('BTTS_YES', 'Both Teams to Score', bttsYesOdd, prediction.bttsProb);
-    if (bttsNoOdd) addMarket('BTTS_NO', 'Both Teams to Score No', bttsNoOdd, Number((1 - prediction.bttsProb).toFixed(3)));
+    addMarket('BTTS_YES', 'Both Teams to Score', prediction.bttsProb);
+    addMarket('BTTS_NO', 'Both Teams to Score No', Number((1 - prediction.bttsProb).toFixed(3)));
 
     // Double Chance
     const dc1XProb = Number((prediction.homeWinProb + prediction.drawProb).toFixed(3));
-    const dc1XOdds = Number((1 / (1 / odds.homeWin + 1 / odds.draw)).toFixed(2));
-    if (dc1XOdds > 1.05) {
-      addMarket('DOUBLE_CHANCE_1X', `${homeTeam} or Draw (1X)`, dc1XOdds, dc1XProb);
-    }
+    addMarket('DOUBLE_CHANCE_1X', `${homeTeam} or Draw (1X)`, dc1XProb);
 
     const dcX2Prob = Number((prediction.awayWinProb + prediction.drawProb).toFixed(3));
-    const dcX2Odds = Number((1 / (1 / odds.awayWin + 1 / odds.draw)).toFixed(2));
-    if (dcX2Odds > 1.05) {
-      addMarket('DOUBLE_CHANCE_X2', `Draw or ${awayTeam} (X2)`, dcX2Odds, dcX2Prob);
-    }
+    addMarket('DOUBLE_CHANCE_X2', `Draw or ${awayTeam} (X2)`, dcX2Prob);
 
-    // 1. Identify MOST LIKELY Outcome
+    // Identify MOST LIKELY Outcome
     let mostLikelyMarket = markets[0];
     for (const m of markets) {
       if (m.probability > (mostLikelyMarket?.probability || 0)) {
@@ -1076,53 +1033,21 @@ export class ApexEngine {
 
     let mostLikelyOutcome: MostLikelyOutcome | undefined;
     if (mostLikelyMarket) {
-      const isProfitable = mostLikelyMarket.expectedValue > 0;
-      const commentary = isProfitable
-        ? `${mostLikelyMarket.name} is the most likely outcome (${(mostLikelyMarket.probability * 100).toFixed(1)}%) and offers positive expected value (+${(mostLikelyMarket.expectedValue * 100).toFixed(1)}% EV).`
-        : `${mostLikelyMarket.name} is the most likely outcome (${(mostLikelyMarket.probability * 100).toFixed(1)}%), but odds of ${mostLikelyMarket.odds.toFixed(2)} are underpriced offering negative expected value (${(mostLikelyMarket.expectedValue * 100).toFixed(1)}% EV). Poor bet despite high likelihood.`;
+      const commentary = `${mostLikelyMarket.name} is the most likely outcome with a ${(mostLikelyMarket.probability * 100).toFixed(1)}% probability.`;
 
       mostLikelyOutcome = {
         selection: mostLikelyMarket.name,
         marketKey: mostLikelyMarket.key,
         probability: mostLikelyMarket.probability,
-        odds: mostLikelyMarket.odds,
-        expectedValue: mostLikelyMarket.expectedValue,
-        isProfitable,
         commentary,
       };
 
       mostLikelyMarket.isMostLikely = true;
     }
 
-    // 2. Identify BEST VALUE BET (+EV profitable bet)
-    const sortedByEV = [...markets].sort((a, b) => b.expectedValue - a.expectedValue);
-    const topEVMarket = sortedByEV.length > 0 ? sortedByEV[0] : undefined;
-
-    let profitableBet: ProfitableBet | undefined;
-    if (topEVMarket && topEVMarket.expectedValue > 0.02) {
-      topEVMarket.isProfitableBet = true;
-      profitableBet = {
-        selection: topEVMarket.name,
-        marketKey: topEVMarket.key,
-        probability: topEVMarket.probability,
-        odds: topEVMarket.odds,
-        expectedValue: topEVMarket.expectedValue,
-        edgePercent: topEVMarket.valueEdge || 0,
-        fairOdds: topEVMarket.fairOdds || 1.0,
-        kellyStakePercent: Number(((topEVMarket.kellyFraction || 0) * 100).toFixed(1)),
-        commentary: `Profitable value bet identified on ${topEVMarket.name}. Model probability of ${(topEVMarket.probability * 100).toFixed(1)}% vs market implied ${(topEVMarket.impliedProb * 100).toFixed(1)}% yields a +${(topEVMarket.expectedValue * 100).toFixed(1)}% expected edge (Fair Odds: ${topEVMarket.fairOdds?.toFixed(2)}).`,
-      };
-    }
-
-    // Attach to prediction object
-    prediction.mostLikelyOutcome = mostLikelyOutcome;
-    prediction.profitableBet = profitableBet;
-
     return {
       markets,
-      bestValueMarket: topEVMarket,
       mostLikelyOutcome,
-      profitableBet,
     };
   }
 
@@ -1214,19 +1139,10 @@ export class ApexEngine {
       leagueAwayAvg = totalAG / allMatches.length || 1.22;
     }
 
-    let hash = 0;
-    for (let i = 0; i < teamName.length; i++) {
-      hash = (hash * 31 + teamName.charCodeAt(i)) % 1000;
-    }
-    const defaultHomeAtk = Number((0.92 + ((hash % 30) / 100)).toFixed(3));
-    const defaultHomeDef = Number((0.88 + (((hash * 3) % 28) / 100)).toFixed(3));
-    const defaultAwayAtk = Number((0.86 + (((hash * 5) % 28) / 100)).toFixed(3));
-    const defaultAwayDef = Number((0.94 + (((hash * 7) % 30) / 100)).toFixed(3));
-
-    const homeAttack = homeMatchesCount > 0 ? (homeGoalsScored / homeMatchesCount) / leagueHomeAvg : defaultHomeAtk;
-    const homeDefense = homeMatchesCount > 0 ? (homeGoalsConceded / homeMatchesCount) / leagueAwayAvg : defaultHomeDef;
-    const awayAttack = awayMatchesCount > 0 ? (awayGoalsScored / awayMatchesCount) / leagueAwayAvg : defaultAwayAtk;
-    const awayDefense = awayMatchesCount > 0 ? (awayGoalsConceded / awayMatchesCount) / leagueHomeAvg : defaultAwayDef;
+    const homeAttack = homeMatchesCount > 0 ? (homeGoalsScored / homeMatchesCount) / leagueHomeAvg : 1.0;
+    const homeDefense = homeMatchesCount > 0 ? (homeGoalsConceded / homeMatchesCount) / leagueAwayAvg : 1.0;
+    const awayAttack = awayMatchesCount > 0 ? (awayGoalsScored / awayMatchesCount) / leagueAwayAvg : 1.0;
+    const awayDefense = awayMatchesCount > 0 ? (awayGoalsConceded / awayMatchesCount) / leagueHomeAvg : 1.0;
 
     const last5 = formList.slice(0, 5);
     let weightedFormPoints = 0;

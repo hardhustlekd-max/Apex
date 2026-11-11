@@ -19,14 +19,14 @@ import {
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
 import { getRelativeDateStr, getPossibleDateStrs, normalizeDateStr } from './core/dateUtils.js';
+import { applyColorTheme, getActiveColorThemeId, setThemeMode, getSavedThemeMode } from './core/themeEngine.js';
 
 import { RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || saved === 'light') return saved;
-    return 'dark';
+    const saved = getSavedThemeMode();
+    return saved === 'light' ? 'light' : 'dark';
   });
   const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY'>('FIXTURES');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -127,21 +127,11 @@ export default function App() {
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
-    localStorage.setItem('theme', nextTheme);
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setThemeMode(nextTheme);
   };
 
   useEffect(() => {
-    // initialize theme
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setThemeMode(theme);
   }, [theme]);
 
 
@@ -229,6 +219,7 @@ export default function App() {
   }, [activeSyncJob, fetchFixtures, fetchSettingsAndProviders, fetchLiveScores]);
 
   useEffect(() => {
+    applyColorTheme(settings?.colorTheme || getActiveColorThemeId());
     fetchSettingsAndProviders();
     fetchFixtures();
     fetchLiveScores();
@@ -286,11 +277,11 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+    <div className="min-h-screen bg-theme-bg text-theme-main flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-white dark:bg-[#121216] text-slate-900 dark:text-white font-mono text-xs px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] shrink-0 animate-pulse" />
+        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-theme-card text-theme-main font-mono text-xs px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2 border border-theme">
+          <span className="w-1.5 h-1.5 rounded-full bg-theme-primary shrink-0 animate-pulse" />
           <span className="truncate max-w-[280px] font-bold">{notification.message}</span>
         </div>
       )}
@@ -334,7 +325,7 @@ export default function App() {
         {/* Content Viewport */}
         <div className="flex-1 min-w-0 flex flex-col">
           <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
-            <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-3.5 space-y-4 pb-20 lg:pb-8">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 sm:py-3 space-y-3 pb-16 lg:pb-6">
               {/* Blocking Job Overlay when Full Sync or Update Predictions is in progress */}
               {isProcessingActive && (
                 <SyncLockOverlay
@@ -345,16 +336,16 @@ export default function App() {
 
               {/* Notification Banner to Start Full Sync if Database has zero fixtures */}
               {fixtures.length === 0 && !isLoadingFixtures && !isProcessingActive && (
-                <div className="bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] text-slate-900 dark:text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-[#FF001F]/10 flex items-center justify-center text-[#FF001F] shrink-0">
-                      <RefreshCw className="w-5 h-5" />
+                <div className="bg-theme-card border border-theme text-theme-main rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8.5 h-8.5 rounded-xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shrink-0 font-bold">
+                      <RefreshCw className="w-4.5 h-4.5" />
                     </div>
                     <div className="space-y-0.5 min-w-0">
                       <h3 className="text-xs sm:text-sm font-extrabold tracking-tight">
                         Database Synchronization Prompt
                       </h3>
-                      <p className="text-[11px] sm:text-xs text-[#8F92A1] dark:text-[#9EA3B2] font-medium">
+                      <p className="text-[11px] text-theme-sub font-medium">
                         Start full sync to fetch active Flashscore fixtures, team stats, H2H records, and calculate 5-Pillar Poisson model predictions.
                       </p>
                     </div>
@@ -362,16 +353,16 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleResetAndSyncData}
-                    className="px-4 py-2.5 rounded-full bg-[#FF001F] text-white hover:bg-[#E6001C] font-bold text-xs transition-all cursor-pointer shadow-sm active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-2"
+                    className="px-3.5 py-2 rounded-full bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover font-black text-xs transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Start Full Sync & Update Data</span>
+                    <span>Start Full Sync</span>
                   </button>
                 </div>
               )}
 
               {activeTab === 'FIXTURES' && (
-                <div className={`w-full grid grid-cols-12 gap-4 lg:gap-5 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
+                <div className={`w-full grid grid-cols-12 gap-3 lg:gap-4 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   {/* Master Feed Column */}
                   <div className="col-span-12 lg:col-span-7 xl:col-span-7 min-w-0">
                     <FixturesList
@@ -402,7 +393,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-16 h-[calc(100vh-4.75rem)] rounded-2xl bg-white dark:bg-[#121216] shadow-sm overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card border border-theme shadow-xs overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
@@ -434,6 +425,7 @@ export default function App() {
                   <PredictionHistoryView
                     isProcessingActive={isProcessingActive}
                     onTriggerFullSync={handleResetAndSyncData}
+                    onSelectDetail={handleSelectFixture}
                   />
                 </div>
               )}

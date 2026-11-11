@@ -17,30 +17,14 @@ export interface HistoricalMatch {
   leagueName?: string;
 }
 
-export interface BookmakerOdds {
-  homeWin: number;
-  draw: number;
-  awayWin: number;
-  over25?: number;
-  under25?: number;
-  bttsYes?: number;
-  bttsNo?: number;
-}
+// BookmakerOdds removed as per user request to eliminate odds-related logic
 
 export interface MarketOption {
   key: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | 'OVER_25' | 'UNDER_25' | 'BTTS_YES' | 'BTTS_NO' | 'DOUBLE_CHANCE_1X' | 'DOUBLE_CHANCE_X2';
   name: string;
-  odds: number;
   probability: number;
-  impliedProb: number;
-  expectedValue: number; // (prob * odds) - 1
-  isPositiveEV: boolean;
   isBanker: boolean;
-  fairOdds?: number; // 1 / probability
-  valueEdge?: number; // (probability - impliedProb) * 100
-  kellyFraction?: number; // Kelly stake fraction
   isMostLikely?: boolean;
-  isProfitableBet?: boolean;
 }
 
 export interface CorrectScoreProb {
@@ -108,24 +92,22 @@ export interface TeamStatsSummary {
   avgGoalsConceded: number;
   recentMatches: TeamFormMatch[];
   teamStrengthRating?: number;
-  opponentAdjustedXG?: number;
-  opponentAdjustedXGA?: number;
   eloRating?: number;
 }
 
 export interface TeamStrengthBreakdown {
   homeStrengthRating: number; // 0 - 100 overall CSF Index
   awayStrengthRating: number;
-  formDominanceHome: number; // Decayed goal & result dominance (0-100)
+  formDominanceHome: number;
   formDominanceAway: number;
-  tableMomentumHome: number; // League standings & PPG momentum (0-100)
+  tableMomentumHome: number;
   tableMomentumAway: number;
-  shotEfficiencyHome: number; // Shot on target conversion & defensive efficiency (0-100)
+  shotEfficiencyHome: number;
   shotEfficiencyAway: number;
-  venueModifierHome: number; // Dynamic home advantage factor
-  venueModifierAway: number; // Dynamic away modifier
-  strengthDifference: number; // Net strength differential
-  homeWinExpectancy: number; // Calibrated 1X2 probabilities derived from CSF
+  venueModifierHome: number;
+  venueModifierAway: number;
+  strengthDifference: number;
+  homeWinExpectancy: number;
   drawExpectancy: number;
   awayWinExpectancy: number;
 }
@@ -134,7 +116,6 @@ export interface EloRatingBreakdown {
   homeElo: number;
   awayElo: number;
   eloDifference: number;
-  homeAdvantageElo: number;
   homeWinProbElo: number;
   drawProbElo: number;
   awayWinProbElo: number;
@@ -164,21 +145,6 @@ export interface MostLikelyOutcome {
   selection: string;
   marketKey: MarketOption['key'];
   probability: number;
-  odds: number;
-  expectedValue: number;
-  isProfitable: boolean;
-  commentary: string;
-}
-
-export interface ProfitableBet {
-  selection: string;
-  marketKey: MarketOption['key'];
-  probability: number;
-  odds: number;
-  expectedValue: number;
-  edgePercent: number;
-  fairOdds: number;
-  kellyStakePercent: number;
   commentary: string;
 }
 
@@ -229,7 +195,6 @@ export interface PoissonPrediction {
   tacticalContext?: TacticalContextBreakdown;
   dixonColesParams?: DixonColesParams;
   mostLikelyOutcome?: MostLikelyOutcome;
-  profitableBet?: ProfitableBet;
 }
 
 export interface Fixture {
@@ -245,12 +210,9 @@ export interface Fixture {
   homeBadge?: string;
   awayBadge?: string;
   status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED';
-  odds: BookmakerOdds;
   prediction?: PoissonPrediction;
   markets?: MarketOption[];
-  bestValueMarket?: MarketOption;
   mostLikelyOutcome?: MostLikelyOutcome;
-  profitableBet?: ProfitableBet;
   homeStats?: TeamStatsSummary;
   awayStats?: TeamStatsSummary;
   score?: { home: number; away: number };
@@ -284,26 +246,17 @@ export interface AccaLeg {
   marketKey: MarketOption['key'];
   marketName: string;
   selection: string;
-  odds: number;
   probability: number;
-  expectedValue: number;
   reasoning: string;
   isBanker: boolean;
-  isPositiveEV: boolean;
 }
 
 export interface AccumulatorSlip {
   id: string;
   name: string;
-  strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';
+  strategy: 'BANKER' | 'PROBABILITY_CHASE' | 'CUSTOM';
   legs: AccaLeg[];
-  combinedOdds: number;
   combinedProb: number;
-  overallEV: number;
-  suggestedStake: number;
-  stake: number;
-  potentialPayout: number;
-  potentialProfit: number;
   riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
   createdAt: string;
   summaryText: string;
@@ -311,11 +264,11 @@ export interface AccumulatorSlip {
 
 export interface EngineSettings {
   rollingMatchWindow: number; // e.g. 10, 15, 20
-  minEVThreshold: number; // e.g. 1.10 (10% EV)
   safeWinThreshold: number; // e.g. 0.70 (70%)
   homeAdvantageFactor: number; // default 1.15
   formDecayRate: number; // 0.85
   autoSyncDaily: boolean;
+  colorTheme?: 'opta-emerald' | 'champions-crimson' | 'ballon-gold' | 'volt-lime';
 }
 
 export interface FlashscoreScrapedMatch {
@@ -372,7 +325,7 @@ export interface FootballTipItem {
   match?: string;
   league?: string;
   predictionOrTip?: string;
-  confidenceOrOdds?: string;
+  confidence?: string;
   analysis: string;
   keyPoints?: string[];
   sourceTitle?: string;

@@ -52,7 +52,6 @@ export class ServerPredictionGeneratorService {
             ...f,
             prediction: p.prediction,
             markets: p.markets || f.markets,
-            bestValueMarket: p.bestValueMarket || f.bestValueMarket,
             homeStats: p.homeStats || f.homeStats,
             awayStats: p.awayStats || f.awayStats,
             measurements: p.measurements || f.measurements,
@@ -197,15 +196,13 @@ export class ServerPredictionGeneratorService {
     // Filter based on all market categories prediction percentage threshold or banker status
     const highValueList = scoredCandidates.filter((item) => {
       if (bankerOnly) {
-        return item.maxProb >= 0.68 || item.fixture.bestValueMarket?.isBanker;
+        return item.maxProb >= 0.68;
       }
 
       // Must meet minimum prediction percentage across any market category (e.g. >= 55%)
       const meetsProbThreshold = item.maxProb >= minProb;
-      const possessesEVEdge = item.maxEV >= minEV || item.fixture.bestValueMarket?.isPositiveEV;
-      const isBanker = item.fixture.bestValueMarket?.isBanker;
 
-      return meetsProbThreshold || possessesEVEdge || isBanker;
+      return meetsProbThreshold;
     });
 
     // Rank strictly descending by highest market category prediction percentage (and EV edge tiebreaker)

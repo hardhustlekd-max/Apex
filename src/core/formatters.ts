@@ -25,37 +25,6 @@ export function getProbValue(prob: number | null | undefined, decimals: number =
   return Math.round(normalized * factor) / factor;
 }
 
-/**
- * Formats European decimal odds to standard 2 decimal places (e.g. 2.45).
- */
-export function formatOdds(odds: number | null | undefined): string {
-  if (!odds || isNaN(odds) || odds <= 1.0) {
-    return '-';
-  }
-  return odds.toFixed(2);
-}
-
-/**
- * Formats expected value (EV) with explicit sign and percentage (e.g. +14.2% or -3.5%).
- */
-export function formatEV(ev: number | null | undefined): string {
-  if (ev === null || ev === undefined || isNaN(ev)) {
-    return '-';
-  }
-  const pct = ev * 100;
-  const sign = pct > 0 ? '+' : '';
-  return `${sign}${pct.toFixed(1)}% EV`;
-}
-
-/**
- * Formats fair odds derived from probability (1 / prob).
- */
-export function formatFairOdds(prob: number | null | undefined): string {
-  if (!prob || prob <= 0) return '-';
-  const val = prob > 1 ? prob / 100 : prob;
-  return (1 / val).toFixed(2);
-}
-
 export interface PickInfo {
   type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N';
   label: string;
@@ -145,94 +114,6 @@ export function getHighestPredictionAcrossAllMarkets(fixture: Fixture): PickInfo
     probability: best.probability,
     probabilityPercent: getProbValue(best.probability, 1),
     probabilityFormatted: formatProb(best.probability, 1),
-  };
-}
-
-export interface ValueBetInfo {
-  hasValue: boolean;
-  marketKey?: MarketOption['key'];
-  selection: string;
-  shortLabel: string;
-  odds: number;
-  probability: number;
-  probabilityFormatted: string;
-  expectedValue: number;
-  evFormatted: string;
-  edgePercent: number;
-}
-
-/**
- * Resolves the authoritative value bet (+EV) for a fixture, if one exists with EV >= +2%.
- */
-export function getAuthoritativeValueBet(fixture: Fixture): ValueBetInfo {
-  // First check if already resolved by Dixon-Coles engine
-  if (fixture.profitableBet && fixture.profitableBet.expectedValue > 0.02) {
-    const pb = fixture.profitableBet;
-    const shortLabel = getShortMarketLabel(pb.marketKey, pb.selection);
-    return {
-      hasValue: true,
-      marketKey: pb.marketKey,
-      selection: pb.selection,
-      shortLabel,
-      odds: pb.odds,
-      probability: pb.probability,
-      probabilityFormatted: formatProb(pb.probability, 1),
-      expectedValue: pb.expectedValue,
-      evFormatted: formatEV(pb.expectedValue),
-      edgePercent: pb.edgePercent,
-    };
-  }
-
-  if (fixture.bestValueMarket && fixture.bestValueMarket.expectedValue > 0.02) {
-    const bvm = fixture.bestValueMarket;
-    const shortLabel = getShortMarketLabel(bvm.key, bvm.name);
-    return {
-      hasValue: true,
-      marketKey: bvm.key,
-      selection: bvm.name,
-      shortLabel,
-      odds: bvm.odds,
-      probability: bvm.probability,
-      probabilityFormatted: formatProb(bvm.probability, 1),
-      expectedValue: bvm.expectedValue,
-      evFormatted: formatEV(bvm.expectedValue),
-      edgePercent: bvm.valueEdge || 0,
-    };
-  }
-
-  // Look through markets if available
-  if (fixture.markets && fixture.markets.length > 0) {
-    const positiveEV = fixture.markets
-      .filter((m) => m.expectedValue > 0.02)
-      .sort((a, b) => b.expectedValue - a.expectedValue);
-
-    if (positiveEV.length > 0) {
-      const best = positiveEV[0];
-      return {
-        hasValue: true,
-        marketKey: best.key,
-        selection: best.name,
-        shortLabel: getShortMarketLabel(best.key, best.name),
-        odds: best.odds,
-        probability: best.probability,
-        probabilityFormatted: formatProb(best.probability, 1),
-        expectedValue: best.expectedValue,
-        evFormatted: formatEV(best.expectedValue),
-        edgePercent: best.valueEdge || 0,
-      };
-    }
-  }
-
-  return {
-    hasValue: false,
-    selection: 'Fair Price',
-    shortLabel: '-',
-    odds: 0,
-    probability: 0,
-    probabilityFormatted: '-',
-    expectedValue: 0,
-    evFormatted: '-',
-    edgePercent: 0,
   };
 }
 

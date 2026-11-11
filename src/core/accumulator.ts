@@ -8,8 +8,7 @@ import {
 import { getRelativeDateStr, getUtcDateStr, hasMatchStarted, normalizeDateStr } from './dateUtils.js';
 
 export interface AccaGenerationParams {
-  strategy: 'BANKER' | 'VALUE_HUNTER' | 'CUSTOM';
-  targetOdds?: number;
+  strategy: 'BANKER' | 'PROBABILITY_CHASE' | 'CUSTOM';
   legCount?: number;
   minProbability?: number;
   stake?: number;
@@ -74,7 +73,6 @@ export class AccumulatorGenerator {
     params: AccaGenerationParams,
     settings: EngineSettings
   ): AccumulatorSlip {
-    const stake = params.stake && params.stake > 0 ? params.stake : 10;
     const strategy = params.strategy || 'BANKER';
     const dateFilter = params.dateFilter || 'TODAY';
 
@@ -147,62 +145,42 @@ export class AccumulatorGenerator {
         const needed = legCount - selectedLegs.length;
         selectedLegs.push(...this.pickDistinctMatchLegs(remaining, needed));
       }
-    } else if (strategy === 'VALUE_HUNTER') {
-      const minEV = settings.minEVThreshold || 1.10;
+    } else if (strategy === 'PROBABILITY_CHASE') {
       const legCount = targetLegCount;
       slipName = isToday
-        ? (legCount >= 8 ? `🔥 Today's ${legCount}-Fold Value Slip` : "⚡ Today's Value Hunter (+EV Edge)")
-        : '⚡ The Value Hunter (+EV Edge)';
+        ? `🔥 Today's ${legCount}-Fold Probability Slip`
+        : '⚡ The Probability Chase';
 
-      // Filter for legs with positive EV (prob * odds >= minEV)
-      const valueLegs = availableLegs
-        .filter((leg) => (leg.probability * leg.odds) >= minEV)
-        .sort((a, b) => b.expectedValue - a.expectedValue);
+      const bestLegs = availableLegs
+        .sort((a, b) => b.probability - a.probability);
 
-      selectedLegs = this.pickDistinctMatchLegs(valueLegs, legCount);
-
-      // Fallback if not enough > 1.10 EV
-      if (selectedLegs.length < legCount) {
-        const remaining = availableLegs
-          .filter((l) => !selectedLegs.some((s) => s.fixtureId === l.fixtureId))
-          .sort((a, b) => b.expectedValue - a.expectedValue);
-        const needed = legCount - selectedLegs.length;
-        selectedLegs.push(...this.pickDistinctMatchLegs(remaining, needed));
-      }
+      selectedLegs = this.pickDistinctMatchLegs(bestLegs, legCount);
     } else {
-      // CUSTOM Multi-leg with Target Odds & Constraints
-      const targetOdds = params.targetOdds || 10.0;
+      // CUSTOM Multi-leg
       const legCount = targetLegCount;
       const minProb = params.minProbability || 0.50;
       slipName = isToday
-        ? `🎯 Today's Custom Acca (${legCount}-Fold ~${targetOdds}x)`
-        : `🎯 Custom Target Acca (${legCount}-Fold ~${targetOdds}x)`;
+        ? `🎯 Today's Custom Acca (${legCount}-Fold)`
+        : `🎯 Custom Acca (${legCount}-Fold)`;
 
-      const qualifiedLegs = availableLegs.filter((leg) => leg.probability >= minProb);
-      selectedLegs = this.optimizeCustomSlip(qualifiedLegs, legCount, targetOdds);
+      const qualifiedLegs = availableLegs
+        .filter((leg) => leg.probability >= minProb)
+        .sort((a, b) => b.probability - a.probability);
+      selectedLegs = this.pickDistinctMatchLegs(qualifiedLegs, legCount);
     }
 
-    // Calculate Multiplied Combined Odds & Probability
-    let combinedOdds = 1.0;
+    // Calculate Multiplied Combined Probability
     let combinedProb = 1.0;
-
     for (const leg of selectedLegs) {
-      combinedOdds *= leg.odds;
       combinedProb *= leg.probability;
     }
-
-    combinedOdds = Number(combinedOdds.toFixed(2));
     combinedProb = Number(combinedProb.toFixed(4));
-    const overallEV = Number(((combinedProb * combinedOdds) - 1.0).toFixed(3));
-
-    const potentialPayout = Number((stake * combinedOdds).toFixed(2));
-    const potentialProfit = Number((potentialPayout - stake).toFixed(2));
 
     // Determine Risk Rating
     let riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME' = 'MEDIUM';
-    if (combinedOdds <= 3.5 && combinedProb >= 0.40) riskRating = 'LOW';
-    else if (combinedOdds <= 8.0 && combinedProb >= 0.20) riskRating = 'MEDIUM';
-    else if (combinedOdds <= 25.0) riskRating = 'HIGH';
+    if (combinedProb >= 0.40) riskRating = 'LOW';
+    else if (combinedProb >= 0.20) riskRating = 'MEDIUM';
+    else if (combinedProb >= 0.05) riskRating = 'HIGH';
     else riskRating = 'EXTREME';
 
     const slipId = `slip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -212,25 +190,20 @@ export class AccumulatorGenerator {
       slipName,
       strategy,
       selectedLegs,
-      combinedOdds,
       combinedProb,
-      overallEV,
-      stake,
-      potentialPayout
+      0, // EV removed
+      0  // Stake removed from summary calc
     );
 
     return {
       id: slipId,
       name: slipName,
-      strategy,
+      strategy: strategy as any,
       legs: selectedLegs,
-      combinedOdds,
       combinedProb,
-      overallEV,
-      suggestedStake: strategy === 'BANKER' ? 25 : strategy === 'VALUE_HUNTER' ? 10 : 5,
-      stake,
-      potentialPayout,
-      potentialProfit,
+      overallEV: 0,
+      suggestedStake: 0,
+      stake: 0,
       riskRating,
       createdAt,
       summaryText,
@@ -295,12 +268,11 @@ export class AccumulatorGenerator {
           marketKey: m.key,
           marketName: m.name,
           selection,
-          odds: m.odds,
           probability: m.probability,
-          expectedValue: m.expectedValue,
+          expectedValue: 0,
           reasoning,
           isBanker: m.isBanker,
-          isPositiveEV: m.isPositiveEV,
+          isPositiveEV: false,
         });
       }
     }
@@ -327,118 +299,34 @@ export class AccumulatorGenerator {
   }
 
   /**
-   * Custom Acca combinatorial search optimizer to find combination matching target odds
-   */
-  private static optimizeCustomSlip(
-    candidates: AccaLeg[],
-    k: number,
-    targetOdds: number
-  ): AccaLeg[] {
-    // Group candidate legs by fixture to pick at most 1 per match
-    const fixtureMap = new Map<string, AccaLeg[]>();
-    for (const leg of candidates) {
-      if (!fixtureMap.has(leg.fixtureId)) fixtureMap.set(leg.fixtureId, []);
-      fixtureMap.get(leg.fixtureId)!.push(leg);
-    }
-
-    const distinctFixtures = Array.from(fixtureMap.values());
-    if (distinctFixtures.length < k) {
-      return this.pickDistinctMatchLegs(candidates, k);
-    }
-
-    // Prioritize fixtures by highest expected value and probability to keep search fast
-    const prioritizedFixtures = distinctFixtures
-      .map((legs) => [...legs].sort((a, b) => (b.expectedValue + b.probability) - (a.expectedValue + a.probability)))
-      .sort((a, b) => ((b[0]?.expectedValue || 0) + (b[0]?.probability || 0)) - ((a[0]?.expectedValue || 0) + (a[0]?.probability || 0)))
-      .slice(0, 10);
-
-    // Limit to top 2 selections per fixture to avoid exponential explosion
-    const simplifiedFixtures = prioritizedFixtures.map((legs) => legs.slice(0, 2));
-
-    let bestCombination: AccaLeg[] = [];
-    let bestScore = -Infinity;
-    let evalCount = 0;
-    const MAX_EVALUATIONS = 400;
-
-    // Fast bounded recursive search
-    const search = (
-      fIdx: number,
-      currentPicks: AccaLeg[],
-      currentOdds: number,
-      currentEV: number
-    ) => {
-      if (evalCount++ > MAX_EVALUATIONS) return;
-
-      if (currentPicks.length === k) {
-        // Distance to target odds penalty
-        const oddsDiffRatio = Math.abs(currentOdds - targetOdds) / Math.max(1, targetOdds);
-        // Score rewards closeness to targetOdds, high EV, and high probability
-        const score = 100 / (1 + oddsDiffRatio * 10) + currentEV * 30;
-        if (score > bestScore) {
-          bestScore = score;
-          bestCombination = [...currentPicks];
-        }
-        return;
-      }
-
-      if (fIdx >= simplifiedFixtures.length) return;
-      if (simplifiedFixtures.length - fIdx < k - currentPicks.length) return;
-      if (currentOdds > targetOdds * 3) return; // Prune runaway multipliers
-
-      // Try picking each leg from this fixture first
-      for (const leg of simplifiedFixtures[fIdx]) {
-        search(
-          fIdx + 1,
-          [...currentPicks, leg],
-          currentOdds * leg.odds,
-          currentEV + leg.expectedValue
-        );
-      }
-
-      // Try skipping this fixture
-      search(fIdx + 1, currentPicks, currentOdds, currentEV);
-    };
-
-    search(0, [], 1.0, 0);
-
-    return bestCombination.length > 0 ? bestCombination : this.pickDistinctMatchLegs(candidates, k);
-  }
-
-  /**
    * Builds formatted bet slip text for copy-to-clipboard
    */
   private static buildSummaryText(
     slipName: string,
     strategy: string,
     legs: AccaLeg[],
-    totalOdds: number,
     winProb: number,
     overallEV: number,
-    stake: number,
-    payout: number
+    stake: number
   ): string {
     const legLines = legs
       .map(
         (l, i) =>
-          `${i + 1}. [${l.league}] ${l.homeTeam} vs ${l.awayTeam}\n   Pick: ${l.selection} @ ${l.odds.toFixed(2)} (AI: ${(l.probability * 100).toFixed(1)}%${l.expectedValue > 0 ? ` | +EV ${(l.expectedValue * 100).toFixed(1)}%` : ''})`
+          `${i + 1}. [${l.league}] ${l.homeTeam} vs ${l.awayTeam}\n   Selection: ${l.selection} (AI: ${(l.probability * 100).toFixed(1)}%)`
       )
       .join('\n\n');
 
     return `════════════════════════════════════
-🎯 FOOTBALL ACCUMULATOR SLIP
+🎯 FOOTBALL PREDICTION SLIP
 ════════════════════════════════════
-Strategy: ${slipName}
+Type: ${slipName}
 Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
 
 SELECTIONS (${legs.length} LEGS):
 ${legLines}
 
 ────────────────────────────────────
-Total Decimal Odds: ${totalOdds.toFixed(2)}
 Model Probability: ${(winProb * 100).toFixed(2)}%
-Overall Expected Value: ${overallEV > 0 ? '+' : ''}${(overallEV * 100).toFixed(1)}%
-Stake: £${stake.toFixed(2)}
-Potential Payout: £${payout.toFixed(2)} (Profit: £${(payout - stake).toFixed(2)})
 ════════════════════════════════════
 Powered by Poisson Statistical AI Engine`;
   }

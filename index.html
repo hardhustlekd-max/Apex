@@ -12,10 +12,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400;1,700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!--
+      CRITICAL: Blocking Inline Theme Hydration Script.
+      Prevents Flash of Unstyled Theme (FOUT) / White Flash before first layout paint.
+      1. Reads saved mode from localStorage ('theme').
+      2. Falls back to OS system setting ('prefers-color-scheme: dark').
+      3. Synchronously applies 'data-theme' attribute and 'dark' class to <html>.
+    -->
+    <script>
+      (function() {
+        try {
+          var savedMode = localStorage.getItem('theme');
+          var effectiveTheme = savedMode;
+          if (!effectiveTheme || (effectiveTheme !== 'dark' && effectiveTheme !== 'light')) {
+            effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', effectiveTheme);
+          if (effectiveTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+
+          var savedColorTheme = localStorage.getItem('app_color_theme') || 'opta-emerald';
+          document.documentElement.setAttribute('data-color-theme', savedColorTheme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

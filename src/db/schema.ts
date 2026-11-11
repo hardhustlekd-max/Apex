@@ -66,13 +66,13 @@ export interface UpcomingFixtureSchema {
   away_team: string;
   home_badge?: string | null;
   away_badge?: string | null;
-  b365_h: number;
-  b365_d: number;
-  b365_a: number;
-  b365_over25?: number | null;
-  b365_under25?: number | null;
-  b365_btts_yes?: number | null;
-  b365_btts_no?: number | null;
+  b365_h: number; // Removed
+  b365_d: number; // Removed
+  b365_a: number; // Removed
+  b365_over25?: number | null; // Removed
+  b365_under25?: number | null; // Removed
+  b365_btts_yes?: number | null; // Removed
+  b365_btts_no?: number | null; // Removed
   home_win_prob?: number | null; // Calculated Poisson home win probability (0-1)
   draw_prob?: number | null; // Calculated Poisson draw probability (0-1)
   away_win_prob?: number | null; // Calculated Poisson away win probability (0-1)
@@ -92,7 +92,7 @@ export interface UpcomingFixtureSchema {
 export interface EngineSettingsSchema {
   activeProvider: ActiveProviderType;
   rollingMatchWindow: number; // Optimized parameter: 15
-  minEVThreshold: number; // Optimized parameter: 1.10
+  // minEVThreshold: number; // Removed
   safeWinThreshold: number; // Default: 0.72
   homeAdvantageFactor: number; // Optimized parameter: 1.12
   formDecayRate: number; // Optimized parameter: 0.85
@@ -394,13 +394,13 @@ export interface UpcomingPredictionRecordSchema {
   home_badge?: string | null;
   away_badge?: string | null;
   status: string;
-  b365_h: number;
-  b365_d: number;
-  b365_a: number;
-  b365_over25?: number | null;
-  b365_under25?: number | null;
-  b365_btts_yes?: number | null;
-  b365_btts_no?: number | null;
+  b365_h: number; // Removed
+  b365_d: number; // Removed
+  b365_a: number; // Removed
+  b365_over25?: number | null; // Removed
+  b365_under25?: number | null; // Removed
+  b365_btts_yes?: number | null; // Removed
+  b365_btts_no?: number | null; // Removed
   home_xg: number;
   away_xg: number;
   home_win_prob: number;
@@ -535,9 +535,9 @@ export interface LivePredictionRecordSchema {
   minute: number;
   home_score: number;
   away_score: number;
-  b365_h: number;
-  b365_d: number;
-  b365_a: number;
+  b365_h: number; // Removed
+  b365_d: number; // Removed
+  b365_a: number; // Removed
   home_xg: number;
   away_xg: number;
   home_win_prob: number;
@@ -549,11 +549,11 @@ export interface LivePredictionRecordSchema {
   btts_prob: number;
   tip_key: string;
   tip_name: string;
-  tip_odds: number;
+  // tip_odds: number; // Removed
   tip_prob: number;
-  tip_ev: number;
-  is_positive_ev: number;
-  is_banker: number;
+  // tip_ev: number; // Removed
+  // is_positive_ev: number; // Removed
+  // is_banker: number; // Removed
   full_fixture_json: string;
   predicted_at: string;
 }
@@ -572,9 +572,9 @@ export interface HistoricalPredictionRecordSchema {
   status: 'FINISHED';
   home_score: number;
   away_score: number;
-  b365_h: number;
-  b365_d: number;
-  b365_a: number;
+  b365_h: number; // Removed
+  b365_d: number; // Removed
+  b365_a: number; // Removed
   home_xg: number;
   away_xg: number;
   home_win_prob: number;
@@ -586,11 +586,11 @@ export interface HistoricalPredictionRecordSchema {
   btts_prob: number;
   tip_key: string;
   tip_name: string;
-  tip_odds: number;
+  // tip_odds: number; // Removed
   tip_prob: number;
-  tip_ev: number;
-  is_positive_ev: number;
-  is_banker: number;
+  // tip_ev: number; // Removed
+  // is_positive_ev: number; // Removed
+  // is_banker: number; // Removed
   full_fixture_json: string;
   predicted_at: string;
 }
@@ -636,13 +636,6 @@ export const DDL_STATEMENTS = {
       home_badge TEXT,
       away_badge TEXT,
       stage TEXT,
-      b365_h REAL NOT NULL,
-      b365_d REAL NOT NULL,
-      b365_a REAL NOT NULL,
-      b365_over25 REAL,
-      b365_under25 REAL,
-      b365_btts_yes REAL,
-      b365_btts_no REAL,
       status TEXT NOT NULL DEFAULT 'SCHEDULED',
       score_json TEXT,
       prediction_json TEXT,
@@ -717,13 +710,6 @@ export const DDL_STATEMENTS = {
       home_badge TEXT,
       away_badge TEXT,
       status TEXT NOT NULL DEFAULT 'SCHEDULED',
-      b365_h REAL NOT NULL,
-      b365_d REAL NOT NULL,
-      b365_a REAL NOT NULL,
-      b365_over25 REAL,
-      b365_under25 REAL,
-      b365_btts_yes REAL,
-      b365_btts_no REAL,
       home_xg REAL NOT NULL,
       away_xg REAL NOT NULL,
       home_win_prob REAL NOT NULL,
@@ -735,11 +721,7 @@ export const DDL_STATEMENTS = {
       btts_prob REAL NOT NULL,
       tip_key TEXT NOT NULL,
       tip_name TEXT NOT NULL,
-      tip_odds REAL NOT NULL,
       tip_prob REAL NOT NULL,
-      tip_ev REAL NOT NULL,
-      is_positive_ev INTEGER NOT NULL DEFAULT 0,
-      is_banker INTEGER NOT NULL DEFAULT 0,
       full_fixture_json TEXT NOT NULL,
       predicted_at TEXT NOT NULL
     );
@@ -762,9 +744,6 @@ export const DDL_STATEMENTS = {
       minute INTEGER DEFAULT 0,
       home_score INTEGER DEFAULT 0,
       away_score INTEGER DEFAULT 0,
-      b365_h REAL NOT NULL,
-      b365_d REAL NOT NULL,
-      b365_a REAL NOT NULL,
       home_xg REAL NOT NULL,
       away_xg REAL NOT NULL,
       home_win_prob REAL NOT NULL,
@@ -776,11 +755,7 @@ export const DDL_STATEMENTS = {
       btts_prob REAL NOT NULL,
       tip_key TEXT NOT NULL,
       tip_name TEXT NOT NULL,
-      tip_odds REAL NOT NULL,
       tip_prob REAL NOT NULL,
-      tip_ev REAL NOT NULL,
-      is_positive_ev INTEGER NOT NULL DEFAULT 0,
-      is_banker INTEGER NOT NULL DEFAULT 0,
       full_fixture_json TEXT NOT NULL,
       predicted_at TEXT NOT NULL
     );
@@ -801,9 +776,6 @@ export const DDL_STATEMENTS = {
       status TEXT NOT NULL DEFAULT 'FINISHED',
       home_score INTEGER NOT NULL,
       away_score INTEGER NOT NULL,
-      b365_h REAL NOT NULL,
-      b365_d REAL NOT NULL,
-      b365_a REAL NOT NULL,
       home_xg REAL NOT NULL,
       away_xg REAL NOT NULL,
       home_win_prob REAL NOT NULL,
@@ -815,11 +787,7 @@ export const DDL_STATEMENTS = {
       btts_prob REAL NOT NULL,
       tip_key TEXT NOT NULL,
       tip_name TEXT NOT NULL,
-      tip_odds REAL NOT NULL,
       tip_prob REAL NOT NULL,
-      tip_ev REAL NOT NULL,
-      is_positive_ev INTEGER NOT NULL DEFAULT 0,
-      is_banker INTEGER NOT NULL DEFAULT 0,
       full_fixture_json TEXT NOT NULL,
       predicted_at TEXT NOT NULL
     );
