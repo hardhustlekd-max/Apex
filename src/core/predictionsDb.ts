@@ -66,9 +66,15 @@ export class PredictionsDB {
         let savedCount = 0;
         for (const f of rows) {
           try {
+            // STRICT VALIDATION: Never save a prediction record if the prediction object itself is missing
+            if (!f.prediction) continue;
+
             const pred = f.prediction;
             const bestTip = f.mostLikelyOutcome;
-            const state = (f.status === 'FINISHED' || (f as any).match_state === 'completed') ? 'completed' : 'upcoming';
+            
+            // Determine match state: only mark as completed if status is FINISHED OR it's a historical prediction
+            const isFin = f.status === 'FINISHED' || (f as any).match_state === 'completed' || f.kickOffTime === 'FT';
+            const state = isFin ? 'completed' : 'upcoming';
 
             stmt.run(
               f.id,
@@ -85,18 +91,18 @@ export class PredictionsDB {
               state,
               f.score?.home ?? null,
               f.score?.away ?? null,
-              pred?.homeXG ?? null,
-              pred?.awayXG ?? null,
-              pred?.homeWinProb ?? null,
-              pred?.drawProb ?? null,
-              pred?.awayWinProb ?? null,
-              pred?.over15Prob ?? null,
-              pred?.over25Prob ?? null,
-              pred?.over35Prob ?? null,
-              pred?.bttsProb ?? null,
+              pred.homeXG ?? null,
+              pred.awayXG ?? null,
+              pred.homeWinProb ?? null,
+              pred.drawProb ?? null,
+              pred.awayWinProb ?? null,
+              pred.over15Prob ?? null,
+              pred.over25Prob ?? null,
+              pred.over35Prob ?? null,
+              pred.bttsProb ?? null,
               bestTip?.marketKey || null,
               (bestTip as any)?.selection || bestTip?.marketKey || null,
-              bestTip?.probability || pred?.homeWinProb || null,
+              bestTip?.probability || pred.homeWinProb || null,
               this.sanitizeFixtureForStorage(f),
               now
             );
@@ -105,7 +111,9 @@ export class PredictionsDB {
             console.warn(`[PredictionsDB] Failed to save fixture ${f.id} (${f.homeTeam} vs ${f.awayTeam}):`, rowErr?.message);
           }
         }
-        console.log(`[PredictionsDB] Successfully saved ${savedCount}/${rows.length} unified predictions to SQLite.`);
+        if (savedCount > 0) {
+          console.log(`[PredictionsDB] Successfully saved ${savedCount}/${rows.length} manual unified predictions to SQLite.`);
+        }
       });
 
       insertMany(fixtures);

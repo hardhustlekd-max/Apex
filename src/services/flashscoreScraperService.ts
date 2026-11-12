@@ -36,25 +36,7 @@ export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
     score: { home: homeScore, away: awayScore },
     statistics: stats,
     information: info,
-    prediction: {
-      homeXG: 1.0,
-      awayXG: 1.0,
-      homeWinProb: 0.33,
-      drawProb: 0.34,
-      awayWinProb: 0.33,
-      over15Prob: 0.5,
-      over25Prob: 0.5,
-      over35Prob: 0.5,
-      bttsProb: 0.5,
-      topCorrectScores: [],
-      homeAttackStrength: 1.0,
-      homeDefenseStrength: 1.0,
-      awayAttackStrength: 1.0,
-      awayDefenseStrength: 1.0,
-      homeFormMultiplier: 1.0,
-      awayFormMultiplier: 1.0,
-      probabilityMatrix: Array(6).fill(0).map(() => Array(6).fill(0)),
-    },
+    prediction: undefined,
   };
 }
 
@@ -310,8 +292,6 @@ export class FlashscoreScraperService {
           }
           if (historicalMatchesToSave.length > 0) {
             db.insertHistoricalMatches(historicalMatchesToSave);
-            const converted = historicalMatchesToSave.map((hm) => convertHistoricalMatchToFixture(hm));
-            await predictionsDb.saveHistoricalPredictions(converted);
           }
           if (scrapedMatchesForDb.length > 0) {
             db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
@@ -383,7 +363,7 @@ export class FlashscoreScraperService {
           // Feed already persisted via fetchAndPersistRawFeed(feedPath)
 
           // Skip finished matches for upcoming fixtures view
-          if (m.statusCode === '3') continue;
+          if (['3', '47', '48', '49'].includes(m.statusCode || '')) continue;
 
           // Guarantee unique fixture ID
           if (seenMatchIds.has(m.matchId)) continue;
@@ -843,7 +823,7 @@ export class FlashscoreScraperService {
       const finished = rawMatches.filter((m) =>
         m.homeScore !== undefined &&
         m.awayScore !== undefined &&
-        (m.statusCode === '3' || m.statusCode === '47' || m.statusCode === '48' || m.statusCode === '49' || (offset < 0 && m.statusCode !== '1' && m.statusCode !== '2'))
+        (['3', '10', '11', '47', '48', '49'].includes(m.statusCode || '') || (offset < 0 && m.statusCode !== '1' && m.statusCode !== '2'))
       );
 
       for (const m of finished) {

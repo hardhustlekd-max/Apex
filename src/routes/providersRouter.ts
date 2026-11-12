@@ -3,7 +3,6 @@ import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { EngineSettings, Fixture } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
-import { ServerEngine } from '../core/serverEngine.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { syncJobService } from '../services/syncJobService.js';
@@ -91,41 +90,8 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     await predictionsDb.reconcileStaleMatches();
     const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-    const predRes = await ServerEngine.predictAndStoreUpcomingFixtures(upcoming);
     await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
 
-    // Save finished scraped matches to historical predictions db
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const finishedScraped = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm, idx) => {
-        const homeScore = parseInt(String(sm.result!.home), 10) || 0;
-        const awayScore = parseInt(String(sm.result!.away), 10) || 0;
-        return {
-          id: sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${idx}`,
-          providerId: 'FLASHSCORE',
-          league: sm.leagueName || sm.stage || 'FLASHSCORE',
-          leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-          matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
-          kickOffTime: 'FT',
-          homeTeam: sm.home.name,
-          awayTeam: sm.away.name,
-          status: 'FINISHED' as const,
-          score: { home: homeScore, away: awayScore },
-          prediction: {
-            homeXG: 1.35,
-            awayXG: 1.15,
-            homeWinProb: 0.45,
-            drawProb: 0.28,
-            awayWinProb: 0.27,
-            over25Prob: 0.52,
-            bttsProb: 0.50,
-          } as any,
-        };
-      });
-    if (finishedScraped.length > 0) {
-      await predictionsDb.saveHistoricalPredictions(finishedScraped as unknown as Fixture[]);
-    }
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     // Update live matches (Read-Only Enrichment)
@@ -177,11 +143,11 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     return {
       success: true,
       message: options.resetDatabase || options.resetRawFeeds
-        ? `Database & raw feeds reset and fully synchronized (${predRes.count} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical predictions)`
-        : `Predictions updated in database (${predRes.count} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical)`,
+        ? `Database & raw feeds reset and fully synchronized (${upcoming.length} upcoming fixtures ingested)`
+        : `Database synchronized (${upcoming.length} upcoming fixtures refreshed)`,
       matchesCount: syncRes.matchesCount,
       upcomingCount: upcoming.length,
-      predictionsCount: predRes.count,
+      predictionsCount: predictionsDb.count(),
       historicalPredictionsCount: histPredCount,
       livePredictionsCount: liveEnrichedCount,
       stats: updatedStats,
@@ -250,37 +216,6 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
     });
 
     const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(500);
-    const finishedScraped = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
-      .map((sm, idx) => {
-        const homeScore = parseInt(String(sm.result!.home), 10) || 0;
-        const awayScore = parseInt(String(sm.result!.away), 10) || 0;
-        return {
-          id: sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${idx}`,
-          providerId: 'FLASHSCORE',
-          league: sm.leagueName || sm.stage || 'FLASHSCORE',
-          leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-          matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
-          kickOffTime: 'FT',
-          homeTeam: sm.home.name,
-          awayTeam: sm.away.name,
-          status: 'FINISHED' as const,
-          score: { home: homeScore, away: awayScore },
-          prediction: {
-            homeXG: 1.35,
-            awayXG: 1.15,
-            homeWinProb: 0.45,
-            drawProb: 0.28,
-            awayWinProb: 0.27,
-            over25Prob: 0.52,
-            bttsProb: 0.50,
-          } as any,
-        };
-      });
-    if (finishedScraped.length > 0) {
-      await predictionsDb.saveHistoricalPredictions(finishedScraped as unknown as Fixture[]);
-    }
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     loggerService.addLog({
