@@ -65,7 +65,6 @@ export class ServerPredictionGeneratorService {
           mergedMap.set(cleanId, {
             ...f,
             prediction: undefined,
-            bestValueMarket: undefined,
             h2hMatches: f.h2hMatches,
             information: f.information,
             statistics: f.statistics,
@@ -142,7 +141,6 @@ export class ServerPredictionGeneratorService {
         maxProb = m.probability;
         maxMarketKey = m.key;
         maxMarketName = m.name;
-        maxEV = m.expectedValue || 0;
       }
       categoryProbs[m.key] = Math.max(categoryProbs[m.key] || 0, m.probability);
     }
@@ -236,7 +234,6 @@ export class ServerPredictionGeneratorService {
     const settings: EngineSettings = db.getSettings() || {
       
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,
@@ -270,11 +267,11 @@ export class ServerPredictionGeneratorService {
       settings
     );
 
-    // 2. Value Hunter Acca (+EV Edge)
-    const valueSlip = AccumulatorGenerator.generateSlip(
+    // 2. High Confidence Acca
+    const probSlip = AccumulatorGenerator.generateSlip(
       fixturesForAcca,
       {
-        strategy: 'VALUE_HUNTER',
+        strategy: 'PROBABILITY_CHASE',
         legCount: 4,
         stake,
         dateFilter: dateScope,
@@ -289,14 +286,13 @@ export class ServerPredictionGeneratorService {
       {
         strategy: 'CUSTOM',
         legCount: 4,
-        targetOdds: 6.0,
         stake,
         dateFilter: dateScope,
         allowedMarkets: ['OVER_25', 'BTTS_YES'],
       },
       settings
     );
-    goalsSlip.name = dateScope === 'TODAY' ? "Today's High Value Goals Acca" : 'High Value Goals & BTTS Combo';
+    goalsSlip.name = dateScope === 'TODAY' ? "Today's High Goals Acca" : 'High Goals & BTTS Combo';
 
     // 4. Mega Combo Acca
     const megaSlip = AccumulatorGenerator.generateSlip(
@@ -304,14 +300,13 @@ export class ServerPredictionGeneratorService {
       {
         strategy: 'CUSTOM',
         legCount: 6,
-        targetOdds: 20.0,
         stake,
         dateFilter: dateScope,
         allowedMarkets: ['HOME_WIN', 'AWAY_WIN', 'OVER_25', 'BTTS_YES', 'DOUBLE_CHANCE_1X'],
       },
       settings
     );
-    megaSlip.name = dateScope === 'TODAY' ? "Today's High Value 6-Fold Mega" : 'High Value Mega Accumulator';
+    megaSlip.name = dateScope === 'TODAY' ? "Today's 6-Fold Mega Acca" : 'Mega Accumulator';
 
     loggerService.addLog({
       level: 'SUCCESS',
@@ -327,7 +322,7 @@ export class ServerPredictionGeneratorService {
 
     return {
       BANKER: bankerSlip,
-      VALUE_HUNTER: valueSlip,
+      PROBABILITY_CHASE: probSlip,
       HIGH_GOALS: goalsSlip,
       MEGA_COMBO: megaSlip,
     };

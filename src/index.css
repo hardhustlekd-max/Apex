@@ -4,6 +4,12 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
 
 @layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border-default);
+  }
+
   /* ==========================================================================
      TIER 1: PRIMITIVE TOKENS (Raw scales, colorway palettes & metric base)
      ========================================================================== */
@@ -184,8 +190,8 @@
     --text-inverse: #080c14;
 
     /* Borders */
-    --border-default: #232d42;
-    --border-subdued: #1a2234;
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-subdued: rgba(255, 255, 255, 0.04);
     --border-accent: rgba(0, 230, 135, 0.45);
 
     /* Brand Accents */
@@ -294,8 +300,8 @@
     --text-muted: #64748b;
     --text-inverse: #ffffff;
 
-    --border-default: #28334a;
-    --border-subdued: #1c2436;
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-subdued: rgba(255, 255, 255, 0.04);
     --border-accent: rgba(255, 26, 67, 0.45);
 
     --accent-default: #e6002a;
@@ -402,8 +408,8 @@
     --text-muted: #6b7280;
     --text-inverse: #090a0f;
 
-    --border-default: #2d3248;
-    --border-subdued: #202434;
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-subdued: rgba(255, 255, 255, 0.04);
     --border-accent: rgba(245, 158, 11, 0.45);
 
     --accent-default: #f59e0b;
@@ -510,8 +516,8 @@
     --text-muted: #64748b;
     --text-inverse: #0b0c0e;
 
-    --border-default: #272a34;
-    --border-subdued: #1e2028;
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-subdued: rgba(255, 255, 255, 0.04);
     --border-accent: rgba(204, 255, 0, 0.45);
 
     --accent-default: #ccff00;

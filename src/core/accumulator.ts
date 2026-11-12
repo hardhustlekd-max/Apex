@@ -201,9 +201,6 @@ export class AccumulatorGenerator {
       strategy: strategy as any,
       legs: selectedLegs,
       combinedProb,
-      overallEV: 0,
-      suggestedStake: 0,
-      stake: 0,
       riskRating,
       createdAt,
       summaryText,
@@ -269,10 +266,8 @@ export class AccumulatorGenerator {
           marketName: m.name,
           selection,
           probability: m.probability,
-          expectedValue: 0,
           reasoning,
           isBanker: m.isBanker,
-          isPositiveEV: false,
         });
       }
     }

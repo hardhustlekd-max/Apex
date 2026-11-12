@@ -1,4 +1,4 @@
-import { APIProvider, LiveOddsUpdate, LiveScore } from './types.js';
+import { APIProvider, LiveScore } from './types.js';
 import { Fixture, LeagueStandingTable } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 
@@ -17,10 +17,6 @@ export class FlashscoreProvider implements APIProvider {
 
   async getUpcomingFixtures(date?: string): Promise<Fixture[]> {
     return flashscoreScraperService.getUpcomingFixtures(date);
-  }
-
-  async getLiveOdds(fixtureId: string): Promise<LiveOddsUpdate> {
-    return flashscoreScraperService.getLiveOdds(fixtureId);
   }
 
   async getLiveScores(): Promise<LiveScore[]> {

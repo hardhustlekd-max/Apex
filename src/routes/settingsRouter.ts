@@ -13,7 +13,6 @@ settingsRouter.get('/', (req, res) => {
       success: true,
       settings: settings || {
         rollingMatchWindow: 15,
-        minEVThreshold: 1.10,
         safeWinThreshold: 0.72,
         homeAdvantageFactor: 1.12,
         formDecayRate: 0.85,
@@ -81,7 +80,6 @@ settingsRouter.put('/', (req, res) => {
     const updated: Partial<EngineSettings> = req.body;
     const current = db.getSettings() || {
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,

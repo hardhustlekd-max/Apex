@@ -256,7 +256,6 @@ export default function App() {
       setSettings(updated);
       fetchFixtures();
       fetchSettingsAndProviders();
-      showNotification('Poisson parameters updated!');
     } catch (e) {
       console.error('Failed to update settings:', e);
     }

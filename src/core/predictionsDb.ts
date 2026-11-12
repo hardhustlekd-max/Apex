@@ -13,7 +13,21 @@ export class PredictionsDB {
     if (this.isInitialized) return;
 
     try {
-      console.log('[PredictionsDB] Initialized local SQLite prediction store in WAL mode.');
+      // Update match_state to 'completed' for past matches based on match_date time
+      const todayStr = getRelativeDateStr(0);
+      sqliteDb.prepare(`
+        UPDATE upcoming_predictions 
+        SET match_state = 'completed', status = 'FINISHED' 
+        WHERE match_date < ? AND match_state != 'completed'
+      `).run(todayStr);
+
+      sqliteDb.prepare(`
+        UPDATE historical_predictions 
+        SET match_state = 'completed', status = 'FINISHED' 
+        WHERE match_state IS NULL OR match_state != 'completed'
+      `).run();
+
+      console.log('[PredictionsDB] Initialized local SQLite prediction store in WAL mode & reconciled match states.');
     } catch (err: any) {
       console.warn('[PredictionsDB] SQLite predictions initialization notice:', err?.message);
     }
@@ -31,7 +45,6 @@ export class PredictionsDB {
       prediction: f.prediction
         ? {
             ...f.prediction,
-            probabilityMatrix: undefined, // Strip 100-cell grid to save 80KB per row
           }
         : undefined,
     };

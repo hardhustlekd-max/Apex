@@ -363,7 +363,7 @@ export function initSqliteSchema(): void {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
 
-    // Schema Migration: Ensure upcoming_predictions has full_fixture_json and other recent columns
+    // Schema Migration: Ensure upcoming_predictions and historical_predictions have match_state column
     try {
       const columns = db.prepare("PRAGMA table_info(upcoming_predictions)").all() as any[];
       const columnNames = columns.map(c => c.name);
@@ -373,13 +373,24 @@ export function initSqliteSchema(): void {
           console.log('[SQLite] Migrating upcoming_predictions: Adding full_fixture_json column');
           db.exec("ALTER TABLE upcoming_predictions ADD COLUMN full_fixture_json TEXT;");
         }
-        if (!columnNames.includes('is_banker')) {
-          console.log('[SQLite] Migrating upcoming_predictions: Adding is_banker column');
-          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN is_banker INTEGER DEFAULT 0;");
+        if (!columnNames.includes('match_state')) {
+          console.log('[SQLite] Migrating upcoming_predictions: Adding match_state column');
+          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN match_state TEXT DEFAULT 'scheduled';");
         }
       }
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for upcoming_predictions:', migErr?.message);
+    }
+
+    try {
+      const histColumns = db.prepare("PRAGMA table_info(historical_predictions)").all() as any[];
+      const histColumnNames = histColumns.map(c => c.name);
+      if (histColumnNames.length > 0 && !histColumnNames.includes('match_state')) {
+        console.log('[SQLite] Migrating historical_predictions: Adding match_state column');
+        db.exec("ALTER TABLE historical_predictions ADD COLUMN match_state TEXT DEFAULT 'completed';");
+      }
+    } catch (migErr: any) {
+      console.warn('[SQLite] Migration note for historical_predictions:', migErr?.message);
     }
 
     // Ensure flashscore_scraped_matches also has these columns

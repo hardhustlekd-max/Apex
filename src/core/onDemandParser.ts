@@ -179,14 +179,31 @@ export class OnDemandParser {
 
         if (s.startsWith('KB÷Last matches: ')) {
           const rawHeaderClub = s.replace('KB÷Last matches: ', '').replace('¬', '').trim();
-          if (!foundHomeHeader) {
+          const normRaw = rawHeaderClub.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normHome = (fixtureHomeTeam || homeClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normAway = (fixtureAwayTeam || awayClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isHomeMatch = normHome.length > 0 && normRaw.length > 0 && (normHome.includes(normRaw) || normRaw.includes(normHome));
+          const isAwayMatch = normAway.length > 0 && normRaw.length > 0 && (normAway.includes(normRaw) || normRaw.includes(normAway));
+
+          if (isHomeMatch && !foundHomeHeader) {
             currentSection = 'HOME_RECENT';
             foundHomeHeader = true;
             if (!homeClubName) homeClubName = rawHeaderClub;
-          } else if (!foundAwayHeader) {
+          } else if (isAwayMatch && !foundAwayHeader) {
             currentSection = 'AWAY_RECENT';
             foundAwayHeader = true;
             if (!awayClubName) awayClubName = rawHeaderClub;
+          } else {
+            if (!foundHomeHeader) {
+              currentSection = 'HOME_RECENT';
+              foundHomeHeader = true;
+              if (!homeClubName) homeClubName = rawHeaderClub;
+            } else if (!foundAwayHeader) {
+              currentSection = 'AWAY_RECENT';
+              foundAwayHeader = true;
+              if (!awayClubName) awayClubName = rawHeaderClub;
+            }
           }
           continue;
         }

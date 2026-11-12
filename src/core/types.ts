@@ -91,6 +91,8 @@ export interface TeamStatsSummary {
   avgGoalsScored: number;
   avgGoalsConceded: number;
   recentMatches: TeamFormMatch[];
+  opponentAdjustedXG?: number;
+  opponentAdjustedXGA?: number;
   teamStrengthRating?: number;
   eloRating?: number;
 }
@@ -116,6 +118,7 @@ export interface EloRatingBreakdown {
   homeElo: number;
   awayElo: number;
   eloDifference: number;
+  homeAdvantageElo?: number;
   homeWinProbElo: number;
   drawProbElo: number;
   awayWinProbElo: number;

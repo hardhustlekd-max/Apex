@@ -13,7 +13,6 @@ export class FootballDB {
   private isInitialized = false;
   private fallbackSettings: EngineSettings = {
     rollingMatchWindow: 15,
-    minEVThreshold: 0,
     safeWinThreshold: 0.72,
     homeAdvantageFactor: 1.12,
     formDecayRate: 0.85,
@@ -145,7 +144,7 @@ export class FootballDB {
           home_team, away_team, home_badge, away_badge, stage,
           rest_days_home, rest_days_away,
           status, score_json,
-          prediction_json, markets_json, best_value_market_json,
+          prediction_json, markets_json,
           home_stats_json, away_stats_json, measurements_json, h2h_matches_json,
           information_json, statistics_json,
           feed_path, updated_at
@@ -154,7 +153,7 @@ export class FootballDB {
           ?, ?, ?, ?, ?,
           ?, ?,
           ?, ?,
-          ?, ?, ?,
+          ?, ?,
           ?, ?, ?, ?,
           ?, ?,
           ?, ?
@@ -378,7 +377,6 @@ export class FootballDB {
         score: row.score_json ? JSON.parse(row.score_json) : undefined,
         prediction: row.prediction_json ? JSON.parse(row.prediction_json) : undefined,
         markets: row.markets_json ? JSON.parse(row.markets_json) : undefined,
-        // bestValueMarket: row.best_value_market_json ? JSON.parse(row.best_value_market_json) : undefined,
         homeStats: row.home_stats_json ? JSON.parse(row.home_stats_json) : undefined,
         awayStats: row.away_stats_json ? JSON.parse(row.away_stats_json) : undefined,
         measurements: row.measurements_json ? JSON.parse(row.measurements_json) : undefined,

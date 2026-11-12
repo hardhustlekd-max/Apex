@@ -20,7 +20,7 @@ interface PrebuiltAccumulatorsProps {
   onTriggerFullSync?: () => void;
 }
 
-type PrebuiltCategory = 'BANKER' | 'VALUE_HUNTER' | 'HIGH_GOALS' | 'MEGA_COMBO';
+type PrebuiltCategory = 'BANKER' | 'PROBABILITY_CHASE' | 'HIGH_GOALS' | 'MEGA_COMBO';
 
 interface RiskProfile {
   level: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';

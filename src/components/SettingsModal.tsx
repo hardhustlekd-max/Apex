@@ -55,7 +55,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRefreshMetrics,
   syncProgress,
 }) => {
-  const [activeTab, setActiveTab] = useState<'ENGINE' | 'DATA' | 'PREDICTIONS' | 'UI'>('ENGINE');
+  const [activeTab, setActiveTab] = useState<'DATA' | 'PREDICTIONS' | 'UI'>('DATA');
   const [activeThemeId, setActiveThemeId] = useState<string>(
     settings?.colorTheme || getActiveColorThemeId()
   );
@@ -223,7 +223,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSave = () => {
     onSaveSettings({
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,
@@ -284,17 +283,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal Navigation Tabs: Engine, Data Management, Predictions, UI */}
         <div className="px-4 sm:px-5 pb-1.5 pt-1">
           <div className="p-1 bg-theme-subtle rounded-full flex items-center gap-1 text-[10.5px] overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActiveTab('ENGINE')}
-              className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'ENGINE'
-                  ? 'bg-theme-primary text-theme-primary-text shadow-xs'
-                  : 'text-theme-sub hover:text-theme-main'
-              }`}
-            >
-              <Cpu className="w-3 h-3" />
-              <span>Engine</span>
-            </button>
+
             <button
               onClick={() => setActiveTab('DATA')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-full font-black text-[10.5px] transition-all cursor-pointer whitespace-nowrap ${
@@ -333,11 +322,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Body */}
         <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
-          {activeTab === 'ENGINE' && (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Prediction engine active.</p>
-            </div>
-          )}
+
 
           {activeTab === 'DATA' && (
             <div className="space-y-4">

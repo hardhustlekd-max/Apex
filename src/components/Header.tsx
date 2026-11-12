@@ -10,7 +10,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenTerminal?: () => void;
   onOpenSeedModal?: () => void;
-  onSelectAccaCategory?: (cat: 'BANKER' | 'VALUE_HUNTER') => void;
+  onSelectAccaCategory?: (cat: 'BANKER' | 'PROBABILITY_CHASE') => void;
   isSyncing: boolean;
   onSyncData?: () => void;
   isSyncingData?: boolean;
@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   setSearchQuery,
 }) => {
   return (
-    <header className="sticky top-0 z-30 h-12 bg-theme-card backdrop-blur-md transition-colors border-b border-theme">
+    <header className="sticky top-0 z-30 h-12 bg-theme-card backdrop-blur-md transition-colors border-b border-theme/40">
       <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-5 flex items-center justify-between gap-3">
         {/* Left: Hamburger Menu Button */}
         <div className="flex items-center gap-2.5">

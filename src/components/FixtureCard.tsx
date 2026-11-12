@@ -28,11 +28,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     <div
       id={`fixture-card-${fixture.id}`}
       onClick={() => onSelectDetail(fixture)}
-      className={`rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-200 cursor-pointer border ${
-        isSelected
-          ? 'bg-theme-card-elevated border-theme-primary shadow-sm'
-          : 'bg-theme-card border-theme shadow-xs hover:border-theme-primary'
-      }`}
+      className="rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-200 cursor-pointer border bg-theme-card border-theme shadow-xs hover:border-theme-primary"
     >
       <div>
         {/* Top bar: League, Time, Stage / Status */}

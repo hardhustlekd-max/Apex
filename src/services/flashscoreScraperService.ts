@@ -36,8 +36,25 @@ export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
     score: { home: homeScore, away: awayScore },
     statistics: stats,
     information: info,
-    prediction: undefined,
-    bestValueMarket: undefined
+    prediction: {
+      homeXG: 1.0,
+      awayXG: 1.0,
+      homeWinProb: 0.33,
+      drawProb: 0.34,
+      awayWinProb: 0.33,
+      over15Prob: 0.5,
+      over25Prob: 0.5,
+      over35Prob: 0.5,
+      bttsProb: 0.5,
+      topCorrectScores: [],
+      homeAttackStrength: 1.0,
+      homeDefenseStrength: 1.0,
+      awayAttackStrength: 1.0,
+      awayDefenseStrength: 1.0,
+      homeFormMultiplier: 1.0,
+      awayFormMultiplier: 1.0,
+      probabilityMatrix: Array(6).fill(0).map(() => Array(6).fill(0)),
+    },
   };
 }
 
@@ -1107,14 +1124,32 @@ export class FlashscoreScraperService {
 
           if (s.startsWith('KB÷Last matches: ')) {
             const rawHeaderClub = s.replace('KB÷Last matches: ', '').replace('¬', '').trim();
-            if (!foundHomeHeader) {
+            const normRaw = rawHeaderClub.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normHome = (fixtureHomeTeam || homeClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normAway = (fixtureAwayTeam || awayClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            const isHomeMatch = normHome.length > 0 && normRaw.length > 0 && (normHome.includes(normRaw) || normRaw.includes(normHome));
+            const isAwayMatch = normAway.length > 0 && normRaw.length > 0 && (normAway.includes(normRaw) || normRaw.includes(normAway));
+
+            if (isHomeMatch && !foundHomeHeader) {
               currentSection = 'HOME_RECENT';
               foundHomeHeader = true;
               if (!homeClubName) homeClubName = rawHeaderClub;
-            } else if (!foundAwayHeader) {
+            } else if (isAwayMatch && !foundAwayHeader) {
               currentSection = 'AWAY_RECENT';
               foundAwayHeader = true;
               if (!awayClubName) awayClubName = rawHeaderClub;
+            } else {
+              // Positional fallback if names do not match explicitly
+              if (!foundHomeHeader) {
+                currentSection = 'HOME_RECENT';
+                foundHomeHeader = true;
+                if (!homeClubName) homeClubName = rawHeaderClub;
+              } else if (!foundAwayHeader) {
+                currentSection = 'AWAY_RECENT';
+                foundAwayHeader = true;
+                if (!awayClubName) awayClubName = rawHeaderClub;
+              }
             }
             continue;
           }

@@ -26,11 +26,17 @@ import {
   formatProb,
   getProbValue,
   getAuthoritative1X2Pick,
-  getAuthoritativeValueBet,
-  formatEV,
 } from '../core/formatters.js';
 
 // H2HTrendBadge removed as per user request to eliminate trend badges
+
+function isTeamMatch(name1?: string, name2?: string): boolean {
+  if (!name1 || !name2) return false;
+  const n1 = name1.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+  const n2 = name2.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+  if (!n1 || !n2) return false;
+  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+}
 
 export interface MatchDetailViewProps {
   fixture: Fixture | null;
@@ -84,13 +90,13 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
   const displayFixture = fixture || lastFixtureRef.current;
   if (!displayFixture) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className="absolute inset-0 cursor-pointer" 
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-2xl mx-auto shadow-2xl animate-in slide-in-from-bottom-4 duration-300 pointer-events-auto">
+      <div className="relative w-full max-w-2xl h-[92vh] sm:h-[85vh] max-h-[820px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
         <MatchDetailView fixture={displayFixture} onClose={onClose} isPanel={false} />
       </div>
     </div>
@@ -312,57 +318,58 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   const h2hTrends = useMemo(() => {
     if (!h2h) return { homeTrend: '', awayTrend: '', homeForm: [], awayForm: [] };
 
-    const homeName = (fixture.homeTeam || h2h.homeClub || '').toLowerCase().trim();
-    const awayName = (fixture.awayTeam || h2h.awayClub || '').toLowerCase().trim();
-
     const recentH2H = h2h.recentH2H || [];
     if (recentH2H.length > 0) {
       const homeForm: ('W' | 'D' | 'L')[] = [];
       const awayForm: ('W' | 'D' | 'L')[] = [];
 
       recentH2H.slice(0, 5).forEach((m) => {
-        const recHome = (m.homeTeam || '').toLowerCase().trim();
-        const recAway = (m.awayTeam || '').toLowerCase().trim();
-
         let gHome = 0;
         let gAway = 0;
-        let parsed = false;
 
         if (m.score && m.score.includes('-')) {
           const parts = m.score.split('-').map((s) => parseInt(s.trim(), 10));
           if (!isNaN(parts[0]) && !isNaN(parts[1])) {
             gHome = parts[0];
             gAway = parts[1];
-            parsed = true;
           }
         }
 
-        let homeWinState: 'W' | 'D' | 'L' = 'D';
-        if (parsed) {
-          if (gHome > gAway) homeWinState = 'W';
-          else if (gAway > gHome) homeWinState = 'L';
-          else homeWinState = 'D';
+        const isRecHomeCurrentHome = isTeamMatch(m.homeTeam, fixture.homeTeam);
+        const isRecHomeCurrentAway = isTeamMatch(m.homeTeam, fixture.awayTeam);
+
+        let homeGoals = 0;
+        let awayGoals = 0;
+
+        if (isRecHomeCurrentHome) {
+          homeGoals = gHome;
+          awayGoals = gAway;
+        } else if (isRecHomeCurrentAway) {
+          homeGoals = gAway;
+          awayGoals = gHome;
         } else {
-          if (m.winner === 'HOME') homeWinState = 'W';
-          else if (m.winner === 'AWAY') homeWinState = 'L';
-          else homeWinState = 'D';
+          if (m.winner === 'HOME') {
+            homeForm.push('W');
+            awayForm.push('L');
+          } else if (m.winner === 'AWAY') {
+            homeForm.push('L');
+            awayForm.push('W');
+          } else {
+            homeForm.push('D');
+            awayForm.push('D');
+          }
+          return;
         }
 
-        const isHomeFixtureTeamHome = recHome.includes(homeName) || homeName.includes(recHome);
-        const isHomeFixtureTeamAway = recAway.includes(homeName) || homeName.includes(recAway);
-        const isAwayFixtureTeamHome = recHome.includes(awayName) || awayName.includes(recHome);
-        const isAwayFixtureTeamAway = recAway.includes(awayName) || awayName.includes(recAway);
-
-        if (isHomeFixtureTeamHome || isAwayFixtureTeamAway) {
-          homeForm.push(homeWinState);
-          awayForm.push(homeWinState === 'W' ? 'L' : homeWinState === 'L' ? 'W' : 'D');
-        } else if (isHomeFixtureTeamAway || isAwayFixtureTeamHome) {
-          const invRes: 'W' | 'D' | 'L' = homeWinState === 'W' ? 'L' : homeWinState === 'L' ? 'W' : 'D';
-          homeForm.push(invRes);
-          awayForm.push(invRes === 'W' ? 'L' : invRes === 'L' ? 'W' : 'D');
+        if (homeGoals > awayGoals) {
+          homeForm.push('W');
+          awayForm.push('L');
+        } else if (homeGoals < awayGoals) {
+          homeForm.push('L');
+          awayForm.push('W');
         } else {
-          homeForm.push(homeWinState);
-          awayForm.push(homeWinState === 'W' ? 'L' : homeWinState === 'L' ? 'W' : 'D');
+          homeForm.push('D');
+          awayForm.push('D');
         }
       });
 
@@ -374,8 +381,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       };
     }
 
-    const homeMatches = h2h.homeRecentMatches || fixture.homeStats?.recentMatches || [];
-    const awayMatches = h2h.awayRecentMatches || fixture.awayStats?.recentMatches || [];
+    const isHomeClubMatchingHomeFixture = !h2h.homeClub || isTeamMatch(h2h.homeClub, fixture.homeTeam);
+
+    const homeMatches = isHomeClubMatchingHomeFixture
+      ? (h2h.homeRecentMatches || fixture.homeStats?.recentMatches || [])
+      : (h2h.awayRecentMatches || fixture.homeStats?.recentMatches || []);
+
+    const awayMatches = isHomeClubMatchingHomeFixture
+      ? (h2h.awayRecentMatches || fixture.awayStats?.recentMatches || [])
+      : (h2h.homeRecentMatches || fixture.awayStats?.recentMatches || []);
 
     const homeForm: ('W' | 'D' | 'L')[] = homeMatches.length > 0
       ? homeMatches.slice(0, 5).map((m) => m.result)
@@ -412,353 +426,109 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   const awayWinPct = pred ? getProbValue(pred.awayWinProb, 1) : 0;
 
   // Unified engine picks
-  const authoritativePick = pred ? getAuthoritative1X2Pick(currentFixture) : { label: 'Match Result', probabilityFormatted: '-' };
 
   const panelContainer = (
     <div
-      className={`bg-theme-card text-theme-main flex flex-col overflow-hidden select-none ${
+      className={`bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full ${
         isPanel
-          ? 'h-full w-full'
-          : 'w-full max-w-2xl h-[88vh] sm:h-[82vh] max-h-[850px] min-h-[540px] rounded-t-3xl sm:rounded-2xl shadow-2xl shrink-0'
+          ? ''
+          : 'rounded-t-3xl sm:rounded-2xl border border-theme shadow-2xl'
       }`}
       style={{ scrollbarGutter: 'stable' }}
     >
       {/* Mobile Drag Handle Affordance */}
       {!isPanel && (
-        <div className="w-10 h-1 bg-theme-subtle rounded-md mx-auto my-2 sm:hidden shrink-0" />
+        <div className="w-10 h-1 bg-slate-200 dark:bg-neutral-700 rounded-full mx-auto my-1.5 sm:hidden shrink-0 opacity-70" />
       )}
 
       {/* Modal Header */}
-      <div className="bg-theme-card px-4 sm:px-5 pt-3 pb-2.5 shrink-0">
+      <div className="bg-theme-card px-3 sm:px-4 pt-2 pb-1.5 shrink-0 border-b border-theme/30">
         <div className="flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-[11px] text-theme-sub">
+          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-[10px] text-theme-sub">
             <span className="font-bold text-theme-main truncate whitespace-nowrap">
               {fixture.stage || fixture.leagueName}
             </span>
-            <span aria-hidden="true" className="text-theme-sub shrink-0">·</span>
-            <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] whitespace-nowrap shrink-0">
-              <Calendar className="w-3 h-3 text-theme-sub" />
-              <span>{formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}</span>
-            </span>
-            <span aria-hidden="true" className="text-theme-sub shrink-0">·</span>
-            <span className="flex items-center gap-1 font-mono tabular-nums text-[10px] whitespace-nowrap shrink-0">
-              <Clock className="w-3 h-3 text-theme-sub" />
-              <span>{formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}</span>
-            </span>
-            {fixture.status === 'LIVE' && (
-              <>
-                <span aria-hidden="true" className="text-theme-sub shrink-0">·</span>
-                <span className="text-theme-primary-text font-black flex items-center gap-1 text-[10px] whitespace-nowrap shrink-0 bg-theme-primary px-1.5 py-0.5 rounded-md font-mono tabular-nums">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
-                  LIVE
-                </span>
-              </>
-            )}
           </div>
-
-          {/* Close Action */}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[32px] min-w-[32px] w-8 h-8 rounded-xl bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              className="w-7 h-7 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0"
               aria-label="Close match details"
             >
-              <X className="w-4 h-4 stroke-[2.5]" />
+              <X className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
           )}
         </div>
 
-        {/* Hero Scoreboard Container - Styled with Red Gradient Card from Reference Image */}
-        <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#FF1A35] via-[#FF0D2E] to-[#E6001C] text-white min-w-0 shadow-lg shadow-red-500/20 shrink-0 min-h-[96px] flex items-center">
-          <div className="grid grid-cols-12 items-center gap-2 w-full">
-            {/* Home Team */}
-            <div className="col-span-5 flex items-center gap-2.5 min-w-0">
-              {fixture.homeBadge ? (
-                <img
-                  src={fixture.homeBadge}
-                  alt=""
-                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 rounded-full bg-white/20 p-0.5"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                  {fixture.homeTeam.slice(0, 1)}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <span
-                  className="text-xs sm:text-sm font-extrabold text-white truncate block"
-                  title={fixture.homeTeam}
-                >
-                  {fixture.homeTeam}
-                </span>
-                <div className="flex items-center gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80 min-h-[16px]">
-                  {pred ? (
-                    <>
-                      <span className="font-bold whitespace-nowrap">
-                        {homeWinPct}% Win
-                      </span>
-                      <span aria-hidden="true" className="text-white/60">·</span>
-                      <span className="whitespace-nowrap">
-                        xG {pred.homeXG}
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-                </div>
-            </div>
+        {/* Compact Hero Scoreboard */}
+        <div className="mt-2 p-3 rounded-xl bg-theme-card border border-theme flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex flex-col items-center gap-0.5 min-w-0 flex-1">
+             <span className="text-xs font-extrabold text-theme-main truncate block">{fixture.homeTeam}</span>
+             {pred && <span className="text-[10px] font-bold text-theme-primary">{homeWinPct}%</span>}
+          </div>
+          
+          <div className="flex flex-col items-center shrink-0 px-2">
+            <span className="text-sm font-black font-mono text-theme-main bg-theme-subtle px-2 py-0.5 rounded-md">
+              {fixture.score ? `${fixture.score.home}-${fixture.score.away}` : 'VS'}
+            </span>
+            <span className="text-[9px] font-bold text-theme-sub uppercase">{fixture.status === 'LIVE' ? 'LIVE' : 'FT'}</span>
+          </div>
 
-            {/* Match Status / Score */}
-            <div className="col-span-2 flex flex-col items-center justify-center text-center shrink-0">
-              {fixture.score && fixture.score.home !== undefined ? (
-                <div>
-                  <span className="text-base sm:text-xl font-mono tabular-nums font-black text-white tracking-tight whitespace-nowrap">
-                    {fixture.score.home} - {fixture.score.away}
-                  </span>
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-white/90 mt-0.5">
-                    {fixture.status === 'LIVE'
-                      ? fixture.minute
-                        ? `${fixture.minute}'`
-                        : 'Live'
-                      : 'Full Time'}
-                  </span>
-                </div>
-              ) : (
-                <div>
-                  <span className="text-[11px] font-black uppercase tracking-widest text-white/90">
-                    VS
-                  </span>
-                  <span className="block text-[10px] font-mono tabular-nums text-white/80 mt-0.5">
-                    {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Away Team */}
-            <div className="col-span-5 flex items-center justify-end gap-2.5 min-w-0 text-right">
-              <div className="min-w-0 flex-1">
-                <span
-                  className="text-xs sm:text-sm font-extrabold text-white truncate block"
-                  title={fixture.awayTeam}
-                >
-                  {fixture.awayTeam}
-                </span>
-                <div className="flex items-center justify-end gap-1.5 mt-0.5 font-mono tabular-nums text-[10px] text-white/80 min-h-[16px]">
-                  {pred ? (
-                    <>
-                      <span className="whitespace-nowrap">
-                        xG {pred.awayXG}
-                      </span>
-                      <span aria-hidden="true" className="text-white/60">·</span>
-                      <span className="font-bold whitespace-nowrap">
-                        {awayWinPct}% Win
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-                </div>
-              {fixture.awayBadge ? (
-                <img
-                  src={fixture.awayBadge}
-                  alt=""
-                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 rounded-full bg-white/20 p-0.5"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                  {fixture.awayTeam.slice(0, 1)}
-                </div>
-              )}
-            </div>
+          <div className="flex flex-col items-center gap-0.5 min-w-0 flex-1">
+             <span className="text-xs font-extrabold text-theme-main truncate block">{fixture.awayTeam}</span>
+             {pred && <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">{awayWinPct}%</span>}
           </div>
         </div>
 
-        {/* Segmented Sub-Navigation Control */}
-        <div className="mt-3 w-full flex items-center gap-1 p-1 bg-theme-subtle rounded-xl overflow-x-auto no-scrollbar shrink-0">
+        <div className="mt-2 w-full flex items-center gap-0.5 p-0.5 bg-theme-subtle rounded-lg overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('OVERVIEW')}
-            className={`flex-1 min-w-[64px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
-              activeTab === 'OVERVIEW'
-                ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                : 'text-theme-sub hover:text-theme-main'
+            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
+              activeTab === 'OVERVIEW' ? 'bg-theme-primary text-theme-primary-text font-black' : 'text-theme-sub hover:text-theme-main'
             }`}
           >
             Overview
           </button>
-
           <button
             type="button"
             onClick={() => setActiveTab('H2H')}
-            className={`flex-1 min-w-[56px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
-              activeTab === 'H2H'
-                ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                : 'text-theme-sub hover:text-theme-main'
+            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
+              activeTab === 'H2H' ? 'bg-theme-primary text-theme-primary-text font-black' : 'text-theme-sub hover:text-theme-main'
             }`}
           >
-            <span>H2H</span>
-            {h2h.matchesCount > 0 && (
-              <span className="text-[10px] font-mono tabular-nums opacity-85">
-                ({h2h.matchesCount})
-              </span>
-            )}
+            H2H {h2h.matchesCount > 0 && <span className="opacity-80">({h2h.matchesCount})</span>}
           </button>
-
-          {(parsedStatsSummary.items.length > 0 || (currentFixture.information && currentFixture.information.length > 0)) && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('STATS')}
-              className={`flex-1 min-w-[64px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
-                activeTab === 'STATS'
-                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                  : 'text-theme-sub hover:text-theme-main'
-              }`}
-            >
-              <span>{parsedStatsSummary.items.length > 0 ? 'Stats' : 'Details'}</span>
-              {parsedStatsSummary.items.length > 0 && (
-                <span className="text-[10px] font-mono tabular-nums opacity-85">
-                  ({parsedStatsSummary.items.length})
-                </span>
-              )}
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => setActiveTab('TEAMS')}
-            className={`flex-1 min-w-[68px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
-              activeTab === 'TEAMS'
-                ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                : 'text-theme-sub hover:text-theme-main'
+            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
+              activeTab === 'TEAMS' ? 'bg-theme-primary text-theme-primary-text font-black' : 'text-theme-sub hover:text-theme-main'
             }`}
           >
-            Team Form
+            Teams {homeRecentMatchesList.length + awayRecentMatchesList.length > 0 && <span className="opacity-80">({homeRecentMatchesList.length + awayRecentMatchesList.length})</span>}
           </button>
-
-          {pred && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('PREDICTIONS')}
-              className={`flex-1 min-w-[76px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
-                activeTab === 'PREDICTIONS'
-                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                  : 'text-theme-sub hover:text-theme-main'
-              }`}
-            >
-              Predictions
-            </button>
-          )}
-
           <button
             type="button"
-            onClick={() => setActiveTab('STANDINGS')}
-            className={`flex-1 min-w-[68px] sm:min-w-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
-              activeTab === 'STANDINGS'
-                ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                : 'text-theme-sub hover:text-theme-main'
+            onClick={() => setActiveTab('PREDICTIONS')}
+            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
+              activeTab === 'PREDICTIONS' ? 'bg-theme-primary text-theme-primary-text font-black' : 'text-theme-sub hover:text-theme-main'
             }`}
           >
-            Standings
+            Preds {bestMarketsPerGroup.length > 0 && <span className="opacity-80">({bestMarketsPerGroup.length})</span>}
           </button>
         </div>
       </div>
 
       {/* Scrollable Content Body */}
-      <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain space-y-4 flex-1 min-h-0 min-w-0">
+      <div className="p-3.5 sm:p-5 overflow-y-auto overscroll-contain space-y-3.5 sm:space-y-4 flex-1 min-h-0 min-w-0">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'OVERVIEW' && (
           <div className="space-y-4">
             {pred ? (
               <>
-                {/* Win Probability Bar & Outcome Cards */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      Match Outcome Probabilities
-                    </span>
-                    <span className="font-mono tabular-nums text-slate-500 dark:text-neutral-400 text-[11px]">
-                      Dixon-Coles Model
-                    </span>
-                  </div>
 
-                  {/* 3-Section Visual Proportional Gauge */}
-                  <div className="h-2 w-full bg-slate-200 dark:bg-[#1A1C24] rounded-full flex overflow-hidden">
-                    <div
-                      style={{ width: `${homeWinPct}%` }}
-                      className="bg-[#CCFF00] transition-all duration-300"
-                    />
-                    <div
-                      style={{ width: `${drawPct}%` }}
-                      className="bg-slate-400 dark:bg-neutral-600 transition-all duration-300"
-                    />
-                    <div
-                      style={{ width: `${awayWinPct}%` }}
-                      className="bg-slate-800 dark:bg-neutral-300 transition-all duration-300"
-                    />
-                  </div>
-
-                  {/* Outcome Metric Cards */}
-                  <div className="grid grid-cols-3 gap-2 pt-1 font-mono tabular-nums">
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] text-center">
-                      <span className="text-[11px] font-sans text-[#8F92A1] dark:text-[#9EA3B2] block truncate">
-                        {fixture.homeTeam}
-                      </span>
-                      <span className="text-sm sm:text-base font-extrabold text-slate-950 dark:text-[#CCFF00] block mt-0.5">
-                        {homeWinPct}%
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] text-center">
-                      <span className="text-[11px] font-sans text-[#8F92A1] dark:text-[#9EA3B2] block">
-                        Draw
-                      </span>
-                      <span className="text-sm sm:text-base font-extrabold text-slate-700 dark:text-neutral-300 block mt-0.5">
-                        {drawPct}%
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#15161C] border border-[#ECEEF2] dark:border-[#20232D] text-center">
-                      <span className="text-[11px] font-sans text-[#8F92A1] dark:text-[#9EA3B2] block truncate">
-                        {fixture.awayTeam}
-                      </span>
-                      <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white block mt-0.5">
-                        {awayWinPct}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Model Projections */}
-                  <div className="pt-2 space-y-1.5 text-xs font-mono tabular-nums">
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                      <span className="font-sans text-slate-600 dark:text-neutral-300">Over 2.5 Goals</span>
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {formatProb(pred.over25Prob, 1)}
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                      <span className="font-sans text-slate-600 dark:text-neutral-300">Both Teams to Score (BTTS)</span>
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {formatProb(pred.bttsProb, 1)}
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                      <span className="font-sans text-slate-600 dark:text-neutral-300">Highest Probability Pick</span>
-                      <span className="font-bold text-slate-900 dark:text-[#CCFF00] font-sans">
-                        {authoritativePick.label} ({authoritativePick.probabilityFormatted})
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Expected Goals & Strength Context */}
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2">
@@ -914,40 +684,46 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 </div>
               ) : h2h.recentH2H && h2h.recentH2H.length > 0 ? (
                 <div className="space-y-1.5 font-mono tabular-nums text-xs">
-                  {h2h.recentH2H.map((enc, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded-xl bg-theme-subtle border border-theme flex items-center justify-between gap-2 min-w-0"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-[10px] text-theme-sub shrink-0 font-sans">
-                          {enc.date}
-                        </span>
-                        {enc.competition && (
-                          <span className="text-[10px] text-theme-sub truncate hidden sm:inline">
-                            {enc.competition}
-                          </span>
-                        )}
-                        <span className="font-bold text-theme-main truncate">
-                          {enc.homeTeam} vs {enc.awayTeam}
-                        </span>
-                      </div>
+                  {h2h.recentH2H.map((enc, idx) => {
+                    const winningTeam = enc.winner === 'HOME' ? enc.homeTeam : enc.winner === 'AWAY' ? enc.awayTeam : null;
+                    const isHomeWinner = winningTeam ? isTeamMatch(winningTeam, fixture.homeTeam) : false;
+                    const isAwayWinner = winningTeam ? isTeamMatch(winningTeam, fixture.awayTeam) : false;
 
-                      <div className="shrink-0">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-xs font-black ${
-                            enc.winner === 'HOME'
-                              ? 'bg-theme-primary/20 text-theme-primary'
-                              : enc.winner === 'AWAY'
-                              ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400'
-                              : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                          }`}
-                        >
-                          {enc.score}
-                        </span>
+                    return (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-theme-subtle border border-theme flex items-center justify-between gap-2 min-w-0"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] text-theme-sub shrink-0 font-sans">
+                            {enc.date}
+                          </span>
+                          {enc.competition && (
+                            <span className="text-[10px] text-theme-sub truncate hidden sm:inline">
+                              {enc.competition}
+                            </span>
+                          )}
+                          <span className="font-bold text-theme-main truncate">
+                            {enc.homeTeam} vs {enc.awayTeam}
+                          </span>
+                        </div>
+
+                        <div className="shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-xs font-black ${
+                              isHomeWinner
+                                ? 'bg-theme-primary/20 text-theme-primary'
+                                : isAwayWinner
+                                ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400'
+                                : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                            }`}
+                          >
+                            {enc.score}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="py-6 text-center text-xs text-theme-sub font-mono">
@@ -958,137 +734,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           </div>
         )}
 
-        {/* TAB 3: STATISTICS & DETAILS */}
-        {activeTab === 'STATS' && (parsedStatsSummary.items.length > 0 || (currentFixture.information && currentFixture.information.length > 0)) && (
-          <div className="space-y-4">
-            {/* Possession Comparative Gauge */}
-            {parsedStatsSummary.possession && (
-              <div className="p-4 rounded-2xl bg-theme-card border border-theme space-y-2 font-mono tabular-nums text-xs shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-theme-primary text-sm">
-                    {parsedStatsSummary.possession.home}%
-                  </span>
-                  <span className="font-sans text-xs font-bold text-theme-main">
-                    Ball Possession
-                  </span>
-                  <span className="font-extrabold text-theme-main text-sm">
-                    {parsedStatsSummary.possession.away}%
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-theme-subtle rounded-full flex overflow-hidden">
-                  <div
-                    style={{ width: `${parsedStatsSummary.possession.home}%` }}
-                    className="bg-theme-primary transition-all duration-300"
-                  />
-                  <div
-                    style={{ width: `${parsedStatsSummary.possession.away}%` }}
-                    className="bg-theme-sub transition-all duration-300"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Category Filter Pills */}
-            {parsedStatsSummary.availableGroups.length > 1 && (
-              <div className="w-full flex items-center bg-theme-subtle p-1 rounded-xl overflow-x-auto no-scrollbar gap-1 flex-nowrap shrink-0">
-                {parsedStatsSummary.availableGroups.map((g) => (
-                  <button
-                    key={g.group}
-                    type="button"
-                    onClick={() => setStatFilterGroup(g.group)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap cursor-pointer flex items-center justify-center gap-1 shrink-0 ${
-                      statFilterGroup === g.group
-                        ? 'bg-theme-primary text-theme-primary-text font-black'
-                        : 'text-theme-sub hover:text-theme-main'
-                    }`}
-                  >
-                    <span>{g.label}</span>
-                    <span className="text-[10px] font-mono tabular-nums opacity-85">({g.count})</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Metric Rows */}
-            {filteredStatItems.length > 0 && (
-              <div className="space-y-1.5">
-                {filteredStatItems.map((stat, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-2xl bg-theme-card border border-theme space-y-1.5 shadow-xs"
-                  >
-                    <div className="flex items-center justify-between text-xs font-mono tabular-nums">
-                      <span
-                        className={`w-12 text-left font-bold ${
-                          stat.leader === 'HOME'
-                            ? 'text-theme-primary font-black'
-                            : 'text-theme-sub'
-                        }`}
-                      >
-                        {stat.home.raw}
-                      </span>
-                      <span className="text-theme-main font-sans font-semibold text-center flex-1 truncate px-2 text-xs">
-                        {stat.category}
-                      </span>
-                      <span
-                        className={`w-12 text-right font-bold ${
-                          stat.leader === 'AWAY'
-                            ? 'text-theme-main font-black'
-                            : 'text-theme-sub'
-                        }`}
-                      >
-                        {stat.away.raw}
-                      </span>
-                    </div>
-
-                    <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden">
-                      <div
-                        style={{ width: `${stat.homeSharePercent}%` }}
-                        className={`transition-all duration-300 ${
-                          stat.isInverseMetric ? 'bg-amber-500' : 'bg-theme-primary'
-                        }`}
-                      />
-                      <div
-                        style={{ width: `${stat.awaySharePercent}%` }}
-                        className={`transition-all duration-300 ${
-                          stat.isInverseMetric ? 'bg-rose-500' : 'bg-theme-sub'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Venue & Details */}
-            {(currentFixture.stage || (currentFixture.information && currentFixture.information.length > 0)) && (
-              <div className="p-4 rounded-2xl bg-theme-card border border-theme space-y-2 shadow-xs">
-                <span className="text-xs font-bold text-theme-main block font-sans">
-                  Match Details & Information
-                </span>
-                <div className="space-y-1.5 text-xs font-mono tabular-nums">
-                  {currentFixture.information?.map((info, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded-xl bg-theme-subtle border border-theme flex items-center justify-between gap-3"
-                    >
-                      <span className="text-theme-sub font-sans">{info.category}</span>
-                      <span className="font-bold text-theme-main truncate">{info.value}</span>
-                    </div>
-                  ))}
-                  {currentFixture.stage && !currentFixture.information?.some(i => i.category.toLowerCase().includes('stage')) && (
-                    <div className="p-2.5 rounded-xl bg-theme-subtle border border-theme flex items-center justify-between gap-3">
-                      <span className="text-theme-sub font-sans">Stage</span>
-                      <span className="font-bold text-theme-main truncate">{currentFixture.stage}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 4: TEAMS & FORM */}
+        {/* TAB 3: TEAMS & FORM */}
         {activeTab === 'TEAMS' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Home Team Card */}
@@ -1403,13 +1049,5 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
     </div>
   );
 
-  if (isPanel) {
-    return panelContainer;
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md font-sans overflow-hidden">
-      {panelContainer}
-    </div>
-  );
+  return panelContainer;
 };

@@ -110,7 +110,6 @@ fixturesRouter.get('/live', async (req, res) => {
           ...lf,
           prediction: stored.prediction,
           markets: stored.markets || lf.markets,
-          bestValueMarket: stored.bestValueMarket || lf.bestValueMarket,
           homeStats: stored.homeStats || lf.homeStats,
           awayStats: stored.awayStats || lf.awayStats,
           measurements: stored.measurements || lf.measurements,
@@ -178,7 +177,6 @@ fixturesRouter.get('/history', async (req, res) => {
               status: 'FINISHED' as const,
               score: { home: homeScore, away: awayScore },
               prediction: undefined,
-              bestValueMarket: undefined
             });
           }
         }

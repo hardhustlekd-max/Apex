@@ -1,4 +1,4 @@
-import { Fixture, BookmakerOdds, HistoricalMatch, LeagueStandingTable } from '../core/types.js';
+import { Fixture, HistoricalMatch, LeagueStandingTable } from '../core/types.js';
 
 export interface LiveScore {
   fixtureId: string;
@@ -13,22 +13,13 @@ export interface LiveScore {
   events?: { minute: number; type: 'GOAL' | 'CARD' | 'VAR'; team: string; player?: string }[];
 }
 
-export interface LiveOddsUpdate {
-  fixtureId: string;
-  timestamp: string;
-  odds: BookmakerOdds;
-  movement: 'UP' | 'DOWN' | 'STABLE';
-}
-
 export interface APIProvider {
   id: 'FLASHSCORE' | 'ESPN' | 'FOOTBALL_DATA_CO_UK' | 'BIG_BALLS_DATA' | 'FOOTBALL_DATA_ORG' | 'API_FOOTBALL';
   name: string;
   type: 'CSV' | 'REST' | 'HYBRID' | 'SCRAPER';
   description: string;
   features: string[];
-
   getUpcomingFixtures(date?: string): Promise<Fixture[]>;
-  getLiveOdds(fixtureId: string): Promise<LiveOddsUpdate>;
   getLiveScores(): Promise<LiveScore[]>;
   syncHistoricalData(daysBack?: number, shouldClear?: boolean): Promise<{ success: boolean; matchesCount: number; message: string }>;
   getLeagueStandings?(league: string): Promise<LeagueStandingTable | null>;

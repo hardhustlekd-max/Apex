@@ -179,16 +179,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     const bttsYes = getBttsYesProb(fixture);
     const bttsNo = getBttsNoProb(fixture);
 
-    const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
-
     return (
       <div
         key={fixture.id}
         onClick={() => onSelectDetail(fixture)}
-        className={`group grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 transition-all cursor-pointer gap-2 border-b border-theme/60 last:border-b-0 ${
-          isSelected
-            ? 'bg-theme-primary-subtle border-l-2 border-theme-primary'
-            : isLive
+        className={`group grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 transition-all cursor-pointer gap-2 border-b border-theme/30 last:border-b-0 ${
+          isLive
             ? 'bg-rose-50/30 dark:bg-rose-950/20 hover:bg-rose-50/60 dark:hover:bg-rose-950/40'
             : 'hover:bg-theme-subtle'
         }`}

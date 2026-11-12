@@ -31,7 +31,8 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     }
     try {
       const data = await EngineService.getHistoricalMatches('ALL', recordLimit);
-      const sorted = (data || []).slice().sort((a, b) => {
+      const completedOnly = (data || []).filter(f => f.status === 'FINISHED' && f.score?.home !== undefined && f.score?.away !== undefined);
+      const sorted = completedOnly.slice().sort((a, b) => {
         const dateA = normalizeDateStr(a.matchDate);
         const dateB = normalizeDateStr(b.matchDate);
         
@@ -79,60 +80,38 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const evaluatePrediction = (f: Fixture) => {
     const hG = f.score?.home ?? 0;
     const aG = f.score?.away ?? 0;
-    const totalGoals = hG + aG;
-    const isBtts = hG > 0 && aG > 0;
+    const pred = f.prediction;
 
-    const pick = f.mostLikelyOutcome;
-    
     let isCorrect = false;
     let predictedLabel = 'Unknown';
     let topProb = 0;
-    let marketKey = '';
+    let predicted1X2 = 'HOME_WIN';
 
-    if (pick) {
-      predictedLabel = (pick as any).name || (pick as any).selection || 'Pick';
-      topProb = (pick as any).probability || 0;
-      marketKey = (pick as any).key || (pick as any).marketKey || '';
+    if (pred) {
+      const hw = pred.homeWinProb || 0;
+      const dr = pred.drawProb || 0;
+      const aw = pred.awayWinProb || 0;
+      if (hw >= dr && hw >= aw) {
+        predicted1X2 = 'HOME_WIN';
+        predictedLabel = `${f.homeTeam} Win`;
+        topProb = hw;
+      } else if (aw >= hw && aw >= dr) {
+        predicted1X2 = 'AWAY_WIN';
+        predictedLabel = `${f.awayTeam} Win`;
+        topProb = aw;
+      } else {
+        predicted1X2 = 'DRAW';
+        predictedLabel = 'Draw';
+        topProb = dr;
+      }
     } else {
-      // Manual fallback
+      predicted1X2 = 'HOME_WIN';
       predictedLabel = `${f.homeTeam} Win`;
-      topProb = f.prediction?.homeWinProb || 0.45;
-      marketKey = 'HOME_WIN';
+      topProb = 0.45;
     }
 
-    switch (marketKey) {
-      case 'HOME_WIN':
-        isCorrect = hG > aG;
-        break;
-      case 'DRAW':
-        isCorrect = hG === aG;
-        break;
-      case 'AWAY_WIN':
-        isCorrect = hG < aG;
-        break;
-      case 'OVER_25':
-        isCorrect = totalGoals > 2.5;
-        break;
-      case 'UNDER_25':
-        isCorrect = totalGoals < 2.5;
-        break;
-      case 'BTTS_YES':
-        isCorrect = isBtts;
-        break;
-      case 'BTTS_NO':
-        isCorrect = !isBtts;
-        break;
-      case 'DOUBLE_CHANCE_1X':
-        isCorrect = hG >= aG;
-        break;
-      case 'DOUBLE_CHANCE_X2':
-        isCorrect = aG >= hG;
-        break;
-      default:
-        // Fallback for 1X2 if market key is unknown
-        const predictedWinner = hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';
-        isCorrect = marketKey === predictedWinner;
-    }
+    const actual1X2 = hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';
+    isCorrect = predicted1X2 === actual1X2;
 
     return {
       hG,

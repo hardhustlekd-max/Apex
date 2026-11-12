@@ -43,7 +43,6 @@ accumulatorRouter.post('/generate', async (req, res) => {
     const settings: EngineSettings = db.getSettings() || {
       
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,

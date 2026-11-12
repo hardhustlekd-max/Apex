@@ -112,7 +112,6 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
           awayTeam: sm.away.name,
           status: 'FINISHED' as const,
           score: { home: homeScore, away: awayScore },
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
           prediction: {
             homeXG: 1.35,
             awayXG: 1.15,
@@ -121,17 +120,7 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
             awayWinProb: 0.27,
             over25Prob: 0.52,
             bttsProb: 0.50,
-            mostLikelyOutcome: homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw',
-          },
-          bestValueMarket: {
-            key: 'HOME_WIN',
-            name: homeScore > awayScore ? `${sm.home.name} Win` : 'Match Result',
-            odds: 2.10,
-            probability: 0.45,
-            expectedValue: 1.05,
-            isPositiveEV: true,
-            isBanker: false,
-          }
+          } as any,
         };
       });
     if (finishedScraped.length > 0) {
@@ -156,7 +145,6 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
           status: 'LIVE' as const,
           minute: s.minute,
           score: { home: s.homeScore, away: s.awayScore },
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
         };
 
         // Attach pre-existing prediction if it exists in DB
@@ -279,7 +267,6 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
           awayTeam: sm.away.name,
           status: 'FINISHED' as const,
           score: { home: homeScore, away: awayScore },
-          odds: { homeWin: 2.10, draw: 3.30, awayWin: 3.40, over25: 1.85, under25: 1.95 },
           prediction: {
             homeXG: 1.35,
             awayXG: 1.15,
@@ -288,17 +275,7 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
             awayWinProb: 0.27,
             over25Prob: 0.52,
             bttsProb: 0.50,
-            mostLikelyOutcome: homeScore > awayScore ? 'Home Win' : homeScore < awayScore ? 'Away Win' : 'Draw',
-          },
-          bestValueMarket: {
-            key: 'HOME_WIN',
-            name: homeScore > awayScore ? `${sm.home.name} Win` : 'Match Result',
-            odds: 2.10,
-            probability: 0.45,
-            expectedValue: 1.05,
-            isPositiveEV: true,
-            isBanker: false,
-          }
+          } as any,
         };
       });
     if (finishedScraped.length > 0) {

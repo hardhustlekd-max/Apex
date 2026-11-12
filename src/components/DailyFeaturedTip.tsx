@@ -90,7 +90,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
             {fixture.homeTeam} vs {fixture.awayTeam}
           </div>
           <div className="text-xs font-bold text-theme-model-pick mt-1">
-            Pick: {market?.name} @ {market?.odds.toFixed(2)}
+            Pick: {market?.name}
           </div>
         </div>
         

@@ -107,7 +107,7 @@ export interface AppSettingsSchema {
 export type QuickSlipStrategy = 'TODAY_SLIP' | 'SAFE_PICKS' | 'TOP_VALUE' | 'CUSTOM_SLIP';
 export type DateFilterScope = 'TODAY' | 'TOMORROW' | 'NEXT_3_DAYS' | 'THIS_WEEK' | 'ALL' | 'CUSTOM';
 export type MarketChoiceFilter = 'BEST_VALUE' | 'OVER_UNDER' | '1X2' | 'BTTS';
-export type PrebuiltCategory = 'BANKER' | 'VALUE_HUNTER' | 'HIGH_GOALS' | 'MEGA_COMBO';
+export type PrebuiltCategory = 'BANKER' | 'PROBABILITY_CHASE' | 'HIGH_GOALS' | 'MEGA_COMBO';
 
 export interface TablePaginationSchema {
   currentPage: number;

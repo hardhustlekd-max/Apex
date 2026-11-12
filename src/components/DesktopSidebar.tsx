@@ -41,7 +41,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   isSyncing = false,
 }) => {
   return (
-    <aside className="w-60 shrink-0 hidden lg:flex flex-col h-[calc(100vh-3rem)] sticky top-12 bg-theme-card border-r border-theme z-20 select-none overflow-y-auto no-scrollbar justify-between">
+    <aside className="w-60 shrink-0 hidden lg:flex flex-col h-[calc(100vh-3rem)] sticky top-12 bg-theme-card border-r border-theme/40 z-20 select-none overflow-y-auto no-scrollbar justify-between">
       <div className="p-3 space-y-4">
         {/* Brand identity lockup */}
         <div className="flex items-center gap-2.5 px-1.5 py-0.5">
@@ -195,7 +195,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       </div>
 
       {/* Bottom Footer Diagnostics & Controls */}
-      <div className="p-2.5 bg-theme-card-elevated border-t border-theme space-y-1.5">
+      <div className="p-2.5 bg-theme-card-elevated border-t border-theme/40 space-y-1.5">
         {/* Engine status indicator */}
         <div className="flex items-center justify-between px-1.5 py-0.5 text-xs text-theme-sub">
           <div className="flex items-center gap-1.5">

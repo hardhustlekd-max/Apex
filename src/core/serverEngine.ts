@@ -426,7 +426,6 @@ export class ServerEngine {
           const unpredicted: Fixture = {
             ...f,
             prediction: undefined,
-            bestValueMarket: undefined,
           };
           unpredictedChunk.push(unpredicted);
           allEnriched.push(unpredicted);
@@ -496,7 +495,6 @@ export class ServerEngine {
     const settings: EngineSettings = db.getSettings() || {
       
       rollingMatchWindow: 15,
-      minEVThreshold: 1.10,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,
@@ -558,7 +556,6 @@ export class ServerEngine {
         const unpredicted: Fixture = {
           ...f,
           prediction: undefined,
-          bestValueMarket: undefined,
         };
         processedFixtures.push(unpredicted);
       }
