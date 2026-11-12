@@ -31,8 +31,16 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     }
     try {
       const data = await EngineService.getHistoricalMatches('ALL', recordLimit);
-      const completedOnly = (data || []).filter(f => f.status === 'FINISHED' && f.score?.home !== undefined && f.score?.away !== undefined);
-      const sorted = completedOnly.slice().sort((a, b) => {
+      
+      // STRICT FILTER: Only show matches that have a prediction and are finished
+      const evaluatedOnly = (data || []).filter(f => 
+        f.prediction !== undefined && 
+        f.status === 'FINISHED' && 
+        f.score?.home !== undefined && 
+        f.score?.away !== undefined
+      );
+
+      const sorted = evaluatedOnly.slice().sort((a, b) => {
         const dateA = normalizeDateStr(a.matchDate);
         const dateB = normalizeDateStr(b.matchDate);
         
@@ -82,32 +90,31 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     const aG = f.score?.away ?? 0;
     const pred = f.prediction;
 
+    if (!pred) {
+      return { hG, aG, predictedLabel: 'N/A', topProb: 0, isCorrect: false };
+    }
+
     let isCorrect = false;
     let predictedLabel = 'Unknown';
     let topProb = 0;
     let predicted1X2 = 'HOME_WIN';
 
-    if (pred) {
-      const hw = pred.homeWinProb || 0;
-      const dr = pred.drawProb || 0;
-      const aw = pred.awayWinProb || 0;
-      if (hw >= dr && hw >= aw) {
-        predicted1X2 = 'HOME_WIN';
-        predictedLabel = `${f.homeTeam} Win`;
-        topProb = hw;
-      } else if (aw >= hw && aw >= dr) {
-        predicted1X2 = 'AWAY_WIN';
-        predictedLabel = `${f.awayTeam} Win`;
-        topProb = aw;
-      } else {
-        predicted1X2 = 'DRAW';
-        predictedLabel = 'Draw';
-        topProb = dr;
-      }
-    } else {
+    const hw = pred.homeWinProb || 0;
+    const dr = pred.drawProb || 0;
+    const aw = pred.awayWinProb || 0;
+
+    if (hw >= dr && hw >= aw) {
       predicted1X2 = 'HOME_WIN';
       predictedLabel = `${f.homeTeam} Win`;
-      topProb = 0.45;
+      topProb = hw;
+    } else if (aw >= hw && aw >= dr) {
+      predicted1X2 = 'AWAY_WIN';
+      predictedLabel = `${f.awayTeam} Win`;
+      topProb = aw;
+    } else {
+      predicted1X2 = 'DRAW';
+      predictedLabel = 'Draw';
+      topProb = dr;
     }
 
     const actual1X2 = hG > aG ? 'HOME_WIN' : hG < aG ? 'AWAY_WIN' : 'DRAW';

@@ -47,7 +47,7 @@ const getStorageStatusHandler = (_req: any, res: any) => {
     predictionsDb: {
       configured: true,
       status: 'CONNECTED',
-      url: `data/football_engine.db (${stats.tableCounts['upcoming_predictions'] || 0} predictions)`,
+      url: `data/football_engine.db (${stats.tableCounts['predictions'] || 0} predictions)`,
       latencyMs: 1,
     },
   });

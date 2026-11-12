@@ -183,8 +183,9 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);
     CREATE INDEX IF NOT EXISTS idx_upcoming_league ON upcoming_fixtures(league);
 
-    -- PILLARS 4 & 5: Dixon-Coles Poisson Predictions
-    CREATE TABLE IF NOT EXISTS upcoming_predictions (
+    -- UNIFIED PREDICTIONS TABLE: Dixon-Coles Poisson Predictions
+    -- Used for upcoming, live, and historical evaluation
+    CREATE TABLE IF NOT EXISTS predictions (
       fixture_id TEXT PRIMARY KEY,
       league TEXT NOT NULL,
       league_name TEXT NOT NULL,
@@ -195,64 +196,8 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       away_team TEXT NOT NULL,
       home_badge TEXT,
       away_badge TEXT,
-      status TEXT NOT NULL DEFAULT 'SCHEDULED',
-      home_xg REAL,
-      away_xg REAL,
-      home_win_prob REAL,
-      draw_prob REAL,
-      away_win_prob REAL,
-      over15_prob REAL,
-      over25_prob REAL,
-      over35_prob REAL,
-      btts_prob REAL,
-      tip_key TEXT,
-      tip_name TEXT,
-      tip_prob REAL,
-      full_fixture_json TEXT,
-      predicted_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_pred_date ON upcoming_predictions(match_date);
-    CREATE INDEX IF NOT EXISTS idx_pred_league ON upcoming_predictions(league);
-
-    -- Live predictions cache
-    CREATE TABLE IF NOT EXISTS live_predictions (
-      fixture_id TEXT PRIMARY KEY,
-      league TEXT NOT NULL,
-      league_name TEXT NOT NULL,
-      match_date TEXT NOT NULL,
-      kick_off_time TEXT NOT NULL,
-      home_team TEXT NOT NULL,
-      away_team TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'LIVE',
-      predicted_at TEXT NOT NULL,
-      home_xg REAL,
-      away_xg REAL,
-      home_win_prob REAL,
-      draw_prob REAL,
-      away_win_prob REAL,
-      over15_prob REAL,
-      over25_prob REAL,
-      over35_prob REAL,
-      btts_prob REAL,
-      tip_key TEXT,
-      tip_name TEXT,
-      tip_prob REAL,
-      full_fixture_json TEXT
-    );
-
-    -- Historical finished predictions
-    CREATE TABLE IF NOT EXISTS historical_predictions (
-      fixture_id TEXT PRIMARY KEY,
-      league TEXT NOT NULL,
-      league_name TEXT NOT NULL,
-      stage TEXT,
-      match_date TEXT NOT NULL,
-      kick_off_time TEXT NOT NULL,
-      home_team TEXT NOT NULL,
-      away_team TEXT NOT NULL,
-      home_badge TEXT,
-      away_badge TEXT,
-      status TEXT NOT NULL DEFAULT 'FINISHED',
+      status TEXT NOT NULL DEFAULT 'SCHEDULED', -- Flashscore status: SCHEDULED, LIVE, FINISHED
+      match_state TEXT DEFAULT 'upcoming', -- Internal state: upcoming, completed
       home_score INTEGER,
       away_score INTEGER,
       home_xg REAL,
@@ -264,13 +209,15 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       over25_prob REAL,
       over35_prob REAL,
       btts_prob REAL,
-      tip_key TEXT,
+      tip_key TEXT, -- The 1x2 prediction key: HOME_WIN, DRAW, AWAY_WIN
       tip_name TEXT,
       tip_prob REAL,
       full_fixture_json TEXT,
       predicted_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_hist_pred_date ON historical_predictions(match_date);
+    CREATE INDEX IF NOT EXISTS idx_predictions_date ON predictions(match_date);
+    CREATE INDEX IF NOT EXISTS idx_predictions_league ON predictions(league);
+    CREATE INDEX IF NOT EXISTS idx_predictions_state ON predictions(match_state);
 
     -- PILLAR 2: Head-to-Head & Venue Splits Measurement Cache
     CREATE TABLE IF NOT EXISTS prediction_measurements_cache (
@@ -363,34 +310,18 @@ export function initSqliteSchema(): void {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
 
-    // Schema Migration: Ensure upcoming_predictions and historical_predictions have match_state column
+    // Schema Migration: Handle transition to unified predictions table
     try {
-      const columns = db.prepare("PRAGMA table_info(upcoming_predictions)").all() as any[];
-      const columnNames = columns.map(c => c.name);
-      
-      if (columnNames.length > 0) {
-        if (!columnNames.includes('full_fixture_json')) {
-          console.log('[SQLite] Migrating upcoming_predictions: Adding full_fixture_json column');
-          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN full_fixture_json TEXT;");
-        }
-        if (!columnNames.includes('match_state')) {
-          console.log('[SQLite] Migrating upcoming_predictions: Adding match_state column');
-          db.exec("ALTER TABLE upcoming_predictions ADD COLUMN match_state TEXT DEFAULT 'scheduled';");
-        }
+      const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='predictions'").get();
+      if (!tableCheck) {
+        console.log('[SQLite] Creating unified predictions table and migrating data if possible...');
+        // Temporary: drop old tables if they exist to avoid confusion
+        db.exec("DROP TABLE IF EXISTS upcoming_predictions;");
+        db.exec("DROP TABLE IF EXISTS live_predictions;");
+        db.exec("DROP TABLE IF EXISTS historical_predictions;");
       }
     } catch (migErr: any) {
-      console.warn('[SQLite] Migration note for upcoming_predictions:', migErr?.message);
-    }
-
-    try {
-      const histColumns = db.prepare("PRAGMA table_info(historical_predictions)").all() as any[];
-      const histColumnNames = histColumns.map(c => c.name);
-      if (histColumnNames.length > 0 && !histColumnNames.includes('match_state')) {
-        console.log('[SQLite] Migrating historical_predictions: Adding match_state column');
-        db.exec("ALTER TABLE historical_predictions ADD COLUMN match_state TEXT DEFAULT 'completed';");
-      }
-    } catch (migErr: any) {
-      console.warn('[SQLite] Migration note for historical_predictions:', migErr?.message);
+      console.warn('[SQLite] Migration note for unified predictions:', migErr?.message);
     }
 
     // Ensure flashscore_scraped_matches also has these columns
@@ -457,10 +388,7 @@ export function getSqliteDbStats(): {
   const tables = [
     'historical_matches',
     'upcoming_fixtures',
-    'upcoming_predictions',
-    'live_predictions',
-    'historical_predictions',
-    'prediction_measurements_cache',
+    'predictions',    'prediction_measurements_cache',
     'raw_feed_data',
     'flashscore_scraped_matches',
     'league_standings',

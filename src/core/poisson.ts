@@ -119,7 +119,7 @@ export class ApexEngine {
       const cleanTarget = teamName.toLowerCase().trim();
       const currentSeason = getCurrentSeason();
       const now = new Date();
-      const prevYear = now.getFullYear() - (now.getMonth() < 6 ? 2 : 1);
+      const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
       const prevSeason = `${prevYear}/${prevYear + 1}`;
       const clubMatches = allMatches
         .filter((m) => {

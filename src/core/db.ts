@@ -53,6 +53,7 @@ export class FootballDB {
         sqliteDb.exec('DELETE FROM historical_matches;');
         sqliteDb.exec('DELETE FROM upcoming_fixtures;');
         sqliteDb.exec('DELETE FROM flashscore_scraped_matches;');
+        sqliteDb.exec('DELETE FROM predictions;');
         sqliteDb.exec('DELETE FROM prediction_measurements_cache;');
         sqliteDb.exec('DELETE FROM league_standings;');
         if (clearRaw) {

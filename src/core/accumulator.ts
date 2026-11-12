@@ -315,7 +315,7 @@ export class AccumulatorGenerator {
 🎯 FOOTBALL PREDICTION SLIP
 ════════════════════════════════════
 Type: ${slipName}
-Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
+Generated: ${new Date().toISOString().replace('T', ' ').substring(0, 16)} UTC
 
 SELECTIONS (${legs.length} LEGS):
 ${legLines}

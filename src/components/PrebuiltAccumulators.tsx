@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Fixture, AccumulatorSlip, EngineSettings } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
-import { getRelativeDateStr, formatLocalKickoffTime } from '../core/dateUtils.js';
+import { getRelativeDateStr, formatUtcKickoffTime } from '../core/dateUtils.js';
 import { isMatchStarted } from '../core/accumulator.js';
 
 interface PrebuiltAccumulatorsProps {
@@ -302,7 +302,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
                           {matchedFixture?.stage || matchedFixture?.leagueName || leg.league}
                         </span>
                         <span className="text-xs text-theme-sub font-mono tabular-nums whitespace-nowrap shrink-0 font-medium">
-                          {matchedFixture ? formatLocalKickoffTime(matchedFixture) : (leg.fixtureDate === getRelativeDateStr(0) ? 'Today' : leg.fixtureDate === getRelativeDateStr(1) ? 'Tomorrow' : leg.fixtureDate)}
+                          {matchedFixture ? formatUtcKickoffTime(matchedFixture) : (leg.fixtureDate === getRelativeDateStr(0) ? 'Today' : leg.fixtureDate === getRelativeDateStr(1) ? 'Tomorrow' : leg.fixtureDate)}
                         </span>
                       </div>
 

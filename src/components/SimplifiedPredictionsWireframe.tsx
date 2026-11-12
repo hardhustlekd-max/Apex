@@ -171,13 +171,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
     const pick = getAuthoritative1X2Pick(fixture);
 
-    const homeProb = getHomeProb(fixture);
-    const drawProb = getDrawProb(fixture);
-    const awayProb = getAwayProb(fixture);
-    const over25 = getOver25Prob(fixture);
-    const under25 = getUnder25Prob(fixture);
-    const bttsYes = getBttsYesProb(fixture);
-    const bttsNo = getBttsNoProb(fixture);
+    const homeProb = fixture.prediction ? getHomeProb(fixture) : null;
+    const drawProb = fixture.prediction ? getDrawProb(fixture) : null;
+    const awayProb = fixture.prediction ? getAwayProb(fixture) : null;
+    const over25 = fixture.prediction ? getOver25Prob(fixture) : null;
+    const under25 = fixture.prediction ? getUnder25Prob(fixture) : null;
+    const bttsYes = fixture.prediction ? getBttsYesProb(fixture) : null;
+    const bttsNo = fixture.prediction ? getBttsNoProb(fixture) : null;
 
     return (
       <div
@@ -304,7 +304,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             className="flex items-center justify-center shrink-0"
             title={pick ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})` : 'No Prediction in Database'}
           >
-            {pick ? (
+            {pick && fixture.prediction ? (
               <div className="flex items-center gap-1 font-mono tabular-nums">
                 <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text text-xs font-black whitespace-nowrap shrink-0 shadow-xs font-mono tabular-nums">
                   {pick.shortLabel}
@@ -326,76 +326,76 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <>
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    over25 >= 50
+                    over25 && over25 >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
                       : 'bg-theme-subtle text-theme-sub font-bold'
                   }`}
                 >
-                  {over25.toFixed(0)}
+                  {over25 !== null ? over25.toFixed(0) : '-'}
                 </span>
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    under25 >= 50
+                    under25 && under25 >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
                       : 'bg-theme-subtle text-theme-sub font-bold'
                   }`}
                 >
-                  {under25.toFixed(0)}
+                  {under25 !== null ? under25.toFixed(0) : '-'}
                 </span>
               </>
             ) : marketFilter === 'BTTS' ? (
               <>
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    bttsYes >= 50
+                    bttsYes && bttsYes >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
                       : 'bg-theme-subtle text-theme-sub font-bold'
                   }`}
                 >
-                  {bttsYes.toFixed(0)}
+                  {bttsYes !== null ? bttsYes.toFixed(0) : '-'}
                 </span>
                 <span
                   className={`w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    bttsNo >= 50
+                    bttsNo && bttsNo >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
                       : 'bg-theme-subtle text-theme-sub font-bold'
                   }`}
                 >
-                  {bttsNo.toFixed(0)}
+                  {bttsNo !== null ? bttsNo.toFixed(0) : '-'}
                 </span>
               </>
             ) : (
               <>
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    homeProb >= 50
+                    homeProb && homeProb >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                      : homeProb >= 35
+                      : homeProb && homeProb >= 35
                       ? 'bg-theme-subtle text-theme-main font-bold'
                       : 'bg-theme-subtle text-theme-sub'
                   }`}
                 >
-                  {homeProb.toFixed(0)}
+                  {homeProb !== null ? homeProb.toFixed(0) : '-'}
                 </span>
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    drawProb >= 35
+                    drawProb && drawProb >= 35
                       ? 'bg-amber-500/20 text-amber-900 dark:text-amber-400 font-bold'
                       : 'bg-theme-subtle text-theme-sub'
                   }`}
                 >
-                  {drawProb.toFixed(0)}
+                  {drawProb !== null ? drawProb.toFixed(0) : '-'}
                 </span>
                 <span
                   className={`w-8 sm:w-8.5 h-6 sm:h-6.5 flex items-center justify-center rounded-lg text-xs whitespace-nowrap shrink-0 transition-colors font-mono tabular-nums ${
-                    awayProb >= 50
+                    awayProb && awayProb >= 50
                       ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
-                      : awayProb >= 35
+                      : awayProb && awayProb >= 35
                       ? 'bg-theme-subtle text-theme-main font-bold'
                       : 'bg-theme-subtle text-theme-sub'
                   }`}
                 >
-                  {awayProb.toFixed(0)}
+                  {awayProb !== null ? awayProb.toFixed(0) : '-'}
                 </span>
               </>
             )}

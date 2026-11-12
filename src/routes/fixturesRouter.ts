@@ -150,46 +150,9 @@ fixturesRouter.get('/history', async (req, res) => {
 
     await predictionsDb.init();
 
-    // Query predictions from predictionsDb
-    let matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
-
-    // If predictionsDb has no matches for this request, convert and migrate from local database
-    if (!matches || matches.length === 0) {
-      const historicalMatches = db.getAllHistoricalMatches(limit);
-      const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
-      const convertedFixtures: Fixture[] = historicalMatches.map((m) => convertHistoricalMatchToFixture(m));
-
-      for (const sm of scrapedMatches) {
-        if (sm.result?.home !== undefined && sm.result?.away !== undefined) {
-          const homeScore = parseInt(String(sm.result.home), 10) || 0;
-          const awayScore = parseInt(String(sm.result.away), 10) || 0;
-          const id = sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${convertedFixtures.length}`;
-          if (!convertedFixtures.some((f) => f.id === id || f.id === `fs_hist_${sm.matchId}`)) {
-            convertedFixtures.push({
-              id,
-              providerId: 'FLASHSCORE',
-              league: sm.leagueName || sm.stage || 'FLASHSCORE',
-              leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-              matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
-              kickOffTime: 'FT',
-              homeTeam: sm.home.name,
-              awayTeam: sm.away.name,
-              status: 'FINISHED' as const,
-              score: { home: homeScore, away: awayScore },
-              prediction: undefined,
-            });
-          }
-        }
-      }
-
-      if (convertedFixtures.length > 0) {
-        await predictionsDb.saveHistoricalPredictions(convertedFixtures);
-        matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
-        if (matches.length === 0) {
-          matches = convertedFixtures;
-        }
-      }
-    }
+    // Query predictions strictly from unified predictionsDb
+    // This is the authoritative source for evaluated model outputs
+    const matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
 
     res.json({
       success: true,

@@ -34,6 +34,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
     let maxProb = 0;
 
     for (const f of fixtures) {
+      if (!f.prediction) continue;
       if (f.markets) {
         for (const market of f.markets) {
           if (market.probability > maxProb) {

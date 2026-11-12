@@ -242,35 +242,6 @@ export class SyncJobService {
         currentStep: 'Fetching Head-to-Head (H2H) raw feeds, team recent form, and encounter statistics...',
       });
       await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
-      const allHistorical = db.getAllHistoricalMatches(5000);
-      const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
-      const historicalFixtures: Fixture[] = allHistorical.map((m) => convertHistoricalMatchToFixture(m));
-
-      for (const sm of scrapedMatches) {
-        if (sm.result?.home !== undefined && sm.result?.away !== undefined) {
-          const homeScore = parseInt(String(sm.result.home), 10) || 0;
-          const awayScore = parseInt(String(sm.result.away), 10) || 0;
-          const id = sm.matchId ? `hist_${sm.matchId}` : `scraped_hist_${historicalFixtures.length}`;
-          if (!historicalFixtures.some((f) => f.id === id || f.id === `fs_hist_${sm.matchId}`)) {
-            historicalFixtures.push({
-              id,
-              providerId: 'FLASHSCORE',
-              league: sm.leagueName || sm.stage || 'FLASHSCORE',
-              leagueName: sm.leagueName || sm.stage || 'FLASHSCORE',
-              matchDate: normalizeDateStr(sm.date ? sm.date.slice(0, 10) : getRelativeDateStr(-30)),
-              kickOffTime: 'FT',
-              homeTeam: sm.home.name,
-              awayTeam: sm.away.name,
-              status: 'FINISHED' as const,
-              score: { home: homeScore, away: awayScore },
-              prediction: undefined,
-            });
-          }
-        }
-      }
-      if (historicalFixtures.length > 0) {
-        await predictionsDb.saveHistoricalPredictions(historicalFixtures);
-      }
       const histPredCount = predictionsDb.countHistoricalPredictions();
 
       if (this.isCancelled(jobId)) return;
@@ -383,9 +354,9 @@ export class SyncJobService {
         progress: 5,
         stepIndex: 1,
         totalSteps: 3,
-        currentStep: 'Purging existing predictions from database & memory cache...',
+        currentStep: 'Purging all existing predictions from database for a clean recalculation...',
       });
-      await predictionsDb.clearPredictions();
+      await predictionsDb.clearAll();
 
       if (this.isCancelled(jobId)) return;
 
@@ -399,9 +370,13 @@ export class SyncJobService {
 
       let upcoming = db.getUpcomingFixtures();
       if (!upcoming || upcoming.length === 0) {
-        const allPreds = predictionsDb.getAllPredictions();
+        const allPreds = predictionsDb.getPredictions({ state: 'all' });
         upcoming = allPreds.filter((f) => f.status === 'SCHEDULED' || f.status === 'TIMED' || (f.status as string) === 'UPCOMING' || (!f.status && f.status !== 'FINISHED' && f.status !== 'LIVE'));
       }
+
+      // STRICT FILTER: Only predict matches that have officially NOT YET STARTED according to UTC standard
+      const { isMatchStarted } = await import('../core/accumulator.js');
+      upcoming = upcoming.filter(f => !isMatchStarted(f));
 
       const totalCount = upcoming ? upcoming.length : 0;
       this.updateProgress(jobId, {

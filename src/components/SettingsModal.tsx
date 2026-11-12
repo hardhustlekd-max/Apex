@@ -511,7 +511,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         Driver: <span className="text-slate-700 dark:text-slate-300 font-semibold">better-sqlite3 C-Bindings</span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] pt-0.5">
-                        <span className="text-slate-500">Stored Predictions: <strong className="text-slate-700 dark:text-slate-200">{storageStatus?.storageEngine?.tableCounts?.upcoming_predictions ?? localStats?.predictionsCount ?? 0}</strong></span>
+                        <span className="text-slate-500">Stored Predictions: <strong className="text-slate-700 dark:text-slate-200">{storageStatus?.storageEngine?.tableCounts?.predictions ?? localStats?.predictionsCount ?? 0}</strong></span>
                         <span className="text-indigo-500 dark:text-indigo-400 font-semibold">5 Pillars Active</span>
                       </div>
                       {storageStatus?.predictionsDb?.error && (

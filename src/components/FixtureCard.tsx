@@ -117,7 +117,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
         </div>
 
-        {/* Probability Bar Indicator */}
+        {/* Probability Bar Indicator - STRICTLY ONLY IF PREDICTION EXISTS */}
         {pred && (
           <div className="my-2 space-y-1">
             <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-theme-sub">
@@ -145,8 +145,8 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
         )}
 
-        {/* Highest Predicted Outcome */}
-        {topPredictionLabel && (
+        {/* Highest Predicted Outcome - STRICTLY ONLY IF PREDICTION EXISTS */}
+        {pred && topPredictionLabel && (
           <div className="mt-2 p-2 rounded-xl bg-theme-card-elevated flex items-center justify-between text-xs min-w-0">
             <div className="flex items-center gap-2 min-w-0 truncate">
               <span className="text-theme-sub font-medium shrink-0">Predicted Pick:</span>

@@ -939,11 +939,6 @@ export class FlashscoreScraperService {
     if (historicalMatches.length > 0) {
       inserted = db.insertHistoricalMatches(historicalMatches);
     }
-    const allStoredHistorical = db.getAllHistoricalMatches(5000);
-    if (allStoredHistorical.length > 0) {
-      const converted = allStoredHistorical.map((m) => convertHistoricalMatchToFixture(m));
-      await predictionsDb.saveHistoricalPredictions(converted);
-    }
 
     // Refresh upcoming fixtures as well
     const upcoming = await this.getUpcomingFixtures();
@@ -986,8 +981,8 @@ export class FlashscoreScraperService {
 
     return {
       success: true,
-      matchesCount: allStoredHistorical.length + upcoming.length,
-      message: `FlashscoreScraping synchronized ${allStoredHistorical.length} real historical multi-year results, ${upcoming.length} upcoming fixtures, and league standings into database.`,
+      matchesCount: historicalMatches.length + upcoming.length,
+      message: `FlashscoreScraping synchronized ${historicalMatches.length} real historical multi-year results, ${upcoming.length} upcoming fixtures, and league standings into database.`,
     };
   }
 
