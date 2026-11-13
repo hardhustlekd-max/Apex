@@ -592,6 +592,96 @@ export class EngineService {
     return res.matches;
   }
 
+  public static async exportPredictions(): Promise<{
+    success: boolean;
+    format?: string;
+    version?: string;
+    exportedAt?: string;
+    count?: number;
+    predictions?: any[];
+    error?: string;
+  }> {
+    const serverData = await this.safeJsonFetch('/api/fixtures/predictions/export');
+    if (serverData && serverData.success) {
+      return serverData;
+    }
+    return {
+      success: false,
+      error: serverData?.error || 'Failed to export predictions',
+    };
+  }
+
+  public static async downloadPredictionsJson(): Promise<{
+    success: boolean;
+    count?: number;
+    filename?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await this.exportPredictions();
+      if (!res.success || !res.predictions) {
+        return {
+          success: false,
+          error: res.error || 'Failed to retrieve predictions for export',
+        };
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `apex_1x2_predictions_${dateStr}.json`;
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      return {
+        success: true,
+        count: res.count ?? res.predictions.length,
+        filename,
+      };
+    } catch (err: any) {
+      console.error('Error downloading predictions JSON:', err);
+      return {
+        success: false,
+        error: err?.message || 'Error creating JSON file download',
+      };
+    }
+  }
+
+  public static async evaluateImportedPredictions(payload: any): Promise<{
+    success: boolean;
+    summary?: {
+      totalImported: number;
+      evaluatedCount: number;
+      pendingCount: number;
+      wonCount: number;
+      lostCount: number;
+      accuracy: number;
+      homePicksCount: number;
+      drawPicksCount: number;
+      awayPicksCount: number;
+    };
+    evaluated?: any[];
+    error?: string;
+  }> {
+    const serverData = await this.safeJsonFetch('/api/fixtures/predictions/evaluate-imported', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (serverData && serverData.success) {
+      return serverData;
+    }
+    return {
+      success: false,
+      error: serverData?.error || 'Failed to evaluate imported predictions',
+    };
+  }
+
   public static async getTerminalLogs(filter?: {
     category?: string;
     level?: string;

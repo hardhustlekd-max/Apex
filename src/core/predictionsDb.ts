@@ -853,6 +853,439 @@ export class PredictionsDB {
   async reconcileAndSyncResults(options?: { force?: boolean }): Promise<void> {
     await this.syncPendingPredictionResultsFromRemote(Boolean(options?.force));
   }
+
+  export1X2Predictions(): {
+    format: string;
+    version: string;
+    exportedAt: string;
+    count: number;
+    predictions: Array<{
+      fixtureId: string;
+      league: string;
+      leagueName: string;
+      stage: string | null;
+      matchDate: string;
+      kickOffTime: string;
+      homeTeam: string;
+      awayTeam: string;
+      homeBadge: string | null;
+      awayBadge: string | null;
+      status: string;
+      matchState: string;
+      homeScore: number | null;
+      awayScore: number | null;
+      homeXG: number | null;
+      awayXG: number | null;
+      homeWinProb: number;
+      drawProb: number;
+      awayWinProb: number;
+      over15Prob: number | null;
+      over25Prob: number | null;
+      over35Prob: number | null;
+      bttsProb: number | null;
+      tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN';
+      tipName: string;
+      tipProb: number;
+      predictedAt: string;
+    }>;
+  } {
+    try {
+      const rows = sqliteDb.prepare(`
+        SELECT 
+          fixture_id, league, league_name, stage, match_date, kick_off_time,
+          home_team, away_team, home_badge, away_badge, status, match_state,
+          home_score, away_score, home_xg, away_xg,
+          home_win_prob, draw_prob, away_win_prob,
+          over15_prob, over25_prob, over35_prob, btts_prob,
+          tip_key, tip_name, tip_prob, predicted_at
+        FROM predictions
+        ORDER BY match_date ASC, kick_off_time ASC, fixture_id ASC
+      `).all() as any[];
+
+      const predictions = rows.map((r) => {
+        const hw = Number(r.home_win_prob ?? 0);
+        const dr = Number(r.draw_prob ?? 0);
+        const aw = Number(r.away_win_prob ?? 0);
+
+        let fallbackTip: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
+        let fallbackName = `${r.home_team} Win`;
+        let fallbackProb = hw;
+
+        if (hw >= dr && hw >= aw) {
+          fallbackTip = 'HOME_WIN';
+          fallbackName = `${r.home_team} Win`;
+          fallbackProb = hw;
+        } else if (aw >= hw && aw >= dr) {
+          fallbackTip = 'AWAY_WIN';
+          fallbackName = `${r.away_team} Win`;
+          fallbackProb = aw;
+        } else {
+          fallbackTip = 'DRAW';
+          fallbackName = 'Draw';
+          fallbackProb = dr;
+        }
+
+        const tipKey = (r.tip_key === 'HOME_WIN' || r.tip_key === 'DRAW' || r.tip_key === 'AWAY_WIN')
+          ? r.tip_key
+          : fallbackTip;
+
+        return {
+          fixtureId: r.fixture_id,
+          league: r.league,
+          leagueName: r.league_name,
+          stage: r.stage || null,
+          matchDate: normalizeDateStr(r.match_date),
+          kickOffTime: r.kick_off_time || 'TBD',
+          homeTeam: r.home_team,
+          awayTeam: r.away_team,
+          homeBadge: r.home_badge || null,
+          awayBadge: r.away_badge || null,
+          status: r.status || 'SCHEDULED',
+          matchState: r.match_state || 'upcoming',
+          homeScore: r.home_score !== null && r.home_score !== undefined ? Number(r.home_score) : null,
+          awayScore: r.away_score !== null && r.away_score !== undefined ? Number(r.away_score) : null,
+          homeXG: r.home_xg !== null && r.home_xg !== undefined ? Number(r.home_xg) : null,
+          awayXG: r.away_xg !== null && r.away_xg !== undefined ? Number(r.away_xg) : null,
+          homeWinProb: Number(hw.toFixed(3)),
+          drawProb: Number(dr.toFixed(3)),
+          awayWinProb: Number(aw.toFixed(3)),
+          over15Prob: r.over15_prob !== null && r.over15_prob !== undefined ? Number(Number(r.over15_prob).toFixed(3)) : null,
+          over25Prob: r.over25_prob !== null && r.over25_prob !== undefined ? Number(Number(r.over25_prob).toFixed(3)) : null,
+          over35Prob: r.over35_prob !== null && r.over35_prob !== undefined ? Number(Number(r.over35_prob).toFixed(3)) : null,
+          bttsProb: r.btts_prob !== null && r.btts_prob !== undefined ? Number(Number(r.btts_prob).toFixed(3)) : null,
+          tipKey,
+          tipName: r.tip_name || fallbackName,
+          tipProb: Number(Number(r.tip_prob ?? fallbackProb).toFixed(3)),
+          predictedAt: r.predicted_at || new Date().toISOString(),
+        };
+      });
+
+      return {
+        format: 'APEX_1X2_PREDICTIONS',
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        count: predictions.length,
+        predictions,
+      };
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error exporting 1X2 predictions:', err?.message);
+      return {
+        format: 'APEX_1X2_PREDICTIONS',
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        count: 0,
+        predictions: [],
+      };
+    }
+  }
+
+  evaluateImportedPredictions(importedPayload: any): {
+    success: boolean;
+    error?: string;
+    summary: {
+      totalImported: number;
+      evaluatedCount: number;
+      pendingCount: number;
+      wonCount: number;
+      lostCount: number;
+      accuracy: number;
+      homePicksCount: number;
+      drawPicksCount: number;
+      awayPicksCount: number;
+    };
+    evaluated: Array<{
+      fixtureId: string;
+      league: string;
+      leagueName: string;
+      matchDate: string;
+      kickOffTime: string;
+      homeTeam: string;
+      awayTeam: string;
+      status: string;
+      homeScore: number | null;
+      awayScore: number | null;
+      homeXG: number | null;
+      awayXG: number | null;
+      homeWinProb: number;
+      drawProb: number;
+      awayWinProb: number;
+      tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN';
+      tipName: string;
+      tipProb: number;
+      actualOutcome: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | null;
+      isCorrect: boolean | null;
+      evaluationState: 'WON' | 'LOST' | 'PENDING';
+    }>;
+  } {
+    let rawList: any[] = [];
+    if (Array.isArray(importedPayload)) {
+      rawList = importedPayload;
+    } else if (importedPayload && Array.isArray(importedPayload.predictions)) {
+      rawList = importedPayload.predictions;
+    } else if (importedPayload && Array.isArray(importedPayload.fixtures)) {
+      rawList = importedPayload.fixtures;
+    } else {
+      return {
+        success: false,
+        error: 'Invalid JSON format: expected an array of predictions or an object with a "predictions" array.',
+        summary: {
+          totalImported: 0,
+          evaluatedCount: 0,
+          pendingCount: 0,
+          wonCount: 0,
+          lostCount: 0,
+          accuracy: 0,
+          homePicksCount: 0,
+          drawPicksCount: 0,
+          awayPicksCount: 0,
+        },
+        evaluated: [],
+      };
+    }
+
+    if (rawList.length === 0) {
+      return {
+        success: false,
+        error: 'JSON file contains 0 predictions.',
+        summary: {
+          totalImported: 0,
+          evaluatedCount: 0,
+          pendingCount: 0,
+          wonCount: 0,
+          lostCount: 0,
+          accuracy: 0,
+          homePicksCount: 0,
+          drawPicksCount: 0,
+          awayPicksCount: 0,
+        },
+        evaluated: [],
+      };
+    }
+
+    // Prepare lookup statements against SQLite database to reconcile actual scores
+    const predStmt = sqliteDb.prepare(`
+      SELECT status, home_score, away_score
+      FROM predictions
+      WHERE (fixture_id = ? OR fixture_id = ?)
+        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+      LIMIT 1
+    `);
+
+    const scrapedStmt = sqliteDb.prepare(`
+      SELECT status, home_score, away_score
+      FROM flashscore_scraped_matches
+      WHERE (match_id = ? OR match_id = ?)
+        OR (LOWER(home_name) = LOWER(?) AND LOWER(away_name) = LOWER(?) AND SUBSTR(match_date, 1, 10) = ?)
+      LIMIT 1
+    `);
+
+    const histStmt = sqliteDb.prepare(`
+      SELECT fthg as home_score, ftag as away_score
+      FROM historical_matches
+      WHERE (id = ? OR id = ? OR id = ?)
+        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+      LIMIT 1
+    `);
+
+    const upcomingStmt = sqliteDb.prepare(`
+      SELECT status, score_json
+      FROM upcoming_fixtures
+      WHERE (id = ? OR id = ?)
+        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+      LIMIT 1
+    `);
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let pendingCount = 0;
+    let homePicksCount = 0;
+    let drawPicksCount = 0;
+    let awayPicksCount = 0;
+
+    const evaluated: any[] = [];
+
+    for (const item of rawList) {
+      const fixtureId = String(item.fixtureId || item.id || '').trim();
+      const cleanId = getCleanId(fixtureId);
+      const homeTeam = String(item.homeTeam || item.home_team || '').trim();
+      const awayTeam = String(item.awayTeam || item.away_team || '').trim();
+      const matchDate = normalizeDateStr(item.matchDate || item.match_date || getRelativeDateStr(0));
+      const kickOffTime = String(item.kickOffTime || item.kick_off_time || 'TBD').trim();
+      const league = String(item.league || 'ALL');
+      const leagueName = String(item.leagueName || item.league_name || league);
+
+      // Probabilities
+      const hw = Number(item.homeWinProb ?? item.home_win_prob ?? item.prediction?.homeWinProb ?? 0);
+      const dr = Number(item.drawProb ?? item.draw_prob ?? item.prediction?.drawProb ?? 0);
+      const aw = Number(item.awayWinProb ?? item.away_win_prob ?? item.prediction?.awayWinProb ?? 0);
+
+      // Determine predicted 1X2 choice
+      let tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
+      let tipName = item.tipName || item.tip_name || '';
+      let tipProb = Number(item.tipProb ?? item.tip_prob ?? 0);
+
+      const rawKey = String(item.tipKey || item.tip_key || item.predictedTip || '').toUpperCase();
+      if (rawKey === 'HOME_WIN' || rawKey === 'HOME' || rawKey === '1') {
+        tipKey = 'HOME_WIN';
+      } else if (rawKey === 'AWAY_WIN' || rawKey === 'AWAY' || rawKey === '2') {
+        tipKey = 'AWAY_WIN';
+      } else if (rawKey === 'DRAW' || rawKey === 'X') {
+        tipKey = 'DRAW';
+      } else {
+        // Evaluate from probabilities
+        if (hw >= dr && hw >= aw) {
+          tipKey = 'HOME_WIN';
+        } else if (aw >= hw && aw >= dr) {
+          tipKey = 'AWAY_WIN';
+        } else {
+          tipKey = 'DRAW';
+        }
+      }
+
+      if (!tipName) {
+        tipName = tipKey === 'HOME_WIN' ? `${homeTeam} Win` : tipKey === 'AWAY_WIN' ? `${awayTeam} Win` : 'Draw';
+      }
+      if (tipProb <= 0) {
+        tipProb = tipKey === 'HOME_WIN' ? hw : tipKey === 'AWAY_WIN' ? aw : dr;
+      }
+
+      if (tipKey === 'HOME_WIN') homePicksCount++;
+      else if (tipKey === 'DRAW') drawPicksCount++;
+      else awayPicksCount++;
+
+      // Reconcile actual scores
+      let finalHomeScore: number | null = null;
+      let finalAwayScore: number | null = null;
+      let matchStatus = String(item.status || 'SCHEDULED').toUpperCase();
+
+      // Priority 1: Was a valid finished score already present in the uploaded file?
+      const itemHomeScore = item.homeScore !== undefined ? item.homeScore : item.home_score;
+      const itemAwayScore = item.awayScore !== undefined ? item.awayScore : item.away_score;
+      if (
+        itemHomeScore !== null &&
+        itemHomeScore !== undefined &&
+        itemAwayScore !== null &&
+        itemAwayScore !== undefined &&
+        (matchStatus === 'FINISHED' || item.matchState === 'completed' || item.kickOffTime === 'FT')
+      ) {
+        finalHomeScore = Number(itemHomeScore);
+        finalAwayScore = Number(itemAwayScore);
+        matchStatus = 'FINISHED';
+      }
+
+      // Priority 2: Look up updated result in predictions DB
+      if (finalHomeScore === null || finalAwayScore === null) {
+        const predRow = predStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
+        if (predRow && predRow.home_score !== null && predRow.away_score !== null) {
+          finalHomeScore = Number(predRow.home_score);
+          finalAwayScore = Number(predRow.away_score);
+          matchStatus = String(predRow.status || 'FINISHED').toUpperCase();
+        }
+      }
+
+      // Priority 3: Look up in flashscore_scraped_matches
+      if (finalHomeScore === null || finalAwayScore === null) {
+        const scrapedRow = scrapedStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
+        if (scrapedRow && scrapedRow.home_score !== null && scrapedRow.away_score !== null) {
+          finalHomeScore = Number(scrapedRow.home_score);
+          finalAwayScore = Number(scrapedRow.away_score);
+          matchStatus = String(scrapedRow.status || 'FINISHED').toUpperCase();
+        }
+      }
+
+      // Priority 4: Look up in historical_matches
+      if (finalHomeScore === null || finalAwayScore === null) {
+        const histRow = histStmt.get(fixtureId, cleanId, `fs_hist_${cleanId}`, homeTeam, awayTeam, matchDate) as any;
+        if (histRow && histRow.home_score !== null && histRow.away_score !== null) {
+          finalHomeScore = Number(histRow.home_score);
+          finalAwayScore = Number(histRow.away_score);
+          matchStatus = 'FINISHED';
+        }
+      }
+
+      // Priority 5: Look up in upcoming_fixtures
+      if (finalHomeScore === null || finalAwayScore === null) {
+        const upRow = upcomingStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
+        if (upRow && upRow.score_json) {
+          try {
+            const parsed = JSON.parse(upRow.score_json);
+            if (parsed?.home !== undefined && parsed?.away !== undefined) {
+              finalHomeScore = Number(parsed.home);
+              finalAwayScore = Number(parsed.away);
+              matchStatus = String(upRow.status || 'FINISHED').toUpperCase();
+            }
+          } catch {}
+        }
+      }
+
+      // Outcome & Evaluation
+      let actualOutcome: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | null = null;
+      let isCorrect: boolean | null = null;
+      let evaluationState: 'WON' | 'LOST' | 'PENDING' = 'PENDING';
+
+      if (finalHomeScore !== null && finalAwayScore !== null && !isNaN(finalHomeScore) && !isNaN(finalAwayScore)) {
+        if (finalHomeScore > finalAwayScore) actualOutcome = 'HOME_WIN';
+        else if (finalAwayScore > finalHomeScore) actualOutcome = 'AWAY_WIN';
+        else actualOutcome = 'DRAW';
+
+        isCorrect = tipKey === actualOutcome;
+        if (isCorrect) {
+          evaluationState = 'WON';
+          wonCount++;
+        } else {
+          evaluationState = 'LOST';
+          lostCount++;
+        }
+      } else {
+        evaluationState = 'PENDING';
+        pendingCount++;
+      }
+
+      evaluated.push({
+        fixtureId: fixtureId || `import_${evaluated.length}`,
+        league,
+        leagueName,
+        matchDate,
+        kickOffTime,
+        homeTeam: homeTeam || 'Home Team',
+        awayTeam: awayTeam || 'Away Team',
+        status: matchStatus,
+        homeScore: finalHomeScore,
+        awayScore: finalAwayScore,
+        homeXG: item.homeXG !== undefined && item.homeXG !== null ? Number(item.homeXG) : item.home_xg !== undefined && item.home_xg !== null ? Number(item.home_xg) : null,
+        awayXG: item.awayXG !== undefined && item.awayXG !== null ? Number(item.awayXG) : item.away_xg !== undefined && item.away_xg !== null ? Number(item.away_xg) : null,
+        homeWinProb: Number(hw.toFixed(3)),
+        drawProb: Number(dr.toFixed(3)),
+        awayWinProb: Number(aw.toFixed(3)),
+        tipKey,
+        tipName,
+        tipProb: Number(tipProb.toFixed(3)),
+        actualOutcome,
+        isCorrect,
+        evaluationState,
+      });
+    }
+
+    const totalImported = evaluated.length;
+    const evaluatedCount = wonCount + lostCount;
+    const accuracy = evaluatedCount > 0 ? Number(((wonCount / evaluatedCount) * 100).toFixed(1)) : 0;
+
+    return {
+      success: true,
+      summary: {
+        totalImported,
+        evaluatedCount,
+        pendingCount,
+        wonCount,
+        lostCount,
+        accuracy,
+        homePicksCount,
+        drawPicksCount,
+        awayPicksCount,
+      },
+      evaluated,
+    };
+  }
 }
 
 export const predictionsDb = new PredictionsDB();

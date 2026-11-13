@@ -12,6 +12,7 @@ import {
   Server,
   Sparkles,
   TrendingUp,
+  Download,
 } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
@@ -117,6 +118,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   } | null>(null);
   const [predictionResultMsg, setPredictionResultMsg] = useState<string | null>(null);
   const [predictionErrMsg, setPredictionErrMsg] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+
+  const handleExportPredictions = async () => {
+    setIsExporting(true);
+    setExportToast(null);
+    try {
+      const res = await EngineService.downloadPredictionsJson();
+      if (res.success) {
+        setExportToast(`Exported ${res.count ?? 0} predictions to ${res.filename}`);
+      } else {
+        setExportToast(res.error || 'Failed to export predictions.');
+      }
+    } catch (err: any) {
+      setExportToast(err?.message || 'Error exporting predictions.');
+    } finally {
+      setIsExporting(false);
+      setTimeout(() => setExportToast(null), 4500);
+    }
+  };
 
   useEffect(() => {
     if (stats) setLocalStats(stats);
@@ -713,6 +734,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <RefreshCw className={`w-4 h-4 ${isUpdatingPredictions ? 'animate-spin' : ''}`} />
                 <span>{isUpdatingPredictions ? 'Calculating & Updating DB...' : 'Update Predictions'}</span>
+              </Button>
+            </Card>
+
+            {/* Action Card: Export 1X2 Predictions to JSON */}
+            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-3.5">
+              <SectionHeader
+                title="Export Predictions"
+                size="md"
+                icon={
+                  <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-bold">
+                    <Download className="w-4 h-4" />
+                  </div>
+                }
+              />
+
+              <p className="text-xs text-theme-sub leading-relaxed font-sans">
+                Export all 1X2 model predictions stored in the database to a standardized JSON file. The file can be archived or loaded into the Historical Evaluation page to backtest accuracy against verified match results.
+              </p>
+
+              {exportToast && (
+                <div className="p-3 rounded-2xl bg-theme-primary-subtle text-theme-primary text-xs font-bold flex items-center gap-2 font-mono">
+                  <Check className="w-4 h-4 text-theme-primary shrink-0" />
+                  <span>{exportToast}</span>
+                </div>
+              )}
+
+              <Button
+                id="export-predictions-json-btn"
+                variant="inverse"
+                size="lg"
+                pill
+                fullWidth
+                onClick={handleExportPredictions}
+                disabled={isExporting || isUpdatingPredictions}
+                className="uppercase tracking-wide"
+              >
+                <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
+                <span>{isExporting ? 'Exporting Predictions...' : 'Export 1X2 Predictions (JSON)'}</span>
               </Button>
             </Card>
 

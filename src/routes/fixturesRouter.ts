@@ -173,6 +173,41 @@ fixturesRouter.get('/history', async (req, res) => {
   }
 });
 
+fixturesRouter.get('/predictions/export', async (req, res) => {
+  try {
+    await db.init();
+    await predictionsDb.init();
+    const payload = predictionsDb.export1X2Predictions();
+
+    if (req.query.download === '1' || req.query.download === 'true') {
+      const filename = `apex_1x2_predictions_${new Date().toISOString().slice(0, 10)}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(JSON.stringify(payload, null, 2));
+    }
+
+    res.json({
+      success: true,
+      ...payload,
+    });
+  } catch (err: any) {
+    console.error('Error exporting predictions:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Failed to export predictions' });
+  }
+});
+
+fixturesRouter.post('/predictions/evaluate-imported', async (req, res) => {
+  try {
+    await db.init();
+    await predictionsDb.init();
+    const result = predictionsDb.evaluateImportedPredictions(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error evaluating imported predictions:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Failed to evaluate imported predictions' });
+  }
+});
+
 fixturesRouter.get('/club/:clubName/recent', async (req, res) => {
   try {
     const clubName = req.params.clubName;
