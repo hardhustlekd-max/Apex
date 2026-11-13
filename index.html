@@ -13,22 +13,26 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400;1,700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
+    <!-- Decouple browser and OS theme enforcement via explicit color-scheme -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#070b12" id="meta-theme-color" />
+
     <!--
       CRITICAL: Blocking Inline Theme Hydration Script.
       Prevents Flash of Unstyled Theme (FOUT) / White Flash before first layout paint.
       1. Reads saved mode from localStorage ('theme').
-      2. Falls back to OS system setting ('prefers-color-scheme: dark').
-      3. Synchronously applies 'data-theme' attribute and 'dark' class to <html>.
+      2. 100% System and Browser Independent: Defaults to 'dark' regardless of OS or browser settings.
+      3. Synchronously applies 'data-theme' attribute, style.colorScheme, and 'dark' class to <html>.
     -->
     <script>
       (function() {
         try {
           var savedMode = localStorage.getItem('theme');
-          var effectiveTheme = savedMode;
-          if (!effectiveTheme || (effectiveTheme !== 'dark' && effectiveTheme !== 'light')) {
-            effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
+          // Strictly application & user controlled, independent of OS or browser prefers-color-scheme
+          var effectiveTheme = (savedMode === 'light' || savedMode === 'dark') ? savedMode : 'dark';
+
           document.documentElement.setAttribute('data-theme', effectiveTheme);
+          document.documentElement.style.colorScheme = effectiveTheme;
           if (effectiveTheme === 'dark') {
             document.documentElement.classList.add('dark');
           } else {
@@ -37,8 +41,14 @@
 
           var savedColorTheme = localStorage.getItem('app_color_theme') || 'opta-emerald';
           document.documentElement.setAttribute('data-color-theme', savedColorTheme);
+
+          var metaTheme = document.getElementById('meta-theme-color');
+          if (metaTheme) {
+            metaTheme.setAttribute('content', effectiveTheme === 'dark' ? '#070b12' : '#f1f5f9');
+          }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.style.colorScheme = 'dark';
           document.documentElement.classList.add('dark');
         }
       })();

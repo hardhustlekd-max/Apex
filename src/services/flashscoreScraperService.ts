@@ -1135,6 +1135,130 @@ export class FlashscoreScraperService {
   }
 
   /**
+   * Improvement 2: Intelligent HTML Match Page Scraper Fallback
+   * Fetches Flashscore match HTML page and parses meta/OG tags when API feeds time out or block.
+   */
+  async fetchMatchHtmlFallback(matchId: string): Promise<{
+    status: 'FINISHED' | 'LIVE' | 'SCHEDULED' | 'POSTPONED' | 'CANCELLED';
+    homeScore?: number;
+    awayScore?: number;
+  } | null> {
+    const cleanId = String(matchId || '').replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    if (!cleanId) return null;
+
+    const urls = [
+      `https://www.flashscore.com/match/${cleanId}/`,
+      `https://www.flashscore.in/match/${cleanId}/`,
+    ];
+
+    for (const url of urls) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://www.flashscore.com/',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) continue;
+        const html = await res.text();
+        if (!html || html.length < 100) continue;
+
+        // Parse score from title or OG description (e.g., "2:1", "1 - 0")
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const titleText = titleMatch ? titleMatch[1] : '';
+        const scoreRegex = /(\d+)\s*[:\x2D]\s*(\d+)/;
+        const matchScore = titleText.match(scoreRegex);
+
+        if (matchScore) {
+          const homeScore = parseInt(matchScore[1], 10);
+          const awayScore = parseInt(matchScore[2], 10);
+          if (!isNaN(homeScore) && !isNaN(awayScore)) {
+            const isFinished = titleText.toLowerCase().includes('full time') || titleText.toLowerCase().includes('ft') || html.includes('Finished');
+            return {
+              status: isFinished ? 'FINISHED' : 'LIVE',
+              homeScore,
+              awayScore,
+            };
+          }
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Improvement 3: Automated Bookmaker Odds & Market Consensus Ingestion
+   * Fetches pre-match 1X2 odds feed (df_o_1_{id}) and calculates market implied probabilities and overround.
+   */
+  async fetchMatchOdds(matchId: string): Promise<{
+    homeOdds?: number;
+    drawOdds?: number;
+    awayOdds?: number;
+    homeImpliedProb?: number;
+    drawImpliedProb?: number;
+    awayImpliedProb?: number;
+  } | null> {
+    const cleanId = String(matchId || '').replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    if (!cleanId) return null;
+
+    try {
+      const feedText = await this.fetchFlashscoreFeed(`df_o_1_${cleanId}`);
+      if (!feedText || feedText.length < 5) return null;
+
+      // Parse Flashscore odds feed key-value format
+      const sections = feedText.split('~');
+      let homeOdds = NaN;
+      let drawOdds = NaN;
+      let awayOdds = NaN;
+
+      for (const section of sections) {
+        if (!section) continue;
+        const parts = section.split('¬');
+        const d: Record<string, string> = {};
+        for (const p of parts) {
+          const sep = p.indexOf('÷');
+          if (sep > 0) {
+            d[p.slice(0, sep)] = p.slice(sep + 1);
+          }
+        }
+        // FS odds keys typically include DE/DF or odds values
+        for (const val of Object.values(d)) {
+          const num = parseFloat(val);
+          if (!isNaN(num) && num > 1.01 && num < 50) {
+            if (isNaN(homeOdds)) homeOdds = num;
+            else if (isNaN(drawOdds)) drawOdds = num;
+            else if (isNaN(awayOdds)) awayOdds = num;
+          }
+        }
+      }
+
+      if (!isNaN(homeOdds) && !isNaN(drawOdds) && !isNaN(awayOdds)) {
+        const rawH = 1 / homeOdds;
+        const rawD = 1 / drawOdds;
+        const rawA = 1 / awayOdds;
+        const total = rawH + rawD + rawA;
+
+        return {
+          homeOdds,
+          drawOdds,
+          awayOdds,
+          homeImpliedProb: Number((rawH / total).toFixed(3)),
+          drawImpliedProb: Number((rawD / total).toFixed(3)),
+          awayImpliedProb: Number((rawA / total).toFixed(3)),
+        };
+      }
+    } catch {}
+
+    return null;
+  }
+
+  /**
    * Export methods matching gustavofariaa/FlashscoreScraping export formats
    */
   exportData(data: Record<string, FlashscoreScrapedMatch> | FlashscoreScrapedMatch[], format: 'json' | 'json-array'): string {

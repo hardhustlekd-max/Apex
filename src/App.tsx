@@ -131,6 +131,18 @@ export default function App() {
     setThemeMode(theme);
   }, [theme]);
 
+  // Synchronize theme changes across open tabs without OS/browser media queries
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        setTheme(e.newValue);
+        setThemeMode(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const fetchFixtures = useCallback(async () => {
     try {
       setIsLoadingFixtures(true);

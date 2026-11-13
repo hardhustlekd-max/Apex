@@ -818,22 +818,22 @@ export class ApexEngine {
       awayCSF.recentMatches.length
     );
 
-    let weightDixonColes = 0.70;
-    let weightCSF = 0.20;
-    let weightElo = 0.10;
+    let weightDixonColes = 0.62;
+    let weightCSF = 0.24;
+    let weightElo = 0.14;
 
-    if (dataConfidence >= 6) {
-      weightDixonColes = 0.76;
-      weightCSF = 0.15;
-      weightElo = 0.09;
-    } else if (dataConfidence >= 3) {
-      weightDixonColes = 0.65;
-      weightCSF = 0.22;
-      weightElo = 0.13;
+    if (dataConfidence >= 8) {
+      weightDixonColes = 0.68;
+      weightCSF = 0.20;
+      weightElo = 0.12;
+    } else if (dataConfidence >= 4) {
+      weightDixonColes = 0.58;
+      weightCSF = 0.26;
+      weightElo = 0.16;
     } else {
-      weightDixonColes = 0.50;
+      weightDixonColes = 0.48;
       weightCSF = 0.32;
-      weightElo = 0.18;
+      weightElo = 0.20;
     }
 
     homeLambda = (homeLambda * weightDixonColes) + (leagueHomeAvg * tsrMultiplierHome * weightCSF) + (leagueHomeAvg * eloMultiplierHome * weightElo);

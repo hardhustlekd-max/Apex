@@ -1,4 +1,4 @@
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark';
 
 export interface ColorTheme {
   id: 'opta-emerald' | 'champions-crimson' | 'ballon-gold' | 'volt-lime';
@@ -127,21 +127,26 @@ export const COLOR_THEMES: ColorTheme[] = [
 export const DEFAULT_COLOR_THEME_ID = 'opta-emerald';
 
 /**
- * Gets the current effective theme mode ('light' or 'dark') taking system preferences into account.
+ * Default application fallback theme mode ('dark').
+ * 100% decoupled from browser or operating system preferences.
  */
 export function getSystemThemePreference(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return 'dark';
 }
 
 /**
- * Gets saved ThemeMode preference from localStorage ('light', 'dark', or 'system')
+ * Gets saved ThemeMode preference from localStorage ('light' or 'dark').
+ * Strictly application-controlled and browser/OS independent (defaults to 'dark').
  */
 export function getSavedThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'dark';
-  const saved = localStorage.getItem('theme') as ThemeMode | null;
-  if (saved === 'light' || saved === 'dark' || saved === 'system') {
-    return saved;
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+  } catch {
+    // ignore storage access errors
   }
   return 'dark';
 }
@@ -149,17 +154,23 @@ export function getSavedThemeMode(): ThemeMode {
 /**
  * Context Switcher Handler & DOM Attractor:
  * Updates root HTML attributes `data-theme` and class `dark` dynamically,
- * syncs choice to localStorage, and dispatches custom state events.
+ * syncs choice to localStorage ('theme'), and dispatches custom state events.
+ * Strictly independent of OS or browser theme settings.
  */
 export function setThemeMode(mode: ThemeMode): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'dark';
 
-  localStorage.setItem('theme', mode);
+  const effectiveTheme: 'light' | 'dark' = mode === 'light' ? 'light' : 'dark';
 
-  const effectiveTheme = mode === 'system' ? getSystemThemePreference() : mode;
+  try {
+    localStorage.setItem('theme', effectiveTheme);
+  } catch {
+    // ignore storage access errors
+  }
 
-  // Set semantic data-theme attribute on <html> element
+  // Set semantic data-theme attribute & explicit color-scheme on <html> element
   document.documentElement.setAttribute('data-theme', effectiveTheme);
+  document.documentElement.style.colorScheme = effectiveTheme;
 
   // Sync Tailwind class for fallback/compatibility
   if (effectiveTheme === 'dark') {
@@ -168,8 +179,25 @@ export function setThemeMode(mode: ThemeMode): 'light' | 'dark' {
     document.documentElement.classList.remove('dark');
   }
 
+  // Synchronize document.body if mounted
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.setAttribute('data-theme', effectiveTheme);
+    document.body.style.colorScheme = effectiveTheme;
+    if (effectiveTheme === 'dark') {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+  }
+
+  // Synchronize browser/OS chrome bar meta tag
+  const metaTheme = document.getElementById('meta-theme-color');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', effectiveTheme === 'dark' ? '#070b12' : '#f1f5f9');
+  }
+
   window.dispatchEvent(new CustomEvent('app-theme-mode-changed', {
-    detail: { mode, effectiveTheme }
+    detail: { mode: effectiveTheme, effectiveTheme }
   }));
 
   return effectiveTheme;

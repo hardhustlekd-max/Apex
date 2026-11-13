@@ -252,9 +252,17 @@ export class EngineService {
       if (!job) {
         const activeJob = await this.getActiveSyncJob();
         if (!activeJob || activeJob.id !== jobId) {
+          console.warn('[EngineService] Prediction update job was lost (server may have restarted). Falling back to synchronous update endpoint...');
+          const syncRes = await this.safeJsonFetch('/api/settings/update-predictions-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (syncRes && syncRes.success) {
+            return syncRes;
+          }
           return {
             success: false,
-            error: 'Prediction update job was lost (server may have restarted). Please try again.',
+            error: syncRes?.error || 'Prediction update job was lost (server may have restarted). Please try again.',
           };
         }
         continue; // Active job found but status call failed briefly

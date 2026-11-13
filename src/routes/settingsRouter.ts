@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
+import { predictionsDb } from '../core/predictionsDb.js';
+import { ServerEngine } from '../core/serverEngine.js';
 import { EngineSettings } from '../core/types.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
 import { getSqliteDbStats } from '../core/sqliteClient.js';
@@ -116,5 +118,57 @@ settingsRouter.post('/update-predictions', async (req, res) => {
   } catch (err: any) {
     console.error('Error updating predictions:', err);
     res.status(500).json({ success: false, error: err?.message || 'Failed to update upcoming predictions' });
+  }
+});
+
+settingsRouter.post('/update-predictions-sync', async (req, res) => {
+  try {
+    await predictionsDb.clearAll();
+    let upcoming = db.getUpcomingFixtures();
+    if (!upcoming || upcoming.length === 0) {
+      const allPreds = predictionsDb.getPredictions({ state: 'all' });
+      upcoming = allPreds.filter((f) => f.status === 'SCHEDULED' || f.status === 'TIMED' || (f.status as string) === 'UPCOMING' || (!f.status && f.status !== 'FINISHED' && f.status !== 'LIVE'));
+    }
+    const { isMatchStarted } = await import('../core/accumulator.js');
+    upcoming = upcoming.filter(f => !isMatchStarted(f));
+
+    const totalCount = upcoming ? upcoming.length : 0;
+    if (totalCount === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        skippedCount: 0,
+        totalPredictionsCount: predictionsDb.count('all'),
+        upcomingCount: 0,
+        message: 'No upcoming fixtures found in database to update.',
+      });
+    }
+
+    const { predictedCount, skippedCount } = await ServerEngine.recalculateUpcomingFromDbInChunks(
+      upcoming,
+      50,
+      undefined,
+      { skipRemoteH2H: true }
+    );
+
+    const totalPredictionsCount = await predictionsDb.countAsync('all');
+    res.json({
+      success: true,
+      count: predictedCount,
+      skippedCount,
+      totalPredictionsCount,
+      upcomingCount: totalCount,
+      stats: {
+        ...db.getStatsSummary(),
+        rawFeedsCount: db.getRawFeedsCount(),
+        upcomingCount: db.getUpcomingFixturesCount(),
+        predictionsCount: totalPredictionsCount,
+        historicalCount: predictionsDb.countHistoricalPredictions(),
+      },
+      message: `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped).`,
+    });
+  } catch (err: any) {
+    console.error('Error in synchronous prediction update:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Failed to update upcoming predictions synchronously' });
   }
 });

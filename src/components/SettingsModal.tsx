@@ -806,7 +806,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="space-y-4">
             {/* Appearance / Theme Selector */}
             <Card surface="subtle" padding="md" radius="2xl" className="sm:p-5 space-y-3">
-              <SectionHeader title="Theme" size="md" />
+              <div className="flex items-center justify-between gap-2">
+                <SectionHeader title="Theme" size="md" />
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-theme-card text-theme-sub">
+                  App Controlled
+                </span>
+              </div>
+
+              <p className="text-xs text-theme-sub leading-relaxed font-sans">
+                Display mode is strictly application-controlled and saved to your device. It operates independently of system or browser appearance preferences.
+              </p>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <button

@@ -40,14 +40,106 @@
   }
 
   /* ==========================================================================
+     EXPLICIT COLOR-SCHEME DECLARATIONS (Decoupled from OS / Browser)
+     ========================================================================== */
+  :root,
+  html {
+    color-scheme: dark;
+  }
+
+  html[data-theme="light"],
+  [data-theme="light"],
+  body[data-theme="light"] {
+    color-scheme: light !important;
+  }
+
+  html[data-theme="dark"],
+  [data-theme="dark"],
+  body[data-theme="dark"],
+  .dark {
+    color-scheme: dark !important;
+  }
+
+  /* ==========================================================================
      TIER 2: SEMANTIC TOKENS — THEME 1: OPTA KINETIC EMERALD (Default)
      ========================================================================== */
 
-  /* Light Mode */
+  /* Dark Mode (Application Default Baseline) */
   :root,
+  html,
+  [data-theme="dark"],
+  html[data-theme="dark"],
+  body[data-theme="dark"],
+  .dark,
+  [data-theme="dark"][data-color-theme="opta-emerald"],
+  html[data-theme="dark"][data-color-theme="opta-emerald"],
+  .dark[data-color-theme="opta-emerald"] {
+    /* Tonal Surface Ladder (Dark Mode) */
+    --bg-primary: #070b12;
+    --bg-secondary: #0e1420;
+    --bg-card: #101724;
+    --bg-card-elevated: #172032;
+    --bg-subtle: #1d283d;
+    --bg-overlay: rgba(2, 6, 14, 0.76);
+    --surface-glass: rgba(16, 23, 36, 0.86);
+
+    /* Typography Hierarchy */
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #75849a;
+    --text-inverse: #070b12;
+
+    /* Border Tokens (reserved for spinners/focus accents) */
+    --border-default: rgba(255, 255, 255, 0.06);
+    --border-subdued: rgba(255, 255, 255, 0.035);
+    --border-accent: rgba(0, 230, 135, 0.40);
+
+    /* Diffused Ambient Shadows */
+    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
+    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
+    --shadow-glow: 0 4px 16px -3px rgba(0, 230, 135, 0.24);
+
+    /* Brand Accent */
+    --accent-default: #00e687;
+    --accent-hover: #00c975;
+    --accent-text: #04120c;
+    --accent-subtle: rgba(0, 230, 135, 0.14);
+    --accent-glow: rgba(0, 230, 135, 0.28);
+
+    /* Semantic Signals */
+    --model-pick: #00e687;
+    --status-live: #ff3b4e;
+    --status-success: #00e687;
+    --status-warning: #fbbf24;
+    --status-danger: #ff453a;
+    --status-info: #38bdf8;
+
+    /* Compatibility Aliases */
+    --color-primary: var(--accent-default);
+    --color-primary-hover: var(--accent-hover);
+    --color-primary-text: var(--accent-text);
+    --color-primary-subtle: var(--accent-subtle);
+    --color-live-accent: var(--status-live);
+    --color-model-pick: var(--model-pick);
+    --color-surface-bg: var(--bg-primary);
+    --color-surface-card: var(--bg-card);
+    --color-surface-card-elevated: var(--bg-card-elevated);
+    --color-surface-subtle: var(--bg-subtle);
+    --color-border-card: var(--border-default);
+    --color-border-subdued: var(--border-subdued);
+    --color-text-main: var(--text-primary);
+    --color-text-sub: var(--text-secondary);
+    --color-text-dim: var(--text-muted);
+    --apex-lime: var(--accent-default);
+    --apex-black: var(--bg-primary);
+  }
+
+  /* Light Mode (Opta Kinetic Emerald) */
   [data-theme="light"],
-  :root[data-color-theme="opta-emerald"],
-  [data-theme="light"][data-color-theme="opta-emerald"] {
+  html[data-theme="light"],
+  body[data-theme="light"],
+  [data-theme="light"][data-color-theme="opta-emerald"],
+  html[data-theme="light"][data-color-theme="opta-emerald"] {
     /* Tonal Surface Ladder (60% Canvas -> 30% Surfaces) */
     --bg-primary: #f1f5f9;
     --bg-secondary: #ffffff;
@@ -73,7 +165,7 @@
     --shadow-elevated: 0 12px 30px -6px rgba(15, 23, 42, 0.10), 0 3px 10px -2px rgba(15, 23, 42, 0.04);
     --shadow-glow: 0 4px 14px -3px rgba(0, 158, 92, 0.24);
 
-    /* Brand Accent (10% Budget) */
+    /* Brand Accent */
     --accent-default: #009e5c;
     --accent-hover: #00824b;
     --accent-text: #ffffff;
@@ -108,69 +200,12 @@
     --apex-black: var(--text-primary);
   }
 
-  /* Dark Mode */
-  [data-theme="dark"],
-  .dark,
-  [data-theme="dark"][data-color-theme="opta-emerald"],
-  .dark[data-color-theme="opta-emerald"] {
-    --bg-primary: #070b12;
-    --bg-secondary: #0e1420;
-    --bg-card: #101724;
-    --bg-card-elevated: #172032;
-    --bg-subtle: #1d283d;
-    --bg-overlay: rgba(2, 6, 14, 0.76);
-    --surface-glass: rgba(16, 23, 36, 0.86);
-
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #75849a;
-    --text-inverse: #070b12;
-
-    --border-default: rgba(255, 255, 255, 0.06);
-    --border-subdued: rgba(255, 255, 255, 0.035);
-    --border-accent: rgba(0, 230, 135, 0.40);
-
-    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
-    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
-    --shadow-glow: 0 4px 16px -3px rgba(0, 230, 135, 0.24);
-
-    --accent-default: #00e687;
-    --accent-hover: #00c975;
-    --accent-text: #04120c;
-    --accent-subtle: rgba(0, 230, 135, 0.14);
-    --accent-glow: rgba(0, 230, 135, 0.28);
-
-    --model-pick: #00e687;
-    --status-live: #ff3b4e;
-    --status-success: #00e687;
-    --status-warning: #fbbf24;
-    --status-danger: #ff453a;
-    --status-info: #38bdf8;
-
-    --color-primary: var(--accent-default);
-    --color-primary-hover: var(--accent-hover);
-    --color-primary-text: var(--accent-text);
-    --color-primary-subtle: var(--accent-subtle);
-    --color-live-accent: var(--status-live);
-    --color-model-pick: var(--model-pick);
-    --color-surface-bg: var(--bg-primary);
-    --color-surface-card: var(--bg-card);
-    --color-surface-card-elevated: var(--bg-card-elevated);
-    --color-surface-subtle: var(--bg-subtle);
-    --color-border-card: var(--border-default);
-    --color-border-subdued: var(--border-subdued);
-    --color-text-main: var(--text-primary);
-    --color-text-sub: var(--text-secondary);
-    --color-text-dim: var(--text-muted);
-    --apex-lime: var(--accent-default);
-    --apex-black: var(--bg-primary);
-  }
-
   /* ==========================================================================
      THEME 2: CHAMPIONS CRIMSON & MINT
      ========================================================================== */
-  :root[data-color-theme="champions-crimson"],
-  [data-theme="light"][data-color-theme="champions-crimson"] {
+  [data-theme="light"][data-color-theme="champions-crimson"],
+  html[data-theme="light"][data-color-theme="champions-crimson"],
+  body[data-theme="light"][data-color-theme="champions-crimson"] {
     --bg-primary: #f1f3f8;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
@@ -282,8 +317,9 @@
   /* ==========================================================================
      THEME 3: BALLON D'OR GOLD
      ========================================================================== */
-  :root[data-color-theme="ballon-gold"],
-  [data-theme="light"][data-color-theme="ballon-gold"] {
+  [data-theme="light"][data-color-theme="ballon-gold"],
+  html[data-theme="light"][data-color-theme="ballon-gold"],
+  body[data-theme="light"][data-color-theme="ballon-gold"] {
     --bg-primary: #f5f3ed;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
@@ -395,8 +431,9 @@
   /* ==========================================================================
      THEME 4: VOLT LIME PRO
      ========================================================================== */
-  :root[data-color-theme="volt-lime"],
-  [data-theme="light"][data-color-theme="volt-lime"] {
+  [data-theme="light"][data-color-theme="volt-lime"],
+  html[data-theme="light"][data-color-theme="volt-lime"],
+  body[data-theme="light"][data-color-theme="volt-lime"] {
     --bg-primary: #f0f2f5;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
