@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Bell } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 
@@ -22,55 +22,37 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  settings,
-  providers,
-  stats,
   onOpenSettings,
-  onOpenTerminal,
-  theme,
-  onToggleTheme,
-  liveScores,
-  searchQuery,
-  setSearchQuery,
 }) => {
   return (
-    <header className="sticky top-0 z-30 h-12 bg-theme-card backdrop-blur-md transition-colors border-b border-theme/40">
+    <header className="sticky top-0 z-30 h-12 bg-theme-glass transition-colors border-b border-theme shadow-theme-sm">
       <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-5 flex items-center justify-between gap-3">
-        {/* Left: Hamburger Menu Button */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-theme-main hover:bg-theme-subtle transition-all cursor-pointer active:scale-95"
-            aria-label="Navigation Menu"
-            title="Menu & Settings"
-          >
-            <Menu className="w-4.5 h-4.5 text-theme-main" />
-          </button>
-          
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="font-extrabold text-sm sm:text-base tracking-tight text-theme-main">
-              Apex Live Score
-            </span>
+        {/* Left: Brand Title */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-theme-primary text-theme-primary-text flex items-center justify-center font-black text-xs shrink-0 shadow-theme-glow">
+            A
           </div>
+          <span className="font-extrabold text-sm sm:text-base tracking-tight text-theme-main truncate">
+            Apex Live Score
+          </span>
         </div>
 
-        {/* Center: Title styled cleanly */}
-        <div className="flex items-center font-bold text-sm sm:text-[15px] text-theme-main select-none">
-          <span>Today's Matches</span>
+        {/* Center: Title */}
+        <div className="hidden sm:flex items-center font-bold text-sm sm:text-[15px] text-theme-main select-none">
+          <span>Today&apos;s Matches</span>
         </div>
 
-        {/* Right: Notification Bell / Quick Settings Icon */}
+        {/* Right: Settings Icon */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             id="open-settings-modal-btn"
+            type="button"
             onClick={onOpenSettings}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-theme-main hover:bg-theme-subtle transition-all cursor-pointer relative active:scale-95"
-            title="Settings & Alerts"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-theme-main hover:bg-theme-subtle border border-transparent hover:border-theme transition-all cursor-pointer active:scale-95"
+            title="Settings"
             aria-label="Settings"
           >
-            <Bell className="w-4 h-4 text-theme-main" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-theme-primary" />
+            <Settings className="w-5 h-5 text-theme-main" />
           </button>
         </div>
       </div>

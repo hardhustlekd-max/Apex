@@ -232,17 +232,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-theme-card text-theme-main rounded-2xl w-full max-w-xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col border border-theme">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-theme-card text-theme-main rounded-2xl w-full max-w-xl max-h-[92vh] overflow-hidden shadow-theme-md flex flex-col border border-theme">
         {/* Header */}
-        <div className="sticky top-0 bg-theme-card/95 backdrop-blur-xl px-4 sm:px-5 py-3 flex items-center justify-between z-10 border-b border-theme">
+        <div className="sticky top-0 bg-theme-glass px-4 sm:px-5 py-3 flex items-center justify-between z-10 border-b border-theme">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-full bg-theme-subtle text-theme-main">
+            <div className="p-2 rounded-full bg-theme-subtle border border-theme text-theme-primary">
               <Settings className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-theme-main">Settings</h2>
-              <p className="text-[10px] text-theme-sub">Configure engine, data, predictions, and UI</p>
             </div>
           </div>
 
@@ -327,9 +326,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'DATA' && (
             <div className="space-y-4">
               {/* Live Database Metrics Overview */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 shadow-theme-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-theme-sub truncate">
                     Live Database & Feed Metrics
                   </h3>
                   <div className="flex items-center gap-2 shrink-0">
@@ -337,41 +336,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="button"
                       onClick={handleRefreshMetrics}
                       disabled={isRefreshingMetrics}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold bg-theme-card border border-theme hover:bg-theme-subtle text-theme-main transition-all cursor-pointer active:scale-95 disabled:opacity-50 shadow-theme-sm"
                       title="Refresh live metrics & feed stats"
                     >
-                      <RefreshCw className={`w-3 h-3 ${isRefreshingMetrics ? 'animate-spin text-[#CCFF00]' : ''}`} />
+                      <RefreshCw className={`w-3 h-3 ${isRefreshingMetrics ? 'animate-spin text-theme-primary' : ''}`} />
                       <span>Refresh</span>
                     </button>
-                    <span className="text-[11px] font-mono text-emerald-600 dark:text-[#CCFF00] font-bold flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
+                    <span className="text-[11px] font-mono text-theme-primary font-bold flex items-center gap-1.5 px-3 py-1 rounded-full bg-theme-primary-subtle border border-theme-accent/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-theme-primary animate-pulse"></span>
                       SQLite Active
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Upcoming Fixtures</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-medium">Upcoming Fixtures</span>
+                    <span className="text-lg font-black text-theme-primary font-mono tabular-nums">
                       {localStats?.upcomingCount !== undefined ? localStats.upcomingCount : (stats?.upcomingCount !== undefined ? stats.upcomingCount : '—')}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Model Predictions</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
-                      {localStats?.predictionsCount !== undefined ? localStats.predictionsCount : (stats?.predictionsCount !== undefined ? stats.predictionsCount : '—')}
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-medium">Stored Predictions</span>
+                    <span className="text-lg font-black text-theme-primary font-mono tabular-nums">
+                      {localStats?.predictionsCount ?? storageStatus?.storageEngine?.tableCounts?.predictions ?? stats?.predictionsCount ?? '—'}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Stored Raw Feeds</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-medium">Stored Raw Feeds</span>
+                    <span className="text-lg font-black text-theme-primary font-mono tabular-nums">
                       {localStats?.rawFeedsCount !== undefined ? localStats.rawFeedsCount : (stats?.rawFeedsCount !== undefined ? stats.rawFeedsCount : '—')}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Historical Matches</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00] font-mono">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-medium">Historical Matches</span>
+                    <span className="text-lg font-black text-theme-primary font-mono tabular-nums">
                       {localStats?.totalMatches !== undefined ? localStats.totalMatches : (stats?.totalMatches !== undefined ? stats.totalMatches : '—')}
                     </span>
                   </div>
@@ -379,11 +378,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 shadow-theme-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-[#CCFF00]" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <Cpu className="w-4 h-4 text-theme-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-theme-main">
                       Scraper Engine & Circuit Breaker Health
                     </h3>
                   </div>
@@ -392,7 +391,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                       : scraperStatus?.circuit?.state === 'HALF_OPEN'
                       ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                      : 'bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00]'
+                      : 'bg-theme-primary-subtle text-theme-primary'
                   }`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
                     CIRCUIT: {scraperStatus?.circuit?.state || 'CLOSED'}
@@ -400,27 +399,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Circuit Failures</span>
-                    <span className="text-sm font-black text-slate-900 dark:text-white">{scraperStatus?.circuit?.failureCount ?? 0}</span>
+                  <div className="p-3 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-sans font-medium">Circuit Failures</span>
+                    <span className="text-sm font-black text-theme-main">{scraperStatus?.circuit?.failureCount ?? 0}</span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Cached Raw Feeds</span>
-                    <span className="text-sm font-black text-slate-900 dark:text-[#CCFF00]">{scraperStatus?.rawFeedsCount ?? localStats?.rawFeedsCount ?? stats?.rawFeedsCount ?? 0}</span>
+                  <div className="p-3 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-sans font-medium">Cached Raw Feeds</span>
+                    <span className="text-sm font-black text-theme-primary">{scraperStatus?.rawFeedsCount ?? localStats?.rawFeedsCount ?? stats?.rawFeedsCount ?? 0}</span>
                   </div>
                 </div>
 
                 {/* Feed Mirrors & CDN Endpoint Status */}
                 {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
-                  <div className="pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-1.5">
-                    <span className="text-[10px] uppercase font-mono font-bold text-slate-500 dark:text-slate-400 block">
+                  <div className="pt-2 border-t border-theme space-y-1.5">
+                    <span className="text-[10px] uppercase font-mono font-bold text-theme-sub block">
                       Active Scraper Feed Mirrors & CDN Endpoints
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono">
                       {scraperStatus.mirrors.map((m: any, idx: number) => (
-                        <div key={idx} className="p-2 rounded-xl bg-white dark:bg-[#121212] flex items-center justify-between gap-2 shadow-xs">
-                          <span className="truncate text-slate-700 dark:text-slate-300 font-medium">{m.name}</span>
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] shrink-0">
+                        <div key={idx} className="p-2 rounded-xl bg-theme-card border border-theme flex items-center justify-between gap-2 shadow-theme-sm">
+                          <span className="truncate text-theme-main font-medium">{m.name}</span>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-theme-primary-subtle text-theme-primary shrink-0">
                             {m.status}
                           </span>
                         </div>
@@ -431,35 +430,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Database & Storage Engine Status Section */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 shadow-theme-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Server className="w-4 h-4 text-[#CCFF00]" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <Server className="w-4 h-4 text-theme-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-theme-main">
                       Database & Storage Engine Status
                     </h3>
                   </div>
                   <button
                     onClick={fetchStorageStatus}
                     disabled={isCheckingStorage}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-all cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-theme-card border border-theme hover:bg-theme-subtle text-theme-main transition-all cursor-pointer disabled:opacity-50 shadow-theme-sm active:scale-95"
                   >
-                    <RefreshCw className={`w-3 h-3 ${isCheckingStorage ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-3 h-3 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`} />
                     <span>Test Storage</span>
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   {/* Football Data Store */}
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] space-y-2 shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme space-y-2 shadow-theme-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Database className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-xs font-bold text-theme-main flex items-center gap-1.5">
+                        <Database className="w-3.5 h-3.5 text-theme-primary" />
                         Local SQLite (Football Data)
                       </span>
                       {storageStatus?.footballDb?.status === 'CONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-theme-primary-subtle text-theme-primary flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-theme-primary animate-pulse"></span>
                           WAL ACTIVE ({storageStatus.footballDb.latencyMs ?? 1}ms)
                         </span>
                       ) : (
@@ -470,13 +469,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </div>
 
-                    <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 space-y-0.5">
+                    <div className="text-[11px] font-mono text-theme-sub space-y-0.5">
                       <div className="truncate">
-                        Path: <span className="text-slate-700 dark:text-slate-300 font-semibold">{storageStatus?.storageEngine?.dbPath || 'data/football_engine.db'}</span>
+                        Path: <span className="text-theme-main font-semibold">{storageStatus?.storageEngine?.dbPath || 'data/football_engine.db'}</span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] pt-0.5">
-                        <span className="text-slate-500">Disk Size: <strong className="text-slate-700 dark:text-[#CCFF00]">{storageStatus?.storageEngine?.sizeMB ?? 0.1} MB</strong></span>
-                        <span className="text-emerald-600 dark:text-[#CCFF00] font-semibold">99.6% Optimized</span>
+                        <span className="text-theme-sub">Disk Size: <strong className="text-theme-primary">{storageStatus?.storageEngine?.sizeMB ?? 0.1} MB</strong></span>
+                        <span className="text-theme-primary font-semibold">99.6% Optimized</span>
                       </div>
                       {storageStatus?.footballDb?.error && (
                         <p className="text-[10px] text-rose-600 dark:text-rose-400 truncate">
@@ -487,15 +486,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   {/* Predictions Store */}
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] space-y-2 shadow-xs">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme space-y-2 shadow-theme-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-theme-main flex items-center gap-1.5">
                         <Database className="w-3.5 h-3.5 text-sky-400" />
                         5-Pillar Prediction Store
                       </span>
                       {storageStatus?.predictionsDb?.status === 'CONNECTED' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00] flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#CCFF00] animate-pulse"></span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-theme-primary-subtle text-theme-primary flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-theme-primary animate-pulse"></span>
                           100% READY
                         </span>
                       ) : (
@@ -506,13 +505,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </div>
 
-                    <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 space-y-0.5">
+                    <div className="text-[11px] font-mono text-theme-sub space-y-0.5">
                       <div className="truncate">
-                        Driver: <span className="text-slate-700 dark:text-slate-300 font-semibold">better-sqlite3 C-Bindings</span>
+                        Driver: <span className="text-theme-main font-semibold">better-sqlite3 C-Bindings</span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] pt-0.5">
-                        <span className="text-slate-500">Stored Predictions: <strong className="text-slate-700 dark:text-slate-200">{storageStatus?.storageEngine?.tableCounts?.predictions ?? localStats?.predictionsCount ?? 0}</strong></span>
-                        <span className="text-indigo-500 dark:text-indigo-400 font-semibold">5 Pillars Active</span>
+                        <span className="text-theme-sub">Stored Predictions: <strong className="text-theme-main">{storageStatus?.storageEngine?.tableCounts?.predictions ?? localStats?.predictionsCount ?? stats?.predictionsCount ?? 0}</strong></span>
+                        <span className="text-theme-primary font-semibold">5 Pillars Active</span>
                       </div>
                       {storageStatus?.predictionsDb?.error && (
                         <p className="text-[10px] text-rose-600 dark:text-rose-400 truncate">
@@ -525,44 +524,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Full Data & H2H Sync Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-4 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-4 shadow-theme-sm">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-full bg-lime-500/10 text-lime-600 dark:text-[#CCFF00]">
+                      <div className="p-2 rounded-full bg-theme-primary-subtle text-theme-primary">
                         <RefreshCw className="w-4 h-4" />
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                        Full Sync (Historical Data, Upcoming Feeds & H2H)
+                      <h3 className="text-sm font-bold text-theme-main">
+                        Full Sync
                       </h3>
                     </div>
                     {isOperating && (
-                      <span className="text-xs text-lime-600 dark:text-[#CCFF00] font-semibold flex items-center gap-1.5">
+                      <span className="text-xs text-theme-primary font-semibold flex items-center gap-1.5">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         In Progress...
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-                    Fetches fresh Flashscore raw feeds for historical match results, upcoming fixtures, Head-to-Head (H2H) records, and live scores, recalculating Poisson prediction models without deleting existing database records.
-                  </p>
                 </div>
 
                 {isOperating && (
-                  <div className="space-y-2.5 p-4 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
                     <div className="flex items-center justify-between text-xs gap-2">
-                      <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 truncate">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#CCFF00] shrink-0" />
+                      <span className="font-bold text-theme-main flex items-center gap-2 truncate">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-theme-primary shrink-0" />
                         <span className="truncate">{syncProgress?.currentStep || 'Fetching historical archives, upcoming feeds & H2H...'}</span>
                       </span>
-                      <span className="text-[11px] font-mono tabular-nums font-black text-slate-900 dark:text-white shrink-0">
+                      <span className="text-[11px] font-mono tabular-nums font-black text-theme-main shrink-0">
                         {syncProgress?.progress ?? 50}%
                         {syncProgress?.stepIndex && syncProgress?.totalSteps ? ` (Step ${syncProgress.stepIndex}/${syncProgress.totalSteps})` : ''}
                       </span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div className="w-full bg-theme-subtle rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-lime-500 via-emerald-400 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
+                        className="bg-theme-primary h-2.5 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(100, Math.max(5, syncProgress?.progress ?? 25))}%` }}
                       />
                     </div>
@@ -572,23 +568,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {!isOperating && !isConfirmingReset && (
                   <button
                     onClick={() => setIsConfirmingReset(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 font-black transition-all cursor-pointer text-xs uppercase tracking-wide active:scale-[0.99]"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-black transition-all cursor-pointer text-xs uppercase tracking-wide shadow-theme-glow active:scale-[0.99]"
                   >
-                    <RefreshCw className="w-4 h-4 text-[#CCFF00] dark:text-slate-950" />
+                    <RefreshCw className="w-4 h-4" />
                     <span>Trigger Full Data & H2H Sync</span>
                   </button>
                 )}
 
                 {!isOperating && isConfirmingReset && (
-                  <div className="p-4 rounded-2xl bg-lime-500/10 dark:bg-[#CCFF00]/10 space-y-3">
+                  <div className="p-4 rounded-2xl bg-theme-primary-subtle border border-theme-accent space-y-3">
                     <div className="flex items-start gap-2.5">
-                      <RefreshCw className="w-4 h-4 text-slate-900 dark:text-[#CCFF00] shrink-0 mt-0.5" />
+                      <RefreshCw className="w-4 h-4 text-theme-primary shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
-                        <p className="text-xs font-bold text-slate-900 dark:text-white">
-                          Start Full Data & H2H Synchronization?
-                        </p>
-                        <p className="text-[11px] text-slate-700 dark:text-slate-300">
-                          This will fetch the latest historical match archives, upcoming fixture feeds, H2H team records, and live score updates from Flashscore.
+                        <p className="text-xs font-bold text-theme-main">
+                          Confirm Full Sync?
                         </p>
                       </div>
                     </div>
@@ -596,14 +589,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleExecuteResetAndSync}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-lime-400 text-white dark:text-slate-950 font-black text-xs transition-colors cursor-pointer active:scale-95"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-black text-xs transition-all cursor-pointer active:scale-95 shadow-theme-glow"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Confirm & Trigger Full Sync</span>
                       </button>
                       <button
                         onClick={() => setIsConfirmingReset(false)}
-                        className="px-4 py-2.5 rounded-full bg-white dark:bg-[#121212] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer active:scale-95"
+                        className="px-4 py-2.5 rounded-full bg-theme-card border border-theme hover:bg-theme-subtle text-theme-main font-bold text-xs transition-colors cursor-pointer active:scale-95"
                       >
                         Cancel
                       </button>
@@ -617,84 +610,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'PREDICTIONS' && (
             <div className="space-y-4">
               {/* Predictions Engine Status Banner */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-3 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 shadow-theme-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <div className="p-2 rounded-full bg-theme-primary-subtle text-theme-primary">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Upcoming Predictions Engine</h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">5-Pillar Poisson Model & Database Persistence</p>
+                      <h3 className="text-sm font-bold text-theme-main">Upcoming Predictions</h3>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10.5px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-[#CCFF00]">
+                  <span className="px-2.5 py-1 rounded-full text-[10.5px] font-mono font-bold bg-theme-primary-subtle text-theme-primary">
                     DB Persisted
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5 pt-1 font-mono">
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Upcoming Fixtures</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-sans font-medium">Upcoming Fixtures</span>
+                    <span className="text-lg font-black text-theme-primary tabular-nums">
                       {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-white dark:bg-[#121212] shadow-xs">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">Stored Model Predictions</span>
-                    <span className="text-lg font-black text-slate-900 dark:text-[#CCFF00]">
-                      {predictionProgress?.predictionsCount ?? localStats?.predictionsCount ?? stats?.predictionsCount ?? '—'}
+                  <div className="p-3.5 rounded-2xl bg-theme-card border border-theme shadow-theme-sm">
+                    <span className="text-[10px] text-theme-sub block font-sans font-medium">Stored Predictions</span>
+                    <span className="text-lg font-black text-theme-primary tabular-nums">
+                      {predictionProgress?.predictionsCount ?? localStats?.predictionsCount ?? storageStatus?.storageEngine?.tableCounts?.predictions ?? stats?.predictionsCount ?? '—'}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Action Card: Trigger Predictions Update for Upcoming Games */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-4 shadow-xs">
+              <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme space-y-4 shadow-theme-sm">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-full bg-slate-900 dark:bg-[#CCFF00] text-white dark:text-slate-950 font-bold">
+                    <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-bold shadow-theme-sm">
                       <TrendingUp className="w-4 h-4" />
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    <h3 className="text-sm font-bold text-theme-main">
                       Recalculate Upcoming Predictions
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-                    Recalculates Poisson model predictions for <strong>upcoming games only</strong> directly from the internal database. Matches must have at least <strong>90% data completeness</strong> to be predicted; incomplete fixtures are skipped.
-                  </p>
                 </div>
 
                 {/* Real-time Background Job Progress Panel */}
                 {isUpdatingPredictions && (
-                  <div className="space-y-2.5 p-4 rounded-2xl bg-white dark:bg-[#121212] shadow-xs border border-amber-500/20 dark:border-[#CCFF00]/20">
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-theme-card shadow-theme-sm border border-theme-accent">
                     <div className="flex items-center justify-between text-xs gap-2">
-                      <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 truncate">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500 dark:text-[#CCFF00] shrink-0" />
+                      <span className="font-bold text-theme-main flex items-center gap-2 truncate">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-theme-primary shrink-0" />
                         <span className="truncate">{predictionProgress?.currentStep || 'Recalculating 5-Pillar Poisson predictions...'}</span>
                       </span>
-                      <span className="text-[11px] font-mono tabular-nums font-black text-slate-900 dark:text-white shrink-0">
+                      <span className="text-[11px] font-mono tabular-nums font-black text-theme-main shrink-0">
                         {predictionProgress?.progress ?? 15}%
                         {predictionProgress?.stepIndex && predictionProgress?.totalSteps ? ` (Step ${predictionProgress.stepIndex}/${predictionProgress.totalSteps})` : ''}
                       </span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div className="w-full bg-theme-subtle rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-amber-500 via-emerald-400 to-[#CCFF00] h-2.5 rounded-full transition-all duration-300"
+                        className="bg-theme-primary h-2.5 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(100, Math.max(5, predictionProgress?.progress ?? 15))}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[10.5px] font-mono text-slate-500 dark:text-slate-400 pt-0.5">
-                      <span>Predicted: <strong className="text-slate-900 dark:text-[#CCFF00]">{predictionProgress?.matchesCount ?? 0}</strong> / {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? '—'}</span>
-                      <span>Skipped (&lt;90% data): <strong className="text-amber-600 dark:text-amber-400">{predictionProgress?.skippedCount ?? 0}</strong></span>
+                    <div className="flex items-center justify-between text-[10.5px] font-mono text-theme-sub pt-0.5">
+                      <span>Predicted: <strong className="text-theme-primary">{predictionProgress?.matchesCount ?? 0}</strong> / {predictionProgress?.upcomingCount ?? localStats?.upcomingCount ?? '—'}</span>
+                      <span>Skipped (&lt;90% data): <strong className="text-amber-500">{predictionProgress?.skippedCount ?? 0}</strong></span>
                     </div>
                   </div>
                 )}
 
                 {/* Feedback Alerts */}
                 {predictionResultMsg && (
-                  <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-800 dark:text-[#CCFF00] text-xs font-bold flex items-center gap-2 font-mono">
-                    <Check className="w-4 h-4 text-emerald-600 dark:text-[#CCFF00] shrink-0" />
+                  <div className="p-3 rounded-2xl bg-theme-primary-subtle border border-theme-accent text-theme-primary text-xs font-bold flex items-center gap-2 font-mono">
+                    <Check className="w-4 h-4 text-theme-primary shrink-0" />
                     <span>{predictionResultMsg}</span>
                   </div>
                 )}
@@ -712,7 +701,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   id="update-upcoming-predictions-btn"
                   onClick={handleUpdatePredictions}
                   disabled={isUpdatingPredictions}
-                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] text-white dark:text-slate-950 font-black transition-all cursor-pointer text-xs uppercase tracking-wide shadow-xs active:scale-95 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-black transition-all cursor-pointer text-xs uppercase tracking-wide shadow-theme-glow active:scale-95 disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 ${isUpdatingPredictions ? 'animate-spin' : ''}`} />
                   <span>{isUpdatingPredictions ? 'Calculating & Updating DB...' : 'Update Predictions'}</span>
@@ -720,11 +709,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Calculated Market Categories Info */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] space-y-2 text-xs">
-                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[10px] block font-mono">
+              <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-2 text-xs shadow-theme-sm">
+                <span className="font-bold text-theme-main uppercase tracking-wider text-[10px] block font-mono">
                   Market Categories & Calculation Scope
                 </span>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-400">
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-theme-sub">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     <span>1X2 Match Outcomes</span>
@@ -751,8 +740,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Appearance / Theme Selector */}
               <div className="p-4 sm:p-5 rounded-2xl bg-theme-subtle border border-theme space-y-3 shadow-xs">
                 <div>
-                  <h3 className="text-sm font-bold text-theme-main">Theme & Appearance</h3>
-                  <p className="text-xs text-theme-sub">Choose between light and dark modes</p>
+                  <h3 className="text-sm font-bold text-theme-main">Theme</h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-1">
@@ -771,7 +759,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                       <div className="text-left">
                         <span className="text-xs font-bold block text-theme-main">Light Mode</span>
-                        <span className="text-[10px] text-theme-sub">Day visual mode</span>
                       </div>
                     </div>
                     {theme === 'light' && <Check className="w-4 h-4 text-theme-main" />}
@@ -792,7 +779,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                       <div className="text-left">
                         <span className="text-xs font-bold block text-theme-main">Dark Mode</span>
-                        <span className="text-[10px] text-theme-sub">Night visual mode</span>
                       </div>
                     </div>
                     {theme === 'dark' && <Check className="w-4 h-4 text-theme-primary" />}
@@ -806,15 +792,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-theme-main flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-theme-primary" />
-                      <span>Color Palette Systems</span>
+                      <span>Color Palette</span>
                     </h3>
                     <span className="text-[10px] font-mono tabular-nums font-bold px-2 py-0.5 rounded-full bg-theme-card border border-theme text-theme-main">
-                      Adaptive Light &amp; Dark
+                      Adaptive
                     </span>
                   </div>
-                  <p className="text-xs text-theme-sub mt-0.5">
-                    Select an expert color palette. Each system dynamically adapts all surfaces, typography, model picks, and live status signals to its distinct colorway.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -842,9 +825,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-[10.5px] font-medium text-theme-sub leading-snug">
-                            {t.description}
-                          </p>
 
                           {/* Colorway Pills */}
                           {t.colorways && t.colorways.length > 0 && (
@@ -902,23 +882,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Terminal Logs & Console Section */}
               {onOpenTerminal && (
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-[#1E1E1E] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="p-4 sm:p-5 rounded-2xl bg-theme-card-elevated border border-theme flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-theme-sm">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-full bg-slate-900 dark:bg-[#CCFF00] text-white dark:text-slate-950 font-bold">
+                      <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-bold shadow-theme-sm">
                         <Terminal className="w-4 h-4" />
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">System Terminal & Logs</h3>
+                      <h3 className="text-sm font-bold text-theme-main">System Terminal & Logs</h3>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      View live background logs, scraper events, and Poisson engine calculations
-                    </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={onOpenTerminal}
-                    className="px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] dark:text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                    className="px-5 py-2.5 rounded-full bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-theme-glow active:scale-95 shrink-0"
                   >
                     <Terminal className="w-3.5 h-3.5" />
                     <span>Open Terminal</span>
@@ -930,8 +907,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           
           {/* Toast Notification */}
           {showSavedToast && (
-            <div className="p-3 rounded-full bg-emerald-500/10 dark:bg-[#CCFF00]/10 text-emerald-800 dark:text-[#CCFF00] text-xs font-black flex items-center gap-2 shadow-xs font-mono">
-              <Check className="w-4 h-4 text-emerald-600 dark:text-[#CCFF00]" />
+            <div className="p-3 rounded-full bg-theme-primary-subtle border border-theme-accent text-theme-primary text-xs font-black flex items-center gap-2 shadow-theme-sm font-mono">
+              <Check className="w-4 h-4 text-theme-primary" />
               <span>Settings saved successfully</span>
             </div>
           )}
@@ -940,14 +917,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="flex items-center justify-end gap-2.5 pt-3">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-full bg-slate-100 dark:bg-[#1E1E1E] hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              className="px-5 py-2.5 rounded-full bg-theme-subtle border border-theme hover:bg-theme-card-elevated text-theme-main text-xs font-bold transition-all cursor-pointer active:scale-95"
             >
               Close
             </button>
             {/* Save Settings Action */}
             <button
               onClick={handleSave}
-              className="px-6 py-2.5 rounded-full bg-slate-950 text-[#CCFF00] hover:bg-slate-900 dark:bg-[#CCFF00] dark:hover:bg-[#b5ff00] dark:text-slate-950 text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
+              className="px-6 py-2.5 rounded-full bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text text-xs font-black shadow-theme-glow transition-all cursor-pointer active:scale-95"
             >
               Save Settings
             </button>

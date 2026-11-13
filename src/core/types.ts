@@ -44,6 +44,7 @@ export interface HeadToHeadMatchRecord {
 }
 
 export interface HeadToHeadMeasurement {
+  parserVersion?: number;
   matchesCount: number;
   homeWins: number;
   draws: number;

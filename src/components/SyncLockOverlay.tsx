@@ -17,19 +17,17 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
 }) => {
   const isPredictionJob = job?.jobType === 'PREDICTIONS';
   const displayTitle = title || (isPredictionJob
-    ? 'Recalculating Upcoming Predictions & Poisson Models'
-    : 'Full Data, Archive & H2H Sync in Progress');
-  
-  const displaySubtitle = subtitle || 'Upcoming predictions, live in-play scores, match history archives, and historical evaluations are temporarily locked while background processing and database updates complete.';
+    ? 'Recalculating Predictions'
+    : 'Data Sync in Progress');
 
   const progress = Math.min(100, Math.max(5, job?.progress ?? 15));
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden bg-theme-card border border-theme p-6 sm:p-8 shadow-2xl backdrop-blur-xl animate-in fade-in duration-200 z-30 my-2 text-theme-main">
+    <div className="relative w-full rounded-3xl overflow-hidden bg-theme-card border border-theme p-6 sm:p-8 shadow-theme-md backdrop-blur-xl animate-in fade-in duration-200 z-30 my-2 text-theme-main">
       <div className="flex flex-col items-center text-center max-w-xl mx-auto space-y-5">
         {/* Animated Icon Ring */}
         <div className="relative flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-theme-primary text-theme-primary-text flex items-center justify-center shadow-lg">
+          <div className="w-16 h-16 rounded-full bg-theme-primary text-theme-primary-text flex items-center justify-center shadow-theme-glow">
             {isPredictionJob ? (
               <Sparkles className="w-8 h-8 animate-pulse text-theme-primary-text" />
             ) : (
@@ -41,14 +39,16 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
           </div>
         </div>
 
-        {/* Title & Description */}
-        <div className="space-y-1.5">
+        {/* Title */}
+        <div className="space-y-1">
           <h3 className="text-base sm:text-lg font-black text-theme-main tracking-tight">
             {displayTitle}
           </h3>
-          <p className="text-xs text-theme-sub leading-relaxed font-medium">
-            {displaySubtitle}
-          </p>
+          {subtitle && (
+            <p className="text-xs text-theme-sub leading-relaxed font-medium">
+              {subtitle}
+            </p>
+          )}
         </div>
 
         {/* Live Step Description & Progress Bar */}
@@ -66,7 +66,7 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
 
           <div className="w-full bg-theme-card border border-theme rounded-full h-3 overflow-hidden p-0.5">
             <div
-              className="bg-theme-primary h-full rounded-full transition-all duration-300 shadow-sm"
+              className="bg-theme-primary h-full rounded-full transition-all duration-300 shadow-theme-glow"
               style={{ width: `${progress}%` }}
             />
           </div>

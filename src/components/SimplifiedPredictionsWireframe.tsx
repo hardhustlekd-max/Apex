@@ -168,6 +168,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean) => {
     const isLive = fixture.status === 'LIVE';
+    const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
     const pick = getAuthoritative1X2Pick(fixture);
 
@@ -183,10 +184,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
       <div
         key={fixture.id}
         onClick={() => onSelectDetail(fixture)}
-        className={`group grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 transition-all cursor-pointer gap-2 border-b border-theme/30 last:border-b-0 ${
-          isLive
+        className={`group grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 transition-all duration-150 cursor-pointer gap-2 border-b border-theme-subdued last:border-b-0 ${
+          isSelected
+            ? 'bg-theme-primary-subtle ring-1 ring-inset ring-theme-accent'
+            : isLive
             ? 'bg-rose-50/30 dark:bg-rose-950/20 hover:bg-rose-50/60 dark:hover:bg-rose-950/40'
-            : 'hover:bg-theme-subtle'
+            : 'hover:bg-theme-subtle/70'
         }`}
       >
         {/* Match Info Column */}
@@ -413,13 +416,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     return (
     <div className="w-full max-w-full space-y-2.5 text-theme-main font-sans">
       {paginatedFixtures.length === 0 ? (
-        <div className="p-8 text-center text-theme-sub bg-theme-card border border-theme rounded-2xl shadow-xs font-bold text-xs">
+        <div className="p-8 text-center text-theme-sub bg-theme-card border border-theme rounded-2xl shadow-theme-sm font-bold text-xs">
           No matches found for the selected filters.
         </div>
       ) : isPercentageSortActive ? (
-        <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-xs transition-all">
+        <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-theme-sm transition-all">
           {/* Header */}
-          <div className="bg-theme-subtle grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2 font-black text-xs select-none">
+          <div className="bg-theme-card-elevated border-b border-theme grid grid-cols-12 items-center px-3 sm:px-4 py-2 sm:py-2.5 gap-2 font-black text-xs select-none">
             <div className="col-span-6 sm:col-span-6 flex items-center gap-1.5 min-w-0 pr-1.5">
               <span className="truncate whitespace-nowrap font-extrabold uppercase text-xs text-theme-main">Match & League</span>
               <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono tabular-nums font-bold bg-theme-primary-subtle text-theme-primary">
@@ -517,10 +520,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         groupedByLeague.map((group) => (
           <div
             key={group.headerKey}
-            className="rounded-xl sm:rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-xs mb-2 transition-all"
+            className="rounded-xl sm:rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-theme-sm mb-2 transition-all"
           >
             {/* Box Header per League */}
-            <div className="bg-theme-subtle border-b border-theme grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 gap-2 font-bold text-xs select-none">
+            <div className="bg-theme-card-elevated border-b border-theme grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 gap-2 font-bold text-xs select-none">
               <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5">
                 <span className="truncate whitespace-nowrap font-extrabold text-theme-main text-xs sm:text-[13px] uppercase tracking-wide">
                   {group.subDivision || group.leagueName}
@@ -596,7 +599,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
       {/* Pagination Bar */}
       {fixtures.length > 0 && (
-        <div className="px-3 py-2 bg-theme-card border border-theme flex flex-wrap items-center justify-between gap-2 text-xs rounded-xl sm:rounded-full shadow-xs">
+        <div className="px-3 py-2 bg-theme-card border border-theme flex flex-wrap items-center justify-between gap-2 text-xs rounded-xl sm:rounded-full shadow-theme-sm">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className="text-theme-sub font-mono tabular-nums text-xs whitespace-nowrap">
               Showing{' '}
@@ -632,7 +635,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage <= 1}
               onClick={() => setCurrentPage(1)}
-              className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-subtle/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-theme-subtle border border-theme text-theme-main hover:bg-theme-card-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
               title="First Page"
               aria-label="First Page"
             >
@@ -642,7 +645,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-subtle/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95"
+              className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-theme-subtle border border-theme text-theme-main hover:bg-theme-card-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95"
               title="Previous Page"
               aria-label="Previous Page"
             >
@@ -683,8 +686,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() => setCurrentPage(item)}
                       className={`min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-xs font-black transition-all cursor-pointer active:scale-95 ${
                         item === safeCurrentPage
-                          ? 'bg-theme-primary text-theme-primary-text shadow-xs'
-                          : 'bg-theme-subtle text-theme-main hover:bg-theme-subtle/80'
+                          ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
+                          : 'bg-theme-subtle border border-theme text-theme-main hover:bg-theme-card-elevated'
                       }`}
                     >
                       {item}
@@ -697,7 +700,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-300 hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95"
+              className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-theme-subtle border border-theme text-theme-main hover:bg-theme-card-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95"
               title="Next Page"
               aria-label="Next Page"
             >
@@ -708,7 +711,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               type="button"
               disabled={safeCurrentPage >= totalPages}
               onClick={() => setCurrentPage(totalPages)}
-              className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-300 hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-theme-subtle border border-theme text-theme-main hover:bg-theme-card-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
               title="Last Page"
               aria-label="Last Page"
             >

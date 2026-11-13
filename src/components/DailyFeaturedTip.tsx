@@ -57,7 +57,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
 
   if (isLoading) {
     return (
-      <div className="bg-theme-card rounded-2xl p-8 flex items-center justify-center border border-theme">
+      <div className="bg-theme-card rounded-2xl p-8 flex items-center justify-center border border-theme shadow-theme-sm">
         <Loader2 className="w-8 h-8 text-theme-primary animate-spin" />
       </div>
     );
@@ -68,7 +68,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({ onSelectDeta
   const { fixture, market } = featuredTip;
 
   return (
-    <div className="bg-theme-card rounded-2xl p-5 shadow-xs border border-theme space-y-4">
+    <div className="bg-theme-card rounded-2xl p-5 shadow-theme-sm hover:border-theme-accent hover:shadow-theme-md transition-all border border-theme space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-theme-primary">
           <Award className="w-5 h-5" />

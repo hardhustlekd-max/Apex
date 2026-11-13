@@ -41,11 +41,11 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   isSyncing = false,
 }) => {
   return (
-    <aside className="w-60 shrink-0 hidden lg:flex flex-col h-[calc(100vh-3rem)] sticky top-12 bg-theme-card border-r border-theme/40 z-20 select-none overflow-y-auto no-scrollbar justify-between">
+    <aside className="w-60 shrink-0 hidden lg:flex flex-col h-[calc(100vh-3rem)] sticky top-12 bg-theme-card border-r border-theme z-20 select-none overflow-y-auto no-scrollbar justify-between">
       <div className="p-3 space-y-4">
         {/* Brand identity lockup */}
         <div className="flex items-center gap-2.5 px-1.5 py-0.5">
-          <div className="w-7.5 h-7.5 rounded-xl bg-theme-primary text-theme-primary-text flex items-center justify-center font-black text-xs shadow-xs shrink-0 tracking-tighter">
+          <div className="w-7.5 h-7.5 rounded-xl bg-theme-primary text-theme-primary-text flex items-center justify-center font-black text-xs shadow-theme-glow shrink-0 tracking-tighter">
             L
           </div>
           <div className="min-w-0">
@@ -69,7 +69,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             onClick={() => onSelectTab('FIXTURES')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'FIXTURES'
-                ? 'bg-theme-primary text-theme-primary-text shadow-xs font-black'
+                ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-black'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main'
             }`}
           >
@@ -99,7 +99,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             onClick={() => onSelectTab('ACCAS')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'ACCAS'
-                ? 'bg-theme-primary text-theme-primary-text shadow-xs font-black'
+                ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-black'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main'
             }`}
           >
@@ -121,7 +121,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             onClick={() => onSelectTab('STANDINGS')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'STANDINGS'
-                ? 'bg-theme-primary text-theme-primary-text shadow-xs font-black'
+                ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-black'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main'
             }`}
           >
@@ -136,7 +136,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             onClick={() => onSelectTab('HISTORY')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'HISTORY'
-                ? 'bg-theme-primary text-theme-primary-text shadow-xs font-black'
+                ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-black'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main'
             }`}
           >
@@ -195,7 +195,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       </div>
 
       {/* Bottom Footer Diagnostics & Controls */}
-      <div className="p-2.5 bg-theme-card-elevated border-t border-theme/40 space-y-1.5">
+      <div className="p-2.5 bg-theme-card-elevated border-t border-theme space-y-1.5">
         {/* Engine status indicator */}
         <div className="flex items-center justify-between px-1.5 py-0.5 text-xs text-theme-sub">
           <div className="flex items-center gap-1.5">
@@ -212,7 +212,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={onToggleTheme}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary transition-all text-xs font-bold cursor-pointer shadow-xs"
+            className="flex-1 flex items-center justify-center gap-1.5 py-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary hover:border-theme-accent transition-all text-xs font-bold cursor-pointer shadow-theme-sm"
             title="Toggle Light / Dark mode"
           >
             {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-theme-main" />}
@@ -222,7 +222,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={onOpenTerminal}
-            className="p-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary transition-all cursor-pointer shadow-xs"
+            className="p-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary hover:border-theme-accent transition-all cursor-pointer shadow-theme-sm"
             title="System Terminal & Logs"
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="p-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary transition-all cursor-pointer shadow-xs"
+            className="p-1 rounded-lg bg-theme-card border border-theme text-theme-main hover:text-theme-primary hover:border-theme-accent transition-all cursor-pointer shadow-theme-sm"
             title="Engine Settings"
           >
             <Settings className="w-3.5 h-3.5" />

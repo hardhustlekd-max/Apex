@@ -27,16 +27,9 @@ import {
   getProbValue,
   getAuthoritative1X2Pick,
 } from '../core/formatters.js';
+import { teamMatchScore, resolveFixtureAlignment, resolveTeamSide } from '../core/feedParser.js';
 
 // H2HTrendBadge removed as per user request to eliminate trend badges
-
-function isTeamMatch(name1?: string, name2?: string): boolean {
-  if (!name1 || !name2) return false;
-  const n1 = name1.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-  const n2 = name2.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-  if (!n1 || !n2) return false;
-  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
-}
 
 export interface MatchDetailViewProps {
   fixture: Fixture | null;
@@ -63,10 +56,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
           <div className="w-12 h-12 rounded-2xl bg-theme-subtle flex items-center justify-center mb-3">
             <Target className="w-6 h-6 text-theme-primary" />
           </div>
-          <h4 className="font-extrabold text-sm text-theme-main">Live Match Analytics</h4>
-          <p className="text-xs text-theme-sub mt-1 max-w-[260px] leading-relaxed">
-            Select a fixture to view Dixon-Coles Poisson projections, team strengths, head-to-head records, and value bets.
-          </p>
+          <h4 className="font-extrabold text-sm text-theme-main">Select a Match</h4>
         </div>
       );
     }
@@ -90,13 +80,13 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
   const displayFixture = fixture || lastFixtureRef.current;
   if (!displayFixture) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-theme-overlay backdrop-blur-md animate-in fade-in duration-200">
       <div 
         className="absolute inset-0 cursor-pointer" 
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-2xl h-[92vh] sm:h-[85vh] max-h-[820px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+      <div className="relative w-full max-w-2xl h-[92vh] sm:h-[85vh] max-h-[820px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-theme-md animate-in slide-in-from-bottom-4 duration-300">
         <MatchDetailView fixture={displayFixture} onClose={onClose} isPanel={false} />
       </div>
     </div>
@@ -335,16 +325,17 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           }
         }
 
-        const isRecHomeCurrentHome = isTeamMatch(m.homeTeam, fixture.homeTeam);
-        const isRecHomeCurrentAway = isTeamMatch(m.homeTeam, fixture.awayTeam);
+        const alignment = resolveFixtureAlignment(fixture.homeTeam, fixture.awayTeam, m.homeTeam, m.awayTeam);
+        const homeVsMatchHome = teamMatchScore(fixture.homeTeam, m.homeTeam);
+        const homeVsMatchAway = teamMatchScore(fixture.homeTeam, m.awayTeam);
 
         let homeGoals = 0;
         let awayGoals = 0;
 
-        if (isRecHomeCurrentHome) {
+        if (alignment.matched ? alignment.isHomeFixture : homeVsMatchHome > homeVsMatchAway) {
           homeGoals = gHome;
           awayGoals = gAway;
-        } else if (isRecHomeCurrentAway) {
+        } else if (alignment.matched ? !alignment.isHomeFixture : homeVsMatchAway > homeVsMatchHome) {
           homeGoals = gAway;
           awayGoals = gHome;
         } else {
@@ -381,7 +372,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       };
     }
 
-    const isHomeClubMatchingHomeFixture = !h2h.homeClub || isTeamMatch(h2h.homeClub, fixture.homeTeam);
+    const isHomeClubMatchingHomeFixture =
+      !h2h.homeClub || resolveTeamSide(h2h.homeClub, fixture.homeTeam, fixture.awayTeam) !== 'AWAY';
 
     const homeMatches = isHomeClubMatchingHomeFixture
       ? (h2h.homeRecentMatches || fixture.homeStats?.recentMatches || [])
@@ -432,17 +424,17 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       className={`bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full ${
         isPanel
           ? ''
-          : 'rounded-t-3xl sm:rounded-2xl border border-theme shadow-2xl'
+          : 'rounded-t-3xl sm:rounded-2xl border border-theme shadow-theme-md'
       }`}
       style={{ scrollbarGutter: 'stable' }}
     >
       {/* Mobile Drag Handle Affordance */}
       {!isPanel && (
-        <div className="w-10 h-1 bg-slate-200 dark:bg-neutral-700 rounded-full mx-auto my-1.5 sm:hidden shrink-0 opacity-70" />
+        <div className="w-10 h-1 bg-theme-dim/40 rounded-full mx-auto my-1.5 sm:hidden shrink-0 opacity-70" />
       )}
 
       {/* Modal Header */}
-      <div className="bg-theme-card px-3 sm:px-4 pt-2 pb-1.5 shrink-0 border-b border-theme/30">
+      <div className="bg-theme-glass px-3 sm:px-4 pt-2 pb-1.5 shrink-0 border-b border-theme">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-[10px] text-theme-sub">
             <span className="font-bold text-theme-main truncate whitespace-nowrap">
@@ -462,31 +454,31 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         </div>
 
         {/* Compact Hero Scoreboard */}
-        <div className="mt-2 p-3 rounded-xl bg-theme-card border border-theme flex items-center justify-between gap-3 shadow-xs">
+        <div className="mt-2 p-3 rounded-xl bg-theme-card-elevated border border-theme flex items-center justify-between gap-3 shadow-theme-sm">
           <div className="flex flex-col items-center gap-0.5 min-w-0 flex-1">
              <span className="text-xs font-extrabold text-theme-main truncate block">{fixture.homeTeam}</span>
-             {pred && <span className="text-[10px] font-bold text-theme-primary">{homeWinPct}%</span>}
+             {pred && <span className="text-[10px] font-bold font-mono tabular-nums text-theme-primary">{homeWinPct}%</span>}
           </div>
           
           <div className="flex flex-col items-center shrink-0 px-2">
-            <span className="text-sm font-black font-mono text-theme-main bg-theme-subtle px-2 py-0.5 rounded-md">
+            <span className="text-sm font-black font-mono tabular-nums text-theme-main bg-theme-subtle border border-theme px-2.5 py-0.5 rounded-lg">
               {fixture.score ? `${fixture.score.home}-${fixture.score.away}` : 'VS'}
             </span>
-            <span className="text-[9px] font-bold text-theme-sub uppercase">{fixture.status === 'LIVE' ? 'LIVE' : 'FT'}</span>
+            <span className="text-[9px] font-bold text-theme-sub uppercase mt-0.5">{fixture.status === 'LIVE' ? 'LIVE' : 'FT'}</span>
           </div>
 
           <div className="flex flex-col items-center gap-0.5 min-w-0 flex-1">
              <span className="text-xs font-extrabold text-theme-main truncate block">{fixture.awayTeam}</span>
-             {pred && <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">{awayWinPct}%</span>}
+             {pred && <span className="text-[10px] font-bold font-mono tabular-nums text-sky-600 dark:text-sky-400">{awayWinPct}%</span>}
           </div>
         </div>
 
-        <div className="mt-2 w-full flex items-center gap-0.5 p-0.5 bg-theme-subtle rounded-lg overflow-x-auto no-scrollbar">
+        <div className="mt-2 w-full flex items-center gap-0.5 p-0.5 bg-theme-subtle border border-theme rounded-lg overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('OVERVIEW')}
-            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center ${
-              activeTab === 'OVERVIEW' ? 'bg-theme-primary text-theme-primary-text font-black' : 'text-theme-sub hover:text-theme-main'
+            className={`flex-1 min-w-[50px] min-h-[28px] px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center ${
+              activeTab === 'OVERVIEW' ? 'bg-theme-primary text-theme-primary-text font-black shadow-theme-sm' : 'text-theme-sub hover:text-theme-main'
             }`}
           >
             Overview
@@ -531,46 +523,46 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
 
                 {/* Expected Goals & Strength Context */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white block font-sans">
+                <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-2 shadow-theme-sm">
+                  <span className="text-xs font-bold text-theme-main block font-sans">
                     Key Performance Projections
                   </span>
                   <div className="space-y-1.5 text-xs font-mono tabular-nums">
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                      <span className="font-sans text-slate-600 dark:text-neutral-300">Expected Goals (xG)</span>
-                      <div className="font-bold text-slate-900 dark:text-white">
-                        <span className="text-slate-900 dark:text-[#CCFF00]">{pred?.homeXG ?? '-'}</span>
-                        <span aria-hidden="true" className="text-slate-400 px-1 font-normal">vs</span>
-                        <span className="text-cyan-600 dark:text-cyan-400">{pred?.awayXG ?? '-'}</span>
+                    <div className="p-2.5 rounded-xl bg-theme-card border border-theme flex items-center justify-between">
+                      <span className="font-sans text-theme-sub">Expected Goals (xG)</span>
+                      <div className="font-bold text-theme-main">
+                        <span className="text-theme-primary">{pred?.homeXG ?? '-'}</span>
+                        <span aria-hidden="true" className="text-theme-dim px-1 font-normal">vs</span>
+                        <span className="text-sky-600 dark:text-sky-400">{pred?.awayXG ?? '-'}</span>
                       </div>
                     </div>
 
                     {pred?.teamStrength ? (
-                      <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                        <span className="font-sans text-slate-600 dark:text-neutral-300">Team Strength Index</span>
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          <span className="text-slate-900 dark:text-[#CCFF00]">{pred.teamStrength.homeStrengthRating}</span>
-                          <span aria-hidden="true" className="text-slate-400 px-1 font-normal">vs</span>
-                          <span className="text-cyan-600 dark:text-cyan-400">{pred.teamStrength.awayStrengthRating}</span>
+                      <div className="p-2.5 rounded-xl bg-theme-card border border-theme flex items-center justify-between">
+                        <span className="font-sans text-theme-sub">Team Strength Index</span>
+                        <div className="font-bold text-theme-main">
+                          <span className="text-theme-primary">{pred.teamStrength.homeStrengthRating}</span>
+                          <span aria-hidden="true" className="text-theme-dim px-1 font-normal">vs</span>
+                          <span className="text-sky-600 dark:text-sky-400">{pred.teamStrength.awayStrengthRating}</span>
                         </div>
                       </div>
                     ) : pred?.eloRatings ? (
-                      <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                        <span className="font-sans text-slate-600 dark:text-neutral-300">Elo Ratings</span>
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          <span className="text-slate-900 dark:text-[#CCFF00]">{pred.eloRatings.homeElo}</span>
-                          <span aria-hidden="true" className="text-slate-400 px-1 font-normal">vs</span>
-                          <span className="text-cyan-600 dark:text-cyan-400">{pred.eloRatings.awayElo}</span>
+                      <div className="p-2.5 rounded-xl bg-theme-card border border-theme flex items-center justify-between">
+                        <span className="font-sans text-theme-sub">Elo Ratings</span>
+                        <div className="font-bold text-theme-main">
+                          <span className="text-theme-primary">{pred.eloRatings.homeElo}</span>
+                          <span aria-hidden="true" className="text-theme-dim px-1 font-normal">vs</span>
+                          <span className="text-sky-600 dark:text-sky-400">{pred.eloRatings.awayElo}</span>
                         </div>
                       </div>
                     ) : null}
 
                     {pred?.tacticalContext && (
-                      <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                        <span className="font-sans text-slate-600 dark:text-neutral-300">Rest Days</span>
-                        <div className="font-bold text-slate-900 dark:text-white">
+                      <div className="p-2.5 rounded-xl bg-theme-card border border-theme flex items-center justify-between">
+                        <span className="font-sans text-theme-sub">Rest Days</span>
+                        <div className="font-bold text-theme-main">
                           <span>{pred.tacticalContext.restDaysHome}d</span>
-                          <span aria-hidden="true" className="text-slate-400 px-1 font-normal">vs</span>
+                          <span aria-hidden="true" className="text-theme-dim px-1 font-normal">vs</span>
                           <span>{pred.tacticalContext.restDaysAway}d</span>
                         </div>
                       </div>
@@ -579,7 +571,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 </div>
 
                 {/* Poisson Score Heatmap Grid */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D]">
+                <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme shadow-theme-sm">
                   <PoissonMatrixView
                     prediction={pred}
                     homeTeam={fixture.homeTeam}
@@ -589,9 +581,9 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 </div>
               </>
             ) : (
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 text-center py-8">
+              <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 text-center py-8 shadow-theme-sm">
                 <Target className="w-8 h-8 text-theme-primary mx-auto mb-2 opacity-50" />
-                <p className="text-xs text-theme-sub">Match Projections Loading...</p>
+                <p className="text-xs text-theme-sub">No projections</p>
               </div>
             )}
           </div>
@@ -686,8 +678,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 <div className="space-y-1.5 font-mono tabular-nums text-xs">
                   {h2h.recentH2H.map((enc, idx) => {
                     const winningTeam = enc.winner === 'HOME' ? enc.homeTeam : enc.winner === 'AWAY' ? enc.awayTeam : null;
-                    const isHomeWinner = winningTeam ? isTeamMatch(winningTeam, fixture.homeTeam) : false;
-                    const isAwayWinner = winningTeam ? isTeamMatch(winningTeam, fixture.awayTeam) : false;
+                    const winHomeScore = winningTeam ? teamMatchScore(winningTeam, fixture.homeTeam) : 0;
+                    const winAwayScore = winningTeam ? teamMatchScore(winningTeam, fixture.awayTeam) : 0;
+                    const isHomeWinner = winHomeScore > 0 && winHomeScore >= winAwayScore;
+                    const isAwayWinner = winAwayScore > 0 && winAwayScore > winHomeScore;
 
                     return (
                       <div
@@ -727,7 +721,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 </div>
               ) : (
                 <div className="py-6 text-center text-xs text-theme-sub font-mono">
-                  No direct previous encounters on record
+                  No H2H records
                 </div>
               )}
             </div>
@@ -738,27 +732,27 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {activeTab === 'TEAMS' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Home Team Card */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 min-w-0">
+            <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 min-w-0 shadow-theme-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <span className="font-extrabold text-sm text-slate-900 dark:text-white truncate block">
+                  <span className="font-extrabold text-sm text-theme-main truncate block">
                     {fixture.homeTeam}
                   </span>
-                  <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums">
+                  <span className="text-[11px] text-theme-sub font-mono tabular-nums">
                     Home Form & Performance
                   </span>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-md bg-slate-100 dark:bg-[#09090B] text-slate-900 dark:text-[#CCFF00] font-mono tabular-nums font-bold shrink-0">
+                <span className="text-xs px-2 py-1 rounded-md bg-theme-card border border-theme text-theme-primary font-mono tabular-nums font-bold shrink-0">
                   x{pred?.homeFormMultiplier ?? 1.0} Form
                 </span>
               </div>
 
               {/* Form Guide */}
               {homeRecentFormList.length > 0 ? (
-                <div className="p-3 rounded-xl bg-white dark:bg-[#09090B] space-y-2 min-w-0">
+                <div className="p-3 rounded-xl bg-theme-card border border-theme space-y-2 min-w-0">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
-                    <span className="font-mono tabular-nums text-[10px] text-slate-400">
+                    <span className="text-theme-sub font-sans">Form Guide</span>
+                    <span className="font-mono tabular-nums text-[10px] text-theme-dim">
                       Last {Math.min(10, homeRecentFormList.length)}
                     </span>
                   </div>
@@ -768,7 +762,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                         key={i}
                         className={`w-6 h-6 rounded-md text-xs font-black flex items-center justify-center shrink-0 ${
                           r === 'W'
-                            ? 'bg-[#CCFF00] text-slate-950'
+                            ? 'bg-theme-primary text-theme-primary-text'
                             : r === 'D'
                             ? 'bg-amber-500 text-white'
                             : 'bg-rose-500 text-white'
@@ -837,13 +831,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="font-bold text-slate-900 dark:text-white">
+                          <span className="font-bold text-theme-main">
                             {m.goalsFor} - {m.goalsAgainst}
                           </span>
                           <span
                             className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 ${
                               m.result === 'W'
-                                ? 'bg-[#CCFF00] text-slate-950'
+                                ? 'bg-theme-primary text-theme-primary-text'
                                 : m.result === 'D'
                                 ? 'bg-amber-500 text-white'
                                 : 'bg-rose-500 text-white'
@@ -860,27 +854,27 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
             </div>
 
             {/* Away Team Card */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3 min-w-0">
+            <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 min-w-0 shadow-theme-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <span className="font-extrabold text-sm text-slate-900 dark:text-white truncate block">
+                  <span className="font-extrabold text-sm text-theme-main truncate block">
                     {fixture.awayTeam}
                   </span>
-                  <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono tabular-nums">
+                  <span className="text-[11px] text-theme-sub font-mono tabular-nums">
                     Away Form & Performance
                   </span>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-md bg-cyan-50 dark:bg-[#09090B] text-cyan-700 dark:text-cyan-400 font-mono tabular-nums font-bold shrink-0">
+                <span className="text-xs px-2 py-1 rounded-md bg-theme-card border border-theme text-sky-600 dark:text-sky-400 font-mono tabular-nums font-bold shrink-0">
                   x{pred?.awayFormMultiplier ?? 1.0} Form
                 </span>
               </div>
 
               {/* Form Guide */}
               {awayRecentFormList.length > 0 ? (
-                <div className="p-3 rounded-xl bg-white dark:bg-[#09090B] space-y-2 min-w-0">
+                <div className="p-3 rounded-xl bg-theme-card border border-theme space-y-2 min-w-0">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-neutral-400 font-sans">Form Guide</span>
-                    <span className="font-mono tabular-nums text-[10px] text-slate-400">
+                    <span className="text-theme-sub font-sans">Form Guide</span>
+                    <span className="font-mono tabular-nums text-[10px] text-theme-dim">
                       Last {Math.min(10, awayRecentFormList.length)}
                     </span>
                   </div>
@@ -890,7 +884,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                         key={i}
                         className={`w-6 h-6 rounded-md text-xs font-black flex items-center justify-center shrink-0 ${
                           r === 'W'
-                            ? 'bg-cyan-500 text-slate-950'
+                            ? 'bg-sky-500 text-white'
                             : r === 'D'
                             ? 'bg-amber-500 text-white'
                             : 'bg-rose-500 text-white'
@@ -905,15 +899,15 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
               {/* Strengths */}
               <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-                <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
-                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Attack Rating</span>
-                  <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block mt-0.5">
+                <div className="p-2.5 rounded-xl bg-theme-card border border-theme">
+                  <span className="text-[10px] text-theme-sub block font-sans">Attack Rating</span>
+                  <span className="text-sm font-black text-sky-600 dark:text-sky-400 block mt-0.5">
                     {pred?.awayAttackStrength ?? 1.0}
                   </span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B]">
-                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 block font-sans">Defense Rating</span>
-                  <span className="text-sm font-black text-cyan-600 dark:text-cyan-400 block mt-0.5">
+                <div className="p-2.5 rounded-xl bg-theme-card border border-theme">
+                  <span className="text-[10px] text-theme-sub block font-sans">Defense Rating</span>
+                  <span className="text-sm font-black text-sky-600 dark:text-sky-400 block mt-0.5">
                     {pred?.awayDefenseStrength ?? 1.0}
                   </span>
                 </div>
@@ -922,9 +916,9 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               {/* Goals Summary */}
               {(awayRecentMatchesList.length > 0 || awayStats) && (
                 <div className="space-y-1.5 font-mono tabular-nums text-xs">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-neutral-400 font-sans">Total Goals</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
+                  <div className="p-2.5 rounded-xl bg-theme-card border border-theme flex items-center justify-between">
+                    <span className="text-theme-sub font-sans">Total Goals</span>
+                    <span className="font-bold text-theme-main">
                       {awayGoalsScored} scored - {awayGoalsConceded} conceded
                     </span>
                   </div>
@@ -934,38 +928,38 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               {/* Recent Matches */}
               {awayRecentMatchesList.length > 0 && (
                 <div className="space-y-1.5 pt-1">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white block font-sans">
+                  <span className="text-xs font-bold text-theme-main block font-sans">
                     Recent Matches
                   </span>
                   <div className="space-y-1 font-mono tabular-nums text-xs">
                     {awayRecentMatchesList.slice(0, 8).map((m, idx) => (
                       <div
                         key={idx}
-                        className="p-2 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between gap-2"
+                        className="p-2 rounded-xl bg-theme-card border border-theme flex items-center justify-between gap-2"
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
                             className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
                               m.isHome
-                                ? 'bg-slate-100 dark:bg-[#18181D] text-slate-700 dark:text-neutral-300'
-                                : 'bg-slate-200 dark:bg-[#18181D] text-slate-600 dark:text-neutral-400'
+                                ? 'bg-theme-subtle text-theme-main'
+                                : 'bg-theme-subtle text-theme-sub'
                             }`}
                           >
                             {m.isHome ? 'H' : 'A'}
                           </span>
-                          <span className="font-bold text-slate-900 dark:text-white truncate">
+                          <span className="font-bold text-theme-main truncate">
                             vs {m.opponent}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="font-bold text-slate-900 dark:text-white">
+                          <span className="font-bold text-theme-main">
                             {m.goalsFor} - {m.goalsAgainst}
                           </span>
                           <span
                             className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 ${
                               m.result === 'W'
-                                ? 'bg-cyan-500 text-slate-950'
+                                ? 'bg-sky-500 text-white'
                                 : m.result === 'D'
                                 ? 'bg-amber-500 text-white'
                                 : 'bg-rose-500 text-white'
@@ -986,8 +980,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {/* TAB 5: PREDICTIONS */}
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D] space-y-3">
-              <span className="text-xs font-bold text-slate-900 dark:text-white block font-sans">
+            <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme space-y-3 shadow-theme-sm">
+              <span className="text-xs font-bold text-theme-main block font-sans">
                 Best Value Betting Predictions
               </span>
               {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
@@ -995,21 +989,21 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   {bestMarketsPerGroup.map((market, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-xl bg-white dark:bg-[#09090B] flex items-center justify-between"
+                      className="p-3 rounded-xl bg-theme-card border border-theme flex items-center justify-between"
                     >
                       <div>
-                        <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-sans block uppercase font-bold">
+                        <span className="text-[10px] text-theme-sub font-sans block uppercase font-bold">
                           {market.groupName} Market
                         </span>
-                        <span className="font-extrabold text-slate-900 dark:text-white font-sans text-sm">
+                        <span className="font-extrabold text-theme-main font-sans text-sm">
                           {market.name}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="font-extrabold text-slate-900 dark:text-[#CCFF00] block text-sm">
+                        <span className="font-extrabold text-theme-primary block text-sm">
                           {(market.probability * 100).toFixed(1)}%
                         </span>
-                        <span className="text-[10px] text-slate-400 block">
+                        <span className="text-[10px] text-theme-dim block">
                           Fair Odds {(1 / market.probability).toFixed(2)}
                         </span>
                       </div>
@@ -1017,14 +1011,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   ))}
                 </div>
               ) : (
-                <div className="py-6 text-center text-xs text-slate-400 font-mono">
+                <div className="py-6 text-center text-xs text-theme-sub font-mono">
                   No predictions computed
                 </div>
               )}
             </div>
 
             {/* Poisson Matrix View */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#18181D]">
+            <div className="p-4 rounded-2xl bg-theme-card-elevated border border-theme shadow-theme-sm">
               <PoissonMatrixView
                 prediction={pred}
                 homeTeam={fixture.homeTeam}

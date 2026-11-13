@@ -1,5 +1,12 @@
 import { db } from './db.js';
-import { parseFeedText, ScrapedRawMatch } from './feedParser.js';
+import {
+  parseFeedText,
+  parseHeadToHeadFeedText,
+  resolveTeamSide,
+  resolveFixtureAlignment,
+  H2H_PARSER_VERSION,
+  ScrapedRawMatch,
+} from './feedParser.js';
 import { HeadToHeadMeasurement, HeadToHeadMatchRecord, TeamFormMatch } from './types.js';
 import { loggerService } from '../services/loggerService.js';
 import { normalizeDateStr, getStandardDateStr } from './dateUtils.js';
@@ -155,203 +162,11 @@ export class OnDemandParser {
     }
 
     if (rawData && rawData.rawText && (rawData.rawText.includes('KB÷') || rawData.rawText.includes('KC÷'))) {
-      const feedText = rawData.rawText;
-      const sections = feedText.split('~');
-      let currentSection: 'NONE' | 'HOME_RECENT' | 'AWAY_RECENT' | 'H2H' = 'NONE';
-      let foundHomeHeader = false;
-      let foundAwayHeader = false;
-      let homeClubName = fixtureHomeTeam || '';
-      let awayClubName = fixtureAwayTeam || '';
-
-      let homeWins = 0;
-      let draws = 0;
-      let awayWins = 0;
-      let homeGoalsTotal = 0;
-      let awayGoalsTotal = 0;
-      const recentH2H: HeadToHeadMatchRecord[] = [];
-      const homeRecentMatches: TeamFormMatch[] = [];
-      const awayRecentMatches: TeamFormMatch[] = [];
-
-      for (const s of sections) {
-        if (s.startsWith('KA÷')) {
-          continue;
-        }
-
-        if (s.startsWith('KB÷Last matches: ')) {
-          const rawHeaderClub = s.replace('KB÷Last matches: ', '').replace('¬', '').trim();
-          const normRaw = rawHeaderClub.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const normHome = (fixtureHomeTeam || homeClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const normAway = (fixtureAwayTeam || awayClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-          const isHomeMatch = normHome.length > 0 && normRaw.length > 0 && (normHome.includes(normRaw) || normRaw.includes(normHome));
-          const isAwayMatch = normAway.length > 0 && normRaw.length > 0 && (normAway.includes(normRaw) || normRaw.includes(normAway));
-
-          if (isHomeMatch && !foundHomeHeader) {
-            currentSection = 'HOME_RECENT';
-            foundHomeHeader = true;
-            if (!homeClubName) homeClubName = rawHeaderClub;
-          } else if (isAwayMatch && !foundAwayHeader) {
-            currentSection = 'AWAY_RECENT';
-            foundAwayHeader = true;
-            if (!awayClubName) awayClubName = rawHeaderClub;
-          } else {
-            if (!foundHomeHeader) {
-              currentSection = 'HOME_RECENT';
-              foundHomeHeader = true;
-              if (!homeClubName) homeClubName = rawHeaderClub;
-            } else if (!foundAwayHeader) {
-              currentSection = 'AWAY_RECENT';
-              foundAwayHeader = true;
-              if (!awayClubName) awayClubName = rawHeaderClub;
-            }
-          }
-          continue;
-        }
-
-        if (s.includes('KB÷Head-to-head matches')) {
-          currentSection = 'H2H';
-          continue;
-        }
-
-        if (s.includes('KC÷')) {
-          const parts = s.split('¬');
-          const d: Record<string, string> = {};
-          for (const p of parts) {
-            const [k, v] = p.split('÷');
-            if (k && v !== undefined) d[k] = v;
-          }
-
-          const rawHome = (d['KJ'] || '').replace(/^\*/, '').trim();
-          const rawAway = (d['KK'] || '').replace(/^\*/, '').trim();
-          const hG = parseInt(d['KT'] || d['AG'] || '0', 10);
-          const aG = parseInt(d['KU'] || d['AH'] || '0', 10);
-          const timestamp = parseInt(d['KC'] || '0', 10);
-          const matchDateObj = timestamp > 0 ? new Date(timestamp * 1000) : new Date();
-          const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
-          const competition = d['KF'] || 'League';
-
-          if (currentSection === 'HOME_RECENT') {
-            const target = homeClubName.toLowerCase();
-            const isH = rawHome.toLowerCase().includes(target) || target.includes(rawHome.toLowerCase());
-            const gf = isH ? hG : aG;
-            const ga = isH ? aG : hG;
-            const opp = isH ? rawAway : rawHome;
-            const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
-
-            if (homeRecentMatches.length < 20) {
-              homeRecentMatches.push({
-                date: dateStr,
-                opponent: opp || 'Opponent',
-                isHome: isH,
-                goalsFor: gf,
-                goalsAgainst: ga,
-                result: res,
-                competition,
-              });
-            }
-          } else if (currentSection === 'AWAY_RECENT') {
-            const target = awayClubName.toLowerCase();
-            const isH = rawHome.toLowerCase().includes(target) || target.includes(rawHome.toLowerCase());
-            const gf = isH ? hG : aG;
-            const ga = isH ? aG : hG;
-            const opp = isH ? rawAway : rawHome;
-            const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
-
-            if (awayRecentMatches.length < 20) {
-              awayRecentMatches.push({
-                date: dateStr,
-                opponent: opp || 'Opponent',
-                isHome: isH,
-                goalsFor: gf,
-                goalsAgainst: ga,
-                result: res,
-                competition,
-              });
-            }
-          } else if (currentSection === 'H2H') {
-            const matchIdField = d['AA'] || '';
-            const statusCode = d['AB'] || '3';
-            const finishedCodes = ['3', '10', '11', '47', '48', '49'];
-            
-            // SKIP if this is the current upcoming fixture being analyzed OR if the match is not explicitly finished
-            if (matchIdField === cleanId || !finishedCodes.includes(statusCode)) {
-              continue;
-            }
-
-            const rHomeLower = rawHome.toLowerCase();
-            const rAwayLower = rawAway.toLowerCase();
-            const hTarget = (fixtureHomeTeam || homeClubName || '').toLowerCase();
-            const aTarget = (fixtureAwayTeam || awayClubName || '').toLowerCase();
-
-            // Strict validation: the match MUST involve both target teams to be a valid H2H encounter
-            const homeInHome = rHomeLower.includes(hTarget) || hTarget.includes(rHomeLower);
-            const homeInAway = rAwayLower.includes(hTarget) || hTarget.includes(rAwayLower);
-            const awayInHome = rHomeLower.includes(aTarget) || aTarget.includes(rHomeLower);
-            const awayInAway = rAwayLower.includes(aTarget) || aTarget.includes(rAwayLower);
-
-            const isStrictH2H = (homeInHome && awayInAway) || (homeInAway && awayInHome);
-            
-            if (!isStrictH2H && (hTarget && aTarget)) {
-              continue;
-            }
-
-            const isHomeFixture = homeInHome;
-
-            const goalsForHome = isHomeFixture ? hG : aG;
-            const goalsForAway = isHomeFixture ? aG : hG;
-
-            homeGoalsTotal += goalsForHome;
-            awayGoalsTotal += goalsForAway;
-
-            if (goalsForHome > goalsForAway) {
-              homeWins++;
-            } else if (goalsForAway > goalsForHome) {
-              awayWins++;
-            } else {
-              draws++;
-            }
-
-            if (recentH2H.length < 15) {
-              recentH2H.push({
-                date: dateStr,
-                homeTeam: rawHome,
-                awayTeam: rawAway,
-                score: `${hG}-${aG}`,
-                winner: hG > aG ? 'HOME' : aG > hG ? 'AWAY' : 'DRAW',
-                competition,
-              });
-            }
-          }
-        }
+      const measurement = parseHeadToHeadFeedText(rawData.rawText, cleanId, fixtureHomeTeam, fixtureAwayTeam);
+      if (measurement) {
+        db.savePredictionMeasurement(cleanId, measurement);
+        return measurement;
       }
-
-      const matchesCount = homeWins + draws + awayWins;
-      const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
-      const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
-      const netWinDiff = homeWins - awayWins;
-      const netGoalDiff = homeGoalsTotal - awayGoalsTotal;
-      const swing = matchesCount > 0 ? netWinDiff * 0.02 + (netGoalDiff / matchesCount) * 0.015 : 0;
-      const h2hMultiplierHome = Number(Math.max(0.90, Math.min(1.15, 1.0 + swing)).toFixed(3));
-      const h2hMultiplierAway = Number(Math.max(0.90, Math.min(1.15, 1.0 - swing)).toFixed(3));
-
-      const measurement: HeadToHeadMeasurement = {
-        matchesCount,
-        homeWins,
-        draws,
-        awayWins,
-        homeGoalsAvg,
-        awayGoalsAvg,
-        h2hMultiplierHome,
-        h2hMultiplierAway,
-        recentH2H,
-        homeClub: homeClubName,
-        awayClub: awayClubName,
-        homeRecentMatches,
-        awayRecentMatches,
-      };
-
-      db.savePredictionMeasurement(cleanId, measurement);
-      return measurement;
     }
 
     // 3. Fallback: Calculate H2H directly from local SQLite historical matches database
@@ -359,20 +174,22 @@ export class OnDemandParser {
     const awayTeam = fixtureAwayTeam || (db.getFixtureById(cleanId)?.awayTeam || '');
 
     if (homeTeam || awayTeam) {
-      const homeName = homeTeam.toLowerCase().trim();
-      const awayName = awayTeam.toLowerCase().trim();
-
-      const homeHist = homeTeam ? db.getTeamHistoricalMatches(homeTeam, 15) : [];
-      const awayHist = awayTeam ? db.getTeamHistoricalMatches(awayTeam, 15) : [];
+      const homeHist = (homeTeam ? db.getTeamHistoricalMatches(homeTeam, 15) : [])
+        .slice()
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
+      const awayHist = (awayTeam ? db.getTeamHistoricalMatches(awayTeam, 15) : [])
+        .slice()
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
 
       const homeRecentMatches: TeamFormMatch[] = homeHist.map((m) => {
-        const isH = m.homeTeam.toLowerCase().includes(homeName);
+        const side = resolveTeamSide(homeTeam, m.homeTeam, m.awayTeam);
+        const isH = side !== 'AWAY';
         const gf = isH ? m.fthg : m.ftag;
         const ga = isH ? m.ftag : m.fthg;
         const opp = isH ? m.awayTeam : m.homeTeam;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           opponent: opp,
           isHome: isH,
           goalsFor: gf,
@@ -383,13 +200,14 @@ export class OnDemandParser {
       });
 
       const awayRecentMatches: TeamFormMatch[] = awayHist.map((m) => {
-        const isH = m.homeTeam.toLowerCase().includes(awayName);
+        const side = resolveTeamSide(awayTeam, m.homeTeam, m.awayTeam);
+        const isH = side !== 'AWAY';
         const gf = isH ? m.fthg : m.ftag;
         const ga = isH ? m.ftag : m.fthg;
         const opp = isH ? m.awayTeam : m.homeTeam;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           opponent: opp,
           isHome: isH,
           goalsFor: gf,
@@ -399,35 +217,15 @@ export class OnDemandParser {
         };
       });
 
-      const homeCore = homeTeam
-        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim().toLowerCase();
-      const awayCore = awayTeam
-        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim().toLowerCase();
-
       const allHistorical = db.getAllHistoricalMatches(5000);
-      const directH2H = allHistorical.filter((m) => {
-        const mHome = m.homeTeam.toLowerCase();
-        const mAway = m.awayTeam.toLowerCase();
-        const hasHome = (homeName && (mHome.includes(homeName) || homeName.includes(mHome))) ||
-          (homeCore && (mHome.includes(homeCore) || homeCore.includes(mHome)));
-        const hasAway = (awayName && (mAway.includes(awayName) || awayName.includes(mAway))) ||
-          (awayCore && (mAway.includes(awayCore) || awayCore.includes(mAway)));
-
-        const hasHomeReverse = (homeName && (mAway.includes(homeName) || homeName.includes(mAway))) ||
-          (homeCore && (mAway.includes(homeCore) || homeCore.includes(mAway)));
-        const hasAwayReverse = (awayName && (mHome.includes(awayName) || awayName.includes(mHome))) ||
-          (awayCore && (mHome.includes(awayCore) || awayCore.includes(mHome)));
-
-        return (hasHome && hasAway) || (hasHomeReverse && hasAwayReverse);
-      });
+      const directH2H = allHistorical
+        .filter((m) => resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam).matched)
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
 
       let homeWins = 0, draws = 0, awayWins = 0, homeGoalsTotal = 0, awayGoalsTotal = 0;
-      const recentH2H: HeadToHeadMatchRecord[] = directH2H.slice(0, 10).map((m) => {
-        const isHomeFixture = m.homeTeam.toLowerCase().includes(homeName);
+      const cappedH2H = directH2H.slice(0, 15);
+      const recentH2H: HeadToHeadMatchRecord[] = cappedH2H.map((m) => {
+        const { isHomeFixture } = resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam);
         const gHome = isHomeFixture ? m.fthg : m.ftag;
         const gAway = isHomeFixture ? m.ftag : m.fthg;
         homeGoalsTotal += gHome;
@@ -437,20 +235,21 @@ export class OnDemandParser {
         else draws++;
 
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           homeTeam: m.homeTeam,
           awayTeam: m.awayTeam,
           score: `${m.fthg}-${m.ftag}`,
-          winner: m.fthg > m.ftag ? (isHomeFixture ? 'HOME' : 'AWAY') : m.ftag > m.fthg ? (isHomeFixture ? 'AWAY' : 'HOME') : 'DRAW',
+          winner: m.fthg > m.ftag ? 'HOME' : m.ftag > m.fthg ? 'AWAY' : 'DRAW',
           competition: m.div,
         };
       });
 
-      const matchesCount = directH2H.length;
+      const matchesCount = homeWins + draws + awayWins;
       const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
       const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
 
       const fallbackMeasurement: HeadToHeadMeasurement = {
+        parserVersion: H2H_PARSER_VERSION,
         matchesCount,
         homeWins,
         draws,

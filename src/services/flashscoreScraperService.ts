@@ -52,7 +52,15 @@ const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
 const FSIGN_HEADER = 'SW9D1eZo';
 const STATIC_IMAGE_BASE = 'https://static.flashscore.com/res/image/data/';
 
-import { parseFeedText, ScrapedRawMatch } from '../core/feedParser.js';
+import {
+  parseFeedText,
+  parseHeadToHeadFeedText,
+  resolveTeamSide,
+  resolveFixtureAlignment,
+  teamMatchScore,
+  H2H_PARSER_VERSION,
+  ScrapedRawMatch,
+} from '../core/feedParser.js';
 
 export type CircuitState = 'CLOSED' | 'HALF_OPEN' | 'OPEN';
 
@@ -1183,213 +1191,19 @@ export class FlashscoreScraperService {
       }
 
       if (feedText) {
-        const sections = feedText.split('~');
-        let currentSection: 'NONE' | 'HOME_RECENT' | 'AWAY_RECENT' | 'H2H' = 'NONE';
-        let foundHomeHeader = false;
-        let foundAwayHeader = false;
-        let homeClubName = fixtureHomeTeam || '';
-        let awayClubName = fixtureAwayTeam || '';
-
-        let homeWins = 0;
-        let draws = 0;
-        let awayWins = 0;
-        let homeGoalsTotal = 0;
-        let awayGoalsTotal = 0;
-        const recentH2H: HeadToHeadMatchRecord[] = [];
-        const homeRecentMatches: TeamFormMatch[] = [];
-        const awayRecentMatches: TeamFormMatch[] = [];
-
-        for (const s of sections) {
-          // If we hit subtabs like "KA÷Home", don't break the loop, just keep looking for our target headers.
-          if (s.startsWith('KA÷')) {
-            continue;
-          }
-
-          if (s.startsWith('KB÷Last matches: ')) {
-            const rawHeaderClub = s.replace('KB÷Last matches: ', '').replace('¬', '').trim();
-            const normRaw = rawHeaderClub.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normHome = (fixtureHomeTeam || homeClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normAway = (fixtureAwayTeam || awayClubName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-            const isHomeMatch = normHome.length > 0 && normRaw.length > 0 && (normHome.includes(normRaw) || normRaw.includes(normHome));
-            const isAwayMatch = normAway.length > 0 && normRaw.length > 0 && (normAway.includes(normRaw) || normRaw.includes(normAway));
-
-            if (isHomeMatch && !foundHomeHeader) {
-              currentSection = 'HOME_RECENT';
-              foundHomeHeader = true;
-              if (!homeClubName) homeClubName = rawHeaderClub;
-            } else if (isAwayMatch && !foundAwayHeader) {
-              currentSection = 'AWAY_RECENT';
-              foundAwayHeader = true;
-              if (!awayClubName) awayClubName = rawHeaderClub;
-            } else {
-              // Positional fallback if names do not match explicitly
-              if (!foundHomeHeader) {
-                currentSection = 'HOME_RECENT';
-                foundHomeHeader = true;
-                if (!homeClubName) homeClubName = rawHeaderClub;
-              } else if (!foundAwayHeader) {
-                currentSection = 'AWAY_RECENT';
-                foundAwayHeader = true;
-                if (!awayClubName) awayClubName = rawHeaderClub;
-              }
-            }
-            continue;
-          }
-
-          if (s.includes('KB÷Head-to-head matches')) {
-            currentSection = 'H2H';
-            continue;
-          }
-
-          if (s.includes('KC÷')) {
-            const parts = s.split('¬');
-            const d: Record<string, string> = {};
-            for (const p of parts) {
-              const [k, v] = p.split('÷');
-              if (k && v !== undefined) d[k] = v;
-            }
-
-            const rawHome = (d['KJ'] || '').replace(/^\*/, '').trim();
-            const rawAway = (d['KK'] || '').replace(/^\*/, '').trim();
-            const hG = parseInt(d['KT'] || d['AG'] || '0', 10);
-            const aG = parseInt(d['KU'] || d['AH'] || '0', 10);
-            const timestamp = parseInt(d['KC'] || '0', 10);
-            const matchDateObj = timestamp > 0 ? new Date(timestamp * 1000) : new Date();
-            const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
-            const competition = d['KF'] || 'League';
-
-            if (currentSection === 'HOME_RECENT') {
-              const target = homeClubName.toLowerCase();
-              const isH = rawHome.toLowerCase().includes(target) || target.includes(rawHome.toLowerCase());
-              const gf = isH ? hG : aG;
-              const ga = isH ? aG : hG;
-              const opp = isH ? rawAway : rawHome;
-              const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
-
-              if (homeRecentMatches.length < 20) {
-                homeRecentMatches.push({
-                  date: dateStr,
-                  opponent: opp || 'Opponent',
-                  isHome: isH,
-                  goalsFor: gf,
-                  goalsAgainst: ga,
-                  result: res,
-                  competition,
-                });
-              }
-            } else if (currentSection === 'AWAY_RECENT') {
-              const target = awayClubName.toLowerCase();
-              const isH = rawHome.toLowerCase().includes(target) || target.includes(rawHome.toLowerCase());
-              const gf = isH ? hG : aG;
-              const ga = isH ? aG : hG;
-              const opp = isH ? rawAway : rawHome;
-              const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
-
-              if (awayRecentMatches.length < 20) {
-                awayRecentMatches.push({
-                  date: dateStr,
-                  opponent: opp || 'Opponent',
-                  isHome: isH,
-                  goalsFor: gf,
-                  goalsAgainst: ga,
-                  result: res,
-                  competition,
-                });
-              }
-            } else if (currentSection === 'H2H') {
-              const matchIdField = d['AA'] || '';
-              const statusCode = d['AB'] || '3';
-              const finishedCodes = ['3', '10', '11', '47', '48', '49'];
-              
-              // SKIP if this is the current upcoming fixture being analyzed OR if the match is not explicitly finished
-              if (matchIdField === cleanId || !finishedCodes.includes(statusCode)) {
-                continue;
-              }
-
-              const rHomeLower = rawHome.toLowerCase();
-              const rAwayLower = rawAway.toLowerCase();
-              const hTarget = (fixtureHomeTeam || homeClubName || '').toLowerCase();
-              const aTarget = (fixtureAwayTeam || awayClubName || '').toLowerCase();
-
-              // Strict validation: the match MUST involve both target teams to be a valid H2H encounter
-              const homeInHome = rHomeLower.includes(hTarget) || hTarget.includes(rHomeLower);
-              const homeInAway = rAwayLower.includes(hTarget) || hTarget.includes(rAwayLower);
-              const awayInHome = rHomeLower.includes(aTarget) || aTarget.includes(rHomeLower);
-              const awayInAway = rAwayLower.includes(aTarget) || aTarget.includes(rAwayLower);
-
-              const isStrictH2H = (homeInHome && awayInAway) || (homeInAway && awayInHome);
-              
-              if (!isStrictH2H && (hTarget && aTarget)) {
-                continue;
-              }
-
-              const isHomeFixture = homeInHome;
-
-              const goalsForHome = isHomeFixture ? hG : aG;
-              const goalsForAway = isHomeFixture ? aG : hG;
-
-              homeGoalsTotal += goalsForHome;
-              awayGoalsTotal += goalsForAway;
-
-              if (goalsForHome > goalsForAway) {
-                homeWins++;
-              } else if (goalsForAway > goalsForHome) {
-                awayWins++;
-              } else {
-                draws++;
-              }
-
-              if (recentH2H.length < 15) {
-                recentH2H.push({
-                  date: dateStr,
-                  homeTeam: rawHome,
-                  awayTeam: rawAway,
-                  score: `${hG}-${aG}`,
-                  winner: hG > aG ? 'HOME' : aG > hG ? 'AWAY' : 'DRAW',
-                  competition,
-                });
-              }
-            }
-          }
-        }
-
-        const matchesCount = homeWins + draws + awayWins;
-        if (matchesCount > 0 || homeRecentMatches.length > 0 || awayRecentMatches.length > 0) {
-          const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
-          const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
-          const netWinDiff = homeWins - awayWins;
-          const netGoalDiff = homeGoalsTotal - awayGoalsTotal;
-          const swing = matchesCount > 0 ? (netWinDiff * 0.02 + (netGoalDiff / matchesCount) * 0.015) : 0;
-          const h2hMultiplierHome = Number(Math.max(0.90, Math.min(1.15, 1.0 + swing)).toFixed(3));
-          const h2hMultiplierAway = Number(Math.max(0.90, Math.min(1.15, 1.0 - swing)).toFixed(3));
-
-          const measurement: HeadToHeadMeasurement = {
-            matchesCount,
-            homeWins,
-            draws,
-            awayWins,
-            homeGoalsAvg,
-            awayGoalsAvg,
-            h2hMultiplierHome,
-            h2hMultiplierAway,
-            recentH2H,
-            homeClub: homeClubName,
-            awayClub: awayClubName,
-            homeRecentMatches,
-            awayRecentMatches,
-          };
-
+        const measurement = parseHeadToHeadFeedText(feedText, cleanId, fixtureHomeTeam, fixtureAwayTeam);
+        if (measurement) {
           db.savePredictionMeasurement(cleanId, measurement);
-          db.savePredictionMeasurement(cleanId, measurement);
-          db.savePredictionMeasurement(matchId, measurement); // Save original ID too
+          if (matchId && matchId !== cleanId) {
+            db.savePredictionMeasurement(matchId, measurement);
+          }
           db.saveH2HRecord(cleanId, measurement);
 
           loggerService.addLog({
             level: 'INFO',
             category: 'SCRAPER',
             source: 'FlashscoreScraper',
-            message: `Scraped H2H for ${homeClubName || fixtureHomeTeam} vs ${awayClubName || fixtureAwayTeam}: ${matchesCount} meetings found`,
+            message: `Scraped H2H for ${measurement.homeClub || fixtureHomeTeam} vs ${measurement.awayClub || fixtureAwayTeam}: ${measurement.matchesCount} meetings found`,
           });
 
           return measurement;
@@ -1406,30 +1220,22 @@ export class FlashscoreScraperService {
 
     // Fallback: Calculate H2H & Recent Matches from DB historical matches if teams provided
     if (fixtureHomeTeam || fixtureAwayTeam) {
-      const homeName = (fixtureHomeTeam || '').toLowerCase().trim();
-      const awayName = (fixtureAwayTeam || '').toLowerCase().trim();
-      const homeCore = (fixtureHomeTeam || '')
-        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim().toLowerCase();
-      const awayCore = (fixtureAwayTeam || '')
-        .replace(/\b(FC|CF|SC|AC|FK|SK|SV|VfB|U19|U20|U21|U23|Women|W)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim().toLowerCase();
-
-      const homeHist = fixtureHomeTeam ? db.getTeamHistoricalMatches(fixtureHomeTeam, 20) : [];
-      const awayHist = fixtureAwayTeam ? db.getTeamHistoricalMatches(fixtureAwayTeam, 20) : [];
+      const homeHist = (fixtureHomeTeam ? db.getTeamHistoricalMatches(fixtureHomeTeam, 20) : [])
+        .slice()
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
+      const awayHist = (fixtureAwayTeam ? db.getTeamHistoricalMatches(fixtureAwayTeam, 20) : [])
+        .slice()
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
 
       const homeRecentMatches: TeamFormMatch[] = homeHist.map((m) => {
-        const mHomeLower = m.homeTeam.toLowerCase();
-        const isH = (homeName && (mHomeLower.includes(homeName) || homeName.includes(mHomeLower))) ||
-          (homeCore && (mHomeLower.includes(homeCore) || homeCore.includes(mHomeLower)));
+        const side = resolveTeamSide(fixtureHomeTeam, m.homeTeam, m.awayTeam);
+        const isH = side !== 'AWAY';
         const gf = isH ? m.fthg : m.ftag;
         const ga = isH ? m.ftag : m.fthg;
         const opp = isH ? m.awayTeam : m.homeTeam;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           opponent: opp,
           isHome: isH,
           goalsFor: gf,
@@ -1440,15 +1246,14 @@ export class FlashscoreScraperService {
       });
 
       const awayRecentMatches: TeamFormMatch[] = awayHist.map((m) => {
-        const mHomeLower = m.homeTeam.toLowerCase();
-        const isH = (awayName && (mHomeLower.includes(awayName) || awayName.includes(mHomeLower))) ||
-          (awayCore && (mHomeLower.includes(awayCore) || awayCore.includes(mHomeLower)));
+        const side = resolveTeamSide(fixtureAwayTeam, m.homeTeam, m.awayTeam);
+        const isH = side !== 'AWAY';
         const gf = isH ? m.fthg : m.ftag;
         const ga = isH ? m.ftag : m.fthg;
         const opp = isH ? m.awayTeam : m.homeTeam;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           opponent: opp,
           isHome: isH,
           goalsFor: gf,
@@ -1459,27 +1264,14 @@ export class FlashscoreScraperService {
       });
 
       const allHistorical = db.getAllHistoricalMatches(3000);
-      const directH2H = allHistorical.filter((m) => {
-        const mHome = m.homeTeam.toLowerCase();
-        const mAway = m.awayTeam.toLowerCase();
-        const hasHome = (homeName && (mHome.includes(homeName) || homeName.includes(mHome))) ||
-          (homeCore && (mHome.includes(homeCore) || homeCore.includes(mHome)));
-        const hasAway = (awayName && (mAway.includes(awayName) || awayName.includes(mAway))) ||
-          (awayCore && (mAway.includes(awayCore) || awayCore.includes(mAway)));
-
-        const hasHomeReverse = (homeName && (mAway.includes(homeName) || homeName.includes(mAway))) ||
-          (homeCore && (mAway.includes(homeCore) || homeCore.includes(mAway)));
-        const hasAwayReverse = (awayName && (mHome.includes(awayName) || awayName.includes(mHome))) ||
-          (awayCore && (mHome.includes(awayCore) || awayCore.includes(mHome)));
-
-        return (hasHome && hasAway) || (hasHomeReverse && hasAwayReverse);
-      });
+      const directH2H = allHistorical
+        .filter((m) => resolveFixtureAlignment(fixtureHomeTeam, fixtureAwayTeam, m.homeTeam, m.awayTeam).matched)
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
 
       let homeWins = 0, draws = 0, awayWins = 0, homeGoalsTotal = 0, awayGoalsTotal = 0;
-      const recentH2H: HeadToHeadMatchRecord[] = directH2H.slice(0, 15).map((m) => {
-        const mHomeLower = m.homeTeam.toLowerCase();
-        const isHomeFixture = (homeName && (mHomeLower.includes(homeName) || homeName.includes(mHomeLower))) ||
-          (homeCore && (mHomeLower.includes(homeCore) || homeCore.includes(mHomeLower)));
+      const cappedH2H = directH2H.slice(0, 15);
+      const recentH2H: HeadToHeadMatchRecord[] = cappedH2H.map((m) => {
+        const { isHomeFixture } = resolveFixtureAlignment(fixtureHomeTeam, fixtureAwayTeam, m.homeTeam, m.awayTeam);
         const gHome = isHomeFixture ? m.fthg : m.ftag;
         const gAway = isHomeFixture ? m.ftag : m.fthg;
         homeGoalsTotal += gHome;
@@ -1489,16 +1281,16 @@ export class FlashscoreScraperService {
         else draws++;
 
         return {
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           homeTeam: m.homeTeam,
           awayTeam: m.awayTeam,
           score: `${m.fthg}-${m.ftag}`,
-          winner: m.fthg > m.ftag ? (isHomeFixture ? 'HOME' : 'AWAY') : m.ftag > m.fthg ? (isHomeFixture ? 'AWAY' : 'HOME') : 'DRAW',
+          winner: m.fthg > m.ftag ? 'HOME' : m.ftag > m.fthg ? 'AWAY' : 'DRAW',
           competition: m.div,
         };
       });
 
-      const matchesCount = directH2H.length;
+      const matchesCount = homeWins + draws + awayWins;
       const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
       const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
       const netWinDiff = homeWins - awayWins;
@@ -1508,6 +1300,7 @@ export class FlashscoreScraperService {
       const h2hMultiplierAway = Number(Math.max(0.90, Math.min(1.15, 1.0 - swing)).toFixed(3));
 
       const fallbackMeasurement: HeadToHeadMeasurement = {
+        parserVersion: H2H_PARSER_VERSION,
         matchesCount,
         homeWins,
         draws,
@@ -1525,7 +1318,9 @@ export class FlashscoreScraperService {
 
       if (matchesCount > 0 || homeRecentMatches.length > 0 || awayRecentMatches.length > 0) {
         db.savePredictionMeasurement(cleanId, fallbackMeasurement);
-        db.savePredictionMeasurement(matchId, fallbackMeasurement);
+        if (matchId && matchId !== cleanId) {
+          db.savePredictionMeasurement(matchId, fallbackMeasurement);
+        }
         db.saveH2HRecord(cleanId, fallbackMeasurement);
       }
       return fallbackMeasurement;
@@ -1533,6 +1328,7 @@ export class FlashscoreScraperService {
 
     // Zero encounters between teams in real records directly from Flashscore feed
     const cleanZeroH2H: HeadToHeadMeasurement = {
+      parserVersion: H2H_PARSER_VERSION,
       matchesCount: 0,
       homeWins: 0,
       draws: 0,
@@ -1547,7 +1343,6 @@ export class FlashscoreScraperService {
       homeRecentMatches: [],
       awayRecentMatches: [],
     };
-    return cleanZeroH2H;
     return cleanZeroH2H;
   }
 
@@ -1576,16 +1371,16 @@ export class FlashscoreScraperService {
    */
   async getClubRecentMatches(clubName: string, matchId?: string): Promise<TeamFormMatch[]> {
     if (!clubName) return [];
-    const target = clubName.toLowerCase().trim();
 
     // 1. If matchId is provided, check cached or fetch H2H feed
     if (matchId) {
       const cleanId = matchId.replace(/^fs_/, '').trim();
       const h2h = await this.getMatchHeadToHead(cleanId, clubName);
-      if (h2h.homeClub?.toLowerCase().includes(target) && h2h.homeRecentMatches && h2h.homeRecentMatches.length > 0) {
+      const side = resolveTeamSide(clubName, h2h.homeClub, h2h.awayClub);
+      if (side === 'HOME' && h2h.homeRecentMatches && h2h.homeRecentMatches.length > 0) {
         return h2h.homeRecentMatches;
       }
-      if (h2h.awayClub?.toLowerCase().includes(target) && h2h.awayRecentMatches && h2h.awayRecentMatches.length > 0) {
+      if (side === 'AWAY' && h2h.awayRecentMatches && h2h.awayRecentMatches.length > 0) {
         return h2h.awayRecentMatches;
       }
       if (h2h.homeRecentMatches && h2h.homeRecentMatches.length > 0) {
@@ -1599,10 +1394,11 @@ export class FlashscoreScraperService {
     // 2. Check DB entries
     const allMeas = db.getAllPredictionMeasurements();
     for (const cached of allMeas.values()) {
-      if (cached.homeClub?.toLowerCase().includes(target) && cached.homeRecentMatches?.length) {
+      const side = resolveTeamSide(clubName, cached.homeClub, cached.awayClub);
+      if (side === 'HOME' && cached.homeRecentMatches?.length) {
         return cached.homeRecentMatches;
       }
-      if (cached.awayClub?.toLowerCase().includes(target) && cached.awayRecentMatches?.length) {
+      if (side === 'AWAY' && cached.awayRecentMatches?.length) {
         return cached.awayRecentMatches;
       }
     }
@@ -1610,20 +1406,26 @@ export class FlashscoreScraperService {
     // 3. Find fixture involving this club from upcoming fixtures
     try {
       const fixtures = await this.getUpcomingFixtures();
-      const match = fixtures.find(
-        (f) =>
-          f.homeTeam.toLowerCase().includes(target) ||
-          target.includes(f.homeTeam.toLowerCase()) ||
-          f.awayTeam.toLowerCase().includes(target) ||
-          target.includes(f.awayTeam.toLowerCase())
-      );
-      if (match && match.id) {
-        const cleanId = match.id.replace(/^fs_/, '');
-        const h2h = await this.getMatchHeadToHead(cleanId, match.homeTeam, match.awayTeam);
-        if (match.homeTeam.toLowerCase().includes(target) && h2h.homeRecentMatches?.length) {
+      let bestMatch: { fixture: Fixture; side: 'HOME' | 'AWAY'; score: number } | null = null;
+      for (const f of fixtures) {
+        const homeScore = teamMatchScore(clubName, f.homeTeam);
+        const awayScore = teamMatchScore(clubName, f.awayTeam);
+        const maxScore = Math.max(homeScore, awayScore);
+        if (maxScore > 0 && (!bestMatch || maxScore > bestMatch.score)) {
+          bestMatch = {
+            fixture: f,
+            side: homeScore >= awayScore ? 'HOME' : 'AWAY',
+            score: maxScore,
+          };
+        }
+      }
+      if (bestMatch && bestMatch.fixture.id) {
+        const cleanId = bestMatch.fixture.id.replace(/^fs_/, '');
+        const h2h = await this.getMatchHeadToHead(cleanId, bestMatch.fixture.homeTeam, bestMatch.fixture.awayTeam);
+        if (bestMatch.side === 'HOME' && h2h.homeRecentMatches?.length) {
           return h2h.homeRecentMatches;
         }
-        if (match.awayTeam.toLowerCase().includes(target) && h2h.awayRecentMatches?.length) {
+        if (bestMatch.side === 'AWAY' && h2h.awayRecentMatches?.length) {
           return h2h.awayRecentMatches;
         }
       }
@@ -1820,6 +1622,55 @@ export class FlashscoreScraperService {
         if (resultsMatch && resultsMatch[1]) {
           const feedText = resultsMatch[1];
           const sections = feedText.split('~');
+          const parsedResults: Array<{
+            ts: number;
+            homeTeam: string;
+            awayTeam: string;
+            homeScore: number;
+            awayScore: number;
+            homeBadge?: string;
+            awayBadge?: string;
+          }> = [];
+          const seenResultIds = new Set<string>();
+
+          for (const s of sections) {
+            if (!s.startsWith('AA÷')) continue;
+            const parts = s.split('¬');
+            const data: Record<string, string> = {};
+            for (const p of parts) {
+              const sepIdx = p.indexOf('÷');
+              if (sepIdx > 0) data[p.slice(0, sepIdx)] = p.slice(sepIdx + 1);
+            }
+
+            if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
+            const resId = data['AA'];
+            if (resId && seenResultIds.has(resId)) continue;
+            if (resId) seenResultIds.add(resId);
+
+            const homeTeam = (data['AE'] || '').trim();
+            const awayTeam = (data['AF'] || '').trim();
+            const homeScore = parseInt(data['AG'], 10);
+            const awayScore = parseInt(data['AH'], 10);
+            if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
+
+            const ts = parseInt(data['AD'] || '0', 10) || 0;
+            const rawHomeBadge = data['OA'] || data['OAJ'];
+            const rawAwayBadge = data['OB'];
+
+            parsedResults.push({
+              ts,
+              homeTeam,
+              awayTeam,
+              homeScore,
+              awayScore,
+              homeBadge: rawHomeBadge ? `${STATIC_IMAGE_BASE}${rawHomeBadge}` : undefined,
+              awayBadge: rawAwayBadge ? `${STATIC_IMAGE_BASE}${rawAwayBadge}` : undefined,
+            });
+          }
+
+          // Sort strictly newest-first by timestamp so form[0..4] holds the 5 most recent matches
+          parsedResults.sort((a, b) => b.ts - a.ts);
+
           const teamStats = new Map<string, {
             played: number;
             won: number;
@@ -1832,46 +1683,33 @@ export class FlashscoreScraperService {
             badge?: string;
           }>();
 
-          for (const s of sections) {
-            if (!s.startsWith('AA÷')) continue;
-            const parts = s.split('¬');
-            const data: Record<string, string> = {};
-            for (const p of parts) {
-              const [k, v] = p.split('÷');
-              if (k && v !== undefined) data[k] = v;
-            }
-
-            if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
-
-            const homeTeam = (data['AE'] || '').trim();
-            const awayTeam = (data['AF'] || '').trim();
-            const homeScore = parseInt(data['AG'], 10);
-            const awayScore = parseInt(data['AH'], 10);
-            if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
-
-            if (!teamStats.has(homeTeam)) {
-              teamStats.set(homeTeam, {
+          for (const r of parsedResults) {
+            if (!teamStats.has(r.homeTeam)) {
+              teamStats.set(r.homeTeam, {
                 played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: [],
-                badge: data['OAJ'] ? `${STATIC_IMAGE_BASE}${data['OAJ']}` : undefined,
+                badge: r.homeBadge,
               });
             }
-            if (!teamStats.has(awayTeam)) {
-              teamStats.set(awayTeam, {
+            if (!teamStats.has(r.awayTeam)) {
+              teamStats.set(r.awayTeam, {
                 played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: [],
-                badge: undefined,
+                badge: r.awayBadge,
               });
             }
 
-            const h = teamStats.get(homeTeam)!;
-            const a = teamStats.get(awayTeam)!;
+            const h = teamStats.get(r.homeTeam)!;
+            const a = teamStats.get(r.awayTeam)!;
+            if (!h.badge && r.homeBadge) h.badge = r.homeBadge;
+            if (!a.badge && r.awayBadge) a.badge = r.awayBadge;
+
             h.played++; a.played++;
-            h.goalsFor += homeScore; h.goalsAgainst += awayScore;
-            a.goalsFor += awayScore; a.goalsAgainst += homeScore;
+            h.goalsFor += r.homeScore; h.goalsAgainst += r.awayScore;
+            a.goalsFor += r.awayScore; a.goalsAgainst += r.homeScore;
 
-            if (homeScore > awayScore) {
+            if (r.homeScore > r.awayScore) {
               h.won++; h.points += 3; h.form.push('W');
               a.lost++; a.form.push('L');
-            } else if (homeScore < awayScore) {
+            } else if (r.homeScore < r.awayScore) {
               a.won++; a.points += 3; a.form.push('W');
               h.lost++; h.form.push('L');
             } else {
@@ -1893,7 +1731,7 @@ export class FlashscoreScraperService {
               goalsAgainst: s.goalsAgainst,
               goalDifference: s.goalsFor - s.goalsAgainst,
               points: s.points,
-              form: (s.form.slice(-5) as ('W' | 'D' | 'L')[]) || undefined,
+              form: (s.form.slice(0, 5) as ('W' | 'D' | 'L')[]) || undefined,
             }));
 
             entries.sort((a, b) => {

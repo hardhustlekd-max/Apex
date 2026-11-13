@@ -63,12 +63,12 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-black/75 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans">
       <div
         ref={modalRef}
-        className="bg-theme-card text-theme-main border border-theme rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-100"
+        className="bg-theme-card text-theme-main border border-theme rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-theme-md flex flex-col animate-in zoom-in-95 duration-100"
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+        <div className="flex items-center justify-between px-4 py-3 bg-theme-glass border-b border-theme">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-full bg-theme-subtle text-theme-main">
               <Filter className="w-3.5 h-3.5" />
@@ -247,7 +247,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 px-4 rounded-full bg-theme-primary text-theme-primary-text hover:opacity-90 text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+            className="flex-1 py-2.5 px-4 rounded-full bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover text-xs font-black shadow-theme-glow transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Apply Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Fixture } from '../core/types.js';
 import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
@@ -28,7 +28,11 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     <div
       id={`fixture-card-${fixture.id}`}
       onClick={() => onSelectDetail(fixture)}
-      className="rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-200 cursor-pointer border bg-theme-card border-theme shadow-xs hover:border-theme-primary"
+      className={`rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-150 cursor-pointer border bg-theme-card ${
+        isSelected
+          ? 'border-theme-primary ring-1 ring-theme-accent shadow-theme-md'
+          : 'border-theme shadow-theme-sm hover:border-theme-accent hover:shadow-theme-md'
+      }`}
     >
       <div>
         {/* Top bar: League, Time, Stage / Status */}
@@ -125,7 +129,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <span className="font-medium text-theme-sub">X: {formatProb(pred.drawProb, 1)}</span>
               <span className="font-bold text-theme-main">2: {formatProb(pred.awayWinProb, 1)}</span>
             </div>
-            <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden">
+            <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
               <div
                 style={{ width: `${pred.homeWinProb * 100}%` }}
                 className="bg-theme-primary rounded-full transition-all duration-300"
@@ -133,12 +137,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               />
               <div
                 style={{ width: `${pred.drawProb * 100}%` }}
-                className="bg-slate-300 dark:bg-neutral-600 rounded-full transition-all duration-300"
+                className="bg-theme-dim/40 rounded-full transition-all duration-300"
                 title={`Draw: ${formatProb(pred.drawProb, 1)}`}
               />
               <div
                 style={{ width: `${pred.awayWinProb * 100}%` }}
-                className="bg-slate-800 dark:bg-neutral-300 rounded-full transition-all duration-300"
+                className="bg-theme-main/70 rounded-full transition-all duration-300"
                 title={`Away Win: ${formatProb(pred.awayWinProb, 1)}`}
               />
             </div>
@@ -158,12 +162,8 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         )}
       </div>
 
-      {/* Action Footer with High Contrast Button */}
-      <div className="mt-2 pt-2 border-t border-theme flex items-center justify-between">
-        <span className="text-xs font-medium text-theme-sub flex items-center gap-1">
-          <Info className="w-3.5 h-3.5 text-theme-dim" />
-          <span>Tap for detailed breakdown</span>
-        </span>
+      {/* Action Footer */}
+      <div className="mt-2 pt-2 border-t border-theme flex items-center justify-end">
         <div className="flex items-center gap-1 text-xs font-bold text-theme-primary">
           <span>Analysis</span>
           <ArrowRight className="w-3.5 h-3.5" />

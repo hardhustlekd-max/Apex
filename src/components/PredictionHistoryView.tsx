@@ -144,9 +144,9 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="bg-theme-card rounded-3xl p-10 text-center font-sans shadow-xs border border-theme">
-        <div className="w-8 h-8 rounded-full border-4 border-theme-primary border-t-transparent animate-spin mx-auto" />
-        <span className="mt-4 block text-xs font-bold text-theme-sub">Loading historical model predictions from server database...</span>
+      <div className="bg-theme-card rounded-3xl p-10 text-center font-sans shadow-theme-sm border border-theme">
+        <div className="w-8 h-8 rounded-full border-4 border-[var(--accent-default)] border-t-transparent animate-spin mx-auto" />
+        <span className="mt-4 block text-xs font-bold text-theme-sub">Loading...</span>
       </div>
     );
   }
@@ -170,9 +170,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             <BarChart3 className="w-4 h-4 text-theme-primary" />
             Historical Prediction Evaluation
           </h2>
-          <p className="text-xs text-theme-sub mt-0.5">
-            Compare stored predictions against historical match results from the database
-          </p>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -212,7 +209,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       {/* Summary Stats Cards */}
       {totalEvaluated > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-xs">
+          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
             <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
               <Layers className="w-3.5 h-3.5 text-theme-primary" />
               <span>Evaluated Matches</span>
@@ -222,7 +219,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-xs">
+          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
             <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
               <ShieldCheck className="w-3.5 h-3.5 text-theme-primary" />
               <span>Model Accuracy</span>
@@ -232,7 +229,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-1 bg-theme-card border border-theme rounded-2xl p-4 shadow-xs">
+          <div className="col-span-2 sm:col-span-1 bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
             <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
               <Target className="w-3.5 h-3.5 text-theme-primary" />
               <span>Correct Hits</span>
@@ -253,44 +250,33 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         const totalPreds = summary?.totalPredictions ?? 0;
         const fixturesInDb = summary?.upcomingFixturesInDb ?? 0;
 
-        let emptyTitle = 'No Match Data or Predictions Recorded Yet';
-        let emptyDescription =
-          'Run a Full Sync to fetch Flashscore fixtures and match archives, then open Settings and run Update Predictions to evaluate upcoming matches.';
+        let emptyTitle = 'No Historical Predictions';
         let showFullSyncCta = true;
-        let refreshCtaLabel = 'Check Finished Results';
+        let refreshCtaLabel = 'Check Results';
 
         if (awaitingCount > 0) {
-          emptyTitle = `Awaiting Final Scores for ${awaitingCount} Completed Match${awaitingCount === 1 ? '' : 'es'}`;
-          emptyDescription = `${awaitingCount} predicted match${awaitingCount === 1 ? ' has' : 'es have'} passed kick-off, but Flashscore has not confirmed final full-time scores yet. Check again to update completed results.`;
+          emptyTitle = `Awaiting Final Scores (${awaitingCount})`;
           showFullSyncCta = false;
-          refreshCtaLabel = 'Check Finished Results';
+          refreshCtaLabel = 'Check Results';
         } else if (activePredCount > 0) {
-          emptyTitle = 'Waiting for Predicted Matches to Finish';
-          const parts: string[] = [];
-          if (upcomingPredCount > 0) parts.push(`${upcomingPredCount} upcoming`);
-          if (livePredCount > 0) parts.push(`${livePredCount} live`);
-          emptyDescription = `${parts.join(' and ')} predicted match${activePredCount === 1 ? ' is' : 'es are'} tracked in the database. Completed results will appear here once full-time scores are finalized.`;
+          emptyTitle = `Pending Matches (${upcomingPredCount} Upcoming, ${livePredCount} Live)`;
           showFullSyncCta = false;
-          refreshCtaLabel = 'Check Finished Results';
+          refreshCtaLabel = 'Check Results';
         } else if (totalPreds === 0 && fixturesInDb > 0) {
-          emptyTitle = 'No Predictions Generated Yet';
-          emptyDescription = `${fixturesInDb} upcoming fixture${fixturesInDb === 1 ? ' is' : 's are'} synced in the database, but no predictions have been generated yet. Open Settings and click Update Predictions to run the model.`;
+          emptyTitle = `No Predictions Generated (${fixturesInDb} Fixtures)`;
           showFullSyncCta = false;
-          refreshCtaLabel = 'Refresh Evaluation';
+          refreshCtaLabel = 'Refresh';
         }
 
         return (
-          <div className="bg-theme-card border border-theme rounded-2xl p-8 text-center text-xs shadow-xs space-y-4">
-            <div className="w-10 h-10 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary mx-auto shadow-xs">
+          <div className="bg-theme-card border border-theme rounded-2xl p-8 text-center text-xs shadow-theme-sm space-y-4">
+            <div className="w-10 h-10 rounded-2xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary mx-auto shadow-theme-sm">
               <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </div>
-            <div className="space-y-1">
+            <div>
               <h3 className="text-sm font-extrabold text-theme-main">
                 {emptyTitle}
               </h3>
-              <p className="text-xs text-theme-sub font-medium max-w-md mx-auto">
-                {emptyDescription}
-              </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               {showFullSyncCta && onTriggerFullSync ? (
@@ -299,7 +285,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     type="button"
                     onClick={onTriggerFullSync}
                     disabled={isProcessingActive || isRefreshing}
-                    className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-theme-glow cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Start Full Sync & Update Data</span>
@@ -308,7 +294,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     type="button"
                     onClick={() => fetchHistory(limit, true)}
                     disabled={isRefreshing || isProcessingActive}
-                    className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-theme-subtle text-theme-main transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-theme-subtle border border-theme text-theme-main transition-all active:scale-95 shadow-theme-sm cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     <span>{isRefreshing ? 'Checking...' : refreshCtaLabel}</span>
@@ -319,7 +305,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                   type="button"
                   onClick={() => fetchHistory(limit, true)}
                   disabled={isRefreshing || isProcessingActive}
-                  className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-theme-glow cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                   <span>{isRefreshing ? 'Checking Flashscore Results...' : refreshCtaLabel}</span>
@@ -329,7 +315,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           </div>
         );
       })() : (
-        <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-xs">
+        <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-theme-sm divide-y divide-[var(--border-subdued)]">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
 
@@ -337,7 +323,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <div
                 key={f.id}
                 onClick={() => onSelectDetail?.(f)}
-                className="px-4 py-2.5 hover:bg-theme-subtle transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px] cursor-pointer group"
+                className="px-4 py-2.5 hover:bg-theme-subtle/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px] cursor-pointer group"
                 role="button"
                 tabIndex={0}
               >

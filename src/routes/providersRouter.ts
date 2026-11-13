@@ -6,6 +6,8 @@ import { flashscoreScraperService } from '../services/flashscoreScraperService.j
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { syncJobService } from '../services/syncJobService.js';
+import { ServerEngine } from '../core/serverEngine.js';
+import { isMatchStarted } from '../core/accumulator.js';
 
 export const providersRouter = Router();
 
@@ -92,6 +94,11 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
     const upcoming = await flashscoreScraperService.getUpcomingFixtures();
     await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
 
+    const eligibleUpcoming = upcoming.filter((f) => !isMatchStarted(f));
+    if (eligibleUpcoming.length > 0) {
+      await ServerEngine.recalculateUpcomingFromDbInChunks(eligibleUpcoming, 50, undefined, { skipRemoteH2H: true });
+    }
+
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     // Update live matches (Read-Only Enrichment)
@@ -126,28 +133,29 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
       liveEnrichedCount = enrichedLive.length;
     }
 
+    const totalPredCount = predictionsDb.count('all');
     const updatedStats = {
       ...db.getStatsSummary(),
       rawFeedsCount: db.getRawFeedsCount(),
       upcomingCount: db.getUpcomingFixturesCount(),
-      predictionsCount: predictionsDb.count(),
+      predictionsCount: totalPredCount,
     };
 
     loggerService.addLog({
       level: 'SUCCESS',
       category: 'DATA_FETCH',
       source: 'SyncEngine',
-      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${histPredCount} historical, ${liveEnrichedCount} live enriched`,
+      message: `Sync completed: ${upcoming.length} upcoming fixtures, ${totalPredCount} stored predictions, ${histPredCount} historical, ${liveEnrichedCount} live enriched`,
     });
 
     return {
       success: true,
       message: options.resetDatabase || options.resetRawFeeds
-        ? `Database & raw feeds reset and fully synchronized (${upcoming.length} upcoming fixtures ingested)`
-        : `Database synchronized (${upcoming.length} upcoming fixtures refreshed)`,
+        ? `Database & raw feeds reset and fully synchronized (${upcoming.length} upcoming fixtures, ${totalPredCount} predictions)`
+        : `Database synchronized (${upcoming.length} upcoming fixtures refreshed, ${totalPredCount} predictions)`,
       matchesCount: syncRes.matchesCount,
       upcomingCount: upcoming.length,
-      predictionsCount: predictionsDb.count(),
+      predictionsCount: totalPredCount,
       historicalPredictionsCount: histPredCount,
       livePredictionsCount: liveEnrichedCount,
       stats: updatedStats,

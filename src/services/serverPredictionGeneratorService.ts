@@ -32,7 +32,7 @@ export class ServerPredictionGeneratorService {
     const upcomingList = db.getUpcomingFixtures(filters);
 
     // 2. Retrieve calculated predictions from predictionsDb
-    const predictionsList = await predictionsDb.getPredictionsAsync(filters);
+    const predictionsList = await predictionsDb.getPredictionsAsync({ ...filters, state: 'all' });
     const predMap = new Map<string, Fixture>();
     for (const p of predictionsList) {
       if (p.id) {
@@ -52,6 +52,7 @@ export class ServerPredictionGeneratorService {
             ...f,
             prediction: p.prediction,
             markets: p.markets || f.markets,
+            mostLikelyOutcome: p.mostLikelyOutcome || f.mostLikelyOutcome,
             homeStats: p.homeStats || f.homeStats,
             awayStats: p.awayStats || f.awayStats,
             measurements: p.measurements || f.measurements,
@@ -72,8 +73,9 @@ export class ServerPredictionGeneratorService {
         }
       }
 
-      // Also ensure any standalone stored predictions not in upcomingList are included
+      // Also ensure any standalone non-finished stored predictions not in upcomingList are included
       for (const p of predictionsList) {
+        if ((p as any).match_state === 'completed' || p.status === 'FINISHED') continue;
         const cleanId = (p.id || '').replace(/^fs_/, '');
         if (!mergedMap.has(cleanId)) {
           mergedMap.set(cleanId, p);

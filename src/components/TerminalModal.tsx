@@ -118,10 +118,10 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-theme-card border border-theme text-theme-main rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono text-[10.5px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-theme-card border border-theme text-theme-main rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-theme-md overflow-hidden font-mono text-[10.5px]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-theme-card border-b border-theme">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-theme-glass border-b border-theme">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-black">
               <Terminal className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -133,9 +133,6 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                   {filteredLogs.length} events
                 </span>
               </div>
-              <p className="text-[10px] text-theme-sub font-sans">
-                Real-time data fetching, prediction engine, and system diagnostics
-              </p>
             </div>
           </div>
 
@@ -197,7 +194,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              className="bg-neutral-800 rounded-full px-3 py-1 text-[10px] font-bold text-neutral-200 outline-none cursor-pointer"
+              className="bg-theme-card border border-theme rounded-full px-3 py-1 text-[10px] font-bold text-theme-main outline-none cursor-pointer"
             >
               <option value="ALL">All Levels</option>
               <option value="ERROR">Errors Only</option>
@@ -207,40 +204,40 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             </select>
 
             <div className="relative flex-1 sm:w-40">
-              <Search className="w-3 h-3 absolute left-2.5 top-2 text-neutral-400" />
+              <Search className="w-3 h-3 absolute left-2.5 top-2 text-theme-dim" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filter terminal..."
-                className="w-full bg-neutral-800 rounded-full pl-7 pr-3 py-1 text-[10px] font-bold text-neutral-200 placeholder-neutral-500 outline-none"
+                className="w-full bg-theme-card border border-theme rounded-full pl-7 pr-3 py-1 text-[10px] font-bold text-theme-main placeholder:text-theme-dim outline-none"
               />
             </div>
           </div>
         </div>
 
         {/* Quick summary stats banner */}
-        <div className="px-4 py-1.5 bg-[#070c14] text-[10px] font-sans flex items-center justify-between text-zinc-400">
-          <div className="flex items-center gap-2.5">
+        <div className="px-4 py-1.5 bg-theme-card-elevated border-b border-theme text-[10px] font-sans flex items-center justify-between text-theme-sub">
+          <div className="flex items-center gap-2.5 font-mono tabular-nums">
             <span>
-              Total: <strong className="text-zinc-200">{stats.total}</strong>
+              Total: <strong className="text-theme-main">{stats.total}</strong>
             </span>
             <span>
-              Success: <strong className="text-emerald-400">{stats.successes}</strong>
+              Success: <strong className="text-theme-success">{stats.successes}</strong>
             </span>
             <span>
-              Warnings: <strong className="text-amber-400">{stats.warnings}</strong>
+              Warnings: <strong className="text-amber-500">{stats.warnings}</strong>
             </span>
             <span>
-              Errors: <strong className={stats.errors > 0 ? 'text-rose-400' : 'text-zinc-400'}>{stats.errors}</strong>
+              Errors: <strong className={stats.errors > 0 ? 'text-rose-500' : 'text-theme-sub'}>{stats.errors}</strong>
             </span>
           </div>
-          <label className="flex items-center gap-1 cursor-pointer text-zinc-400 hover:text-zinc-200 select-none">
+          <label className="flex items-center gap-1 cursor-pointer text-theme-sub hover:text-theme-main select-none">
             <input
               type="checkbox"
               checked={autoScroll}
               onChange={(e) => setAutoScroll(e.target.checked)}
-              className="rounded-md bg-[#162038] border-none text-[#A3FF12] focus:ring-0 w-3 h-3"
+              className="rounded-md bg-theme-subtle border border-theme accent-[var(--accent-default)] focus:ring-0 w-3 h-3"
             />
             <span>Auto scroll</span>
           </label>
@@ -347,13 +344,13 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 bg-[#101728] flex items-center justify-between font-sans text-[10.5px]">
-          <span className="text-zinc-400">
-            Unified Apex Engine active • 5-Pillar Dixon-Coles model
+        <div className="px-4 py-2 bg-theme-card-elevated border-t border-theme flex items-center justify-between font-sans text-[10.5px]">
+          <span className="text-theme-sub font-mono font-bold">
+            Apex Engine
           </span>
           <button
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-xl bg-[#A3FF12] hover:bg-[#92e610] text-black font-extrabold transition-all cursor-pointer active:scale-95"
+            className="px-3.5 py-1.5 rounded-xl bg-theme-primary hover:bg-theme-primary-hover text-theme-primary-text font-extrabold transition-all cursor-pointer shadow-theme-glow active:scale-95"
           >
             Close
           </button>

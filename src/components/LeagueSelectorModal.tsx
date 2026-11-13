@@ -28,17 +28,16 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-black/70 backdrop-blur-xl animate-in fade-in duration-150 font-sans">
-      <div className="bg-theme-card border border-theme text-theme-main rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-3.5 bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans">
+      <div className="bg-theme-card border border-theme text-theme-main rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-theme-md flex flex-col">
         {/* Header */}
-        <div className="px-4 sm:px-6 py-3.5 flex items-center justify-between shrink-0 border-b border-theme">
+        <div className="px-4 sm:px-6 py-3.5 bg-theme-glass flex items-center justify-between shrink-0 border-b border-theme">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-full bg-theme-primary text-theme-primary-text font-black shadow-xs">
+            <div className="p-2.5 rounded-full bg-theme-primary text-theme-primary-text font-black shadow-theme-glow">
               <Globe className="w-4.5 h-4.5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base sm:text-lg text-theme-main">Global Leagues Directory</h3>
-              <p className="text-xs text-theme-sub font-semibold">Select from professional football leagues worldwide</p>
+              <h3 className="font-extrabold text-base sm:text-lg text-theme-main">Leagues</h3>
             </div>
           </div>
           <button
@@ -72,17 +71,16 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
               onSelectLeague('ALL');
               onClose();
             }}
-            className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all ${
+            className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all border ${
               selectedLeague === 'ALL'
-                ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-xs'
-                : 'bg-theme-subtle hover:bg-theme-subtle/80 text-theme-main'
+                ? 'bg-theme-primary-subtle border-theme-accent font-black text-theme-primary shadow-theme-sm'
+                : 'bg-theme-subtle border-transparent hover:border-theme hover:bg-theme-card-elevated text-theme-main'
             }`}
           >
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-theme-primary shrink-0" />
               <div>
                 <div className="text-xs sm:text-sm font-extrabold">All Leagues Worldwide</div>
-                <div className="text-xs text-theme-sub">All available global matches</div>
               </div>
             </div>
             {selectedLeague === 'ALL' && <Check className="w-4 h-4 text-theme-primary stroke-[3]" />}
@@ -97,10 +95,10 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
                   onSelectLeague(league.code);
                   onClose();
                 }}
-                className={`flex items-center justify-between px-4 py-2.5 rounded-full cursor-pointer transition-all ${
+                className={`flex items-center justify-between px-4 py-2.5 rounded-full cursor-pointer transition-all border ${
                   isSelected
-                    ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-xs'
-                    : 'bg-theme-subtle hover:bg-theme-subtle/80 text-theme-main'
+                    ? 'bg-theme-primary-subtle border-theme-accent font-black text-theme-primary shadow-theme-sm'
+                    : 'bg-theme-subtle border-transparent hover:border-theme hover:bg-theme-card-elevated text-theme-main'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">

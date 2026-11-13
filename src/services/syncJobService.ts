@@ -222,23 +222,22 @@ export class SyncJobService {
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 4: Ingest upcoming fixtures (Data Ingest only, zero predictions)
+      // Step 4: Ingest upcoming fixtures
       this.updateProgress(jobId, {
-        progress: 60,
+        progress: 55,
         stepIndex: 4,
-        totalSteps: 6,
+        totalSteps: 7,
         currentStep: 'Fetching upcoming fixtures raw feeds and syncing to database...',
       });
       const upcoming = await flashscoreScraperService.getUpcomingFixtures();
-      // REMOVED: ServerEngine.predictAndStoreUpcomingFixtures(upcoming)
 
       if (this.isCancelled(jobId)) return;
 
       // Step 5: Fetch and store Head-to-Head (H2H) raw feeds for upcoming games
       this.updateProgress(jobId, {
-        progress: 80,
+        progress: 70,
         stepIndex: 5,
-        totalSteps: 6,
+        totalSteps: 7,
         currentStep: 'Fetching Head-to-Head (H2H) raw feeds, team recent form, and encounter statistics...',
       });
       await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
@@ -246,11 +245,43 @@ export class SyncJobService {
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 6: Update live matches (Read-Only Enrichment)
+      // Step 6: Calculate and persist predictions for unstarted upcoming fixtures
+      const { isMatchStarted } = await import('../core/accumulator.js');
+      const eligibleUpcoming = upcoming.filter((f) => !isMatchStarted(f));
+
+      this.updateProgress(jobId, {
+        progress: 80,
+        stepIndex: 6,
+        totalSteps: 7,
+        upcomingCount: upcoming.length,
+        currentStep: `Calculating predictions for ${eligibleUpcoming.length} upcoming matches from database...`,
+      });
+
+      if (eligibleUpcoming.length > 0) {
+        await ServerEngine.recalculateUpcomingFromDbInChunks(
+          eligibleUpcoming,
+          50,
+          (processed, total, predicted) => {
+            if (this.isCancelled(jobId)) return;
+            const pct = Math.min(92, Math.round(80 + (processed / Math.max(1, total)) * 12));
+            this.updateProgress(jobId, {
+              progress: pct,
+              matchesCount: predicted,
+              predictionsCount: predictionsDb.count('all'),
+              currentStep: `Calculating predictions (${processed}/${total} processed, ${predicted} stored)...`,
+            });
+          },
+          { skipRemoteH2H: true }
+        );
+      }
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 7: Update live matches (Read-Only Enrichment)
       this.updateProgress(jobId, {
         progress: 95,
-        stepIndex: 6,
-        totalSteps: 6,
+        stepIndex: 7,
+        totalSteps: 7,
         currentStep: 'Refreshing active live scores and enriching from database...',
       });
 
@@ -286,17 +317,18 @@ export class SyncJobService {
         liveEnrichedCount = enrichedLive.length;
       }
 
+      const totalStoredPredictions = predictionsDb.count('all');
       const updatedStats = {
         ...db.getStatsSummary(),
         rawFeedsCount: db.getRawFeedsCount(),
         upcomingCount: db.getUpcomingFixturesCount(),
-        predictionsCount: predictionsDb.count(),
+        predictionsCount: totalStoredPredictions,
         historicalCount: predictionsDb.countHistoricalPredictions(),
       };
 
       const finalMessage = options.resetDatabase || options.resetRawFeeds
-        ? `Database & feeds reset and synchronized (${upcoming.length} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical predictions)`
-        : `Database synchronized (${upcoming.length} upcoming, ${liveEnrichedCount} live, ${histPredCount} historical)`;
+        ? `Database & feeds reset and synchronized (${upcoming.length} upcoming, ${totalStoredPredictions} predictions, ${liveEnrichedCount} live)`
+        : `Database synchronized (${upcoming.length} upcoming, ${totalStoredPredictions} predictions, ${liveEnrichedCount} live)`;
 
       this.updateProgress(jobId, {
         status: 'COMPLETED',
@@ -304,7 +336,7 @@ export class SyncJobService {
         currentStep: 'Completed',
         matchesCount: syncRes.matchesCount,
         upcomingCount: upcoming.length,
-        predictionsCount: predictionsDb.count() as any,
+        predictionsCount: totalStoredPredictions,
         historicalPredictionsCount: histPredCount,
         livePredictionsCount: liveEnrichedCount,
         stats: updatedStats,
@@ -397,7 +429,7 @@ export class SyncJobService {
           matchesCount: 0,
           skippedCount: 0,
           upcomingCount: 0,
-          predictionsCount: predictionsDb.count(),
+          predictionsCount: predictionsDb.count('all'),
           message: 'No upcoming fixtures found in database to update.',
           endTime: Date.now(),
         });
@@ -406,11 +438,11 @@ export class SyncJobService {
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 3: Recalculate predictions in chunks using the 90% Data Availability Gatekeeper
+      // Step 3: Recalculate predictions in chunks using pure local DB data
       this.updateProgress(jobId, {
         stepIndex: 3,
         totalSteps: 3,
-        currentStep: `Recalculating predictions for ${totalCount} matches in chunks (90% data availability threshold)...`,
+        currentStep: `Recalculating predictions for ${totalCount} matches in chunks...`,
       });
 
       const { predictedCount, skippedCount } = await ServerEngine.recalculateUpcomingFromDbInChunks(
@@ -424,21 +456,22 @@ export class SyncJobService {
             matchesCount: predicted,
             skippedCount: skipped,
             upcomingCount: totalCount,
-            predictionsCount: predictionsDb.count(),
+            predictionsCount: predictionsDb.count('all'),
             currentStep: `Processed ${processed}/${total} matches (${predicted} predicted, ${skipped} skipped)`,
           });
-        }
+        },
+        { skipRemoteH2H: true }
       );
 
       if (this.isCancelled(jobId)) return;
 
-      const totalPredictionsCount = await predictionsDb.countAsync();
+      const totalPredictionsCount = await predictionsDb.countAsync('all');
       const finalMessage = `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <90% data completeness).`;
 
       const finalStats = {
         ...db.getStatsSummary(),
         rawFeedsCount: db.getRawFeedsCount(),
-        upcomingCount: totalCount,
+        upcomingCount: db.getUpcomingFixturesCount(),
         predictionsCount: totalPredictionsCount,
         historicalCount: predictionsDb.countHistoricalPredictions(),
       };

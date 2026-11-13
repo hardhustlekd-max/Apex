@@ -35,11 +35,13 @@ fixturesRouter.get('/', async (req, res) => {
       endDate,
     });
 
+    const predictedCount = resultFixtures.filter((f) => Boolean(f.prediction)).length;
+
     loggerService.addLog({
       level: 'INFO',
       category: 'DATA_FETCH',
       source: 'FixturesRouter',
-      message: `Returning ${resultFixtures.length} static predictions for filter (${leagueFilter || 'ALL'}, ${dateFilter || dateParam || 'ALL'})`,
+      message: `Returning ${resultFixtures.length} fixtures (${predictedCount} with stored predictions) for filter (${leagueFilter || 'ALL'}, ${dateFilter || dateParam || 'ALL'})`,
     });
 
     res.json({

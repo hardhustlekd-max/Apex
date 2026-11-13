@@ -133,10 +133,10 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
 
   if (isLoading && (!activeSlip || Object.keys(prebuiltSlips).length === 0)) {
     return (
-      <div className="p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-3 font-sans shadow-xs border border-theme">
+      <div className="p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-3 font-sans shadow-theme-sm border border-theme">
         <Loader2 className="w-8 h-8 text-theme-primary animate-spin shrink-0 mx-auto" />
         <h3 className="text-xs font-bold text-theme-main">
-          Generating Poisson Accumulators...
+          Loading...
         </h3>
       </div>
     );
@@ -144,23 +144,20 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
 
   if (!fixtures || fixtures.length === 0 || !activeSlip) {
     return (
-      <div className="p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-4 font-sans shadow-xs border border-theme">
-        <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shadow-xs">
+      <div className="p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center bg-theme-card rounded-3xl space-y-4 font-sans shadow-theme-sm border border-theme">
+        <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary shadow-theme-sm">
           <RefreshCw className="w-6 h-6" />
         </div>
-        <div className="space-y-1.5 max-w-md">
+        <div className="max-w-md">
           <h3 className="text-sm font-extrabold text-theme-main">
             No Accumulators Available
           </h3>
-          <p className="text-xs text-theme-sub font-medium">
-            Accumulator slips require active match fixture predictions. Run a full data sync to calculate high-confidence parlays.
-          </p>
         </div>
         {onTriggerFullSync && (
           <button
             type="button"
             onClick={onTriggerFullSync}
-            className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 mt-1"
+            className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-theme-glow active:scale-95 flex items-center gap-2 mt-1"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Start Full Sync & Update Data</span>
@@ -173,7 +170,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
   const risk = activeSlip ? calculateRiskProfile(activeSlip) : null;
 
   return (
-    <div className="bg-theme-card rounded-2xl p-4 space-y-3 font-sans flex-1 flex flex-col shadow-xs transition-all border border-theme">
+    <div className="bg-theme-card rounded-2xl p-4 space-y-3 font-sans flex-1 flex flex-col shadow-theme-sm transition-all border border-theme">
       {/* Header Bar */}
       <div className="flex items-center justify-between gap-2.5 pb-2">
         <div>
@@ -185,7 +182,6 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               AI Predictions
             </span>
           </div>
-          <p className="text-xs text-theme-sub font-medium mt-0.5">Multi-leg parlays compiled from high-confidence predictions</p>
         </div>
 
         {/* Date Filter Dropdown */}
@@ -206,7 +202,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
       </div>
 
       {/* Category Pills Switcher */}
-      <div className="bg-theme-subtle p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs">
+      <div className="bg-theme-subtle border border-theme p-1 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar shadow-theme-sm">
         {categories.map((cat) => {
           const isSelected = selectedCategory === cat.id;
           const slip = prebuiltSlips[cat.id];
@@ -218,7 +214,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               onClick={() => setSelectedCategory(cat.id)}
               className={`flex-1 min-w-[80px] min-h-[35px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 ${
                 isSelected
-                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-xs'
+                  ? 'bg-theme-primary text-theme-primary-text font-black shadow-theme-glow'
                   : 'text-theme-sub hover:text-theme-main'
               }`}
             >
@@ -239,9 +235,9 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
       {activeSlip && (
         <div className="space-y-3">
           {/* Key Metrics Bar */}
-          <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar flex-nowrap bg-theme-card border border-theme p-2.5 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar flex-nowrap bg-theme-card-elevated border border-theme p-2.5 rounded-2xl shadow-theme-sm">
             <div className="flex items-center gap-1.5 text-xs flex-nowrap shrink-0 overflow-x-auto no-scrollbar">
-              <span className="bg-theme-primary text-theme-primary-text px-2.5 py-1 rounded-full font-mono tabular-nums font-black text-xs whitespace-nowrap shrink-0 shadow-xs">
+              <span className="bg-theme-primary text-theme-primary-text px-2.5 py-1 rounded-full font-mono tabular-nums font-black text-xs whitespace-nowrap shrink-0 shadow-theme-sm">
                 {activeSlip.legs.length} Selections
               </span>
               <span className="bg-theme-subtle px-2.5 py-1 rounded-full font-mono tabular-nums font-bold text-theme-main whitespace-nowrap shrink-0">
@@ -258,7 +254,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
             <button
               type="button"
               onClick={() => handleCopySlip(activeSlip, activeSlip.id)}
-              className="px-3.5 py-1.5 min-h-[35px] rounded-full text-xs font-black flex items-center gap-1 transition-all cursor-pointer shrink-0 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover shadow-xs whitespace-nowrap active:scale-95"
+              className="px-3.5 py-1.5 min-h-[35px] rounded-full text-xs font-black flex items-center gap-1 transition-all cursor-pointer shrink-0 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover shadow-theme-glow whitespace-nowrap active:scale-95"
             >
               {copiedId === activeSlip.id ? (
                 <>
@@ -286,7 +282,7 @@ export const PrebuiltAccumulators: React.FC<PrebuiltAccumulatorsProps> = ({
               return (
                 <div
                   key={`${leg.fixtureId}-${leg.marketKey}`}
-                  className="bg-theme-card-elevated rounded-2xl p-4 transition-all hover:bg-theme-subtle flex flex-col justify-between group shadow-xs space-y-3 border border-theme"
+                  className="bg-theme-card-elevated rounded-2xl p-4 transition-all hover:border-theme-accent flex flex-col justify-between group shadow-theme-sm space-y-3 border border-theme"
                 >
                   <div>
                     {/* Top bar: Leg number, League, Time / Date */}

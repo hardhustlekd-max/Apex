@@ -19,7 +19,8 @@ import {
   MatchTacticalContextInput,
 } from './types.js';
 import { loggerService } from '../services/loggerService.js';
-import { getCurrentSeason } from './dateUtils.js';
+import { getCurrentSeason, normalizeDateStr } from './dateUtils.js';
+import { resolveTeamSide, resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
 
 /**
  * Evidence-Based Prediction Engine
@@ -114,18 +115,17 @@ export class ApexEngine {
     let recentMatchesList: TeamFormMatch[] = [];
 
     if (scrapedRecent && scrapedRecent.length > 0) {
-      recentMatchesList = scrapedRecent.slice(0, Math.min(10, Math.max(5, windowSize)));
+      recentMatchesList = [...scrapedRecent]
+        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
+        .slice(0, Math.min(10, Math.max(5, windowSize)));
     } else {
-      const cleanTarget = teamName.toLowerCase().trim();
       const currentSeason = getCurrentSeason();
       const now = new Date();
       const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
       const prevSeason = `${prevYear}/${prevYear + 1}`;
       const clubMatches = allMatches
         .filter((m) => {
-          const h = m.homeTeam.toLowerCase().trim();
-          const a = m.awayTeam.toLowerCase().trim();
-          const isRelevantTeam = h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantTeam = resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== null;
           const isRelevantSeason = m.season === currentSeason || m.season === prevSeason;
           return isRelevantTeam && isRelevantSeason;
         })
@@ -133,8 +133,7 @@ export class ApexEngine {
         .slice(0, Math.min(10, Math.max(5, windowSize)));
 
       for (const m of clubMatches) {
-        const h = m.homeTeam.toLowerCase().trim();
-        const isHome = h === cleanTarget || h.includes(cleanTarget);
+        const isHome = resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== 'AWAY';
         const gf = isHome ? m.fthg : m.ftag;
         const ga = isHome ? m.ftag : m.fthg;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
@@ -196,11 +195,16 @@ export class ApexEngine {
     // 2. League Standings & Table Momentum (20%)
     let tableMomentum = formDominance;
     if (standings && Array.isArray(standings.table) && standings.table.length > 0) {
-      const cleanTarget = teamName.toLowerCase().trim();
-      const entry = standings.table.find((e) => {
-        const tn = e.teamName.toLowerCase().trim();
-        return tn === cleanTarget || tn.includes(cleanTarget) || cleanTarget.includes(tn);
-      });
+      let entry = standings.table[0];
+      let bestScore = 0;
+      for (const e of standings.table) {
+        const s = teamMatchScore(teamName, e.teamName);
+        if (s > bestScore) {
+          bestScore = s;
+          entry = e;
+        }
+      }
+      if (bestScore === 0) entry = undefined as any;
 
       if (entry) {
         const totalTeams = Math.max(10, standings.table.length);
@@ -349,12 +353,16 @@ export class ApexEngine {
   public static getTeamElo(teamName: string, ratingsMap: Map<string, number>): number {
     const clean = teamName.toLowerCase().trim();
     if (ratingsMap.has(clean)) return ratingsMap.get(clean)!;
+    let bestScore = 0;
+    let bestVal = 1500;
     for (const [key, val] of ratingsMap.entries()) {
-      if (key === clean || key.includes(clean) || clean.includes(key)) {
-        return val;
+      const s = teamMatchScore(clean, key);
+      if (s > bestScore) {
+        bestScore = s;
+        bestVal = val;
       }
     }
-    return 1500; // Strictly neutral baseline for unknown teams
+    return bestScore > 0 ? bestVal : 1500; // Strictly neutral baseline for unknown teams
   }
 
   public static getEloWinExpectancy(
@@ -416,16 +424,17 @@ export class ApexEngine {
     let recentMatchesList: TeamFormMatch[] = [];
 
     if (scrapedRecent && scrapedRecent.length > 0) {
-      recentMatchesList = scrapedRecent.slice(0, Math.min(10, Math.max(5, windowSize)));
+      recentMatchesList = [...scrapedRecent]
+        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
+        .slice(0, Math.min(10, Math.max(5, windowSize)));
     } else {
-      const cleanTarget = teamName.toLowerCase().trim();
-      const currentSeason = '2025/2026';
-      const prevSeason = '2024/2025';
+      const currentSeason = getCurrentSeason();
+      const now = new Date();
+      const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
+      const prevSeason = `${prevYear}/${prevYear + 1}`;
       const clubMatches = allMatches
         .filter((m) => {
-          const h = m.homeTeam.toLowerCase().trim();
-          const a = m.awayTeam.toLowerCase().trim();
-          const isRelevantTeam = h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
+          const isRelevantTeam = resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== null;
           const isRelevantSeason = m.season === currentSeason || m.season === prevSeason;
           return isRelevantTeam && isRelevantSeason;
         })
@@ -433,8 +442,7 @@ export class ApexEngine {
         .slice(0, Math.min(10, Math.max(5, windowSize)));
 
       for (const m of clubMatches) {
-        const h = m.homeTeam.toLowerCase().trim();
-        const isHome = h === cleanTarget || h.includes(cleanTarget);
+        const isHome = resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== 'AWAY';
         const gf = isHome ? m.fthg : m.ftag;
         const ga = isHome ? m.ftag : m.fthg;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
@@ -1072,7 +1080,9 @@ export class ApexEngine {
     let awayGoalsConceded = 0;
 
     if (scrapedRecentMatches && scrapedRecentMatches.length > 0) {
-      formattedRecent = scrapedRecentMatches.slice(0, Math.min(10, Math.max(5, windowLimit)));
+      formattedRecent = [...scrapedRecentMatches]
+        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
+        .slice(0, Math.min(10, Math.max(5, windowLimit)));
       for (const m of formattedRecent) {
         formList.push(m.result);
         if (m.isHome) {
@@ -1086,19 +1096,13 @@ export class ApexEngine {
         }
       }
     } else {
-      const cleanTarget = teamName.toLowerCase().trim();
       const teamMatches = allMatches
-        .filter((m) => {
-          const h = m.homeTeam.toLowerCase().trim();
-          const a = m.awayTeam.toLowerCase().trim();
-          return h === cleanTarget || a === cleanTarget || h.includes(cleanTarget) || cleanTarget.includes(h) || a.includes(cleanTarget) || cleanTarget.includes(a);
-        })
+        .filter((m) => resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== null)
         .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
         .slice(0, Math.min(10, Math.max(5, windowLimit)));
 
       for (const m of teamMatches) {
-        const h = m.homeTeam.toLowerCase().trim();
-        const isHome = h === cleanTarget || h.includes(cleanTarget);
+        const isHome = resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== 'AWAY';
         const gf = isHome ? m.fthg : m.ftag;
         const ga = isHome ? m.ftag : m.fthg;
         const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
@@ -1185,15 +1189,15 @@ export class ApexEngine {
   ): HeadToHeadMeasurement {
     const twoYearsAgoTime = Date.now() - (730 * 24 * 60 * 60 * 1000);
 
-    const h2hMatches = allMatches.filter((m) => {
-      const isTeamMatch =
-        (m.homeTeam.toLowerCase() === homeTeam.toLowerCase() && m.awayTeam.toLowerCase() === awayTeam.toLowerCase()) ||
-        (m.homeTeam.toLowerCase() === awayTeam.toLowerCase() && m.awayTeam.toLowerCase() === homeTeam.toLowerCase());
-      if (!isTeamMatch) return false;
-      if (!m.matchDate) return true;
-      const mTime = new Date(m.matchDate).getTime();
-      return isNaN(mTime) || mTime >= twoYearsAgoTime;
-    });
+    const h2hMatches = allMatches
+      .filter((m) => {
+        const alignment = resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam);
+        if (!alignment.matched) return false;
+        if (!m.matchDate) return true;
+        const mTime = new Date(m.matchDate).getTime();
+        return isNaN(mTime) || mTime >= twoYearsAgoTime;
+      })
+      .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
 
     let homeWins = 0;
     let draws = 0;
@@ -1203,9 +1207,9 @@ export class ApexEngine {
     const recentH2H: HeadToHeadMatchRecord[] = [];
 
     for (const m of h2hMatches) {
-      const isHomeTeamDirect = m.homeTeam.toLowerCase() === homeTeam.toLowerCase();
-      const hGoals = isHomeTeamDirect ? m.fthg : m.ftag;
-      const aGoals = isHomeTeamDirect ? m.ftag : m.fthg;
+      const { isHomeFixture } = resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam);
+      const hGoals = isHomeFixture ? m.fthg : m.ftag;
+      const aGoals = isHomeFixture ? m.ftag : m.fthg;
       homeGoalsTotal += hGoals;
       awayGoalsTotal += aGoals;
 
@@ -1215,7 +1219,7 @@ export class ApexEngine {
 
       if (recentH2H.length < 5) {
         recentH2H.push({
-          date: m.matchDate,
+          date: normalizeDateStr(m.matchDate),
           homeTeam: m.homeTeam,
           awayTeam: m.awayTeam,
           score: `${m.fthg}-${m.ftag}`,
@@ -1265,7 +1269,9 @@ export class ApexEngine {
     let homeMatchesCount = 0;
 
     if (scrapedHomeRecent && scrapedHomeRecent.length > 0) {
-      const list = scrapedHomeRecent.slice(0, 10);
+      const list = [...scrapedHomeRecent]
+        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
+        .slice(0, 10);
       homeMatchesCount = list.length;
       for (const m of list) {
         homeGoalDiff += (m.goalsFor - m.goalsAgainst);
@@ -1273,12 +1279,13 @@ export class ApexEngine {
         else if (m.result === 'D') homeFormPoints += 1;
       }
     } else {
-      const homeTeamMatches = allMatches.filter(
-        (m) => m.homeTeam.toLowerCase() === homeTeam.toLowerCase() || m.awayTeam.toLowerCase() === homeTeam.toLowerCase()
-      ).slice(0, 10);
+      const homeTeamMatches = allMatches
+        .filter((m) => resolveTeamSide(homeTeam, m.homeTeam, m.awayTeam) !== null)
+        .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
+        .slice(0, 10);
       homeMatchesCount = homeTeamMatches.length;
       for (const m of homeTeamMatches) {
-        const isHome = m.homeTeam.toLowerCase() === homeTeam.toLowerCase();
+        const isHome = resolveTeamSide(homeTeam, m.homeTeam, m.awayTeam) !== 'AWAY';
         const gf = isHome ? m.fthg : m.ftag;
         const ga = isHome ? m.ftag : m.fthg;
         homeGoalDiff += (gf - ga);
@@ -1292,7 +1299,9 @@ export class ApexEngine {
     let awayMatchesCount = 0;
 
     if (scrapedAwayRecent && scrapedAwayRecent.length > 0) {
-      const list = scrapedAwayRecent.slice(0, 10);
+      const list = [...scrapedAwayRecent]
+        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
+        .slice(0, 10);
       awayMatchesCount = list.length;
       for (const m of list) {
         awayGoalDiff += (m.goalsFor - m.goalsAgainst);
@@ -1300,12 +1309,13 @@ export class ApexEngine {
         else if (m.result === 'D') awayFormPoints += 1;
       }
     } else {
-      const awayTeamMatches = allMatches.filter(
-        (m) => m.homeTeam.toLowerCase() === awayTeam.toLowerCase() || m.awayTeam.toLowerCase() === awayTeam.toLowerCase()
-      ).slice(0, 10);
+      const awayTeamMatches = allMatches
+        .filter((m) => resolveTeamSide(awayTeam, m.homeTeam, m.awayTeam) !== null)
+        .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
+        .slice(0, 10);
       awayMatchesCount = awayTeamMatches.length;
       for (const m of awayTeamMatches) {
-        const isHome = m.homeTeam.toLowerCase() === awayTeam.toLowerCase();
+        const isHome = resolveTeamSide(awayTeam, m.homeTeam, m.awayTeam) !== 'AWAY';
         const gf = isHome ? m.fthg : m.ftag;
         const ga = isHome ? m.ftag : m.fthg;
         awayGoalDiff += (gf - ga);

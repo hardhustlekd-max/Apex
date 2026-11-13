@@ -17,7 +17,7 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
   isSyncing,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 w-full z-40 lg:hidden bg-theme-card/95 backdrop-blur-xl border-t border-theme/40 pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] px-3 transition-all">
+    <div className="fixed bottom-0 left-0 right-0 w-full z-40 lg:hidden bg-theme-glass border-t border-theme shadow-theme-md pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] px-3 transition-all">
       <div className="max-w-md mx-auto flex items-center justify-around w-full">
         {/* Home / Matches Tab */}
         <button

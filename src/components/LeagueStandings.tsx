@@ -101,7 +101,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
           <h2 className="text-sm sm:text-base font-extrabold text-theme-main">
             League Standings
           </h2>
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 p-1 bg-theme-card border border-theme rounded-2xl shadow-xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 p-1 bg-theme-card border border-theme rounded-2xl shadow-theme-sm">
             {POPULAR_LEAGUES.map((l) => (
               <button
                 key={l.code}
@@ -109,7 +109,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                 onClick={() => handleLeagueChange(l.code)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
                   currentLeague === l.code
-                    ? 'bg-theme-primary text-theme-primary-text font-black shadow-sm scale-[1.02]'
+                    ? 'bg-theme-primary text-theme-primary-text font-black shadow-theme-glow scale-[1.02]'
                     : 'text-theme-sub hover:text-theme-main'
                 }`}
               >
@@ -135,7 +135,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {isLoading && (
-        <div className="bg-theme-card rounded-2xl p-5 shadow-sm space-y-1.5 animate-pulse border border-theme">
+        <div className="bg-theme-card rounded-2xl p-5 shadow-theme-sm space-y-1.5 animate-pulse border border-theme">
           <div className="h-3.5 bg-theme-subtle rounded-full w-1/3 mb-3" />
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-6.5 bg-theme-subtle rounded-xl flex items-center justify-between px-2.5" />
@@ -144,14 +144,14 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!isLoading && error && (
-        <div className="bg-theme-card rounded-2xl p-6 text-center space-y-3 shadow-sm border border-theme">
+        <div className="bg-theme-card rounded-2xl p-6 text-center space-y-3 shadow-theme-sm border border-theme">
           <AlertCircle className="w-5 h-5 text-theme-sub mx-auto" />
           <p className="text-xs text-theme-sub font-medium">{error}</p>
           <div className="flex items-center justify-center gap-2 pt-1">
             <button
               type="button"
               onClick={() => fetchStandings(currentLeague)}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-theme-subtle text-theme-main cursor-pointer active:scale-95 shadow-xs"
+              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-theme-subtle border border-theme text-theme-main cursor-pointer active:scale-95 shadow-theme-sm"
             >
               Retry
             </button>
@@ -159,7 +159,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
               <button
                 type="button"
                 onClick={onTriggerFullSync}
-                className="px-3.5 py-1.5 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text cursor-pointer active:scale-95 shadow-xs flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text cursor-pointer active:scale-95 shadow-theme-glow flex items-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Start Full Sync</span>
@@ -170,11 +170,11 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {!isLoading && standingsData && standingsData.table.length > 0 && (
-        <div className="bg-theme-card rounded-2xl overflow-hidden shadow-sm border border-theme">
+        <div className="bg-theme-card rounded-2xl overflow-hidden shadow-theme-sm border border-theme">
           <div className="overflow-x-auto no-scrollbar">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-theme-subtle text-xs font-extrabold text-theme-main">
+                <tr className="bg-theme-card-elevated border-b border-theme text-xs font-extrabold text-theme-main">
                   <th className="py-2 pl-3 pr-1.5 text-center w-7 font-mono tabular-nums">#</th>
                   <th className="py-2 px-2.5">Team</th>
                   <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Played">MP</th>
@@ -185,7 +185,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                   <th className="py-2 px-2.5 text-center font-black text-theme-main w-9 font-mono tabular-nums" title="Points">PTS</th>
                 </tr>
               </thead>
-              <tbody className="font-semibold">
+              <tbody className="font-semibold divide-y divide-[var(--border-subdued)]">
                 {standingsData.table.map((row) => {
                   const highlightRole = isTeamHighlighted(row.teamName);
                   const isTop4 = row.rank <= 4;

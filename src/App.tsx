@@ -279,7 +279,7 @@ export default function App() {
     <div className="min-h-screen bg-theme-bg text-theme-main flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-theme-card text-theme-main font-mono text-xs px-3 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-2 border border-theme">
+        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-theme-glass text-theme-main font-mono text-xs px-3 py-2 rounded-full shadow-theme-md flex items-center gap-2 animate-in slide-in-from-bottom-2 border border-theme">
           <span className="w-1.5 h-1.5 rounded-full bg-theme-primary shrink-0 animate-pulse" />
           <span className="truncate max-w-[280px] font-bold">{notification.message}</span>
         </div>
@@ -323,7 +323,36 @@ export default function App() {
 
         {/* Content Viewport */}
         <div className="flex-1 min-w-0 flex flex-col">
-          <PullToRefresh onRefresh={handleRefresh} pullingContent="" refreshingContent="Refreshing...">
+          <PullToRefresh
+            onRefresh={handleRefresh}
+            pullingContent=""
+            refreshingContent={
+              <div className="flex items-center justify-center py-3">
+                <div
+                  className="w-9 h-9 rounded-full bg-theme-card border border-theme shadow-theme-md flex items-center justify-center text-theme-primary"
+                  role="status"
+                  aria-label="Refreshing"
+                >
+                  <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      stroke="currentColor"
+                      strokeWidth="2.75"
+                      className="opacity-20"
+                    />
+                    <path
+                      d="M12 3a9 9 0 0 1 9 9"
+                      stroke="currentColor"
+                      strokeWidth="2.75"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+            }
+          >
             <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 sm:py-3 space-y-3 pb-16 lg:pb-6">
               {/* Blocking Job Overlay when Full Sync or Update Predictions is in progress */}
               {isProcessingActive && (
@@ -335,24 +364,21 @@ export default function App() {
 
               {/* Notification Banner to Start Full Sync if Database has zero fixtures */}
               {fixtures.length === 0 && !isLoadingFixtures && !isProcessingActive && (
-                <div className="bg-theme-card border border-theme text-theme-main rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                <div className="bg-theme-card border border-theme text-theme-main rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-theme-sm">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8.5 h-8.5 rounded-xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shrink-0 font-bold">
+                    <div className="w-8.5 h-8.5 rounded-xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary shrink-0 font-bold">
                       <RefreshCw className="w-4.5 h-4.5" />
                     </div>
-                    <div className="space-y-0.5 min-w-0">
+                    <div className="min-w-0">
                       <h3 className="text-xs sm:text-sm font-extrabold tracking-tight">
-                        Database Synchronization Prompt
+                        No Fixtures in Database
                       </h3>
-                      <p className="text-[11px] text-theme-sub font-medium">
-                        Start full sync to fetch active Flashscore fixtures, team stats, and H2H records. Then use Update Predictions in Settings to run the 5-Pillar Poisson model.
-                      </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleResetAndSyncData}
-                    className="px-3.5 py-2 rounded-full bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover font-black text-xs transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-full bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover font-black text-xs transition-all cursor-pointer shadow-theme-glow active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Start Full Sync</span>
@@ -392,7 +418,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card border border-theme shadow-xs overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
@@ -470,7 +496,7 @@ export default function App() {
           setIsSettingsOpen(false);
           setIsTerminalOpen(true);
         }}
-        onRefreshMetrics={fetchSettingsAndProviders}
+        onRefreshMetrics={handleRefresh}
       />
 
       {/* Floating Bottom Navigation Dock (Mobile Only) */}

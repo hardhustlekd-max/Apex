@@ -6,17 +6,22 @@ export const statsRouter = Router();
 
 statsRouter.get('/', async (req, res) => {
   try {
+    await db.init();
+    await predictionsDb.init();
     const baseStats = db.getStatsSummary();
     const rawFeedsCount = db.getRawFeedsCount();
     const upcomingDbCount = db.getUpcomingFixturesCount();
-    const predCount = await predictionsDb.countAsync();
+    const totalPredCount = await predictionsDb.countAsync('all');
+    const upcomingPredCount = await predictionsDb.countAsync('upcoming');
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     const stats = {
       ...baseStats,
       rawFeedsCount,
-      upcomingCount: upcomingDbCount > 0 ? upcomingDbCount : predCount,
-      predictionsCount: predCount,
+      upcomingCount: upcomingDbCount > 0 ? upcomingDbCount : upcomingPredCount,
+      predictionsCount: totalPredCount,
+      upcomingPredictionsCount: upcomingPredCount,
+      historicalPredictionsCount: histPredCount,
       totalMatches: Math.max(baseStats.totalMatches, histPredCount),
     };
     res.json({
@@ -38,7 +43,7 @@ statsRouter.post('/reset', (req, res) => {
       ...baseStats,
       rawFeedsCount: db.getRawFeedsCount(),
       upcomingCount: db.getUpcomingFixturesCount(),
-      predictionsCount: predictionsDb.count(),
+      predictionsCount: predictionsDb.count('all'),
     };
     res.json({
       success: true,

@@ -13,6 +13,7 @@ import { flashscoreScraperService } from '../services/flashscoreScraperService.j
 import { matchesLeague } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
+import { resolveTeamSide, parseHeadToHeadFeedText } from './feedParser.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -61,30 +62,31 @@ export class ServerEngine {
     const fixtureTime = fixtureDate.getTime();
     if (isNaN(fixtureTime)) return undefined as any;
 
-    // 1. Inspect recent matches from H2H scraped feed (most authoritative & timestamped)
+    // 1. Inspect recent matches from H2H scraped feed (find the actual latest prior match regardless of array order)
     if (recentFormMatches && recentFormMatches.length > 0) {
+      let latestRecentPriorTime = 0;
       for (const rm of recentFormMatches) {
         if (rm.date) {
           const matchDate = new Date(rm.date.length === 10 ? `${rm.date}T12:00:00Z` : rm.date);
           const matchTime = matchDate.getTime();
-          if (!isNaN(matchTime) && matchTime < fixtureTime) {
-            const diffDays = Math.round((fixtureTime - matchTime) / (1000 * 3600 * 24));
-            if (diffDays >= 1) {
-              return Math.min(28, diffDays);
-            }
+          if (!isNaN(matchTime) && matchTime < fixtureTime && matchTime > latestRecentPriorTime) {
+            latestRecentPriorTime = matchTime;
           }
+        }
+      }
+      if (latestRecentPriorTime > 0) {
+        const diffDays = Math.round((fixtureTime - latestRecentPriorTime) / (1000 * 3600 * 24));
+        if (diffDays >= 1) {
+          return Math.min(28, diffDays);
         }
       }
     }
 
     // 2. Fallback to unified historical universe
-    const cleanTeam = teamName.toLowerCase().trim();
     let latestPriorTime = 0;
 
     for (const m of allMatches) {
-      const h = m.homeTeam?.toLowerCase().trim();
-      const a = m.awayTeam?.toLowerCase().trim();
-      if (h === cleanTeam || a === cleanTeam || (h && cleanTeam.includes(h)) || (a && cleanTeam.includes(a))) {
+      if (resolveTeamSide(teamName, m.homeTeam, m.awayTeam) !== null) {
         if (m.matchDate) {
           const md = new Date(m.matchDate.length === 10 ? `${m.matchDate}T12:00:00Z` : m.matchDate);
           const mt = md.getTime();
@@ -336,8 +338,10 @@ export class ServerEngine {
   public static async recalculateUpcomingFromDbInChunks(
     upcomingFixtures: Fixture[],
     chunkSize = 50,
-    onProgress?: (processed: number, total: number, predicted: number, skipped: number) => void
+    onProgress?: (processed: number, total: number, predicted: number, skipped: number) => void,
+    options?: { skipRemoteH2H?: boolean }
   ): Promise<{ predictedCount: number; skippedCount: number; fixtures: Fixture[] }> {
+    const skipRemoteH2H = options?.skipRemoteH2H ?? false;
     const settings: EngineSettings = db.getSettings() || {
       
       rollingMatchWindow: 15,
@@ -400,6 +404,19 @@ export class ServerEngine {
             : null);
 
         if (!cachedH2H) {
+          // Check local raw SQLite H2H feed directly without decompressing unrelated daily feeds
+          const rawStored = db.getRawFeed(cleanId, true);
+          if (rawStored && rawStored.rawText && (rawStored.rawText.includes('KB÷') || rawStored.rawText.includes('KC÷'))) {
+            const parsedLocal = parseHeadToHeadFeedText(rawStored.rawText, cleanId, f.homeTeam, f.awayTeam);
+            if (parsedLocal) {
+              cachedH2H = parsedLocal;
+              db.savePredictionMeasurement(cleanId, parsedLocal);
+              cachedH2HMap.set(cleanId, parsedLocal);
+            }
+          }
+        }
+
+        if (!cachedH2H && !skipRemoteH2H) {
           try {
             cachedH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
             if (cachedH2H && cachedH2H.matchesCount > 0) {

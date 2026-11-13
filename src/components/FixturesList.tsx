@@ -305,16 +305,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         };
       }
 
-      if (base) {
-        return {
-          ...base,
-          status: 'LIVE' as const,
-          minute: s.minute,
-          score: { home: s.homeScore, away: s.awayScore },
-          kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
-        };
-      }
-
       // Fallback for live matches not in our local DB yet
       return {
         id: s.fixtureId.startsWith('fs_') ? s.fixtureId : `fs_${s.fixtureId}`,
@@ -468,9 +458,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 else if (cd.index === 1) setDateFilter('TOMORROW');
                 else setDateFilter(cd.dateStr);
               }}
-              className={`w-full max-w-[44px] min-h-[46px] sm:min-h-[50px] flex flex-col items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 ${
+              className={`w-full max-w-[44px] min-h-[46px] sm:min-h-[50px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 ${
                 isSelected
-                  ? 'bg-theme-primary text-theme-primary-text rounded-xl sm:rounded-2xl shadow-md py-1.5 px-2 scale-[1.04]'
+                  ? 'bg-theme-primary text-theme-primary-text rounded-xl sm:rounded-2xl shadow-theme-glow py-1.5 px-2 scale-[1.04]'
                   : 'bg-transparent text-theme-main hover:text-theme-primary py-1 px-1'
               }`}
             >
@@ -497,14 +487,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Scope Sub-Tabs: Upcoming, Live, History & Filters */}
       <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
-        <div className="flex items-center bg-theme-card border border-theme p-0.5 rounded-xl shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-0.5 shadow-xs">
+        <div className="flex items-center bg-theme-card border border-theme p-0.5 rounded-xl shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-0.5 shadow-theme-sm">
           <button
             id="subtab-upcoming-btn"
             type="button"
             onClick={() => setActiveScope('UPCOMING')}
             className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
               activeScope === 'UPCOMING'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-xs'
+                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
                 : 'text-theme-sub hover:text-theme-main'
             }`}
           >
@@ -517,7 +507,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             onClick={() => setActiveScope('LIVE')}
             className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1.5 ${
               activeScope === 'LIVE'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-xs'
+                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
                 : 'text-theme-sub hover:text-theme-main'
             }`}
           >
@@ -540,7 +530,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             onClick={() => setActiveScope('HISTORY')}
             className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
               activeScope === 'HISTORY'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-xs'
+                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
                 : 'text-theme-sub hover:text-theme-main'
             }`}
           >
@@ -553,10 +543,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`min-h-[30px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+            className={`min-h-[30px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
               activeFilterCount > 0
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold'
-                : 'bg-theme-card border border-theme text-theme-main hover:bg-theme-subtle'
+                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-glow'
+                : 'bg-theme-card border border-theme text-theme-main hover:bg-theme-subtle shadow-theme-sm'
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-current" />
@@ -694,47 +684,36 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Match List Display */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-theme-card rounded-3xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center shadow-xs border border-theme">
-          <div className="w-6 h-6 rounded-full border-2 border-theme-primary border-t-transparent animate-spin shrink-0 mx-auto" />
-          <span className="mt-3 text-xs text-theme-sub font-bold">Loading match data...</span>
+        <div className="bg-theme-card rounded-3xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center shadow-theme-sm border border-theme">
+          <div className="w-6 h-6 rounded-full border-2 border-[var(--accent-default)] border-t-transparent animate-spin shrink-0 mx-auto" />
+          <span className="mt-3 text-xs text-theme-sub font-bold">Loading...</span>
         </div>
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-theme-card rounded-3xl p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center space-y-4 shadow-xs border border-theme">
-          <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shadow-xs">
+        <div className="bg-theme-card rounded-3xl p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center space-y-4 shadow-theme-sm border border-theme">
+          <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary shadow-theme-sm">
             <RefreshCw className="w-6 h-6" />
           </div>
-          <div className="space-y-1.5 max-w-md">
+          <div className="max-w-md">
             <h3 className="text-sm font-extrabold text-theme-main">
               {activeScope === 'UPCOMING'
-                ? 'No upcoming fixtures found in database'
+                ? 'No Upcoming Fixtures'
                 : activeScope === 'LIVE'
-                ? 'No live matches currently in play'
+                ? 'No Live Matches'
                 : historySummary && historySummary.completedAwaitingScore > 0
-                ? `Awaiting final scores for ${historySummary.completedAwaitingScore} completed prediction(s)`
+                ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
                 : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
-                ? 'Waiting for predicted matches to finish'
+                ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
                 : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
-                ? 'No predictions generated yet'
-                : 'No historical predictions found in database'}
+                ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
+                : 'No Historical Predictions'}
             </h3>
-            <p className="text-xs text-theme-sub font-medium">
-              {activeFilterCount > 0
-                ? 'Some active filters or search terms may be narrowing down your results.'
-                : activeScope === 'HISTORY' && historySummary && historySummary.completedAwaitingScore > 0
-                ? 'Predicted matches have passed kick-off and are awaiting full-time scores from Flashscore.'
-                : activeScope === 'HISTORY' && historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
-                ? `${historySummary.upcomingPredictions} upcoming and ${historySummary.livePredictions} live predicted matches are tracked and will appear here once full-time results are recorded.`
-                : activeScope === 'HISTORY' && historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
-                ? 'Upcoming fixtures are already in the database. Open Settings and click Update Predictions to generate model forecasts.'
-                : 'Trigger a full synchronization to fetch Flashscore fixtures, live scores, and head-to-head records, then run Update Predictions in Settings.'}
-            </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
               <button
                 type="button"
                 onClick={onTriggerFullSync}
-                className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2"
+                className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-theme-glow active:scale-95 flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Start Full Sync & Update Data</span>
@@ -744,7 +723,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={handleResetAllFilters}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3.5 py-2.5 bg-theme-subtle hover:bg-theme-card-elevated border border-theme text-theme-main rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-theme-sm"
               >
                 Reset filters ({activeFilterCount})
               </button>
@@ -753,7 +732,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilter('ALL')}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                className="px-3.5 py-2.5 bg-theme-subtle hover:bg-theme-card-elevated border border-theme text-theme-main rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-theme-sm"
               >
                 Show all dates ({uniqueFixtures.length})
               </button>

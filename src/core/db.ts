@@ -668,12 +668,16 @@ export class FootballDB {
   savePredictionMeasurement(fixtureId: string, h2h: HeadToHeadMeasurement): void {
     if (!fixtureId) return;
     const cleanId = fixtureId.replace(/^fs_/, '').trim();
+    const versioned: HeadToHeadMeasurement = {
+      ...h2h,
+      parserVersion: h2h.parserVersion ?? 2,
+    };
 
     try {
       sqliteDb.prepare(`
         INSERT OR REPLACE INTO prediction_measurements_cache (fixture_id, h2h_json, calculated_at)
         VALUES (?, ?, ?)
-      `).run(cleanId, JSON.stringify(h2h), new Date().toISOString());
+      `).run(cleanId, JSON.stringify(versioned), new Date().toISOString());
     } catch (err: any) {
       console.error('[FootballDB] Error saving prediction measurement:', err?.message);
     }
@@ -689,12 +693,15 @@ export class FootballDB {
       ).get(cleanId, fixtureId) as any;
       if (row && row.h2h_json) {
         const parsed = JSON.parse(row.h2h_json) as HeadToHeadMeasurement;
+        // Invalidate legacy cached entries parsed before KU/KT & KA÷ subtab fixes
+        if (!parsed || (parsed.parserVersion ?? 0) < 2) {
+          return null;
+        }
         // Only return if it contains actual populated data
         if (
-          parsed &&
-          (parsed.matchesCount > 0 ||
-            (parsed.homeRecentMatches && parsed.homeRecentMatches.length > 0) ||
-            (parsed.recentH2H && parsed.recentH2H.length > 0))
+          parsed.matchesCount > 0 ||
+          (parsed.homeRecentMatches && parsed.homeRecentMatches.length > 0) ||
+          (parsed.recentH2H && parsed.recentH2H.length > 0)
         ) {
           return parsed;
         }
@@ -713,7 +720,10 @@ export class FootballDB {
       const rows = sqliteDb.prepare("SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 1000").all() as any[];
       for (const row of rows) {
         try {
-          measurements.set(row.fixture_id, JSON.parse(row.h2h_json));
+          const parsed = JSON.parse(row.h2h_json) as HeadToHeadMeasurement;
+          if (parsed && (parsed.parserVersion ?? 0) >= 2) {
+            measurements.set(row.fixture_id, parsed);
+          }
         } catch {}
       }
     } catch (err: any) {
@@ -760,7 +770,7 @@ export class FootballDB {
     return this.saveRawFeedData(fixtureId, feedPath, rawText);
   }
 
-  getRawFeed(fixtureId: string): { rawText: string } | null {
+  getRawFeed(fixtureId: string, directOnly = false): { rawText: string } | null {
     if (!fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
 
@@ -769,6 +779,10 @@ export class FootballDB {
       const directRow = sqliteDb.prepare("SELECT compressed_data FROM raw_feed_data WHERE feed_path = ? OR feed_path = ?").get(cleanId, `df_hh_1_${cleanId}`) as any;
       if (directRow && directRow.compressed_data) {
         return { rawText: decompressBuffer(directRow.compressed_data) };
+      }
+
+      if (directOnly) {
+        return null;
       }
 
       // Check daily feeds stored in SQLite
