@@ -147,7 +147,13 @@ export class OnDemandParser {
 
     // 1. Check if measurement is already saved in local SQLite cache
     const storedMeasurement = db.getPredictionMeasurement(cleanId) || db.getPredictionMeasurement(fixtureId);
-    if (storedMeasurement && (storedMeasurement.matchesCount > 0 || storedMeasurement.homeRecentMatches?.length || storedMeasurement.recentH2H?.length)) {
+    if (
+      storedMeasurement &&
+      (storedMeasurement.matchesCount > 0 ||
+        storedMeasurement.homeRecentMatches?.length ||
+        storedMeasurement.awayRecentMatches?.length ||
+        storedMeasurement.recentH2H?.length)
+    ) {
       return storedMeasurement;
     }
 
@@ -155,7 +161,13 @@ export class OnDemandParser {
     let rawData = await db.getRawFeedAsync(cleanId);
     if (!rawData || !rawData.rawText || (!rawData.rawText.includes('KB÷') && !rawData.rawText.includes('KC÷'))) {
       const scraped = await flashscoreScraperService.getMatchHeadToHead(cleanId, fixtureHomeTeam, fixtureAwayTeam);
-      if (scraped && (scraped.matchesCount > 0 || scraped.homeRecentMatches?.length || scraped.recentH2H?.length)) {
+      if (
+        scraped &&
+        (scraped.matchesCount > 0 ||
+          scraped.homeRecentMatches?.length ||
+          scraped.awayRecentMatches?.length ||
+          scraped.recentH2H?.length)
+      ) {
         return scraped;
       }
       rawData = await db.getRawFeedAsync(cleanId);

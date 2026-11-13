@@ -1,5 +1,5 @@
 import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement } from './types.js';
-import { getPossibleDateStrs, normalizeDateStr } from './dateUtils.js';
+import { getPossibleDateStrs, normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import {
   sqliteDb,
@@ -344,16 +344,13 @@ export class FootballDB {
         query += " AND match_date = ?";
         params.push(normalizeDateStr(dateParam));
       } else if (dateFilter && dateFilter !== 'ALL') {
-        const todayStrs = getPossibleDateStrs(0);
-        const tomorrowStrs = getPossibleDateStrs(1);
-        const df = dateFilter.toUpperCase();
-        
-        if (df === 'TODAY') {
-          query += ` AND match_date IN (${todayStrs.map(() => '?').join(',')})`;
-          params.push(...todayStrs);
-        } else if (df === 'TOMORROW') {
-          query += ` AND match_date IN (${tomorrowStrs.map(() => '?').join(',')})`;
-          params.push(...tomorrowStrs);
+        const resolved = resolveDateFilter(dateFilter);
+        if (resolved.kind === 'SINGLE') {
+          query += " AND match_date = ?";
+          params.push(resolved.targetDate);
+        } else if (resolved.kind === 'RANGE') {
+          query += " AND match_date >= ? AND match_date <= ?";
+          params.push(resolved.startDate, resolved.endDate);
         }
       }
 
@@ -701,6 +698,7 @@ export class FootballDB {
         if (
           parsed.matchesCount > 0 ||
           (parsed.homeRecentMatches && parsed.homeRecentMatches.length > 0) ||
+          (parsed.awayRecentMatches && parsed.awayRecentMatches.length > 0) ||
           (parsed.recentH2H && parsed.recentH2H.length > 0)
         ) {
           return parsed;

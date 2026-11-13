@@ -11,30 +11,10 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
   onSelectTab,
 }) => {
   const tabs = [
-    {
-      id: 'FIXTURES' as const,
-      label: 'Predictions',
-      icon: Target,
-      count: undefined,
-    },
-    {
-      id: 'ACCAS' as const,
-      label: 'Featured',
-      icon: Layers,
-      count: '4',
-    },
-    {
-      id: 'STANDINGS' as const,
-      label: 'Standings',
-      icon: Trophy,
-      count: undefined,
-    },
-    {
-      id: 'HISTORY' as const,
-      label: 'History',
-      icon: History,
-      count: undefined,
-    },
+    { id: 'FIXTURES' as const, label: 'Predictions', icon: Target, count: undefined },
+    { id: 'ACCAS' as const, label: 'Featured', icon: Layers, count: '4' },
+    { id: 'STANDINGS' as const, label: 'Standings', icon: Trophy, count: undefined },
+    { id: 'HISTORY' as const, label: 'History', icon: History, count: undefined },
   ];
 
   return (
@@ -42,7 +22,7 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
       aria-label="Primary Navigation"
       className="bg-theme-bg px-3 sm:px-6 py-2 sticky top-[56px] z-20 transition-colors"
     >
-      <div className="max-w-6xl w-full mx-auto p-1 bg-theme-card border border-theme text-theme-main rounded-2xl flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-xs">
+      <div className="max-w-6xl w-full mx-auto p-1 bg-theme-card text-theme-main rounded-2xl flex items-center gap-1.5 overflow-x-auto no-scrollbar shadow-theme-sm">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -53,9 +33,9 @@ export const MainTabBar: React.FC<MainTabBarProps> = ({
               id={`tab-${tab.id.toLowerCase()}-btn`}
               type="button"
               onClick={() => onSelectTab(tab.id)}
-              className={`flex-1 min-w-[110px] sm:min-h-0 min-h-[40px] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 active:scale-95 ${
+              className={`flex-1 min-w-[110px] sm:min-h-0 min-h-[40px] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center justify-center gap-2 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                 isActive
-                  ? 'bg-theme-primary text-theme-primary-text shadow-xs font-black'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm font-black'
                   : 'text-theme-sub hover:text-theme-main hover:bg-theme-subtle'
               }`}
             >

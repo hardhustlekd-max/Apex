@@ -746,8 +746,15 @@ export class ApexEngine {
     const tacticalContext = this.computeTacticalAdjustments(homeTeam, awayTeam, tacticalInput);
 
     // 4. Head to Head record directly from scraper feed or records
-    const h2h = (realScrapedH2H && realScrapedH2H.matchesCount > 0)
-      ? realScrapedH2H
+    const hasRealScrapedH2H = Boolean(
+      realScrapedH2H &&
+      (realScrapedH2H.matchesCount > 0 ||
+        (realScrapedH2H.homeRecentMatches && realScrapedH2H.homeRecentMatches.length > 0) ||
+        (realScrapedH2H.awayRecentMatches && realScrapedH2H.awayRecentMatches.length > 0) ||
+        (realScrapedH2H.recentH2H && realScrapedH2H.recentH2H.length > 0))
+    );
+    const h2h = hasRealScrapedH2H
+      ? realScrapedH2H!
       : this.computeHeadToHead(homeTeam, awayTeam, historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches);
 
     const measurements: PredictionEngineMeasurements = {

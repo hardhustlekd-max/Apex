@@ -20,10 +20,24 @@ export class ServerEngine {
     let rawHist = db.getAllHistoricalMatches(5000);
     const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
     const scrapedAsHistorical: HistoricalMatch[] = scrapedMatches
-      .filter((sm) => sm.result?.home !== undefined && sm.result?.away !== undefined)
+      .filter((sm) => {
+        if (sm.status !== 'FINISHED') return false;
+        const h = sm.result?.home;
+        const a = sm.result?.away;
+        return (
+          h !== undefined &&
+          h !== null &&
+          h !== '' &&
+          a !== undefined &&
+          a !== null &&
+          a !== '' &&
+          !isNaN(Number(h)) &&
+          !isNaN(Number(a))
+        );
+      })
       .map((sm, idx) => {
-        const homeScore = parseInt(String(sm.result!.home), 10) || 0;
-        const awayScore = parseInt(String(sm.result!.away), 10) || 0;
+        const homeScore = parseInt(String(sm.result!.home), 10);
+        const awayScore = parseInt(String(sm.result!.away), 10);
         const ftr: 'H' | 'D' | 'A' = homeScore > awayScore ? 'H' : homeScore < awayScore ? 'A' : 'D';
         return {
           id: sm.matchId || `scraped_${idx}`,
@@ -399,7 +413,9 @@ export class ServerEngine {
           cachedH2HMap.get(f.id) ||
           db.getPredictionMeasurement(cleanId) ||
           db.getPredictionMeasurement(f.id) ||
-          (f.prediction?.measurements?.h2h && f.prediction.measurements.h2h.matchesCount > 0
+          (f.prediction?.measurements?.h2h &&
+          ((f.prediction.measurements.h2h.homeRecentMatches && f.prediction.measurements.h2h.homeRecentMatches.length > 0) ||
+            (f.prediction.measurements.h2h.awayRecentMatches && f.prediction.measurements.h2h.awayRecentMatches.length > 0))
             ? f.prediction.measurements.h2h
             : null);
 
@@ -419,7 +435,12 @@ export class ServerEngine {
         if (!cachedH2H && !skipRemoteH2H) {
           try {
             cachedH2H = await flashscoreScraperService.getMatchHeadToHead(cleanId, f.homeTeam, f.awayTeam);
-            if (cachedH2H && cachedH2H.matchesCount > 0) {
+            if (
+              cachedH2H &&
+              (cachedH2H.matchesCount > 0 ||
+                (cachedH2H.homeRecentMatches && cachedH2H.homeRecentMatches.length > 0) ||
+                (cachedH2H.awayRecentMatches && cachedH2H.awayRecentMatches.length > 0))
+            ) {
               cachedH2HMap.set(cleanId, cachedH2H);
             }
           } catch {}

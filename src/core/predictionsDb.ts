@@ -1,7 +1,7 @@
 import { Fixture } from './types.js';
 import { getLeaguePriority } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
-import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
+import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
 import { sqliteDb } from './sqliteClient.js';
 import { loggerService } from '../services/loggerService.js';
 
@@ -255,16 +255,13 @@ export class PredictionsDB {
         whereClauses.push('match_date = ?');
         params.push(normalizeDateStr(filters.date));
       } else if (filters?.dateFilter && filters.dateFilter !== 'ALL') {
-        const todayStrs = getPossibleDateStrs(0);
-        const tomorrowStrs = getPossibleDateStrs(1);
-        const df = filters.dateFilter.toUpperCase();
-
-        if (df === 'TODAY') {
-          whereClauses.push(`match_date IN (${todayStrs.map(() => '?').join(',')})`);
-          params.push(...todayStrs);
-        } else if (df === 'TOMORROW') {
-          whereClauses.push(`match_date IN (${tomorrowStrs.map(() => '?').join(',')})`);
-          params.push(...tomorrowStrs);
+        const resolved = resolveDateFilter(filters.dateFilter);
+        if (resolved.kind === 'SINGLE') {
+          whereClauses.push('match_date = ?');
+          params.push(resolved.targetDate);
+        } else if (resolved.kind === 'RANGE') {
+          whereClauses.push('match_date >= ? AND match_date <= ?');
+          params.push(resolved.startDate, resolved.endDate);
         }
       }
 

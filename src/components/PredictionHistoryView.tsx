@@ -2,8 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Fixture } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import { CheckCircle2, XCircle, RefreshCw, BarChart3, ShieldCheck, Target, Layers, Database } from 'lucide-react';
-import { getLeaguePriority } from '../core/leaguePriority.js';
 import { normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  LoadingState,
+  SectionHeader,
+  Select,
+  StatTile,
+} from './ui/index.js';
 
 interface PredictionHistoryViewProps {
   isProcessingActive?: boolean;
@@ -41,22 +50,20 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       const { matches, summary: evalSummary } = await EngineService.getHistoricalEvaluation('ALL', recordLimit, showRefreshing);
       setSummary(evalSummary);
 
-      // STRICT FILTER: Only show matches that have a prediction and are finished
-      const evaluatedOnly = (matches || []).filter(f => 
-        f.prediction !== undefined && 
-        f.status === 'FINISHED' && 
-        f.score?.home !== undefined && 
-        f.score?.away !== undefined
+      const evaluatedOnly = (matches || []).filter(
+        (f) =>
+          f.prediction !== undefined &&
+          f.status === 'FINISHED' &&
+          f.score?.home !== undefined &&
+          f.score?.away !== undefined
       );
 
       const sorted = evaluatedOnly.slice().sort((a, b) => {
         const dateA = normalizeDateStr(a.matchDate);
         const dateB = normalizeDateStr(b.matchDate);
-        
-        // Date Descending
+
         if (dateA !== dateB) return dateB.localeCompare(dateA);
 
-        // Time Descending (Time can be 'FT' or 'HH:mm')
         const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
         const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
         return timeB.localeCompare(timeA);
@@ -143,19 +150,17 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const accuracyPct = totalEvaluated > 0 ? ((correctCount / totalEvaluated) * 100).toFixed(1) : '0.0';
 
   if (isLoading) {
-    return (
-      <div className="bg-theme-card rounded-3xl p-10 text-center font-sans shadow-theme-sm border border-theme">
-        <div className="w-8 h-8 rounded-full border-4 border-[var(--accent-default)] border-t-transparent animate-spin mx-auto" />
-        <span className="mt-4 block text-xs font-bold text-theme-sub">Loading...</span>
-      </div>
-    );
+    return <LoadingState label="Loading..." minHeight="min-h-[240px]" />;
   }
 
   return (
     <div className="space-y-3 font-sans">
       {/* Toast Notification for Scraper Sync */}
       {syncToast && (
-        <div className="p-3 rounded-2xl bg-theme-card text-theme-primary border border-theme text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div
+          role="status"
+          className="p-3 rounded-2xl bg-theme-card text-theme-primary text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-theme-md animate-in fade-in slide-in-from-top-2"
+        >
           <div className="flex items-center gap-2">
             <Database className={`w-4 h-4 shrink-0 ${isSyncingHistory ? 'animate-spin text-theme-primary' : 'text-theme-primary'}`} />
             <span>{syncToast}</span>
@@ -165,157 +170,157 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div>
-          <h2 className="text-sm sm:text-base font-extrabold text-theme-main flex items-center gap-1.5 tracking-tight">
-            <BarChart3 className="w-4 h-4 text-theme-primary" />
-            Historical Prediction Evaluation
-          </h2>
-        </div>
+        <SectionHeader
+          title="Prediction History"
+          icon={<BarChart3 className="w-4 h-4 text-theme-primary" />}
+          size="md"
+        />
 
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          <select
+          <Select
+            aria-label="History match limit"
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="px-3 py-1.5 min-h-[35px] rounded-full bg-theme-subtle border border-theme text-xs font-bold text-theme-main focus:outline-none shadow-xs cursor-pointer font-mono tabular-nums"
-          >
-            <option value={30}>30 Matches</option>
-            <option value={50}>50 Matches</option>
-            <option value={100}>100 Matches</option>
-            <option value={200}>200 Matches</option>
-          </select>
+            surface="subtle"
+            selectSize="sm"
+            options={[
+              { value: 30, label: '30 Matches' },
+              { value: 50, label: '50 Matches' },
+              { value: 100, label: '100 Matches' },
+              { value: 200, label: '200 Matches' },
+            ]}
+          />
 
-          {/* Sync Historical Data Scraper Button */}
-          <button
+          <Button
+            variant="inverse"
+            size="sm"
+            pill
             onClick={handleSyncHistoryScraper}
             disabled={isSyncingHistory || isRefreshing || isProcessingActive}
-            className="inline-flex items-center gap-1.5 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-theme-main text-theme-card hover:opacity-90 transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
             title="Run historical archive scraper to populate database with multi-year results"
           >
             <Database className={`w-3.5 h-3.5 ${isSyncingHistory ? 'animate-spin text-theme-primary' : 'text-theme-primary'}`} />
             <span>{isSyncingHistory ? 'Syncing Scraper...' : 'Sync Historical Data'}</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="primary"
+            size="sm"
+            pill
             onClick={() => fetchHistory(limit, true)}
             disabled={isRefreshing || isSyncingHistory || isProcessingActive}
-            className="inline-flex items-center gap-1 min-h-[35px] px-3.5 py-1.5 rounded-full text-xs font-black bg-theme-primary hover:opacity-90 text-theme-primary-text transition-all disabled:opacity-50 active:scale-95 shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Summary Stats Cards */}
       {totalEvaluated > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
-            <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
-              <Layers className="w-3.5 h-3.5 text-theme-primary" />
-              <span>Evaluated Matches</span>
-            </div>
-            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-theme-main">
-              {totalEvaluated}
-            </div>
-          </div>
+          <StatTile
+            label="Evaluated Matches"
+            value={totalEvaluated}
+            icon={<Layers className="w-3.5 h-3.5 text-theme-primary" />}
+            tone="default"
+            surface="card"
+          />
 
-          <div className="bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
-            <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-theme-primary" />
-              <span>Model Accuracy</span>
-            </div>
-            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-theme-primary">
-              {accuracyPct}%
-            </div>
-          </div>
+          <StatTile
+            label="Model Accuracy"
+            value={`${accuracyPct}%`}
+            icon={<ShieldCheck className="w-3.5 h-3.5 text-theme-primary" />}
+            tone="accent"
+            surface="card"
+          />
 
-          <div className="col-span-2 sm:col-span-1 bg-theme-card border border-theme rounded-2xl p-4 shadow-theme-sm">
-            <div className="flex items-center gap-1 text-theme-sub text-xs font-semibold mb-1">
-              <Target className="w-3.5 h-3.5 text-theme-primary" />
-              <span>Correct Hits</span>
-            </div>
-            <div className="text-xl sm:text-2xl font-black font-mono tabular-nums text-theme-main">
-              {correctCount} <span className="text-xs font-bold text-theme-sub">/ {totalEvaluated}</span>
-            </div>
-          </div>
+          <StatTile
+            label="Correct Hits"
+            value={correctCount}
+            subValue={`/ ${totalEvaluated}`}
+            icon={<Target className="w-3.5 h-3.5 text-theme-primary" />}
+            tone="default"
+            surface="card"
+            className="col-span-2 sm:col-span-1"
+          />
         </div>
       )}
 
       {/* Fixtures List */}
-      {history.length === 0 ? (() => {
-        const awaitingCount = summary?.completedAwaitingScore ?? 0;
-        const upcomingPredCount = summary?.upcomingPredictions ?? 0;
-        const livePredCount = summary?.livePredictions ?? 0;
-        const activePredCount = upcomingPredCount + livePredCount;
-        const totalPreds = summary?.totalPredictions ?? 0;
-        const fixturesInDb = summary?.upcomingFixturesInDb ?? 0;
+      {history.length === 0 ? (
+        (() => {
+          const awaitingCount = summary?.completedAwaitingScore ?? 0;
+          const upcomingPredCount = summary?.upcomingPredictions ?? 0;
+          const livePredCount = summary?.livePredictions ?? 0;
+          const activePredCount = upcomingPredCount + livePredCount;
+          const totalPreds = summary?.totalPredictions ?? 0;
+          const fixturesInDb = summary?.upcomingFixturesInDb ?? 0;
 
-        let emptyTitle = 'No Historical Predictions';
-        let showFullSyncCta = true;
-        let refreshCtaLabel = 'Check Results';
+          let emptyTitle = 'No Historical Predictions';
+          let showFullSyncCta = true;
+          let refreshCtaLabel = 'Check Results';
 
-        if (awaitingCount > 0) {
-          emptyTitle = `Awaiting Final Scores (${awaitingCount})`;
-          showFullSyncCta = false;
-          refreshCtaLabel = 'Check Results';
-        } else if (activePredCount > 0) {
-          emptyTitle = `Pending Matches (${upcomingPredCount} Upcoming, ${livePredCount} Live)`;
-          showFullSyncCta = false;
-          refreshCtaLabel = 'Check Results';
-        } else if (totalPreds === 0 && fixturesInDb > 0) {
-          emptyTitle = `No Predictions Generated (${fixturesInDb} Fixtures)`;
-          showFullSyncCta = false;
-          refreshCtaLabel = 'Refresh';
-        }
+          if (awaitingCount > 0) {
+            emptyTitle = `Awaiting Final Scores (${awaitingCount})`;
+            showFullSyncCta = false;
+            refreshCtaLabel = 'Check Results';
+          } else if (activePredCount > 0) {
+            emptyTitle = `Pending Matches (${upcomingPredCount} Upcoming, ${livePredCount} Live)`;
+            showFullSyncCta = false;
+            refreshCtaLabel = 'Check Results';
+          } else if (totalPreds === 0 && fixturesInDb > 0) {
+            emptyTitle = `No Predictions Generated (${fixturesInDb} Fixtures)`;
+            showFullSyncCta = false;
+            refreshCtaLabel = 'Refresh';
+          }
 
-        return (
-          <div className="bg-theme-card border border-theme rounded-2xl p-8 text-center text-xs shadow-theme-sm space-y-4">
-            <div className="w-10 h-10 rounded-2xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary mx-auto shadow-theme-sm">
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </div>
-            <div>
-              <h3 className="text-sm font-extrabold text-theme-main">
-                {emptyTitle}
-              </h3>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-              {showFullSyncCta && onTriggerFullSync ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onTriggerFullSync}
-                    disabled={isProcessingActive || isRefreshing}
-                    className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-theme-glow cursor-pointer disabled:opacity-50"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Start Full Sync & Update Data</span>
-                  </button>
-                  <button
-                    type="button"
+          return (
+            <EmptyState
+              icon={<RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />}
+              title={emptyTitle}
+              actions={
+                showFullSyncCta && onTriggerFullSync ? (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      pill
+                      onClick={onTriggerFullSync}
+                      disabled={isProcessingActive || isRefreshing}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Start Full Sync & Update Data</span>
+                    </Button>
+                    <Button
+                      variant="subtle"
+                      size="md"
+                      pill
+                      onClick={() => fetchHistory(limit, true)}
+                      disabled={isRefreshing || isProcessingActive}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      <span>{isRefreshing ? 'Checking...' : refreshCtaLabel}</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    pill
                     onClick={() => fetchHistory(limit, true)}
                     disabled={isRefreshing || isProcessingActive}
-                    className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-theme-subtle border border-theme text-theme-main transition-all active:scale-95 shadow-theme-sm cursor-pointer disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span>{isRefreshing ? 'Checking...' : refreshCtaLabel}</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fetchHistory(limit, true)}
-                  disabled={isRefreshing || isProcessingActive}
-                  className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-theme-glow cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>{isRefreshing ? 'Checking Flashscore Results...' : refreshCtaLabel}</span>
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })() : (
-        <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-theme-sm divide-y divide-[var(--border-subdued)]">
+                    <span>{isRefreshing ? 'Checking Flashscore Results...' : refreshCtaLabel}</span>
+                  </Button>
+                )
+              }
+            />
+          );
+        })()
+      ) : (
+        <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);
 
@@ -323,28 +328,32 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <div
                 key={f.id}
                 onClick={() => onSelectDetail?.(f)}
-                className="px-4 py-2.5 hover:bg-theme-subtle/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px] cursor-pointer group"
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && onSelectDetail) {
+                    e.preventDefault();
+                    onSelectDetail(f);
+                  }
+                }}
+                className="px-4 py-2.5 odd:bg-theme-card even:bg-theme-card-elevated/45 hover:bg-theme-subtle/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px] cursor-pointer group"
                 role="button"
                 tabIndex={0}
               >
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-extrabold text-theme-main text-[10.5px] sm:text-xs">
+                    <span className="font-extrabold text-theme-main text-[11px] sm:text-xs">
                       {f.homeTeam} <span className="text-theme-sub font-normal">vs</span> {f.awayTeam}
                     </span>
-                    <span className="text-[8.5px] font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full bg-theme-subtle text-theme-sub">
+                    <Badge variant="default" size="xs" pill>
                       {f.leagueName || f.league}
-                    </span>
-                    <span className="text-[8.5px] font-mono tabular-nums text-theme-sub">
-                      {f.matchDate}
-                    </span>
+                    </Badge>
+                    <span className="text-[9px] font-mono tabular-nums text-theme-sub">{f.matchDate}</span>
                   </div>
 
-                  <div className="text-[9.5px] text-theme-sub font-mono tabular-nums flex items-center gap-2 flex-wrap">
+                  <div className="text-[10px] text-theme-sub font-mono tabular-nums flex items-center gap-2 flex-wrap">
                     <span>
                       Final Score: <strong className="text-theme-main font-black">{evalResult.hG} - {evalResult.aG}</strong>
                     </span>
-                    <span className="text-theme-sub">•</span>
+                    <span className="text-theme-sub" aria-hidden="true">•</span>
                     <span>
                       Model Pick: <strong className="text-theme-main font-black">{evalResult.predictedLabel}</strong> ({(evalResult.topProb * 100).toFixed(0)}%)
                     </span>
@@ -352,13 +361,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 </div>
 
                 <div className="shrink-0 flex items-center gap-1.5">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black ${
-                      evalResult.isCorrect
-                        ? 'bg-theme-primary text-theme-primary-text font-mono tabular-nums'
-                        : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 font-mono tabular-nums'
-                    }`}
-                  >
+                  <Badge variant={evalResult.isCorrect ? 'solid' : 'danger'} size="sm" pill>
                     {evalResult.isCorrect ? (
                       <>
                         <CheckCircle2 className="w-3 h-3 text-theme-primary-text" />
@@ -370,14 +373,13 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                         <span>Missed</span>
                       </>
                     )}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             );
           })}
-        </div>
+        </Card>
       )}
     </div>
   );
 };
-

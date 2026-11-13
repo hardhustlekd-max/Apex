@@ -1161,7 +1161,7 @@ export class FlashscoreScraperService {
 
     try {
       let feedText: string | null = null;
-      const rawStored = db.getRawFeed(cleanId);
+      const rawStored = db.getRawFeed(cleanId, true);
       if (rawStored && rawStored.rawText && (rawStored.rawText.includes('KB÷') || rawStored.rawText.includes('KC÷'))) {
         feedText = rawStored.rawText;
         loggerService.addLog({

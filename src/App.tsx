@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
+import { RefreshCw } from 'lucide-react';
 import { Header } from './components/Header.js';
 import { DesktopSidebar } from './components/DesktopSidebar.js';
 import { FixturesList } from './components/FixturesList.js';
@@ -11,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
 import { BottomNavDock } from './components/BottomNavDock.js';
 import { SyncLockOverlay } from './components/SyncLockOverlay.js';
+import { Button, Card, Toast } from './components/ui/index.js';
 import {
   Fixture,
   EngineSettings,
@@ -18,10 +20,8 @@ import {
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
-import { getRelativeDateStr, getPossibleDateStrs, normalizeDateStr } from './core/dateUtils.js';
+import { matchesDateFilter } from './core/dateUtils.js';
 import { applyColorTheme, getActiveColorThemeId, setThemeMode, getSavedThemeMode } from './core/themeEngine.js';
-
-import { RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -32,8 +32,8 @@ export default function App() {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoadingFixtures, setIsLoadingFixtures] = useState<boolean>(true);
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
-  const [dateFilter, setDateFilter] = useState<'TODAY' | 'TOMORROW' | 'NEXT_3_DAYS' | 'THIS_WEEK' | 'CUSTOM' | 'ALL'>('TODAY');
-  const [marketChoiceFilter, setMarketChoiceFilter] = useState<'BEST_VALUE' | 'OVER_UNDER' | '1X2' | 'BTTS'>('BEST_VALUE');
+  const [dateFilter, setDateFilter] = useState<string>('TODAY');
+  const [marketChoiceFilter, setMarketChoiceFilter] = useState<'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS'>('MOST_LIKELY');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'WIREFRAME' | 'CARDS'>('WIREFRAME');
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState<boolean>(false);
@@ -55,7 +55,7 @@ export default function App() {
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
-  const [isSeeding, setIsSeeding] = useState<boolean>(false);
+  const [isSeeding] = useState<boolean>(false);
   const [isSyncingData, setIsSyncingData] = useState<boolean>(false);
   const [activeSyncJob, setActiveSyncJob] = useState<any | null>(null);
   const [syncJobProgress, setSyncJobProgress] = useState<{
@@ -121,9 +121,6 @@ export default function App() {
     }
   };
 
-  const handleSyncData = handleResetAndSyncData;
-  const handleResetDatabase = handleResetAndSyncData;
-
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
@@ -134,18 +131,14 @@ export default function App() {
     setThemeMode(theme);
   }, [theme]);
 
-
-  // Fetch initial fixtures and settings
   const fetchFixtures = useCallback(async () => {
     try {
       setIsLoadingFixtures(true);
       const data = await EngineService.getFixtures('ALL');
       setFixtures(data);
 
-      const todayStrs = getPossibleDateStrs(0);
-      const tomorrowStrs = getPossibleDateStrs(1);
-      const hasTodayMatches = data.some(f => todayStrs.includes(normalizeDateStr(f.matchDate)) && f.status !== 'LIVE');
-      const hasTomorrowMatches = data.some(f => tomorrowStrs.includes(normalizeDateStr(f.matchDate)) && f.status !== 'LIVE');
+      const hasTodayMatches = data.some(f => f.status !== 'LIVE' && matchesDateFilter(f, 'TODAY'));
+      const hasTomorrowMatches = data.some(f => f.status !== 'LIVE' && matchesDateFilter(f, 'TOMORROW'));
       if (hasTodayMatches) {
         setDateFilter('TODAY');
       } else if (hasTomorrowMatches) {
@@ -200,24 +193,6 @@ export default function App() {
     }
   }, [selectedLeague]);
 
-  const checkActiveSyncJob = useCallback(async () => {
-    try {
-      const active = await EngineService.getActiveSyncJob();
-      if (active && (active.status === 'RUNNING' || active.status === 'PENDING')) {
-        setActiveSyncJob(active);
-      } else if (activeSyncJob && (activeSyncJob.status === 'RUNNING' || activeSyncJob.status === 'PENDING')) {
-        setActiveSyncJob(null);
-        setIsSyncingData(false);
-        await Promise.all([fetchFixtures(), fetchSettingsAndProviders(), fetchLiveScores(), fetchLivePredictions()]);
-        showNotification('Synchronization & prediction recalculation complete!', 'success');
-      } else {
-        setActiveSyncJob(null);
-      }
-    } catch {
-      // safe catch
-    }
-  }, [activeSyncJob, fetchFixtures, fetchSettingsAndProviders, fetchLiveScores]);
-
   useEffect(() => {
     applyColorTheme(settings?.colorTheme || getActiveColorThemeId());
     fetchSettingsAndProviders();
@@ -225,9 +200,7 @@ export default function App() {
     fetchLiveScores();
     fetchLivePredictions();
 
-    // Adaptive polling: 15s for live scores
     const liveInterval = setInterval(fetchLiveScores, 15000);
-    // Predictions update less frequently (every 1 min)
     const predInterval = setInterval(fetchLivePredictions, 60000);
 
     return () => {
@@ -235,20 +208,6 @@ export default function App() {
       clearInterval(predInterval);
     };
   }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores, fetchLivePredictions]);
-
-  const handleSelectLeague = (league: string) => {
-    setSelectedLeague(league);
-  };
-
-  const handleProviderChange = async () => {
-    try {
-      await EngineService.switchProvider();
-      showNotification(`Provider switched successfully`);
-      fetchFixtures();
-    } catch (e) {
-      console.error('Failed to switch provider:', e);
-    }
-  };
 
   const handleSaveSettings = async (newSettings: Partial<EngineSettings>) => {
     try {
@@ -278,12 +237,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-theme-bg text-theme-main flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
-      {notification && (
-        <div className="fixed bottom-16 sm:bottom-5 right-3 z-[100] bg-theme-glass text-theme-main font-mono text-xs px-3 py-2 rounded-full shadow-theme-md flex items-center gap-2 animate-in slide-in-from-bottom-2 border border-theme">
-          <span className="w-1.5 h-1.5 rounded-full bg-theme-primary shrink-0 animate-pulse" />
-          <span className="truncate max-w-[280px] font-bold">{notification.message}</span>
-        </div>
-      )}
+      <Toast message={notification?.message ?? null} type={notification?.type ?? 'info'} />
 
       {/* Top Application Header */}
       <Header
@@ -329,7 +283,7 @@ export default function App() {
             refreshingContent={
               <div className="flex items-center justify-center py-3">
                 <div
-                  className="w-9 h-9 rounded-full bg-theme-card border border-theme shadow-theme-md flex items-center justify-center text-theme-primary"
+                  className="w-9 h-9 rounded-full bg-theme-card shadow-theme-md flex items-center justify-center text-theme-primary"
                   role="status"
                   aria-label="Refreshing"
                 >
@@ -358,32 +312,36 @@ export default function App() {
               {isProcessingActive && (
                 <SyncLockOverlay
                   job={activeSyncJob}
-                  onCancel={(jobId) => EngineService.cancelSyncJob(jobId)}
+                  onCancel={(jobId) => {
+                    setActiveSyncJob(null);
+                    return EngineService.cancelSyncJob(jobId);
+                  }}
                 />
               )}
 
               {/* Notification Banner to Start Full Sync if Database has zero fixtures */}
               {fixtures.length === 0 && !isLoadingFixtures && !isProcessingActive && (
-                <div className="bg-theme-card border border-theme text-theme-main rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-theme-sm">
+                <Card className="flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8.5 h-8.5 rounded-xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary shrink-0 font-bold">
+                    <div className="w-9 h-9 rounded-xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shrink-0">
                       <RefreshCw className="w-4.5 h-4.5" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-xs sm:text-sm font-extrabold tracking-tight">
+                      <h3 className="text-xs sm:text-sm font-extrabold tracking-tight truncate">
                         No Fixtures in Database
                       </h3>
                     </div>
                   </div>
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={handleResetAndSyncData}
-                    className="px-3.5 py-2 rounded-full bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover font-black text-xs transition-all cursor-pointer shadow-theme-glow active:scale-95 shrink-0 whitespace-nowrap flex items-center gap-1.5"
+                    className="font-black"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Start Full Sync</span>
-                  </button>
-                </div>
+                  </Button>
+                </Card>
               )}
 
               {activeTab === 'FIXTURES' && (
@@ -418,7 +376,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card shadow-theme-md overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
@@ -510,4 +468,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -11,144 +11,76 @@
   }
 
   /* ==========================================================================
-     TIER 1: PRIMITIVE TOKENS (Raw scales, colorway palettes & metric base)
+     TIER 1: PRIMITIVE TOKENS (Typography, Radii, Motion, Color Scales)
      ========================================================================== */
   :root {
     /* Base Neutral Scales */
     --primitive-white: #ffffff;
     --primitive-black: #000000;
 
-    /* Slate Neutral Ramp (Opta Kinetic Palette Base) */
-    --primitive-slate-50: #f8fafc;
-    --primitive-slate-100: #f1f5f9;
-    --primitive-slate-200: #e2e8f0;
-    --primitive-slate-300: #cbd5e1;
-    --primitive-slate-400: #94a3b8;
-    --primitive-slate-500: #64748b;
-    --primitive-slate-600: #475569;
-    --primitive-slate-700: #334155;
-    --primitive-slate-800: #1e293b;
-    --primitive-slate-900: #0f172a;
-    --primitive-slate-950: #080c14;
-
-    /* Midnight Stadium Navy Ramp (Champions Crimson Palette Base) */
-    --primitive-navy-950: #0a0e1a;
-    --primitive-navy-900: #121828;
-    --primitive-navy-850: #1a2136;
-    --primitive-navy-800: #1e2638;
-    --primitive-navy-700: #28334a;
-
-    /* Velvet Gala Onyx Ramp (Ballon d'Or Gold Palette Base) */
-    --primitive-onyx-950: #090a0f;
-    --primitive-onyx-900: #141622;
-    --primitive-onyx-850: #1c1f2e;
-    --primitive-onyx-800: #232738;
-    --primitive-onyx-700: #2d3248;
-
-    /* Cyber Graphite Ramp (Volt Lime Pro Palette Base) */
-    --primitive-graphite-950: #0b0c0e;
-    --primitive-graphite-900: #15161c;
-    --primitive-graphite-850: #1e2027;
-    --primitive-graphite-800: #252832;
-    --primitive-graphite-700: #272a34;
-
-    /* Pitch Emerald Primitive Ramp */
-    --primitive-emerald-600: #009657;
-    --primitive-emerald-500: #00b368;
-    --primitive-emerald-400: #00e687;
-    --primitive-emerald-300: #00c272;
-
-    /* Matchday Crimson & Flare Red Primitive Ramp */
-    --primitive-crimson-700: #c40023;
-    --primitive-crimson-600: #e6002a;
-    --primitive-crimson-500: #ff1a43;
-    --primitive-crimson-400: #ff2e51;
-
-    /* Cyber Mint Primitive Ramp (Generated for Champions Model Value) */
-    --primitive-mint-600: #009e60;
-    --primitive-mint-500: #00b875;
-    --primitive-mint-400: #00f5a0;
-    --primitive-mint-300: #33ffb5;
-
-    /* Championship Trophy Gold Primitive Ramp */
-    --primitive-gold-700: #b45309;
-    --primitive-gold-600: #d97706;
-    --primitive-gold-500: #f59e0b;
-    --primitive-gold-400: #fbbf24;
-
-    /* Gala Trophy Jade & Coral Ramps (Generated for Ballon d'Or System) */
-    --primitive-jade-600: #059669;
-    --primitive-jade-500: #10b981;
-    --primitive-jade-400: #34d399;
-
-    --primitive-coral-600: #e11d48;
-    --primitive-coral-500: #ff385c;
-    --primitive-coral-400: #fb7185;
-
-    /* Volt Lime Primitive Ramp */
-    --primitive-volt-600: #6d8f00;
-    --primitive-volt-500: #85ad00;
-    --primitive-volt-400: #ccff00;
-    --primitive-volt-300: #d4ff33;
-    --primitive-laser-red: #ff334b;
-
-    /* Global Typography & Font Metrics */
+    /* Global Typography & Font Metrics (2+1 Font System) */
     --font-family-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --font-size-base: 14px;
     --font-line-height-base: 21px;
 
-    /* Spatial Radii */
-    --radius-sm: 0.375rem; /* 6px */
-    --radius-md: 0.5rem;   /* 8px */
-    --radius-lg: 0.75rem;  /* 12px */
-    --radius-xl: 1rem;     /* 16px */
-    --radius-2xl: 1.25rem; /* 20px */
+    /* Spatial Radii Scale */
+    --radius-sm: 0.375rem;   /* 6px */
+    --radius-md: 0.5rem;     /* 8px */
+    --radius-lg: 0.75rem;    /* 12px */
+    --radius-xl: 1rem;       /* 16px */
+    --radius-2xl: 1.25rem;   /* 20px */
+    --radius-3xl: 1.5rem;    /* 24px */
     --radius-full: 9999px;
+
+    /* Motion Tokens (<= 200ms interactive settling) */
+    --duration-fast: 150ms;
+    --duration-normal: 180ms;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* ==========================================================================
-     TIER 2: SEMANTIC TOKENS - BASELINE / SYSTEM 1: OPTA KINETIC EMERALD
+     TIER 2: SEMANTIC TOKENS — THEME 1: OPTA KINETIC EMERALD (Default)
      ========================================================================== */
 
-  /* Light Baseline (Opta Kinetic Emerald Light) */
+  /* Light Mode */
   :root,
   [data-theme="light"],
   :root[data-color-theme="opta-emerald"],
   [data-theme="light"][data-color-theme="opta-emerald"] {
-    /* Surfaces */
-    --bg-primary: #f5f7fb;
+    /* Tonal Surface Ladder (60% Canvas -> 30% Surfaces) */
+    --bg-primary: #f1f5f9;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
-    --bg-card-elevated: #f8fafd;
+    --bg-card-elevated: #f8fafc;
     --bg-subtle: #edf2f7;
-    --bg-overlay: rgba(15, 23, 42, 0.45);
-    --surface-glass: rgba(255, 255, 255, 0.82);
+    --bg-overlay: rgba(15, 23, 42, 0.44);
+    --surface-glass: rgba(255, 255, 255, 0.88);
 
-    /* Typography */
+    /* Typography Hierarchy */
     --text-primary: #0b1220;
     --text-secondary: #475569;
-    --text-muted: #94a3b8;
+    --text-muted: #64748b;
     --text-inverse: #ffffff;
 
-    /* Borders */
-    --border-default: rgba(15, 23, 42, 0.08);
-    --border-subdued: rgba(15, 23, 42, 0.05);
-    --border-accent: rgba(0, 158, 92, 0.38);
+    /* Border Tokens (reserved for spinners/focus accents) */
+    --border-default: rgba(15, 23, 42, 0.06);
+    --border-subdued: rgba(15, 23, 42, 0.035);
+    --border-accent: rgba(0, 158, 92, 0.34);
 
-    /* Shadows */
-    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -4px rgba(15, 23, 42, 0.05);
-    --shadow-elevated: 0 8px 24px -6px rgba(15, 23, 42, 0.10), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-    --shadow-glow: 0 6px 16px -4px rgba(0, 158, 92, 0.30);
+    /* Diffused Ambient Shadows */
+    --shadow-card: 0 2px 10px -2px rgba(15, 23, 42, 0.05), 0 1px 3px -1px rgba(15, 23, 42, 0.025);
+    --shadow-elevated: 0 12px 30px -6px rgba(15, 23, 42, 0.10), 0 3px 10px -2px rgba(15, 23, 42, 0.04);
+    --shadow-glow: 0 4px 14px -3px rgba(0, 158, 92, 0.24);
 
-    /* Brand Accents */
+    /* Brand Accent (10% Budget) */
     --accent-default: #009e5c;
     --accent-hover: #00824b;
     --accent-text: #ffffff;
     --accent-subtle: rgba(0, 158, 92, 0.11);
     --accent-glow: rgba(0, 158, 92, 0.25);
 
-    /* Domain Colors Matching Opta Emerald */
+    /* Semantic Signals */
     --model-pick: #00874e;
     --status-live: #e11d48;
     --status-success: #009e5c;
@@ -156,7 +88,7 @@
     --status-danger: #e11d48;
     --status-info: #0284c7;
 
-    /* Backward Compatible Bindings */
+    /* Compatibility Aliases */
     --color-primary: var(--accent-default);
     --color-primary-hover: var(--accent-hover);
     --color-primary-text: var(--accent-text);
@@ -176,44 +108,38 @@
     --apex-black: var(--text-primary);
   }
 
-  /* Dark Baseline (Opta Kinetic Emerald Dark) */
+  /* Dark Mode */
   [data-theme="dark"],
   .dark,
   [data-theme="dark"][data-color-theme="opta-emerald"],
   .dark[data-color-theme="opta-emerald"] {
-    /* Surfaces */
     --bg-primary: #070b12;
     --bg-secondary: #0e1420;
-    --bg-card: #0f1623;
-    --bg-card-elevated: #161f30;
-    --bg-subtle: #1a2436;
-    --bg-overlay: rgba(2, 6, 14, 0.78);
-    --surface-glass: rgba(15, 22, 35, 0.80);
+    --bg-card: #101724;
+    --bg-card-elevated: #172032;
+    --bg-subtle: #1d283d;
+    --bg-overlay: rgba(2, 6, 14, 0.76);
+    --surface-glass: rgba(16, 23, 36, 0.86);
 
-    /* Typography */
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-muted: #75849a;
     --text-inverse: #070b12;
 
-    /* Borders */
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-subdued: rgba(255, 255, 255, 0.045);
-    --border-accent: rgba(0, 230, 135, 0.45);
+    --border-default: rgba(255, 255, 255, 0.06);
+    --border-subdued: rgba(255, 255, 255, 0.035);
+    --border-accent: rgba(0, 230, 135, 0.40);
 
-    /* Shadows */
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 12px 32px -8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --shadow-glow: 0 6px 18px -4px rgba(0, 230, 135, 0.28);
+    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
+    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
+    --shadow-glow: 0 4px 16px -3px rgba(0, 230, 135, 0.24);
 
-    /* Brand Accents */
     --accent-default: #00e687;
     --accent-hover: #00c975;
     --accent-text: #04120c;
     --accent-subtle: rgba(0, 230, 135, 0.14);
     --accent-glow: rgba(0, 230, 135, 0.28);
 
-    /* Domain Colors Matching Opta Emerald */
     --model-pick: #00e687;
     --status-live: #ff3b4e;
     --status-success: #00e687;
@@ -221,7 +147,6 @@
     --status-danger: #ff453a;
     --status-info: #38bdf8;
 
-    /* Backward Compatible Bindings */
     --color-primary: var(--accent-default);
     --color-primary-hover: var(--accent-hover);
     --color-primary-text: var(--accent-text);
@@ -242,32 +167,30 @@
   }
 
   /* ==========================================================================
-     SYSTEM 2: CHAMPIONS CRIMSON & MINT (European Matchday Intensity)
+     THEME 2: CHAMPIONS CRIMSON & MINT
      ========================================================================== */
-
-  /* Light Mode */
   :root[data-color-theme="champions-crimson"],
   [data-theme="light"][data-color-theme="champions-crimson"] {
-    --bg-primary: #f7f8fb;
+    --bg-primary: #f1f3f8;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
-    --bg-card-elevated: #f3f5f9;
-    --bg-subtle: #eaeef5;
-    --bg-overlay: rgba(15, 23, 42, 0.50);
-    --surface-glass: rgba(255, 255, 255, 0.84);
+    --bg-card-elevated: #f7f8fc;
+    --bg-subtle: #ebeff6;
+    --bg-overlay: rgba(15, 23, 42, 0.46);
+    --surface-glass: rgba(255, 255, 255, 0.88);
 
     --text-primary: #0f172a;
     --text-secondary: #475569;
-    --text-muted: #94a3b8;
+    --text-muted: #64748b;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(15, 23, 42, 0.08);
-    --border-subdued: rgba(15, 23, 42, 0.05);
-    --border-accent: rgba(217, 4, 41, 0.35);
+    --border-default: rgba(15, 23, 42, 0.06);
+    --border-subdued: rgba(15, 23, 42, 0.035);
+    --border-accent: rgba(217, 4, 41, 0.32);
 
-    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -4px rgba(15, 23, 42, 0.05);
-    --shadow-elevated: 0 8px 24px -6px rgba(15, 23, 42, 0.10), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-    --shadow-glow: 0 6px 16px -4px rgba(217, 4, 41, 0.28);
+    --shadow-card: 0 2px 10px -2px rgba(15, 23, 42, 0.05), 0 1px 3px -1px rgba(15, 23, 42, 0.025);
+    --shadow-elevated: 0 12px 30px -6px rgba(15, 23, 42, 0.10), 0 3px 10px -2px rgba(15, 23, 42, 0.04);
+    --shadow-glow: 0 4px 14px -3px rgba(217, 4, 41, 0.24);
 
     --accent-default: #d90429;
     --accent-hover: #b80322;
@@ -275,7 +198,6 @@
     --accent-subtle: rgba(217, 4, 41, 0.10);
     --accent-glow: rgba(217, 4, 41, 0.25);
 
-    /* Generated Distinct Colorway Matching Champions Crimson & Mint */
     --model-pick: #059669;
     --status-live: #d90429;
     --status-success: #059669;
@@ -302,29 +224,28 @@
     --apex-black: var(--text-primary);
   }
 
-  /* Dark Mode */
   [data-theme="dark"][data-color-theme="champions-crimson"],
   .dark[data-color-theme="champions-crimson"] {
     --bg-primary: #090d18;
     --bg-secondary: #111727;
     --bg-card: #12192b;
-    --bg-card-elevated: #192138;
-    --bg-subtle: #1d263f;
-    --bg-overlay: rgba(2, 5, 12, 0.80);
-    --surface-glass: rgba(18, 25, 43, 0.82);
+    --bg-card-elevated: #1a233b;
+    --bg-subtle: #212c47;
+    --bg-overlay: rgba(2, 5, 12, 0.78);
+    --surface-glass: rgba(18, 25, 43, 0.86);
 
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-muted: #75849a;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-subdued: rgba(255, 255, 255, 0.045);
-    --border-accent: rgba(255, 35, 75, 0.45);
+    --border-default: rgba(255, 255, 255, 0.06);
+    --border-subdued: rgba(255, 255, 255, 0.035);
+    --border-accent: rgba(255, 35, 75, 0.40);
 
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 12px 32px -8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --shadow-glow: 0 6px 18px -4px rgba(255, 35, 75, 0.35);
+    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
+    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
+    --shadow-glow: 0 4px 16px -3px rgba(255, 35, 75, 0.28);
 
     --accent-default: #ff234b;
     --accent-hover: #ff3d60;
@@ -332,7 +253,6 @@
     --accent-subtle: rgba(255, 35, 75, 0.18);
     --accent-glow: rgba(255, 35, 75, 0.32);
 
-    /* Generated Distinct Colorway Matching Champions Crimson & Mint */
     --model-pick: #00f5a0;
     --status-live: #ff2e51;
     --status-success: #00f5a0;
@@ -360,32 +280,30 @@
   }
 
   /* ==========================================================================
-     SYSTEM 3: BALLON D'OR GOLD (Luxury Football Gala & Editorial)
+     THEME 3: BALLON D'OR GOLD
      ========================================================================== */
-
-  /* Light Mode */
   :root[data-color-theme="ballon-gold"],
   [data-theme="light"][data-color-theme="ballon-gold"] {
-    --bg-primary: #faf9f6;
+    --bg-primary: #f5f3ed;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
-    --bg-card-elevated: #f5f4f0;
-    --bg-subtle: #edece6;
-    --bg-overlay: rgba(17, 24, 39, 0.45);
-    --surface-glass: rgba(255, 255, 255, 0.84);
+    --bg-card-elevated: #faf9f5;
+    --bg-subtle: #efede6;
+    --bg-overlay: rgba(17, 24, 39, 0.44);
+    --surface-glass: rgba(255, 255, 255, 0.88);
 
     --text-primary: #141418;
     --text-secondary: #52525b;
-    --text-muted: #a1a1aa;
+    --text-muted: #71717a;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(20, 20, 24, 0.08);
-    --border-subdued: rgba(20, 20, 24, 0.05);
-    --border-accent: rgba(194, 106, 3, 0.35);
+    --border-default: rgba(20, 20, 24, 0.06);
+    --border-subdued: rgba(20, 20, 24, 0.035);
+    --border-accent: rgba(194, 106, 3, 0.32);
 
-    --shadow-card: 0 1px 2px rgba(20, 20, 24, 0.04), 0 4px 14px -4px rgba(20, 20, 24, 0.05);
-    --shadow-elevated: 0 8px 24px -6px rgba(20, 20, 24, 0.10), 0 2px 6px -1px rgba(20, 20, 24, 0.04);
-    --shadow-glow: 0 6px 16px -4px rgba(194, 106, 3, 0.28);
+    --shadow-card: 0 2px 10px -2px rgba(20, 20, 24, 0.05), 0 1px 3px -1px rgba(20, 20, 24, 0.025);
+    --shadow-elevated: 0 12px 30px -6px rgba(20, 20, 24, 0.10), 0 3px 10px -2px rgba(20, 20, 24, 0.04);
+    --shadow-glow: 0 4px 14px -3px rgba(194, 106, 3, 0.24);
 
     --accent-default: #c26a03;
     --accent-hover: #a65702;
@@ -393,7 +311,6 @@
     --accent-subtle: rgba(194, 106, 3, 0.11);
     --accent-glow: rgba(194, 106, 3, 0.25);
 
-    /* Generated Distinct Colorway Matching Luxury Gold, Jade & Coral */
     --model-pick: #059669;
     --status-live: #e11d48;
     --status-success: #059669;
@@ -420,29 +337,28 @@
     --apex-black: var(--text-primary);
   }
 
-  /* Dark Mode */
   [data-theme="dark"][data-color-theme="ballon-gold"],
   .dark[data-color-theme="ballon-gold"] {
     --bg-primary: #090a0f;
     --bg-secondary: #131520;
     --bg-card: #141724;
-    --bg-card-elevated: #1b1f30;
-    --bg-subtle: #22263a;
-    --bg-overlay: rgba(2, 3, 6, 0.82);
-    --surface-glass: rgba(20, 23, 36, 0.82);
+    --bg-card-elevated: #1c2032;
+    --bg-subtle: #24293f;
+    --bg-overlay: rgba(2, 3, 6, 0.78);
+    --surface-glass: rgba(20, 23, 36, 0.86);
 
     --text-primary: #fafafa;
     --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --text-muted: #787882;
     --text-inverse: #090a0f;
 
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-subdued: rgba(255, 255, 255, 0.045);
-    --border-accent: rgba(245, 158, 11, 0.45);
+    --border-default: rgba(255, 255, 255, 0.06);
+    --border-subdued: rgba(255, 255, 255, 0.035);
+    --border-accent: rgba(245, 158, 11, 0.40);
 
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 12px 32px -8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --shadow-glow: 0 6px 18px -4px rgba(245, 158, 11, 0.32);
+    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
+    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
+    --shadow-glow: 0 4px 16px -3px rgba(245, 158, 11, 0.24);
 
     --accent-default: #f59e0b;
     --accent-hover: #fbbf24;
@@ -450,7 +366,6 @@
     --accent-subtle: rgba(245, 158, 11, 0.16);
     --accent-glow: rgba(245, 158, 11, 0.32);
 
-    /* Generated Distinct Colorway Matching Luxury Gold, Jade & Coral */
     --model-pick: #10b981;
     --status-live: #ff385c;
     --status-success: #10b981;
@@ -478,32 +393,30 @@
   }
 
   /* ==========================================================================
-     SYSTEM 4: VOLT LIME PRO (High-Energy Volt Cyber)
+     THEME 4: VOLT LIME PRO
      ========================================================================== */
-
-  /* Light Mode */
   :root[data-color-theme="volt-lime"],
   [data-theme="light"][data-color-theme="volt-lime"] {
-    --bg-primary: #f6f7f9;
+    --bg-primary: #f0f2f5;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
-    --bg-card-elevated: #f2f4f7;
+    --bg-card-elevated: #f7f8fa;
     --bg-subtle: #eaedf2;
-    --bg-overlay: rgba(24, 25, 31, 0.45);
-    --surface-glass: rgba(255, 255, 255, 0.84);
+    --bg-overlay: rgba(24, 25, 31, 0.44);
+    --surface-glass: rgba(255, 255, 255, 0.88);
 
     --text-primary: #14161b;
     --text-secondary: #4e5361;
-    --text-muted: #8b909e;
+    --text-muted: #6c7280;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(20, 22, 27, 0.08);
-    --border-subdued: rgba(20, 22, 27, 0.05);
-    --border-accent: rgba(101, 135, 0, 0.35);
+    --border-default: rgba(20, 22, 27, 0.06);
+    --border-subdued: rgba(20, 22, 27, 0.035);
+    --border-accent: rgba(101, 135, 0, 0.32);
 
-    --shadow-card: 0 1px 2px rgba(20, 22, 27, 0.04), 0 4px 14px -4px rgba(20, 22, 27, 0.05);
-    --shadow-elevated: 0 8px 24px -6px rgba(20, 22, 27, 0.10), 0 2px 6px -1px rgba(20, 22, 27, 0.04);
-    --shadow-glow: 0 6px 16px -4px rgba(101, 135, 0, 0.28);
+    --shadow-card: 0 2px 10px -2px rgba(20, 22, 27, 0.05), 0 1px 3px -1px rgba(20, 22, 27, 0.025);
+    --shadow-elevated: 0 12px 30px -6px rgba(20, 22, 27, 0.10), 0 3px 10px -2px rgba(20, 22, 27, 0.04);
+    --shadow-glow: 0 4px 14px -3px rgba(101, 135, 0, 0.24);
 
     --accent-default: #658700;
     --accent-hover: #537000;
@@ -511,7 +424,6 @@
     --accent-subtle: rgba(101, 135, 0, 0.12);
     --accent-glow: rgba(101, 135, 0, 0.24);
 
-    /* Generated Distinct Colorway Matching Volt Pro */
     --model-pick: #658700;
     --status-live: #dc2626;
     --status-success: #658700;
@@ -538,29 +450,28 @@
     --apex-black: var(--text-primary);
   }
 
-  /* Dark Mode */
   [data-theme="dark"][data-color-theme="volt-lime"],
   .dark[data-color-theme="volt-lime"] {
     --bg-primary: #0a0b0e;
     --bg-secondary: #13151b;
     --bg-card: #15171e;
-    --bg-card-elevated: #1c1f28;
-    --bg-subtle: #232733;
-    --bg-overlay: rgba(0, 0, 0, 0.82);
-    --surface-glass: rgba(21, 23, 30, 0.82);
+    --bg-card-elevated: #1d202a;
+    --bg-subtle: #252936;
+    --bg-overlay: rgba(0, 0, 0, 0.78);
+    --surface-glass: rgba(21, 23, 30, 0.86);
 
     --text-primary: #f9fafb;
     --text-secondary: #9ea3b2;
-    --text-muted: #64748b;
+    --text-muted: #767d8e;
     --text-inverse: #0a0b0e;
 
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-subdued: rgba(255, 255, 255, 0.045);
-    --border-accent: rgba(204, 255, 0, 0.45);
+    --border-default: rgba(255, 255, 255, 0.06);
+    --border-subdued: rgba(255, 255, 255, 0.035);
+    --border-accent: rgba(204, 255, 0, 0.40);
 
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 12px 32px -8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --shadow-glow: 0 6px 18px -4px rgba(204, 255, 0, 0.25);
+    --shadow-card: 0 2px 12px -2px rgba(0, 0, 0, 0.30);
+    --shadow-elevated: 0 14px 34px -6px rgba(0, 0, 0, 0.52);
+    --shadow-glow: 0 4px 16px -3px rgba(204, 255, 0, 0.22);
 
     --accent-default: #ccff00;
     --accent-hover: #d7ff38;
@@ -568,7 +479,6 @@
     --accent-subtle: rgba(204, 255, 0, 0.14);
     --accent-glow: rgba(204, 255, 0, 0.30);
 
-    /* Generated Distinct Colorway Matching Volt Pro */
     --model-pick: #ccff00;
     --status-live: #ff334b;
     --status-success: #ccff00;
@@ -595,7 +505,9 @@
     --apex-black: var(--bg-primary);
   }
 
-  /* Base Document Reset */
+  /* ==========================================================================
+     BASE DOCUMENT & TYPOGRAPHY RULES
+     ========================================================================== */
   html {
     font-size: var(--font-size-base);
     line-height: var(--font-line-height-base);
@@ -614,7 +526,9 @@
     padding: 0;
     color: var(--text-primary);
     background-color: var(--bg-primary);
-    transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      background-color var(--duration-normal) var(--ease-out-expo),
+      color var(--duration-normal) var(--ease-out-expo);
   }
 
   #root {
@@ -624,14 +538,25 @@
     background-color: var(--bg-primary);
   }
 
-  .font-mono {
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+
+  .font-mono,
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Focus rings for keyboard navigation */
+  /* Optical legibility boost for dark mode prose */
+  [data-theme="dark"] body,
+  .dark body {
+    letter-spacing: 0.005em;
+  }
+
+  /* Clean accessible focus ring */
   *:focus-visible {
-    outline: 2px solid var(--accent-default) !important;
-    outline-offset: 2px !important;
+    outline: 2px solid var(--accent-default);
+    outline-offset: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -667,10 +592,10 @@
 }
 
 /* ==========================================================================
-   TIER 3: UTILITY MAPPINGS & COMPONENT UTILITIES
+   TIER 3: SEMANTIC UTILITY MAPPINGS
    ========================================================================== */
 @layer utilities {
-  /* Surface Utilities */
+  /* Surfaces */
   .bg-theme-bg { background-color: var(--bg-primary) !important; }
   .bg-theme-card { background-color: var(--bg-card) !important; }
   .bg-theme-card-elevated { background-color: var(--bg-card-elevated) !important; }
@@ -682,7 +607,7 @@
     -webkit-backdrop-filter: blur(18px) saturate(165%);
   }
 
-  /* Accent & Action Utilities */
+  /* Accents & Status Fills */
   .bg-theme-primary { background-color: var(--accent-default) !important; }
   .bg-theme-primary-hover:hover { background-color: var(--accent-hover) !important; }
   .bg-theme-primary-subtle { background-color: var(--accent-subtle) !important; }
@@ -692,7 +617,7 @@
   .bg-theme-warning { background-color: var(--status-warning) !important; }
   .bg-theme-danger { background-color: var(--status-danger) !important; }
 
-  /* Typography Utilities */
+  /* Typography */
   .text-theme-main { color: var(--text-primary) !important; }
   .text-theme-sub { color: var(--text-secondary) !important; }
   .text-theme-dim { color: var(--text-muted) !important; }
@@ -704,7 +629,7 @@
   .text-theme-warning { color: var(--status-warning) !important; }
   .text-theme-danger { color: var(--status-danger) !important; }
 
-  /* Border, Ring & Elevation Utilities */
+  /* Rings & Shadows */
   .border-theme { border-color: var(--border-default) !important; }
   .border-theme-subdued { border-color: var(--border-subdued) !important; }
   .border-theme-primary { border-color: var(--accent-default) !important; }

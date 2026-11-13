@@ -1,17 +1,27 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Filter, ChevronDown, Search, X, RefreshCw, Calendar } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Filter, ChevronDown, X, RefreshCw } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { Fixture } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
-import { getRelativeDateStr, getPossibleDateStrs, getStandardDateStr, getUtcDateStr, getFixtureUtcDate, normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
+import {
+  getUtcDateStr,
+  normalizeDateStr,
+  normalizeTimeStr,
+  getCalendarStripDays,
+  getDateFilterOptions,
+  resolveDateFilter,
+  matchesDateFilter,
+  getDateFilterDisplayLabel,
+} from '../core/dateUtils.js';
 import { FixtureCard } from './FixtureCard.js';
 import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe.js';
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
 import { FixturesFilterModal } from './FixturesFilterModal.js';
 import { EngineService } from '../services/engineService.js';
-import { ApexEngine } from '../core/poisson.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
-import { getSlugForCode, getCodeForSlug, matchesLeague } from '../core/leagueMapper.js';
+import { matchesLeague } from '../core/leagueMapper.js';
+import { getProbValue } from '../core/formatters.js';
+import { Button, EmptyState, LoadingState, SegmentedTabs } from './ui/index.js';
 
 interface FixturesListProps {
   fixtures: Fixture[];
@@ -38,8 +48,6 @@ interface FixturesListProps {
   isProcessingActive?: boolean;
   onTriggerFullSync?: () => void;
 }
-
-import { getAuthoritative1X2Pick, getProbValue } from '../core/formatters.js';
 
 function getTipProb(fixture: Fixture): number {
   const pick = fixture.mostLikelyOutcome;
@@ -74,13 +82,11 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   searchQuery,
   setSearchQuery,
   viewMode,
-  setViewMode,
   isLeagueModalOpen,
   setIsLeagueModalOpen,
   sortBy = 'DEFAULT',
   onSelectSortBy,
   selectedFixtureId,
-  isProcessingActive = false,
   onTriggerFullSync,
 }) => {
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
@@ -95,36 +101,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   } | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const filterDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close filter modal when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        filterDropdownRef.current &&
-        !filterDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsFilterOpen(false);
-      }
-    };
-
-    if (isFilterOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isFilterOpen]);
-
-  const dateOptions = [
-    { key: 'TODAY', label: "Today's Matches" },
-    { key: 'TOMORROW', label: 'Tomorrow' },
-    { key: 'DAY_2', label: 'Day 2' },
-    { key: 'DAY_3', label: 'Day 3' },
-    { key: 'NEXT_3_DAYS', label: 'Next 3 Days' },
-    { key: 'THIS_WEEK', label: 'This Week' },
-    { key: 'ALL', label: 'All Dates' },
-  ];
+  const dateOptions = useMemo(() => getDateFilterOptions(), []);
 
   const marketOptions = [
     { key: 'MOST_LIKELY', label: 'Most Likely' },
@@ -147,27 +125,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     ...GLOBAL_LEAGUES_DATASET.map((l) => ({ code: l.code, name: `${l.name} (${l.country || 'Global'})` })),
   ];
 
-  const datasetDates = useMemo(() => {
-    return Array.from(new Set(fixtures.map((f) => normalizeDateStr(f.matchDate)))).filter(Boolean).sort();
-  }, [fixtures]);
+  const utcToday = getUtcDateStr(0);
+  const resolvedDateFilter = useMemo(() => resolveDateFilter(dateFilter), [dateFilter]);
+  const canonicalDateFilter = resolvedDateFilter.canonicalKey;
 
-  const baseToday = useMemo(() => {
-    const utcToday = getUtcDateStr(0);
-    if (fixtures.some((f) => {
-      const nd = normalizeDateStr(f.matchDate);
-      const ud = normalizeDateStr(getFixtureUtcDate(f));
-      return nd === utcToday || ud === utcToday;
-    })) {
-      return utcToday;
+  const handleSelectDateFilter = (nextDateFilter: string) => {
+    const resolvedNext = resolveDateFilter(nextDateFilter);
+    setDateFilter(resolvedNext.canonicalKey);
+    if (activeScope !== 'UPCOMING') {
+      setActiveScope('UPCOMING');
     }
-    // Find nearest date >= utcToday
-    const upcomingDate = datasetDates.find((d) => d >= utcToday);
-    if (upcomingDate) return upcomingDate;
-    // Fallback to latest available date or utcToday
-    return datasetDates[datasetDates.length - 1] || utcToday;
-  }, [fixtures, datasetDates]);
+  };
 
-  // Load history predictions from predictions db when history tab is active or selected league changes
   useEffect(() => {
     let isCancelled = false;
     async function fetchHistory() {
@@ -205,7 +174,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     });
   }, [fixtures]);
 
-  // Create a fast lookup set for live IDs to filter upcoming
   const liveIdSet = useMemo(() => {
     const set = new Set<string>();
     if (liveScores) {
@@ -218,48 +186,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   }, [liveScores]);
 
   const filteredUpcomingFixtures = useMemo(() => {
-    const weekMax = getUtcDateStr(6);
-    const todayStrs = getPossibleDateStrs(0);
-    const tomorrowStrs = getPossibleDateStrs(1);
-    const day2Strs = getPossibleDateStrs(2);
-    const day3Strs = getPossibleDateStrs(3);
-
-    let matches = uniqueFixtures.filter((f) => {
-      // 1. FILTER OUT LIVE MATCHES
+    const matches = uniqueFixtures.filter((f) => {
       if (f.status === 'LIVE' || liveIdSet.has(f.id)) return false;
+      if (!matchesDateFilter(f, canonicalDateFilter)) return false;
 
-      const matchDateNorm = normalizeDateStr(f.matchDate);
-      const utcMatchDateNorm = normalizeDateStr(getFixtureUtcDate(f));
-
-      // Date filtering
-      if (dateFilter === 'TODAY') {
-        if (!todayStrs.includes(matchDateNorm) && !todayStrs.includes(utcMatchDateNorm) && matchDateNorm !== baseToday) return false;
-      } else if (dateFilter === 'TOMORROW') {
-        if (!tomorrowStrs.includes(matchDateNorm) && !tomorrowStrs.includes(utcMatchDateNorm)) return false;
-      } else if (dateFilter === 'DAY_2') {
-        if (!day2Strs.includes(matchDateNorm) && !day2Strs.includes(utcMatchDateNorm)) return false;
-      } else if (dateFilter === 'DAY_3') {
-        if (!day3Strs.includes(matchDateNorm) && !day3Strs.includes(utcMatchDateNorm)) return false;
-      } else if (dateFilter === 'NEXT_3_DAYS') {
-        const inNext3 = todayStrs.includes(matchDateNorm) || todayStrs.includes(utcMatchDateNorm) ||
-          tomorrowStrs.includes(matchDateNorm) || tomorrowStrs.includes(utcMatchDateNorm) ||
-          day2Strs.includes(matchDateNorm) || day2Strs.includes(utcMatchDateNorm);
-        if (!inNext3) return false;
-      } else if (dateFilter === 'THIS_WEEK') {
-        const inWeek = (matchDateNorm >= todayStrs[0] && matchDateNorm <= weekMax) ||
-          (utcMatchDateNorm >= todayStrs[0] && utcMatchDateNorm <= weekMax);
-        if (!inWeek) return false;
-      } else if (dateFilter !== 'ALL') {
-        const targetDate = normalizeDateStr(dateFilter);
-        if (matchDateNorm !== targetDate && utcMatchDateNorm !== targetDate) return false;
-      }
-
-      // League filter
       if (selectedLeague !== 'ALL') {
         if (!matchesLeague(f.league, f.leagueName, selectedLeague)) return false;
       }
 
-      // Search filter
       if (searchQuery.trim().length > 0) {
         const query = searchQuery.toLowerCase();
         const matchName = `${f.homeTeam} ${f.awayTeam} ${f.leagueName}`.toLowerCase();
@@ -276,19 +210,15 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       if (a.matchDate !== b.matchDate) return a.matchDate.localeCompare(b.matchDate);
       return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
     });
-  }, [uniqueFixtures, liveIdSet, dateFilter, selectedLeague, searchQuery, baseToday]);
+  }, [uniqueFixtures, liveIdSet, canonicalDateFilter, selectedLeague, searchQuery]);
 
   const liveFixtures: Fixture[] = useMemo(() => {
     if (!liveScores || liveScores.length === 0) return [];
 
-    // The source of truth for "which matches are live" is the liveScores feed from provider
     const combined: Fixture[] = liveScores.map((s) => {
-      // Find matching prediction data passed from App
       const matchInPredictions = livePredictions.find(
         (f) => f.id === s.fixtureId || f.id === `fs_${s.fixtureId}` || f.id.replace('fs_', '') === s.fixtureId
       );
-      
-      // Find matching fixture in upcoming (in case prediction not found yet)
       const matchInUpcoming = uniqueFixtures.find(
         (f) => f.id === s.fixtureId || f.id === `fs_${s.fixtureId}` || f.id.replace('fs_', '') === s.fixtureId
       );
@@ -305,13 +235,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         };
       }
 
-      // Fallback for live matches not in our local DB yet
       return {
         id: s.fixtureId.startsWith('fs_') ? s.fixtureId : `fs_${s.fixtureId}`,
         providerId: 'FLASHSCORE',
         league: s.league || 'ALL',
         leagueName: s.leagueName || 'Live In-Play',
-        matchDate: baseToday,
+        matchDate: utcToday,
         kickOffTime: s.status === 'FINISHED' ? 'FT' : (s.minute ? `${s.minute}'` : 'Live'),
         homeTeam: s.homeTeam,
         awayTeam: s.awayTeam,
@@ -329,7 +258,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     });
 
     return combined;
-  }, [liveScores, livePredictions, uniqueFixtures, baseToday]);
+  }, [liveScores, livePredictions, uniqueFixtures, utcToday]);
 
   const displayedFixtures = useMemo(() => {
     const applySort = (list: Fixture[]) => {
@@ -362,9 +291,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     if (activeScope === 'HISTORY') {
       const filtered = historyFixtures
         .filter((f) => {
-          // STRICT FILTER: Only show historical matches that HAVE a real model prediction
           if (f.prediction === undefined) return false;
-
           if (selectedLeague !== 'ALL') {
             if (!matchesLeague(f.league, f.leagueName, selectedLeague)) return false;
           }
@@ -395,12 +322,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (selectedLeague !== 'ALL') count++;
-    if (dateFilter !== 'TODAY') count++;
+    if (canonicalDateFilter !== 'TODAY') count++;
     if (searchQuery.trim().length > 0) count++;
     if (marketChoiceFilter !== 'MOST_LIKELY') count++;
     if (sortBy && sortBy !== 'DEFAULT') count++;
     return count;
-  }, [selectedLeague, dateFilter, searchQuery, marketChoiceFilter, sortBy]);
+  }, [selectedLeague, canonicalDateFilter, searchQuery, marketChoiceFilter, sortBy]);
 
   const handleResetAllFilters = () => {
     onSelectLeague('ALL');
@@ -412,70 +339,93 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
   const selectedLeagueObj = leagueOptions.find((l) => l.code === selectedLeague);
   const selectedLeagueLabel = selectedLeagueObj ? selectedLeagueObj.name : selectedLeague;
-  const dateOptionObj = dateOptions.find((d) => d.key === dateFilter);
+  const dateFilterLabel = useMemo(() => getDateFilterDisplayLabel(canonicalDateFilter), [canonicalDateFilter]);
   const marketOptionObj = marketOptions.find((m) => m.key === marketChoiceFilter);
   const sortOptionObj = sortOptions.find((s) => s.key === sortBy);
 
-  const calendarDays = useMemo(() => {
-    const days = [];
-    const dayNameMap: Record<string, string> = {
-      Sun: 'Su',
-      Mon: 'Mo',
-      Tue: 'Tu',
-      Wed: 'Wed',
-      Thu: 'Th',
-      Fri: 'Fr',
-      Sat: 'Sa',
-    };
+  const calendarDays = useMemo(() => getCalendarStripDays(7), [utcToday]);
 
-    for (let i = 0; i < 7; i++) {
-      const dateStr = getUtcDateStr(i);
-      const [y, m, dNum] = dateStr.split('-').map((p) => parseInt(p, 10));
-      // Use Date.UTC to ensure "locale" formatting doesn't shift the day incorrectly
-      const utcDateObj = new Date(Date.UTC(y, m - 1, dNum));
-      const rawDayShort = utcDateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-      const dayTwoLetter = dayNameMap[rawDayShort] || rawDayShort;
-      days.push({ dayTwoLetter, dayNum: dNum, dateStr, index: i });
-    }
-    return days;
-  }, []);
+  const scopeTabs = useMemo(
+    () => [
+      {
+        id: 'UPCOMING' as const,
+        label: 'Upcoming',
+        buttonId: 'subtab-upcoming-btn',
+      },
+      {
+        id: 'LIVE' as const,
+        label: 'Live',
+        buttonId: 'subtab-live-btn',
+        icon: <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />,
+        count: liveScores && liveScores.length > 0 ? liveScores.length : undefined,
+      },
+      {
+        id: 'HISTORY' as const,
+        label: 'History',
+        buttonId: 'subtab-history-btn',
+      },
+    ],
+    [liveScores]
+  );
+
+  const emptyTitle =
+    activeScope === 'UPCOMING'
+      ? 'No Upcoming Fixtures'
+      : activeScope === 'LIVE'
+      ? 'No Live Matches'
+      : historySummary && historySummary.completedAwaitingScore > 0
+      ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
+      : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
+      ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
+      : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
+      ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
+      : 'No Historical Predictions';
 
   return (
     <div className="space-y-2 font-sans flex-1 flex flex-col">
-      {/* Day Selector Bar */}
+      {/* 7-Day Selector Bar */}
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5 items-center justify-items-center w-full py-1 px-0.5">
         {calendarDays.map((cd) => {
-          const isToday = cd.index === 0 && dateFilter === 'TODAY';
-          const isTomorrow = cd.index === 1 && dateFilter === 'TOMORROW';
-          const isSelected = isToday || isTomorrow || (dateFilter === cd.dateStr);
+          const isSelected =
+            resolvedDateFilter.kind === 'SINGLE' && resolvedDateFilter.dayIndex === cd.index;
+          const isInRange =
+            resolvedDateFilter.kind === 'RANGE' &&
+            cd.dateStr >= resolvedDateFilter.startDate &&
+            cd.dateStr <= resolvedDateFilter.endDate;
 
           return (
             <button
               key={cd.dateStr}
               type="button"
-              onClick={() => {
-                if (cd.index === 0) setDateFilter('TODAY');
-                else if (cd.index === 1) setDateFilter('TOMORROW');
-                else setDateFilter(cd.dateStr);
-              }}
-              className={`w-full max-w-[44px] min-h-[46px] sm:min-h-[50px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 ${
+              onClick={() => handleSelectDateFilter(cd.filterKey)}
+              aria-pressed={isSelected || isInRange}
+              title={cd.fullLabel}
+              className={`w-full max-w-[44px] min-h-[46px] sm:min-h-[50px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl sm:rounded-2xl ${
                 isSelected
-                  ? 'bg-theme-primary text-theme-primary-text rounded-xl sm:rounded-2xl shadow-theme-glow py-1.5 px-2 scale-[1.04]'
-                  : 'bg-transparent text-theme-main hover:text-theme-primary py-1 px-1'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow py-1.5 px-2 scale-[1.04]'
+                  : isInRange
+                  ? 'bg-theme-primary-subtle text-theme-primary py-1.5 px-1'
+                  : 'bg-transparent text-theme-main hover:bg-theme-card hover:text-theme-primary py-1 px-1'
               }`}
             >
-              {/* Date Number on TOP */}
               <span
                 className={`text-sm sm:text-[15px] font-extrabold font-mono tabular-nums leading-none tracking-tight ${
-                  isSelected ? 'text-theme-primary-text' : 'text-theme-main'
+                  isSelected
+                    ? 'text-theme-primary-text'
+                    : isInRange
+                    ? 'text-theme-primary'
+                    : 'text-theme-main'
                 }`}
               >
                 {cd.dayNum}
               </span>
-              {/* Day Abbreviation on BOTTOM */}
               <span
                 className={`text-[10px] font-semibold leading-none mt-1 ${
-                  isSelected ? 'text-theme-primary-text font-bold' : 'text-theme-sub'
+                  isSelected
+                    ? 'text-theme-primary-text font-bold'
+                    : isInRange
+                    ? 'text-theme-primary font-bold'
+                    : 'text-theme-sub'
                 }`}
               >
                 {cd.dayTwoLetter}
@@ -485,68 +435,26 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         })}
       </div>
 
-      {/* Scope Sub-Tabs: Upcoming, Live, History & Filters */}
+      {/* Scope Sub-Tabs & Filters Bar */}
       <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
-        <div className="flex items-center bg-theme-card border border-theme p-0.5 rounded-xl shrink-0 overflow-x-auto no-scrollbar flex-nowrap gap-0.5 shadow-theme-sm">
-          <button
-            id="subtab-upcoming-btn"
-            type="button"
-            onClick={() => setActiveScope('UPCOMING')}
-            className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
-              activeScope === 'UPCOMING'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
-                : 'text-theme-sub hover:text-theme-main'
-            }`}
-          >
-            Upcoming
-          </button>
+        <SegmentedTabs
+          items={scopeTabs}
+          value={activeScope}
+          onChange={(val) => setActiveScope(val as 'UPCOMING' | 'LIVE' | 'HISTORY')}
+          variant="card"
+          size="xs"
+          ariaLabel="Match scope"
+        />
 
-          <button
-            id="subtab-live-btn"
-            type="button"
-            onClick={() => setActiveScope('LIVE')}
-            className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeScope === 'LIVE'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
-                : 'text-theme-sub hover:text-theme-main'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
-            <span className="whitespace-nowrap">Live</span>
-            {liveScores && liveScores.length > 0 && (
-              <span className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono tabular-nums ${
-                activeScope === 'LIVE'
-                  ? 'bg-black/15 text-current'
-                  : 'bg-theme-primary-subtle text-theme-primary'
-              }`}>
-                {liveScores.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            id="subtab-history-btn"
-            type="button"
-            onClick={() => setActiveScope('HISTORY')}
-            className={`min-h-[30px] px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center ${
-              activeScope === 'HISTORY'
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-sm'
-                : 'text-theme-sub hover:text-theme-main'
-            }`}
-          >
-            History
-          </button>
-        </div>
-
-        {/* Filter Button */}
+        {/* Filter Trigger */}
         <div className="shrink-0">
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`min-h-[30px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+            className={`min-h-[30px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeFilterCount > 0
                 ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-glow'
-                : 'bg-theme-card border border-theme text-theme-main hover:bg-theme-subtle shadow-theme-sm'
+                : 'bg-theme-card text-theme-main hover:bg-theme-subtle shadow-theme-sm'
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-current" />
@@ -566,8 +474,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           onClose={() => setIsFilterOpen(false)}
           selectedLeague={selectedLeague}
           onSelectLeague={onSelectLeague}
-          dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
+          dateFilter={canonicalDateFilter}
+          setDateFilter={handleSelectDateFilter}
           marketChoiceFilter={marketChoiceFilter}
           setMarketChoiceFilter={setMarketChoiceFilter}
           searchQuery={searchQuery}
@@ -587,7 +495,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Active Filter Chips Strip */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap py-2 px-3 bg-theme-card border border-theme rounded-2xl text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap py-2 px-3 bg-theme-card rounded-2xl text-xs shadow-theme-sm">
           <span className="text-xs font-bold text-theme-sub shrink-0">
             Active filters:
           </span>
@@ -599,7 +507,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => onSelectLeague('ALL')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5"
+                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Remove league filter"
                 aria-label="Remove league filter"
               >
@@ -608,14 +516,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             </span>
           )}
 
-          {dateFilter !== 'TODAY' && (
+          {canonicalDateFilter !== 'TODAY' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
               <span className="text-theme-sub">Date:</span>
-              <span className="font-semibold">{dateOptionObj?.label || dateFilter}</span>
+              <span className="font-semibold">{dateFilterLabel}</span>
               <button
                 type="button"
-                onClick={() => setDateFilter('TODAY')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5"
+                onClick={() => handleSelectDateFilter('TODAY')}
+                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset date filter"
                 aria-label="Reset date filter"
               >
@@ -624,15 +532,15 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             </span>
           )}
 
-          {marketChoiceFilter !== 'BEST_VALUE' && (
+          {marketChoiceFilter !== 'MOST_LIKELY' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
               <span className="text-theme-sub">Market:</span>
               <span className="font-semibold">{marketOptionObj?.label || marketChoiceFilter}</span>
               <button
                 type="button"
-                onClick={() => setMarketChoiceFilter('BEST_VALUE')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5"
-                title="Reset to Best Value"
+                onClick={() => setMarketChoiceFilter('MOST_LIKELY')}
+                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                title="Reset to Most Likely"
                 aria-label="Reset market filter"
               >
                 <X className="w-3 h-3" />
@@ -643,11 +551,11 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           {searchQuery.trim().length > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
               <span className="text-theme-sub">Search:</span>
-              <span className="truncate max-w-[110px] font-semibold">"{searchQuery}"</span>
+              <span className="truncate max-w-[110px] font-semibold">&quot;{searchQuery}&quot;</span>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5"
+                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Clear search"
                 aria-label="Clear search"
               >
@@ -663,7 +571,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               <button
                 type="button"
                 onClick={() => onSelectSortBy?.('DEFAULT')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5"
+                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset sort"
                 aria-label="Reset sort"
               >
@@ -675,7 +583,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={handleResetAllFilters}
-            className="ml-auto text-xs font-bold text-theme-primary hover:underline px-1 py-0.5 cursor-pointer"
+            className="ml-auto text-xs font-bold text-theme-primary hover:underline px-1.5 py-0.5 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Clear all
           </button>
@@ -684,61 +592,33 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Match List Display */}
       {(isLoading && activeScope === 'UPCOMING') || (isLoadingHistory && activeScope === 'HISTORY') || (isLoadingLive && activeScope === 'LIVE') ? (
-        <div className="bg-theme-card rounded-3xl p-10 flex-1 min-h-[320px] flex flex-col items-center justify-center text-center shadow-theme-sm border border-theme">
-          <div className="w-6 h-6 rounded-full border-2 border-[var(--accent-default)] border-t-transparent animate-spin shrink-0 mx-auto" />
-          <span className="mt-3 text-xs text-theme-sub font-bold">Loading...</span>
-        </div>
+        <LoadingState />
       ) : displayedFixtures.length === 0 ? (
-        <div className="bg-theme-card rounded-3xl p-8 sm:p-12 flex-1 min-h-[340px] flex flex-col items-center justify-center text-center space-y-4 shadow-theme-sm border border-theme">
-          <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle border border-theme-accent/30 flex items-center justify-center text-theme-primary shadow-theme-sm">
-            <RefreshCw className="w-6 h-6" />
-          </div>
-          <div className="max-w-md">
-            <h3 className="text-sm font-extrabold text-theme-main">
-              {activeScope === 'UPCOMING'
-                ? 'No Upcoming Fixtures'
-                : activeScope === 'LIVE'
-                ? 'No Live Matches'
-                : historySummary && historySummary.completedAwaitingScore > 0
-                ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
-                : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
-                ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
-                : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
-                ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
-                : 'No Historical Predictions'}
-            </h3>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
-              <button
-                type="button"
-                onClick={onTriggerFullSync}
-                className="px-4 py-2.5 bg-theme-primary text-theme-primary-text hover:bg-theme-primary-hover rounded-xl text-xs font-black transition-all cursor-pointer shadow-theme-glow active:scale-95 flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Start Full Sync & Update Data</span>
-              </button>
-            )}
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={handleResetAllFilters}
-                className="px-3.5 py-2.5 bg-theme-subtle hover:bg-theme-card-elevated border border-theme text-theme-main rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-theme-sm"
-              >
-                Reset filters ({activeFilterCount})
-              </button>
-            )}
-            {activeScope === 'UPCOMING' && dateFilter !== 'ALL' && (
-              <button
-                type="button"
-                onClick={() => setDateFilter('ALL')}
-                className="px-3.5 py-2.5 bg-theme-subtle hover:bg-theme-card-elevated border border-theme text-theme-main rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-theme-sm"
-              >
-                Show all dates ({uniqueFixtures.length})
-              </button>
-            )}
-          </div>
-        </div>
+        <EmptyState
+          icon={<RefreshCw className="w-6 h-6" />}
+          title={emptyTitle}
+          minHeight="min-h-[340px]"
+          actions={
+            <>
+              {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
+                <Button variant="primary" size="md" pill={false} onClick={onTriggerFullSync}>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Start Full Sync &amp; Update Data</span>
+                </Button>
+              )}
+              {activeFilterCount > 0 && (
+                <Button variant="subtle" size="md" pill={false} onClick={handleResetAllFilters}>
+                  Reset filters ({activeFilterCount})
+                </Button>
+              )}
+              {activeScope === 'UPCOMING' && canonicalDateFilter !== 'ALL' && (
+                <Button variant="subtle" size="md" pill={false} onClick={() => handleSelectDateFilter('ALL')}>
+                  Show all dates ({uniqueFixtures.length})
+                </Button>
+              )}
+            </>
+          }
+        />
       ) : viewMode === 'CARDS' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {displayedFixtures.map((fixture) => (

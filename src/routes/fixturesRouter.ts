@@ -234,7 +234,13 @@ fixturesRouter.get('/:id/h2h', async (req, res) => {
     }
 
     let h2h = await flashscoreScraperService.getMatchHeadToHead(cleanId, homeTeam, awayTeam);
-    if (!h2h || (!h2h.matchesCount && !h2h.homeRecentMatches?.length)) {
+    if (
+      !h2h ||
+      (!h2h.matchesCount &&
+        !h2h.homeRecentMatches?.length &&
+        !h2h.awayRecentMatches?.length &&
+        !h2h.recentH2H?.length)
+    ) {
       h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
     }
     res.json({ success: true, h2h });
@@ -336,14 +342,35 @@ fixturesRouter.get('/:id', async (req, res) => {
       }
     }
 
-    // Ensure H2H measurement is attached
-    if (!stored.measurements?.h2h || (!stored.measurements.h2h.matchesCount && !stored.measurements.h2h.homeRecentMatches?.length)) {
+    // Ensure H2H & Team Form measurement is attached whenever recent form arrays are missing
+    const existingH2H = stored.measurements?.h2h;
+    const hasExistingTeamForm = Boolean(
+      existingH2H &&
+      ((existingH2H.homeRecentMatches && existingH2H.homeRecentMatches.length > 0) ||
+        (existingH2H.awayRecentMatches && existingH2H.awayRecentMatches.length > 0))
+    );
+    if (!hasExistingTeamForm) {
       const h2hData = await flashscoreScraperService.getMatchHeadToHead(cleanId, stored.homeTeam, stored.awayTeam);
-      if (h2hData && (h2hData.matchesCount > 0 || h2hData.homeRecentMatches?.length || h2hData.recentH2H?.length)) {
+      if (
+        h2hData &&
+        (h2hData.matchesCount > 0 ||
+          h2hData.homeRecentMatches?.length ||
+          h2hData.awayRecentMatches?.length ||
+          h2hData.recentH2H?.length)
+      ) {
         stored.measurements = {
           ...(stored.measurements || {}),
           h2h: h2hData,
         };
+        if (stored.prediction) {
+          stored.prediction = {
+            ...stored.prediction,
+            measurements: {
+              ...(stored.prediction.measurements || {}),
+              h2h: h2hData,
+            },
+          };
+        }
         stored.h2hMatches = h2hData.recentH2H || stored.h2hMatches || [];
       }
     }

@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { Fixture } from '../core/types.js';
 import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
+import { Badge, Card, TeamAvatar } from './ui/index.js';
 
 interface FixtureCardProps {
   fixture: Fixture;
@@ -21,18 +22,24 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
     ? `${pick.label} (${pick.probabilityFormatted})`
     : null;
 
-  const isHighConfidence = pick && pick.probabilityPercent >= 65;
+  const isHighConfidence = Boolean(pick && pick.probabilityPercent >= 65);
   const { dateStr: localDate, timeStr: localTime } = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp);
 
   return (
-    <div
+    <Card
       id={`fixture-card-${fixture.id}`}
+      surface={isSelected ? 'selected' : 'interactive'}
+      padding="none"
+      role="button"
+      tabIndex={0}
       onClick={() => onSelectDetail(fixture)}
-      className={`rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-150 cursor-pointer border bg-theme-card ${
-        isSelected
-          ? 'border-theme-primary ring-1 ring-theme-accent shadow-theme-md'
-          : 'border-theme shadow-theme-sm hover:border-theme-accent hover:shadow-theme-md'
-      }`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectDetail(fixture);
+        }
+      }}
+      className="p-3 sm:p-3.5 flex flex-col justify-between"
     >
       <div>
         {/* Top bar: League, Time, Stage / Status */}
@@ -49,18 +56,18 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
             {fixture.status === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-theme-live text-white font-mono tabular-nums shadow-xs">
+              <Badge variant="live" pill size="xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                LIVE
-              </span>
+                <span>LIVE</span>
+              </Badge>
             ) : isHighConfidence ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-theme-primary-subtle text-theme-primary font-mono tracking-wide">
+              <Badge variant="accent" pill size="xs">
                 HIGH CONFIDENCE
-              </span>
+              </Badge>
             ) : !pred && fixture.status !== 'FINISHED' ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-theme-subtle text-theme-sub font-mono tracking-wide">
+              <Badge variant="default" pill size="xs" className="font-medium text-theme-sub">
                 UNPREDICTED
-              </span>
+              </Badge>
             ) : null}
           </div>
         </div>
@@ -70,18 +77,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           {/* Home Team */}
           <div className="col-span-5 flex flex-col min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-nowrap">
-              {fixture.homeBadge ? (
-                <img
-                  src={fixture.homeBadge}
-                  alt=""
-                  className="w-5.5 h-5.5 object-contain shrink-0 rounded-full"
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-5.5 h-5.5 rounded-full bg-theme-subtle text-xs font-bold text-theme-main flex items-center justify-center shrink-0">
-                  {fixture.homeTeam.slice(0, 1)}
-                </div>
-              )}
+              <TeamAvatar src={fixture.homeBadge} name={fixture.homeTeam} size="md" />
               <span className="text-xs sm:text-sm font-bold text-theme-main truncate whitespace-nowrap" title={fixture.homeTeam}>
                 {fixture.homeTeam}
               </span>
@@ -105,23 +101,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <span className="text-xs sm:text-sm font-bold text-theme-main truncate whitespace-nowrap" title={fixture.awayTeam}>
                 {fixture.awayTeam}
               </span>
-              {fixture.awayBadge ? (
-                <img
-                  src={fixture.awayBadge}
-                  alt=""
-                  className="w-5.5 h-5.5 object-contain shrink-0 rounded-full"
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-5.5 h-5.5 rounded-full bg-theme-subtle text-xs font-bold text-theme-main flex items-center justify-center shrink-0">
-                  {fixture.awayTeam.slice(0, 1)}
-                </div>
-              )}
+              <TeamAvatar src={fixture.awayBadge} name={fixture.awayTeam} size="md" />
             </div>
           </div>
         </div>
 
-        {/* Probability Bar Indicator - STRICTLY ONLY IF PREDICTION EXISTS */}
+        {/* Probability Bar Indicator */}
         {pred && (
           <div className="my-2 space-y-1">
             <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-theme-sub">
@@ -149,7 +134,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
         )}
 
-        {/* Highest Predicted Outcome - STRICTLY ONLY IF PREDICTION EXISTS */}
+        {/* Highest Predicted Outcome */}
         {pred && topPredictionLabel && (
           <div className="mt-2 p-2 rounded-xl bg-theme-card-elevated flex items-center justify-between text-xs min-w-0">
             <div className="flex items-center gap-2 min-w-0 truncate">
@@ -163,12 +148,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
       </div>
 
       {/* Action Footer */}
-      <div className="mt-2 pt-2 border-t border-theme flex items-center justify-end">
+      <div className="mt-2 pt-2 flex items-center justify-end">
         <div className="flex items-center gap-1 text-xs font-bold text-theme-primary">
           <span>Analysis</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
