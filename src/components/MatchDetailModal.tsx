@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, History, Target } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, MarketOption } from '../core/types.js';
 import { PoissonMatrixView } from './PoissonMatrixView.js';
+import { MatchHeatmap } from './MatchHeatmap.js';
+import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
 import { LeagueStandings } from './LeagueStandings.js';
@@ -15,7 +17,7 @@ export interface MatchDetailViewProps {
   isPanel?: boolean;
 }
 
-type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS';
+type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'HEATMAP' | 'TACTICS';
 
 export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   fixture,
@@ -416,6 +418,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       label: 'Preds',
       count: bestMarketsPerGroup.length > 0 ? bestMarketsPerGroup.length : undefined,
     },
+    { id: 'HEATMAP' as ModalTab, label: 'Heatmap' },
+    { id: 'TACTICS' as ModalTab, label: 'Tactics' },
   ];
 
   const panelContainer = (
@@ -917,6 +921,20 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               highlightTeams={{ homeTeam: fixture.homeTeam, awayTeam: fixture.awayTeam }}
               compact
             />
+          </div>
+        )}
+
+        {/* TAB 7: HEATMAP */}
+        {activeTab === 'HEATMAP' && (
+          <div className="space-y-4">
+            <MatchHeatmap fixture={enrichedFixture} />
+          </div>
+        )}
+
+        {/* TAB 8: TACTICS */}
+        {activeTab === 'TACTICS' && (
+          <div className="space-y-4">
+            <TacticalAnalysis fixture={enrichedFixture} />
           </div>
         )}
       </div>

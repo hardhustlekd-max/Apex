@@ -126,18 +126,6 @@ export const COLOR_THEMES: ColorTheme[] = [
 
 export const DEFAULT_COLOR_THEME_ID = 'opta-emerald';
 
-/**
- * Default application fallback theme mode ('dark').
- * 100% decoupled from browser or operating system preferences.
- */
-export function getSystemThemePreference(): 'light' | 'dark' {
-  return 'dark';
-}
-
-/**
- * Gets saved ThemeMode preference from localStorage ('light' or 'dark').
- * Strictly application-controlled and browser/OS independent (defaults to 'dark').
- */
 export function getSavedThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'dark';
   try {
@@ -145,77 +133,82 @@ export function getSavedThemeMode(): ThemeMode {
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
-  } catch {
-    // ignore storage access errors
-  }
+  } catch {}
   return 'dark';
-}
-
-/**
- * Context Switcher Handler & DOM Attractor:
- * Updates root HTML attributes `data-theme` and class `dark` dynamically,
- * syncs choice to localStorage ('theme'), and dispatches custom state events.
- * Strictly independent of OS or browser theme settings.
- */
-export function setThemeMode(mode: ThemeMode): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'dark';
-
-  const effectiveTheme: 'light' | 'dark' = mode === 'light' ? 'light' : 'dark';
-
-  try {
-    localStorage.setItem('theme', effectiveTheme);
-  } catch {
-    // ignore storage access errors
-  }
-
-  // Set semantic data-theme attribute & explicit color-scheme on <html> element
-  document.documentElement.setAttribute('data-theme', effectiveTheme);
-  document.documentElement.style.colorScheme = effectiveTheme;
-
-  // Sync Tailwind class for fallback/compatibility
-  if (effectiveTheme === 'dark') {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-
-  // Synchronize document.body if mounted
-  if (typeof document !== 'undefined' && document.body) {
-    document.body.setAttribute('data-theme', effectiveTheme);
-    document.body.style.colorScheme = effectiveTheme;
-    if (effectiveTheme === 'dark') {
-      document.body.classList.add('dark');
-    } else {
-      document.body.classList.remove('dark');
-    }
-  }
-
-  // Synchronize browser/OS chrome bar meta tag
-  const metaTheme = document.getElementById('meta-theme-color');
-  if (metaTheme) {
-    metaTheme.setAttribute('content', effectiveTheme === 'dark' ? '#070b12' : '#f1f5f9');
-  }
-
-  window.dispatchEvent(new CustomEvent('app-theme-mode-changed', {
-    detail: { mode: effectiveTheme, effectiveTheme }
-  }));
-
-  return effectiveTheme;
 }
 
 export function getActiveColorThemeId(): string {
   if (typeof window === 'undefined') return DEFAULT_COLOR_THEME_ID;
-  const stored = localStorage.getItem('app_color_theme');
-  if (stored && COLOR_THEMES.some((t) => t.id === stored)) {
-    return stored;
-  }
+  try {
+    const stored = localStorage.getItem('app_color_theme');
+    if (stored && COLOR_THEMES.some((t) => t.id === stored)) {
+      return stored;
+    }
+  } catch {}
   return DEFAULT_COLOR_THEME_ID;
 }
 
+/**
+ * Robust, Industry-Standard Unified Theme Application
+ * Simultaneously updates both mode (light/dark) and color palette (data-color-theme)
+ * across both <html> and <body> to prevent attribute desynchronization.
+ */
+export function applyTheme(options: { mode?: ThemeMode; colorTheme?: string }): { mode: ThemeMode; colorTheme: string } {
+  if (typeof window === 'undefined') return { mode: 'dark', colorTheme: DEFAULT_COLOR_THEME_ID };
+
+  const currentMode = getSavedThemeMode();
+  const currentColor = getActiveColorThemeId();
+
+  const mode: ThemeMode = options.mode === 'light' || options.mode === 'dark' ? options.mode : currentMode;
+  const colorTheme = options.colorTheme && COLOR_THEMES.some((t) => t.id === options.colorTheme) ? options.colorTheme : currentColor;
+
+  try {
+    localStorage.setItem('theme', mode);
+    localStorage.setItem('app_color_theme', colorTheme);
+  } catch {}
+
+  // Apply to <html>
+  const root = document.documentElement;
+  root.setAttribute('data-theme', mode);
+  root.setAttribute('data-color-theme', colorTheme);
+  root.style.colorScheme = mode;
+  if (mode === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+
+  // Apply to <body> if mounted
+  if (document.body) {
+    const body = document.body;
+    body.setAttribute('data-theme', mode);
+    body.setAttribute('data-color-theme', colorTheme);
+    body.style.colorScheme = mode;
+    if (mode === 'dark') {
+      body.classList.add('dark');
+    } else {
+      body.classList.remove('dark');
+    }
+  }
+
+  // Update meta theme color
+  const metaTheme = document.getElementById('meta-theme-color');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', mode === 'dark' ? '#070b12' : '#f1f5f9');
+  }
+
+  // Dispatch events
+  window.dispatchEvent(new CustomEvent('app-theme-mode-changed', { detail: { mode, effectiveTheme: mode } }));
+  window.dispatchEvent(new CustomEvent('app-color-theme-changed', { detail: colorTheme }));
+
+  return { mode, colorTheme };
+}
+
+export function setThemeMode(mode: ThemeMode): 'light' | 'dark' {
+  const res = applyTheme({ mode });
+  return res.mode;
+}
+
 export function applyColorTheme(themeId: string) {
-  if (typeof window === 'undefined') return;
-  const validTheme = COLOR_THEMES.find((t) => t.id === themeId) ? themeId : DEFAULT_COLOR_THEME_ID;
-  document.documentElement.setAttribute('data-color-theme', validTheme);
-  localStorage.setItem('app_color_theme', validTheme);
-  window.dispatchEvent(new CustomEvent('app-color-theme-changed', { detail: validTheme }));
+  applyTheme({ colorTheme: themeId });
 }

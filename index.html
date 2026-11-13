@@ -28,10 +28,11 @@
       (function() {
         try {
           var savedMode = localStorage.getItem('theme');
-          // Strictly application & user controlled, independent of OS or browser prefers-color-scheme
           var effectiveTheme = (savedMode === 'light' || savedMode === 'dark') ? savedMode : 'dark';
+          var savedColorTheme = localStorage.getItem('app_color_theme') || 'opta-emerald';
 
           document.documentElement.setAttribute('data-theme', effectiveTheme);
+          document.documentElement.setAttribute('data-color-theme', savedColorTheme);
           document.documentElement.style.colorScheme = effectiveTheme;
           if (effectiveTheme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -39,15 +40,13 @@
             document.documentElement.classList.remove('dark');
           }
 
-          var savedColorTheme = localStorage.getItem('app_color_theme') || 'opta-emerald';
-          document.documentElement.setAttribute('data-color-theme', savedColorTheme);
-
           var metaTheme = document.getElementById('meta-theme-color');
           if (metaTheme) {
             metaTheme.setAttribute('content', effectiveTheme === 'dark' ? '#070b12' : '#f1f5f9');
           }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.setAttribute('data-color-theme', 'opta-emerald');
           document.documentElement.style.colorScheme = 'dark';
           document.documentElement.classList.add('dark');
         }
