@@ -345,7 +345,7 @@ export default function App() {
                         Database Synchronization Prompt
                       </h3>
                       <p className="text-[11px] text-theme-sub font-medium">
-                        Start full sync to fetch active Flashscore fixtures, team stats, H2H records, and calculate 5-Pillar Poisson model predictions.
+                        Start full sync to fetch active Flashscore fixtures, team stats, and H2H records. Then use Update Predictions in Settings to run the 5-Pillar Poisson model.
                       </p>
                     </div>
                   </div>

@@ -556,17 +556,40 @@ export class EngineService {
     return [];
   }
 
-  public static async getHistoricalMatches(league = 'ALL', limit = 200): Promise<Fixture[]> {
+  public static async getHistoricalEvaluation(
+    league = 'ALL',
+    limit = 200,
+    refresh = false
+  ): Promise<{
+    matches: Fixture[];
+    summary: {
+      upcomingFixturesInDb: number;
+      totalPredictions: number;
+      upcomingPredictions: number;
+      livePredictions: number;
+      completedWithScore: number;
+      completedAwaitingScore: number;
+    } | null;
+  }> {
     const params = new URLSearchParams();
     if (league !== 'ALL') params.set('league', league);
     params.set('limit', String(limit));
+    if (refresh) params.set('refresh', 'true');
 
     const serverData = await this.safeJsonFetch(`/api/fixtures/history?${params.toString()}`);
     if (serverData && serverData.success && Array.isArray(serverData.matches)) {
-      return serverData.matches;
+      return {
+        matches: serverData.matches,
+        summary: serverData.summary || null,
+      };
     }
 
-    return [];
+    return { matches: [], summary: null };
+  }
+
+  public static async getHistoricalMatches(league = 'ALL', limit = 200, refresh = false): Promise<Fixture[]> {
+    const res = await this.getHistoricalEvaluation(league, limit, refresh);
+    return res.matches;
   }
 
   public static async getTerminalLogs(filter?: {

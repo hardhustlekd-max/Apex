@@ -216,6 +216,8 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
     });
 
     const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
+    await predictionsDb.init();
+    await predictionsDb.syncPendingPredictionResultsFromRemote(true);
     const histPredCount = predictionsDb.countHistoricalPredictions();
 
     loggerService.addLog({
@@ -227,7 +229,7 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Synchronized ${syncRes.matchesCount} historical matches and stored ${histPredCount} predictions in database.`,
+      message: `Synchronized ${syncRes.matchesCount} historical matches and reconciled ${histPredCount} completed predictions in database.`,
       count: syncRes.matchesCount,
     });
   } catch (err: any) {

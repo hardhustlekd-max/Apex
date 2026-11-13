@@ -17,6 +17,14 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   onSelectDetail,
 }) => {
   const [history, setHistory] = useState<Fixture[]>([]);
+  const [summary, setSummary] = useState<{
+    upcomingFixturesInDb: number;
+    totalPredictions: number;
+    upcomingPredictions: number;
+    livePredictions: number;
+    completedWithScore: number;
+    completedAwaitingScore: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isSyncingHistory, setIsSyncingHistory] = useState<boolean>(false);
@@ -30,10 +38,11 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       setIsLoading(true);
     }
     try {
-      const data = await EngineService.getHistoricalMatches('ALL', recordLimit);
-      
+      const { matches, summary: evalSummary } = await EngineService.getHistoricalEvaluation('ALL', recordLimit, showRefreshing);
+      setSummary(evalSummary);
+
       // STRICT FILTER: Only show matches that have a prediction and are finished
-      const evaluatedOnly = (data || []).filter(f => 
+      const evaluatedOnly = (matches || []).filter(f => 
         f.prediction !== undefined && 
         f.status === 'FINISHED' && 
         f.score?.home !== undefined && 
@@ -236,41 +245,90 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       )}
 
       {/* Fixtures List */}
-      {history.length === 0 ? (
-        <div className="bg-theme-card border border-theme rounded-2xl p-8 text-center text-xs shadow-xs space-y-4">
-          <div className="w-10 h-10 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary mx-auto shadow-xs">
-            <RefreshCw className="w-5 h-5" />
+      {history.length === 0 ? (() => {
+        const awaitingCount = summary?.completedAwaitingScore ?? 0;
+        const upcomingPredCount = summary?.upcomingPredictions ?? 0;
+        const livePredCount = summary?.livePredictions ?? 0;
+        const activePredCount = upcomingPredCount + livePredCount;
+        const totalPreds = summary?.totalPredictions ?? 0;
+        const fixturesInDb = summary?.upcomingFixturesInDb ?? 0;
+
+        let emptyTitle = 'No Match Data or Predictions Recorded Yet';
+        let emptyDescription =
+          'Run a Full Sync to fetch Flashscore fixtures and match archives, then open Settings and run Update Predictions to evaluate upcoming matches.';
+        let showFullSyncCta = true;
+        let refreshCtaLabel = 'Check Finished Results';
+
+        if (awaitingCount > 0) {
+          emptyTitle = `Awaiting Final Scores for ${awaitingCount} Completed Match${awaitingCount === 1 ? '' : 'es'}`;
+          emptyDescription = `${awaitingCount} predicted match${awaitingCount === 1 ? ' has' : 'es have'} passed kick-off, but Flashscore has not confirmed final full-time scores yet. Check again to update completed results.`;
+          showFullSyncCta = false;
+          refreshCtaLabel = 'Check Finished Results';
+        } else if (activePredCount > 0) {
+          emptyTitle = 'Waiting for Predicted Matches to Finish';
+          const parts: string[] = [];
+          if (upcomingPredCount > 0) parts.push(`${upcomingPredCount} upcoming`);
+          if (livePredCount > 0) parts.push(`${livePredCount} live`);
+          emptyDescription = `${parts.join(' and ')} predicted match${activePredCount === 1 ? ' is' : 'es are'} tracked in the database. Completed results will appear here once full-time scores are finalized.`;
+          showFullSyncCta = false;
+          refreshCtaLabel = 'Check Finished Results';
+        } else if (totalPreds === 0 && fixturesInDb > 0) {
+          emptyTitle = 'No Predictions Generated Yet';
+          emptyDescription = `${fixturesInDb} upcoming fixture${fixturesInDb === 1 ? ' is' : 's are'} synced in the database, but no predictions have been generated yet. Open Settings and click Update Predictions to run the model.`;
+          showFullSyncCta = false;
+          refreshCtaLabel = 'Refresh Evaluation';
+        }
+
+        return (
+          <div className="bg-theme-card border border-theme rounded-2xl p-8 text-center text-xs shadow-xs space-y-4">
+            <div className="w-10 h-10 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary mx-auto shadow-xs">
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-extrabold text-theme-main">
+                {emptyTitle}
+              </h3>
+              <p className="text-xs text-theme-sub font-medium max-w-md mx-auto">
+                {emptyDescription}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {showFullSyncCta && onTriggerFullSync ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onTriggerFullSync}
+                    disabled={isProcessingActive || isRefreshing}
+                    className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Start Full Sync & Update Data</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fetchHistory(limit, true)}
+                    disabled={isRefreshing || isProcessingActive}
+                    className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-theme-subtle text-theme-main transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshing ? 'Checking...' : refreshCtaLabel}</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fetchHistory(limit, true)}
+                  disabled={isRefreshing || isProcessingActive}
+                  className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span>{isRefreshing ? 'Checking Flashscore Results...' : refreshCtaLabel}</span>
+                </button>
+              )}
+            </div>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-extrabold text-theme-main">
-              No historical predictions recorded in database yet
-            </h3>
-            <p className="text-xs text-theme-sub font-medium max-w-sm mx-auto">
-              Run a full sync to fetch Flashscore match archives, evaluate Poisson predictions, and build accuracy logs.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            {onTriggerFullSync && (
-              <button
-                type="button"
-                onClick={onTriggerFullSync}
-                className="inline-flex items-center gap-2 min-h-[36px] px-4 py-2 rounded-full text-xs font-black bg-theme-primary text-theme-primary-text transition-all active:scale-95 shadow-md cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Start Full Sync & Update Data</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => fetchHistory(limit, true)}
-              className="inline-flex items-center gap-1.5 min-h-[36px] px-4 py-2 rounded-full text-xs font-bold bg-theme-subtle text-theme-main transition-all active:scale-95 shadow-xs cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Evaluate Historical Database</span>
-            </button>
-          </div>
-        </div>
-      ) : (
+        );
+      })() : (
         <div className="rounded-2xl overflow-hidden bg-theme-card border border-theme shadow-xs">
           {history.map((f) => {
             const evalResult = evaluatePrediction(f);

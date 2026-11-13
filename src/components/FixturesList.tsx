@@ -85,6 +85,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 }) => {
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [historyFixtures, setHistoryFixtures] = useState<Fixture[]>([]);
+  const [historySummary, setHistorySummary] = useState<{
+    upcomingFixturesInDb: number;
+    totalPredictions: number;
+    upcomingPredictions: number;
+    livePredictions: number;
+    completedWithScore: number;
+    completedAwaitingScore: number;
+  } | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
@@ -165,9 +173,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     async function fetchHistory() {
       try {
         setIsLoadingHistory(true);
-        const data = await EngineService.getHistoricalMatches(selectedLeague, 200);
+        const { matches, summary } = await EngineService.getHistoricalEvaluation(selectedLeague, 200);
         if (!isCancelled) {
-          setHistoryFixtures(data);
+          setHistoryFixtures(matches);
+          setHistorySummary(summary);
         }
       } catch (err) {
         console.error('Failed to load history predictions from db:', err);
@@ -700,16 +709,28 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 ? 'No upcoming fixtures found in database'
                 : activeScope === 'LIVE'
                 ? 'No live matches currently in play'
-                : 'No historical matches found in database'}
+                : historySummary && historySummary.completedAwaitingScore > 0
+                ? `Awaiting final scores for ${historySummary.completedAwaitingScore} completed prediction(s)`
+                : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
+                ? 'Waiting for predicted matches to finish'
+                : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
+                ? 'No predictions generated yet'
+                : 'No historical predictions found in database'}
             </h3>
             <p className="text-xs text-theme-sub font-medium">
               {activeFilterCount > 0
                 ? 'Some active filters or search terms may be narrowing down your results.'
-                : 'Trigger a full synchronization to fetch fresh Flashscore match data, live scores, head-to-head records, and 5-Pillar Poisson model predictions.'}
+                : activeScope === 'HISTORY' && historySummary && historySummary.completedAwaitingScore > 0
+                ? 'Predicted matches have passed kick-off and are awaiting full-time scores from Flashscore.'
+                : activeScope === 'HISTORY' && historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
+                ? `${historySummary.upcomingPredictions} upcoming and ${historySummary.livePredictions} live predicted matches are tracked and will appear here once full-time results are recorded.`
+                : activeScope === 'HISTORY' && historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
+                ? 'Upcoming fixtures are already in the database. Open Settings and click Update Predictions to generate model forecasts.'
+                : 'Trigger a full synchronization to fetch Flashscore fixtures, live scores, and head-to-head records, then run Update Predictions in Settings.'}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            {onTriggerFullSync && (
+            {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
               <button
                 type="button"
                 onClick={onTriggerFullSync}

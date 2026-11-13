@@ -147,18 +147,23 @@ fixturesRouter.get('/history', async (req, res) => {
   try {
     const league = req.query.league as string | undefined;
     const limit = parseInt((req.query.limit as string) || '300', 10);
+    const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
 
+    await db.init();
     await predictionsDb.init();
+    await predictionsDb.reconcileAndSyncResults({ force: forceRefresh });
 
     // Query predictions strictly from unified predictionsDb
     // This is the authoritative source for evaluated model outputs
     const matches = await predictionsDb.getHistoricalPredictionsAsync({ league, limit });
+    const summary = predictionsDb.getEvaluationSummary();
 
     res.json({
       success: true,
       provider: 'PREDICTIONS_DB',
       count: matches.length,
       matches,
+      summary,
     });
   } catch (err: any) {
     console.error('Error fetching historical matches from predictions db:', err);

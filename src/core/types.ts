@@ -212,7 +212,7 @@ export interface Fixture {
   awayTeam: string;
   homeBadge?: string;
   awayBadge?: string;
-  status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED';
+  status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED';
   prediction?: PoissonPrediction;
   markets?: MarketOption[];
   mostLikelyOutcome?: MostLikelyOutcome;

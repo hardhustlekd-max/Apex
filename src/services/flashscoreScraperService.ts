@@ -224,7 +224,17 @@ export class FlashscoreScraperService {
 
             const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
             const isLive = m.statusCode === '2';
-            const isFinished = m.statusCode === '3' || m.statusCode === '47' || m.statusCode === '48' || m.statusCode === '49';
+            const isFinished = ['3', '10', '11', '47', '48', '49'].includes(m.statusCode || '');
+            const isCancelledOrPostponed = ['4', '5', '6', '36', '37', '38'].includes(m.statusCode || '');
+            const mappedStatus = isFinished
+              ? 'FINISHED'
+              : isLive
+              ? 'LIVE'
+              : ['5', '36'].includes(m.statusCode || '')
+              ? 'CANCELLED'
+              : isCancelledOrPostponed
+              ? 'POSTPONED'
+              : 'SCHEDULED';
 
             if (isFinished && m.homeScore !== undefined && m.awayScore !== undefined) {
               const ftr = m.homeScore > m.awayScore ? 'H' : m.homeScore < m.awayScore ? 'A' : 'D';
@@ -239,7 +249,7 @@ export class FlashscoreScraperService {
                 ftag: m.awayScore,
                 ftr,
               });
-            } else if (!isFinished) {
+            } else if (!isFinished && !isCancelledOrPostponed) {
               upcomingFixturesToSave.push({
                 id: `fs_${m.matchId}`,
                 providerId: 'FLASHSCORE',
@@ -268,7 +278,7 @@ export class FlashscoreScraperService {
             scrapedMatchesForDb.push({
               matchId: m.matchId,
               stage: m.tournament,
-              status: isFinished ? 'FINISHED' : isLive ? 'LIVE' : 'SCHEDULED',
+              status: mappedStatus,
               date: `${dateStr} ${kickOffTime}`,
               country: m.country,
               leagueName: name,
@@ -542,6 +552,104 @@ export class FlashscoreScraperService {
     return liveScores;
   }
 
+
+  /**
+   * Refreshes and persists daily UTC Flashscore feed (t=0) for a given day offset (-7..1)
+   */
+  public async syncDailyFeedForOffset(offsetDays: number): Promise<boolean> {
+    const clampedOffset = Math.max(-7, Math.min(1, Math.trunc(offsetDays)));
+    const feedPath = `f_1_${clampedOffset}_0_en_1`;
+    const rawText = await this.fetchAndPersistRawFeed(feedPath);
+    return Boolean(rawText && rawText.length > 0);
+  }
+
+  /**
+   * Queries Flashscore lightweight match header feed (dc_1_<id>) for authoritative status and score.
+   * Uses a short timeout and bypasses the global scraperCircuitBreaker so individual lookup misses never block bulk feeds.
+   */
+  public async fetchMatchStatusAndScore(matchId: string): Promise<{
+    statusCode: string;
+    status: 'FINISHED' | 'LIVE' | 'SCHEDULED' | 'POSTPONED' | 'CANCELLED';
+    homeScore?: number;
+    awayScore?: number;
+  } | null> {
+    const cleanId = String(matchId || '')
+      .replace(/^fs_hist_/, '')
+      .replace(/^fs_/, '')
+      .replace(/^hist_/, '')
+      .replace(/^scraped_/, '')
+      .trim();
+
+    if (!cleanId) return null;
+
+    const urls = [
+      `${FLASHSCORE_FEED_BASE}/dc_1_${cleanId}`,
+      `${FLASHSCORE_NINJA_BASE}/dc_1_${cleanId}`,
+    ];
+
+    for (const url of urls) {
+      let timeout: NodeJS.Timeout | null = null;
+      try {
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(url, {
+          headers: {
+            'x-fsign': FSIGN_HEADER,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://www.flashscore.com/',
+            'Origin': 'https://www.flashscore.com',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': '*/*',
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) continue;
+        const text = await res.text();
+        if (!text || (!text.includes('DB÷') && !text.includes('DA÷') && !text.includes('DE÷'))) {
+          continue;
+        }
+
+        const kv: Record<string, string> = {};
+        for (const section of text.split('~')) {
+          for (const part of section.split('¬')) {
+            const sepIdx = part.indexOf('÷');
+            if (sepIdx > 0) {
+              kv[part.slice(0, sepIdx)] = part.slice(sepIdx + 1);
+            }
+          }
+        }
+
+        const statusCode = kv['DB'] || kv['DA'] || kv['DZ'] || '';
+        const parsedHome = kv['DE'] !== undefined && kv['DE'] !== '' ? parseInt(kv['DE'], 10) : NaN;
+        const parsedAway = kv['DF'] !== undefined && kv['DF'] !== '' ? parseInt(kv['DF'], 10) : NaN;
+        const homeScore = Number.isFinite(parsedHome) ? parsedHome : undefined;
+        const awayScore = Number.isFinite(parsedAway) ? parsedAway : undefined;
+
+        let status: 'FINISHED' | 'LIVE' | 'SCHEDULED' | 'POSTPONED' | 'CANCELLED' = 'SCHEDULED';
+        if (['3', '10', '11', '47', '48', '49'].includes(statusCode)) {
+          status = 'FINISHED';
+        } else if (statusCode === '2') {
+          status = 'LIVE';
+        } else if (['5', '36'].includes(statusCode)) {
+          status = 'CANCELLED';
+        } else if (['4', '6', '37', '38'].includes(statusCode)) {
+          status = 'POSTPONED';
+        }
+
+        return { statusCode, status, homeScore, awayScore };
+      } catch {
+        // Try next mirror
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+      }
+    }
+
+    return null;
+  }
 
   /**
    * Clears in-memory caches for fresh scraping
