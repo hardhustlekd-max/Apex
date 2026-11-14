@@ -175,11 +175,11 @@ export class SyncJobService {
         this.updateProgress(jobId, {
           progress: 5,
           stepIndex: 1,
-          totalSteps: 6,
+          totalSteps: 7,
           currentStep: 'Purging database tables, raw feeds, and clearing all cached data to zero...',
         });
-        db.clearAllData(options.resetRawFeeds ?? true);
-        predictionsDb.clearAll();
+        await db.clearAllData(options.resetRawFeeds ?? true, 'fullsync');
+        await predictionsDb.clearAll('fullsync');
         flashscoreScraperService.clearCaches();
       }
 
@@ -229,59 +229,70 @@ export class SyncJobService {
         totalSteps: 7,
         currentStep: 'Fetching upcoming fixtures raw feeds and syncing to database...',
       });
-      const upcoming = await flashscoreScraperService.getUpcomingFixtures();
+      const upcoming = await flashscoreScraperService.getUpcomingFixtures(undefined, true);
 
       if (this.isCancelled(jobId)) return;
 
       // Step 5: Fetch and store Head-to-Head (H2H) raw feeds for upcoming games
       this.updateProgress(jobId, {
-        progress: 70,
+        progress: 65,
         stepIndex: 5,
-        totalSteps: 7,
+        totalSteps: 8,
         currentStep: 'Fetching Head-to-Head (H2H) raw feeds, team recent form, and encounter statistics...',
       });
       await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 6: Scrape and persist Flashscore pre-match market odds & implied probabilities
+      this.updateProgress(jobId, {
+        progress: 75,
+        stepIndex: 6,
+        totalSteps: 8,
+        currentStep: 'Scraping Flashscore bookmaker odds & market-implied probabilities into SQLite...',
+      });
+      await flashscoreScraperService.prefetchOddsForUpcomingFixtures(upcoming, 200, 10).catch((oddsErr: any) => {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'SCRAPER',
+          source: 'SyncJobService',
+          message: `Full sync odds prefetch note: ${oddsErr?.message || oddsErr}`,
+        });
+      });
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 7: Calculate and persist predictions for unstarted upcoming fixtures
+      this.updateProgress(jobId, {
+        progress: 84,
+        stepIndex: 7,
+        totalSteps: 8,
+        currentStep: 'Calculating and saving predictions into SQLite database...',
+      });
+      try {
+        const { isMatchStarted } = await import('../core/accumulator.js');
+        const unstarted = upcoming.filter((f) => !isMatchStarted(f));
+        if (unstarted.length > 0) {
+          await ServerEngine.recalculateUpcomingFromDbInChunks(unstarted, 100, undefined, { skipRemoteH2H: true });
+        }
+      } catch (predErr: any) {
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'PREDICTION',
+          source: 'SyncJobService',
+          message: `Full sync prediction calculation note: ${predErr?.message || predErr}`,
+        });
+      }
+
       const histPredCount = predictionsDb.countHistoricalPredictions();
 
       if (this.isCancelled(jobId)) return;
 
-      // Step 6: Calculate and persist predictions for unstarted upcoming fixtures
-      const { isMatchStarted } = await import('../core/accumulator.js');
-      const eligibleUpcoming = upcoming.filter((f) => !isMatchStarted(f));
-
+      // Step 8: Update live matches (Read-Only Enrichment)
       this.updateProgress(jobId, {
-        progress: 80,
-        stepIndex: 6,
-        totalSteps: 7,
-        upcomingCount: upcoming.length,
-        currentStep: `Calculating predictions for ${eligibleUpcoming.length} upcoming matches from database...`,
-      });
-
-      if (eligibleUpcoming.length > 0) {
-        await ServerEngine.recalculateUpcomingFromDbInChunks(
-          eligibleUpcoming,
-          50,
-          (processed, total, predicted) => {
-            if (this.isCancelled(jobId)) return;
-            const pct = Math.min(92, Math.round(80 + (processed / Math.max(1, total)) * 12));
-            this.updateProgress(jobId, {
-              progress: pct,
-              matchesCount: predicted,
-              predictionsCount: predictionsDb.count('all'),
-              currentStep: `Calculating predictions (${processed}/${total} processed, ${predicted} stored)...`,
-            });
-          },
-          { skipRemoteH2H: true }
-        );
-      }
-
-      if (this.isCancelled(jobId)) return;
-
-      // Step 7: Update live matches (Read-Only Enrichment)
-      this.updateProgress(jobId, {
-        progress: 95,
-        stepIndex: 7,
-        totalSteps: 7,
+        progress: 92,
+        stepIndex: 8,
+        totalSteps: 8,
         currentStep: 'Refreshing active live scores and enriching from database...',
       });
 
@@ -381,21 +392,10 @@ export class SyncJobService {
     });
 
     try {
-      // Step 1: Purge existing predictions from DB and memory cache as the first step
+      // Step 1: Query upcoming fixtures strictly from local DB before clearing
       this.updateProgress(jobId, {
-        progress: 5,
+        progress: 10,
         stepIndex: 1,
-        totalSteps: 3,
-        currentStep: 'Purging all existing predictions from database for a clean recalculation...',
-      });
-      await predictionsDb.clearAll();
-
-      if (this.isCancelled(jobId)) return;
-
-      // Step 2: Query upcoming fixtures strictly from local DB
-      this.updateProgress(jobId, {
-        progress: 15,
-        stepIndex: 2,
         totalSteps: 3,
         currentStep: 'Querying upcoming fixtures from database...',
       });
@@ -411,15 +411,6 @@ export class SyncJobService {
       upcoming = upcoming.filter(f => !isMatchStarted(f));
 
       const totalCount = upcoming ? upcoming.length : 0;
-      this.updateProgress(jobId, {
-        progress: 25,
-        upcomingCount: totalCount,
-        matchesCount: 0,
-        skippedCount: 0,
-        currentStep: totalCount > 0
-          ? `Loaded ${totalCount} upcoming matches from database. Preparing 90% data availability recalculation...`
-          : 'No upcoming matches found in database. Run full sync to populate matches.',
-      });
 
       if (totalCount === 0) {
         this.updateProgress(jobId, {
@@ -435,6 +426,20 @@ export class SyncJobService {
         });
         return;
       }
+
+      if (this.isCancelled(jobId)) return;
+
+      // Step 2: Purge existing upcoming predictions (preserving completed historical predictions)
+      this.updateProgress(jobId, {
+        progress: 15,
+        stepIndex: 2,
+        totalSteps: 3,
+        upcomingCount: totalCount,
+        matchesCount: 0,
+        skippedCount: 0,
+        currentStep: `Refreshing ${totalCount} upcoming predictions in SQLite database...`,
+      });
+      await predictionsDb.clearPredictions('upcoming', 'update_predictions');
 
       if (this.isCancelled(jobId)) return;
 

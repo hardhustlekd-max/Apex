@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { motion } from 'motion/react';
 import { Fixture } from '../core/types.js';
 import { Card, SectionHeader, TeamAvatar } from './ui/index.js';
 import { Compass, Zap, ShieldAlert, Swords, TrendingUp, Layers, CheckCircle2 } from 'lucide-react';
@@ -101,23 +102,40 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
 
   return (
     <div className="space-y-4">
-      {/* Overview Banner */}
-      <Card surface="elevated" padding="md" radius="2xl" className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-theme-primary-subtle text-theme-primary">
-            <Compass className="w-4 h-4" />
+      {/* Overview Banner with Framer Motion hover pulsing keywords */}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        transition={{ duration: 0.2 }}
+      >
+        <Card surface="elevated" padding="md" radius="2xl" className="space-y-3 cursor-pointer group">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-theme-primary-subtle text-theme-primary">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <SectionHeader title="Tactical Style & Matchup Analysis" size="sm" />
+              <p className="text-[11px] text-theme-sub font-mono">
+                AI-driven tactical blueprint derived from tactical structures, pressing metrics, and recent performances
+              </p>
+            </div>
           </div>
-          <div>
-            <SectionHeader title="Tactical Style & Matchup Analysis" size="sm" />
-            <p className="text-[11px] text-theme-sub font-mono">
-              AI-driven tactical blueprint derived from tactical structures, pressing metrics, and recent performances
-            </p>
-          </div>
-        </div>
-        <p className="text-xs text-theme-main font-sans leading-relaxed p-3 rounded-xl bg-theme-card border border-theme">
-          {tacticalBattleSummary}
-        </p>
-      </Card>
+          <p className="text-xs text-theme-main font-sans leading-relaxed p-3 rounded-xl bg-theme-card border border-theme">
+            The tactical chess match between{' '}
+            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-bold underline decoration-dotted">
+              {fixture.homeTeam}
+            </motion.span>{' '}
+            (<motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">{homeProfile.styleName}</motion.span>) and{' '}
+            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-bold underline decoration-dotted">
+              {fixture.awayTeam}
+            </motion.span>{' '}
+            (<motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">{awayProfile.styleName}</motion.span>) centers on{' '}
+            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">midfield territory control</motion.span>. Expect{' '}
+            {fixture.homeTeam} to seek{' '}
+            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">territorial dominance</motion.span>, while {fixture.awayTeam} will look to exploit{' '}
+            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">transition channels</motion.span>.
+          </p>
+        </Card>
+      </motion.div>
 
       {/* Side-by-Side Team Tactical Profiles */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -138,7 +156,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
 
           <div className="space-y-2.5">
             <div>
-              <span className="text-xs font-black text-theme-main block">{homeProfile.styleName}</span>
+              <motion.span whileHover={{ scale: 1.03, color: 'var(--color-primary)' }} className="text-xs font-black text-theme-main block cursor-default">
+                {homeProfile.styleName}
+              </motion.span>
               <span className="text-[11px] text-theme-sub block leading-snug">{homeProfile.tagline}</span>
             </div>
 
@@ -164,9 +184,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
               </div>
             </div>
 
-            <p className="text-[11px] text-theme-sub font-mono leading-relaxed pt-1">
+            <motion.p whileHover={{ scale: 1.01 }} className="text-[11px] text-theme-sub font-mono leading-relaxed pt-1 cursor-default">
               {homeProfile.summary}
-            </p>
+            </motion.p>
           </div>
         </Card>
 
@@ -187,7 +207,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
 
           <div className="space-y-2.5">
             <div>
-              <span className="text-xs font-black text-theme-main block">{awayProfile.styleName}</span>
+              <motion.span whileHover={{ scale: 1.03, color: 'var(--color-primary)' }} className="text-xs font-black text-theme-main block cursor-default">
+                {awayProfile.styleName}
+              </motion.span>
               <span className="text-[11px] text-theme-sub block leading-snug">{awayProfile.tagline}</span>
             </div>
 
@@ -213,9 +235,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
               </div>
             </div>
 
-            <p className="text-[11px] text-theme-sub font-mono leading-relaxed pt-1">
+            <motion.p whileHover={{ scale: 1.01 }} className="text-[11px] text-theme-sub font-mono leading-relaxed pt-1 cursor-default">
               {awayProfile.summary}
-            </p>
+            </motion.p>
           </div>
         </Card>
       </div>

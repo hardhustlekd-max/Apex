@@ -24,10 +24,22 @@ function createRawDbInstance(): Database.Database {
 }
 
 /**
- * Safely resets a corrupted or malformed SQLite database on disk
+ * Safely checkpoints SQLite WAL changes to disk without blocking readers
+ */
+export function checkpointSqliteWal(mode: 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE' = 'PASSIVE'): void {
+  if (!rawDbInstance) return;
+  try {
+    rawDbInstance.pragma(`wal_checkpoint(${mode})`);
+  } catch (err: any) {
+    console.warn(`[SQLite] WAL checkpoint (${mode}) notice:`, err?.message);
+  }
+}
+
+/**
+ * Safely backs up and resets a confirmed corrupted SQLite database on disk
  */
 export function resetCorruptedSqliteDb(): Database.Database {
-  console.warn('[SQLite] Resetting malformed or corrupted database file...');
+  console.warn('[SQLite] Backing up and resetting confirmed corrupted database file...');
   if (rawDbInstance) {
     try {
       rawDbInstance.pragma('wal_checkpoint(TRUNCATE)');
@@ -38,12 +50,13 @@ export function resetCorruptedSqliteDb(): Database.Database {
     rawDbInstance = null;
   }
 
+  const suffix = `.corrupt.${Date.now()}`;
   try {
-    if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
-    if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
-    if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
+    if (fs.existsSync(DB_PATH)) fs.renameSync(DB_PATH, `${DB_PATH}${suffix}`);
+    if (fs.existsSync(`${DB_PATH}-wal`)) fs.renameSync(`${DB_PATH}-wal`, `${DB_PATH}-wal${suffix}`);
+    if (fs.existsSync(`${DB_PATH}-shm`)) fs.renameSync(`${DB_PATH}-shm`, `${DB_PATH}-shm${suffix}`);
   } catch (err: any) {
-    console.warn('[SQLite] Notice unlinking database files:', err?.message);
+    console.warn('[SQLite] Notice backing up corrupted database files:', err?.message);
   }
 
   rawDbInstance = createRawDbInstance();
@@ -53,7 +66,7 @@ export function resetCorruptedSqliteDb(): Database.Database {
 }
 
 /**
- * Verifies SQLite B-Tree integrity on disk and resets only if confirmed unrecoverable
+ * Verifies SQLite B-Tree integrity on disk
  */
 export function checkAndRepairSqliteIntegrity(dbInstance?: Database.Database): boolean {
   try {
@@ -77,6 +90,15 @@ export function checkAndRepairSqliteIntegrity(dbInstance?: Database.Database): b
   }
 }
 
+function isFatalSqliteCorruptionError(err: any): boolean {
+  const code = String(err?.code || '').toUpperCase();
+  if (code === 'SQLITE_CORRUPT' || code === 'SQLITE_NOTADB') {
+    return true;
+  }
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('database disk image is malformed') || msg.includes('file is not a database');
+}
+
 /**
  * Returns the current active raw SQLite database instance
  */
@@ -85,8 +107,7 @@ export function getSqliteDb(): Database.Database {
     try {
       rawDbInstance = createRawDbInstance();
     } catch (err: any) {
-      const msg = String(err?.message || '').toLowerCase();
-      if (msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk image')) {
+      if (isFatalSqliteCorruptionError(err)) {
         return resetCorruptedSqliteDb();
       }
       throw err;
@@ -108,11 +129,10 @@ export const sqliteDb: Database.Database = new Proxy({} as any, {
         try {
           return value.apply(db, args);
         } catch (err: any) {
-          const msg = String(err?.message || '').toLowerCase();
-          if (msg.includes('malformed') || msg.includes('corrupt') || msg.includes('disk image')) {
-            console.error('[SQLite] Malformed database error detected during execution:', err?.message);
+          if (isFatalSqliteCorruptionError(err) && !checkAndRepairSqliteIntegrity(db)) {
+            console.error('[SQLite] Confirmed database corruption detected during execution:', err?.message);
             try {
-              fs.appendFileSync('sqlite_debug.log', `[${new Date().toISOString()}] Malformed error caught during ${String(prop)}: ${err?.message}\n`);
+              fs.appendFileSync('sqlite_debug.log', `[${new Date().toISOString()}] Confirmed corruption caught during ${String(prop)}: ${err?.message}\n`);
             } catch {}
             const freshDb = resetCorruptedSqliteDb();
             const freshMethod = (freshDb as any)[prop];
@@ -177,6 +197,7 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       h2h_matches_json TEXT,
       information_json TEXT,
       statistics_json TEXT,
+      market_odds_json TEXT,
       feed_path TEXT,
       updated_at TEXT NOT NULL
     );
@@ -224,6 +245,13 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       fixture_id TEXT PRIMARY KEY,
       h2h_json TEXT NOT NULL,
       calculated_at TEXT NOT NULL
+    );
+
+    -- SCRAPED MARKET ODDS CACHE: Flashscore bookmaker odds & implied probabilities
+    CREATE TABLE IF NOT EXISTS match_odds_cache (
+      fixture_id TEXT PRIMARY KEY,
+      odds_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL
     );
 
     -- ARCHIVAL: Single-Instance Compressed Raw Feeds (strictly 1 row per daily feed)
@@ -306,6 +334,10 @@ export function initSqliteSchema(): void {
         console.log('[SQLite] Migrating upcoming_fixtures: Adding statistics_json column');
         db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN statistics_json TEXT;");
       }
+      if (!columnNames.includes('market_odds_json')) {
+        console.log('[SQLite] Migrating upcoming_fixtures: Adding market_odds_json column');
+        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN market_odds_json TEXT;");
+      }
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
@@ -334,6 +366,19 @@ export function initSqliteSchema(): void {
       if (!columnNames.includes('statistics_json')) {
         db.exec("ALTER TABLE flashscore_scraped_matches ADD COLUMN statistics_json TEXT;");
       }
+    } catch {}
+
+    // Ensure default engine_settings row exists in app_settings
+    try {
+      db.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('engine_settings', ?)").run(
+        JSON.stringify({
+          rollingMatchWindow: 15,
+          safeWinThreshold: 0.72,
+          homeAdvantageFactor: 1.12,
+          formDecayRate: 0.85,
+          autoSyncDaily: true,
+        })
+      );
     } catch {}
 
     isSchemaInitialized = true;
@@ -388,7 +433,9 @@ export function getSqliteDbStats(): {
   const tables = [
     'historical_matches',
     'upcoming_fixtures',
-    'predictions',    'prediction_measurements_cache',
+    'predictions',
+    'prediction_measurements_cache',
+    'match_odds_cache',
     'raw_feed_data',
     'flashscore_scraped_matches',
     'league_standings',

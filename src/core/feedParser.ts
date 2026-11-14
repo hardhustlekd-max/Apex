@@ -11,6 +11,8 @@ export interface ScrapedRawMatch {
   leagueUrl?: string;
   homeTeam: string;
   awayTeam: string;
+  homeParticipantId?: string;
+  awayParticipantId?: string;
   homeBadge?: string;
   awayBadge?: string;
   statusCode: string;
@@ -204,6 +206,12 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
             break;
           case 'AC':
             matchData.periodCode = val;
+            break;
+          case 'JA':
+            matchData.homeParticipantId = val;
+            break;
+          case 'JB':
+            matchData.awayParticipantId = val;
             break;
           case 'OA':
             matchData.homeBadge = val;

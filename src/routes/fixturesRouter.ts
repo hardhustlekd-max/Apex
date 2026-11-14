@@ -177,7 +177,8 @@ fixturesRouter.get('/predictions/export', async (req, res) => {
   try {
     await db.init();
     await predictionsDb.init();
-    const payload = predictionsDb.export1X2Predictions();
+    const sortByProb = req.query.sortByProb as 'desc' | 'asc' | undefined;
+    const payload = predictionsDb.export1X2Predictions(sortByProb);
 
     if (req.query.download === '1' || req.query.download === 'true') {
       const filename = `apex_1x2_predictions_${new Date().toISOString().slice(0, 10)}.json`;
@@ -407,6 +408,23 @@ fixturesRouter.get('/:id', async (req, res) => {
           };
         }
         stored.h2hMatches = h2hData.recentH2H || stored.h2hMatches || [];
+      }
+    }
+
+    if (!stored.marketOdds) {
+      const cachedOdds = db.getMatchOddsCache(cleanId);
+      if (cachedOdds) {
+        stored.marketOdds = cachedOdds;
+      } else if (stored.status !== 'FINISHED') {
+        const fetchedOdds = await flashscoreScraperService
+          .fetchMatchOdds(cleanId, {
+            homeParticipantId: stored.homeParticipantId,
+            awayParticipantId: stored.awayParticipantId,
+          })
+          .catch(() => null);
+        if (fetchedOdds) {
+          stored.marketOdds = fetchedOdds;
+        }
       }
     }
 

@@ -600,7 +600,7 @@ export class EngineService {
     return res.matches;
   }
 
-  public static async exportPredictions(): Promise<{
+  public static async exportPredictions(sortByProb?: 'desc' | 'asc'): Promise<{
     success: boolean;
     format?: string;
     version?: string;
@@ -609,7 +609,8 @@ export class EngineService {
     predictions?: any[];
     error?: string;
   }> {
-    const serverData = await this.safeJsonFetch('/api/fixtures/predictions/export');
+    const query = sortByProb ? `?sortByProb=${sortByProb}` : '';
+    const serverData = await this.safeJsonFetch(`/api/fixtures/predictions/export${query}`);
     if (serverData && serverData.success) {
       return serverData;
     }
@@ -619,14 +620,14 @@ export class EngineService {
     };
   }
 
-  public static async downloadPredictionsJson(): Promise<{
+  public static async downloadPredictionsJson(sortByProb?: 'desc' | 'asc'): Promise<{
     success: boolean;
     count?: number;
     filename?: string;
     error?: string;
   }> {
     try {
-      const res = await this.exportPredictions();
+      const res = await this.exportPredictions(sortByProb);
       if (!res.success || !res.predictions) {
         return {
           success: false,

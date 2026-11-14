@@ -1,8 +1,8 @@
 import { Fixture } from './types.js';
-import { getLeaguePriority } from './leaguePriority.js';
+import { compareFixturesByPopularityAndDateTimeDesc } from './leaguePriority.js';
 import { isMatchStarted } from './accumulator.js';
 import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
-import { sqliteDb } from './sqliteClient.js';
+import { sqliteDb, checkpointSqliteWal } from './sqliteClient.js';
 import { loggerService } from '../services/loggerService.js';
 
 export interface PredictionEvaluationSummary {
@@ -219,6 +219,7 @@ export class PredictionsDB {
       });
 
       insertMany(fixtures);
+      checkpointSqliteWal('PASSIVE');
     } catch (err: any) {
       console.error('[PredictionsDB] Error persisting predictions to SQLite:', err?.message);
       throw err;
@@ -276,13 +277,7 @@ export class PredictionsDB {
         fixtures = fixtures.filter((f) => !isMatchStarted(f));
       }
 
-      fixtures.sort((a, b) => {
-        const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-        const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        if (a.matchDate !== b.matchDate) return (a.matchDate || '').localeCompare(b.matchDate || '');
-        return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-      });
+      fixtures.sort(compareFixturesByPopularityAndDateTimeDesc);
 
       return fixtures;
     } catch (err: any) {
@@ -339,13 +334,31 @@ export class PredictionsDB {
     return this.count(state);
   }
 
-  async clearPredictions(state: 'upcoming' | 'completed' | 'all' = 'upcoming'): Promise<void> {
+  async clearPredictions(
+    state: 'upcoming' | 'completed' | 'all' = 'upcoming',
+    origin?: 'fullsync' | 'update_predictions'
+  ): Promise<void> {
+    if (origin !== 'fullsync' && origin !== 'update_predictions') {
+      console.warn(`[PredictionsDB] Blocked unauthorized clearPredictions call (state=${state}, origin=${String(origin || 'none')}).`);
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'DATABASE',
+        source: 'PredictionsDB',
+        message: `Blocked unauthorized clearPredictions attempt (state=${state}, origin=${String(origin || 'none')})`,
+      });
+      return;
+    }
+
+    // Update Predictions must only recalculate upcoming predictions and never wipe completed historical records
+    const effectiveState = origin === 'update_predictions' && state === 'all' ? 'upcoming' : state;
+
     try {
-      if (state === 'all') {
+      if (effectiveState === 'all') {
         sqliteDb.exec('DELETE FROM predictions;');
       } else {
-        sqliteDb.prepare('DELETE FROM predictions WHERE match_state = ?').run(state);
+        sqliteDb.prepare('DELETE FROM predictions WHERE match_state = ?').run(effectiveState);
       }
+      checkpointSqliteWal('PASSIVE');
     } catch (err: any) {
       console.error('[PredictionsDB] Error clearing predictions:', err?.message);
     }
@@ -368,8 +381,14 @@ export class PredictionsDB {
     }
   }
 
-  async clearAll(): Promise<void> {
-    return this.clearPredictions('all');
+  async clearAll(origin?: 'fullsync' | 'update_predictions'): Promise<void> {
+    if (origin === 'fullsync') {
+      return this.clearPredictions('all', 'fullsync');
+    }
+    if (origin === 'update_predictions') {
+      return this.clearPredictions('upcoming', 'update_predictions');
+    }
+    console.warn(`[PredictionsDB] Blocked unauthorized clearAll call (origin=${String(origin || 'none')}).`);
   }
 
   async saveLivePredictions(fixtures: Fixture[]): Promise<void> {
@@ -854,7 +873,7 @@ export class PredictionsDB {
     await this.syncPendingPredictionResultsFromRemote(Boolean(options?.force));
   }
 
-  export1X2Predictions(): {
+  export1X2Predictions(sortByProb?: 'desc' | 'asc'): {
     format: string;
     version: string;
     exportedAt: string;
@@ -890,6 +909,13 @@ export class PredictionsDB {
     }>;
   } {
     try {
+      let orderClause = 'ORDER BY match_date ASC, kick_off_time ASC, fixture_id ASC';
+      if (sortByProb === 'desc') {
+        orderClause = 'ORDER BY tip_prob DESC, match_date ASC';
+      } else if (sortByProb === 'asc') {
+        orderClause = 'ORDER BY tip_prob ASC, match_date ASC';
+      }
+
       const rows = sqliteDb.prepare(`
         SELECT 
           fixture_id, league, league_name, stage, match_date, kick_off_time,
@@ -899,7 +925,7 @@ export class PredictionsDB {
           over15_prob, over25_prob, over35_prob, btts_prob,
           tip_key, tip_name, tip_prob, predicted_at
         FROM predictions
-        ORDER BY match_date ASC, kick_off_time ASC, fixture_id ASC
+        ${orderClause}
       `).all() as any[];
 
       const predictions = rows.map((r) => {

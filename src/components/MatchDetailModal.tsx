@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, History, Target } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, MarketOption } from '../core/types.js';
-import { PoissonMatrixView } from './PoissonMatrixView.js';
-import { MatchHeatmap } from './MatchHeatmap.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
@@ -17,7 +15,7 @@ export interface MatchDetailViewProps {
   isPanel?: boolean;
 }
 
-type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'HEATMAP' | 'TACTICS';
+type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
 
 export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   fixture,
@@ -142,7 +140,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
       let resolvedTeamForm = hasValidH2H;
 
-      if (!fixture.statistics?.length || !fixture.information?.length || !fixture.prediction) {
+      if (!fixture.statistics?.length || !fixture.information?.length || !fixture.prediction || !fixture.marketOdds) {
         setIsParsing(true);
         try {
           const detail = await EngineService.getMatchDetail(fixture.id);
@@ -153,6 +151,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               statistics: detail.statistics?.length ? detail.statistics : prev.statistics,
               information: detail.information?.length ? detail.information : prev.information,
               score: detail.score || prev.score,
+              marketOdds: detail.marketOdds || prev.marketOdds,
               measurements: {
                 ...prev.measurements,
                 ...(detail.measurements || {}),
@@ -418,7 +417,6 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       label: 'Preds',
       count: bestMarketsPerGroup.length > 0 ? bestMarketsPerGroup.length : undefined,
     },
-    { id: 'HEATMAP' as ModalTab, label: 'Heatmap' },
     { id: 'TACTICS' as ModalTab, label: 'Tactics' },
   ];
 
@@ -560,14 +558,77 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   </div>
                 </Card>
 
-                <Card surface="elevated" padding="md" radius="2xl">
-                  <PoissonMatrixView
-                    prediction={pred}
-                    homeTeam={fixture.homeTeam}
-                    awayTeam={fixture.awayTeam}
-                    showTopScores={true}
-                  />
-                </Card>
+                {enrichedFixture.marketOdds && (
+                  <Card surface="elevated" padding="md" radius="2xl" className="space-y-2.5">
+                    <SectionHeader
+                      title="Flashscore Market Odds"
+                      size="sm"
+                      action={
+                        enrichedFixture.marketOdds.bookmakersCount ? (
+                          <span className="text-[10px] font-mono tabular-nums text-theme-dim">
+                            {enrichedFixture.marketOdds.bookmakersCount} bookmakers
+                          </span>
+                        ) : undefined
+                      }
+                    />
+                    <div className="grid grid-cols-3 gap-1.5 text-center font-mono tabular-nums">
+                      <div className="p-2 rounded-xl bg-theme-card">
+                        <span className="text-[9.5px] font-sans text-theme-sub block">1 (Home)</span>
+                        <span className="text-xs font-black text-theme-primary block">
+                          {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
+                        </span>
+                        <span className="text-[10px] text-theme-dim block">
+                          {enrichedFixture.marketOdds.homeImpliedProb !== undefined
+                            ? `${(enrichedFixture.marketOdds.homeImpliedProb * 100).toFixed(1)}%`
+                            : '-'}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-theme-card">
+                        <span className="text-[9.5px] font-sans text-theme-sub block">X (Draw)</span>
+                        <span className="text-xs font-black text-amber-500 block">
+                          {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
+                        </span>
+                        <span className="text-[10px] text-theme-dim block">
+                          {enrichedFixture.marketOdds.drawImpliedProb !== undefined
+                            ? `${(enrichedFixture.marketOdds.drawImpliedProb * 100).toFixed(1)}%`
+                            : '-'}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-theme-card">
+                        <span className="text-[9.5px] font-sans text-theme-sub block">2 (Away)</span>
+                        <span className="text-xs font-black text-sky-600 dark:text-sky-400 block">
+                          {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
+                        </span>
+                        <span className="text-[10px] text-theme-dim block">
+                          {enrichedFixture.marketOdds.awayImpliedProb !== undefined
+                            ? `${(enrichedFixture.marketOdds.awayImpliedProb * 100).toFixed(1)}%`
+                            : '-'}
+                        </span>
+                      </div>
+                    </div>
+                    {(enrichedFixture.marketOdds.over25Odds || enrichedFixture.marketOdds.bttsYesOdds) && (
+                      <div className="grid grid-cols-2 gap-1.5 text-xs font-mono tabular-nums">
+                        {enrichedFixture.marketOdds.over25Odds && (
+                          <div className="p-2 rounded-xl bg-theme-card flex items-center justify-between">
+                            <span className="font-sans text-theme-sub">O/U 2.5</span>
+                            <span className="font-bold text-theme-main">
+                              {enrichedFixture.marketOdds.over25Odds.toFixed(2)} / {enrichedFixture.marketOdds.under25Odds?.toFixed(2) ?? '-'}
+                            </span>
+                          </div>
+                        )}
+                        {enrichedFixture.marketOdds.bttsYesOdds && (
+                          <div className="p-2 rounded-xl bg-theme-card flex items-center justify-between">
+                            <span className="font-sans text-theme-sub">BTTS Y/N</span>
+                            <span className="font-bold text-theme-main">
+                              {enrichedFixture.marketOdds.bttsYesOdds.toFixed(2)} / {enrichedFixture.marketOdds.bttsNoOdds?.toFixed(2) ?? '-'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                )}
+
               </>
             ) : (
               <EmptyState
@@ -876,40 +937,49 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               <SectionHeader title="Best Predictions" size="sm" />
               {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
                 <div className="space-y-2 font-mono tabular-nums text-xs">
-                  {bestMarketsPerGroup.map((market, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-theme-card flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-theme-sub font-sans block uppercase font-bold">
-                          {market.groupName} Market
-                        </span>
-                        <span className="font-extrabold text-theme-main font-sans text-sm">{market.name}</span>
+                  {bestMarketsPerGroup.map((market, idx) => {
+                    const mOdds = enrichedFixture.marketOdds;
+                    let fsOdds: number | undefined;
+                    let fsProb: number | undefined;
+                    if (mOdds) {
+                      if (market.key === 'HOME_WIN') { fsOdds = mOdds.homeOdds; fsProb = mOdds.homeImpliedProb; }
+                      else if (market.key === 'DRAW') { fsOdds = mOdds.drawOdds; fsProb = mOdds.drawImpliedProb; }
+                      else if (market.key === 'AWAY_WIN') { fsOdds = mOdds.awayOdds; fsProb = mOdds.awayImpliedProb; }
+                      else if (market.key === 'OVER_25') { fsOdds = mOdds.over25Odds; fsProb = mOdds.over25ImpliedProb; }
+                      else if (market.key === 'UNDER_25') { fsOdds = mOdds.under25Odds; fsProb = mOdds.under25ImpliedProb; }
+                      else if (market.key === 'BTTS_YES') { fsOdds = mOdds.bttsYesOdds; fsProb = mOdds.bttsYesImpliedProb; }
+                      else if (market.key === 'BTTS_NO') { fsOdds = mOdds.bttsNoOdds; fsProb = mOdds.bttsNoImpliedProb; }
+                      else if (market.key === 'DOUBLE_CHANCE_1X') { fsOdds = mOdds.dc1XOdds; fsProb = mOdds.dc1XImpliedProb; }
+                      else if (market.key === 'DOUBLE_CHANCE_X2') { fsOdds = mOdds.dcX2Odds; fsProb = mOdds.dcX2ImpliedProb; }
+                    }
+                    return (
+                      <div key={idx} className="p-3 rounded-xl bg-theme-card flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] text-theme-sub font-sans block uppercase font-bold">
+                            {market.groupName} Market
+                          </span>
+                          <span className="font-extrabold text-theme-main font-sans text-sm">{market.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-extrabold text-theme-primary block text-sm">
+                            {(market.probability * 100).toFixed(1)}%
+                          </span>
+                          <span className="text-[10px] text-theme-dim block">
+                            Model Fair {(1 / market.probability).toFixed(2)}
+                            {fsOdds !== undefined && fsProb !== undefined
+                              ? ` · FS ${fsOdds.toFixed(2)} (${(fsProb * 100).toFixed(1)}%)`
+                              : ''}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-extrabold text-theme-primary block text-sm">
-                          {(market.probability * 100).toFixed(1)}%
-                        </span>
-                        <span className="text-[10px] text-theme-dim block">
-                          Fair Odds {(1 / market.probability).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="py-6 text-center text-xs text-theme-sub font-mono">No predictions computed</div>
               )}
             </Card>
 
-            {pred && (
-              <Card surface="elevated" padding="md" radius="2xl">
-                <PoissonMatrixView
-                  prediction={pred}
-                  homeTeam={fixture.homeTeam}
-                  awayTeam={fixture.awayTeam}
-                  showTopScores={true}
-                />
-              </Card>
-            )}
           </div>
         )}
 
@@ -924,14 +994,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           </div>
         )}
 
-        {/* TAB 7: HEATMAP */}
-        {activeTab === 'HEATMAP' && (
-          <div className="space-y-4">
-            <MatchHeatmap fixture={enrichedFixture} />
-          </div>
-        )}
-
-        {/* TAB 8: TACTICS */}
+        {/* TAB 7: TACTICS */}
         {activeTab === 'TACTICS' && (
           <div className="space-y-4">
             <TacticalAnalysis fixture={enrichedFixture} />

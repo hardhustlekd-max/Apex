@@ -14,6 +14,7 @@ import { matchesLeague } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
 import { resolveTeamSide, parseHeadToHeadFeedText } from './feedParser.js';
+import { checkpointSqliteWal } from './sqliteClient.js';
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
@@ -389,10 +390,24 @@ export class ServerEngine {
     }
 
     const cachedH2HMap = db.getAllPredictionMeasurements();
+    const cachedOddsMap = db.getAllMatchOddsCache();
     
     // Pre-calculate Elo map once for the entire batch to avoid O(N^2) complexity
     const eloRatingsMap = ApexEngine.computeAugmentedEloRatings(allMatches);
-    
+    const leagueContextCache = new Map<string, HistoricalMatch[]>();
+    const getLeagueContext = (league?: string, leagueName?: string): HistoricalMatch[] => {
+      const key = `${league || ''}::${leagueName || ''}`;
+      const cached = leagueContextCache.get(key);
+      if (cached) return cached;
+      const filtered = allMatches.filter((m) =>
+        matchesLeague(m.div, (m as any).leagueName, league || '') ||
+        matchesLeague(m.div, (m as any).leagueName, leagueName || '')
+      );
+      const resolved = filtered.length >= 10 ? filtered : allMatches;
+      leagueContextCache.set(key, resolved);
+      return resolved;
+    };
+
     let predictedCount = 0;
     let skippedCount = 0;
     let processed = 0;
@@ -411,8 +426,6 @@ export class ServerEngine {
         let cachedH2H =
           cachedH2HMap.get(cleanId) ||
           cachedH2HMap.get(f.id) ||
-          db.getPredictionMeasurement(cleanId) ||
-          db.getPredictionMeasurement(f.id) ||
           (f.prediction?.measurements?.h2h &&
           ((f.prediction.measurements.h2h.homeRecentMatches && f.prediction.measurements.h2h.homeRecentMatches.length > 0) ||
             (f.prediction.measurements.h2h.awayRecentMatches && f.prediction.measurements.h2h.awayRecentMatches.length > 0))
@@ -453,16 +466,37 @@ export class ServerEngine {
           stage: f.stage,
         };
 
-        const availability = this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
+        const leagueHistoricalContext = getLeagueContext(f.league, f.leagueName);
+        const availability = allMatches.length >= 10
+          ? { score: 1.0, isEligible: true, missingFields: [] as string[] }
+          : this.calculateDataAvailability(f, allMatches, cachedH2H, scrapedMap);
+
+        const cachedOdds = f.marketOdds || cachedOddsMap.get(cleanId) || cachedOddsMap.get(f.id);
 
         if (availability.isEligible) {
-          const enriched = this.predictFixtureUnified(f, allMatches, settings, cachedH2H, tacticalInput, scrapedMap, undefined, eloRatingsMap);
+          const enriched = this.predictFixtureUnified(
+            f,
+            allMatches,
+            settings,
+            cachedH2H,
+            tacticalInput,
+            scrapedMap,
+            leagueHistoricalContext,
+            eloRatingsMap
+          );
+          if (cachedOdds) {
+            enriched.marketOdds = cachedOdds;
+            if (enriched.prediction) {
+              enriched.prediction.marketOdds = cachedOdds;
+            }
+          }
           predictedChunk.push(enriched);
           allEnriched.push(enriched);
           predictedCount++;
         } else {
           const unpredicted: Fixture = {
             ...f,
+            marketOdds: cachedOdds || f.marketOdds,
             prediction: undefined,
           };
           unpredictedChunk.push(unpredicted);
@@ -511,6 +545,8 @@ export class ServerEngine {
       // Small tick delay to yield control and keep server responsive
       await new Promise((resolve) => setTimeout(resolve, 15));
     }
+
+    checkpointSqliteWal('PASSIVE');
 
     loggerService.addLog({
       level: 'INFO',

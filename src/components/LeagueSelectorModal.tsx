@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Globe, Check } from 'lucide-react';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
+import { getLeaguePopularityScore } from '../core/leaguePriority.js';
 import { Input, Modal } from './ui/index.js';
 
 interface LeagueSelectorModalProps {
@@ -9,6 +10,13 @@ interface LeagueSelectorModalProps {
   selectedLeague: string;
   onSelectLeague: (code: string) => void;
 }
+
+const SORTED_LEAGUES = GLOBAL_LEAGUES_DATASET.slice().sort((a, b) => {
+  const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
+  const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
+  if (scoreA !== scoreB) return scoreB - scoreA;
+  return a.name.localeCompare(b.name);
+});
 
 export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
   isOpen,
@@ -20,8 +28,8 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
 
   const filteredLeagues = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return GLOBAL_LEAGUES_DATASET;
-    return GLOBAL_LEAGUES_DATASET.filter(
+    if (!q) return SORTED_LEAGUES;
+    return SORTED_LEAGUES.filter(
       (l) => l.name.toLowerCase().includes(q) || (l.country && l.country.toLowerCase().includes(q))
     );
   }, [search]);

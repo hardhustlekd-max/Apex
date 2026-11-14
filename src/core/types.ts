@@ -17,7 +17,43 @@ export interface HistoricalMatch {
   leagueName?: string;
 }
 
-// BookmakerOdds removed as per user request to eliminate odds-related logic
+export interface ScrapedMarketOdds {
+  provider: 'FLASHSCORE';
+  fetchedAt: string;
+  bookmakersCount?: number;
+  homeParticipantId?: string;
+  awayParticipantId?: string;
+  homeOdds?: number;
+  drawOdds?: number;
+  awayOdds?: number;
+  homeImpliedProb?: number;
+  drawImpliedProb?: number;
+  awayImpliedProb?: number;
+  dc1XOdds?: number;
+  dc12Odds?: number;
+  dcX2Odds?: number;
+  dc1XImpliedProb?: number;
+  dcX2ImpliedProb?: number;
+  over15Odds?: number;
+  under15Odds?: number;
+  over15ImpliedProb?: number;
+  over25Odds?: number;
+  under25Odds?: number;
+  over25ImpliedProb?: number;
+  under25ImpliedProb?: number;
+  over35Odds?: number;
+  under35Odds?: number;
+  over35ImpliedProb?: number;
+  bttsYesOdds?: number;
+  bttsNoOdds?: number;
+  bttsYesImpliedProb?: number;
+  bttsNoImpliedProb?: number;
+  topCorrectScores?: Array<{
+    score: string;
+    odds: number;
+    impliedProb: number;
+  }>;
+}
 
 export interface MarketOption {
   key: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | 'OVER_25' | 'UNDER_25' | 'BTTS_YES' | 'BTTS_NO' | 'DOUBLE_CHANCE_1X' | 'DOUBLE_CHANCE_X2';
@@ -199,6 +235,7 @@ export interface PoissonPrediction {
   tacticalContext?: TacticalContextBreakdown;
   dixonColesParams?: DixonColesParams;
   mostLikelyOutcome?: MostLikelyOutcome;
+  marketOdds?: ScrapedMarketOdds;
 }
 
 export interface Fixture {
@@ -239,6 +276,9 @@ export interface Fixture {
   restDaysHome?: number;
   restDaysAway?: number;
   h2hMatches?: any[];
+  homeParticipantId?: string;
+  awayParticipantId?: string;
+  marketOdds?: ScrapedMarketOdds;
 }
 
 export interface AccaLeg {

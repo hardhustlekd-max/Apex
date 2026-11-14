@@ -350,9 +350,17 @@ export class ApexEngine {
     return ratings;
   }
 
+  private static eloLookupCache = new WeakMap<Map<string, number>, Map<string, number>>();
+
   public static getTeamElo(teamName: string, ratingsMap: Map<string, number>): number {
     const clean = teamName.toLowerCase().trim();
     if (ratingsMap.has(clean)) return ratingsMap.get(clean)!;
+    let mapCache = this.eloLookupCache.get(ratingsMap);
+    if (!mapCache) {
+      mapCache = new Map<string, number>();
+      this.eloLookupCache.set(ratingsMap, mapCache);
+    }
+    if (mapCache.has(clean)) return mapCache.get(clean)!;
     let bestScore = 0;
     let bestVal = 1500;
     for (const [key, val] of ratingsMap.entries()) {
@@ -362,7 +370,9 @@ export class ApexEngine {
         bestVal = val;
       }
     }
-    return bestScore > 0 ? bestVal : 1500; // Strictly neutral baseline for unknown teams
+    const resolved = bestScore > 0 ? bestVal : 1500; // Strictly neutral baseline for unknown teams
+    mapCache.set(clean, resolved);
+    return resolved;
   }
 
   public static getEloWinExpectancy(

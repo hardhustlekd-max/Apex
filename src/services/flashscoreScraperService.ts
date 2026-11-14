@@ -1,7 +1,8 @@
-import { Fixture, HistoricalMatch, LeagueCode, FlashscoreScrapedMatch, HeadToHeadMeasurement, HeadToHeadMatchRecord, TeamFormMatch, LeagueStandingTable, LeagueStandingEntry, ProviderStatus } from '../core/types.js';
+import { Fixture, HistoricalMatch, LeagueCode, FlashscoreScrapedMatch, HeadToHeadMeasurement, HeadToHeadMatchRecord, TeamFormMatch, LeagueStandingTable, LeagueStandingEntry, ProviderStatus, ScrapedMarketOdds } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
+import { getLeaguePriority } from '../core/leaguePriority.js';
 
 export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
   const homeScore = m.fthg ?? 0;
@@ -43,12 +44,21 @@ export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
 
 
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
-import { getCurrentSeason, normalizeDateStr, normalizeTimeStr, getStandardDateStr, getStandardTimeStr } from '../core/dateUtils.js';
+import {
+  getCurrentSeason,
+  getUtcDateStr,
+  matchesDateFilter,
+  normalizeDateStr,
+  normalizeTimeStr,
+  getStandardDateStr,
+  getStandardTimeStr,
+} from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
 
 
 const FLASHSCORE_FEED_BASE = 'https://www.flashscore.com/x/feed';
-const FLASHSCORE_NINJA_BASE = 'https://46.flashscore.ninja/46/x/feed';
+const FLASHSCORE_NINJA_BASE = 'https://2.flashscore.ninja/2/x/feed';
+const CYRILLIC_REGEX = /[\u0400-\u04FF]/;
 const FSIGN_HEADER = 'SW9D1eZo';
 const STATIC_IMAGE_BASE = 'https://static.flashscore.com/res/image/data/';
 
@@ -122,6 +132,8 @@ export const scraperCircuitBreaker = new ScraperCircuitBreaker();
 export class FlashscoreScraperService {
   private lastFetchTime = 0;
   private CACHE_TTL_MS = 60000; // 1 minute in-memory cache
+  private upcomingMultiDaySyncPromise: Promise<Fixture[]> | null = null;
+  private lastMultiDaySyncAt = 0;
 
   /**
    * Fetch raw feed string from Flashscore feed endpoint
@@ -130,8 +142,8 @@ export class FlashscoreScraperService {
     const urls = [
       `${FLASHSCORE_FEED_BASE}/${path}`,
       `${FLASHSCORE_NINJA_BASE}/${path}`,
-      `https://1.flashscore.ninja/46/x/feed/${path}`,
-      `https://2.flashscore.ninja/46/x/feed/${path}`,
+      `https://1.flashscore.ninja/2/x/feed/${path}`,
+      `https://www.flashscore.co.uk/x/feed/${path}`,
       `https://www.flashscore.in/x/feed/${path}`,
     ];
 
@@ -168,6 +180,10 @@ export class FlashscoreScraperService {
               const text = await res.text();
               // Flashscore responses can sometimes be very short (e.g., A1÷¬~)
               if (text && text.length > 0) {
+                if (CYRILLIC_REGEX.test(text)) {
+                  lastError = new Error(`Non-English (Cyrillic) feed returned by ${url}`);
+                  continue;
+                }
                 return text;
               }
               lastError = new Error(`Flashscore feed response empty on ${url}`);
@@ -190,7 +206,7 @@ export class FlashscoreScraperService {
       });
     } catch (cbErr: any) {
       const localCached = db.getRawFeed(path);
-      if (localCached && localCached.rawText) {
+      if (localCached && localCached.rawText && !CYRILLIC_REGEX.test(localCached.rawText)) {
         return localCached.rawText;
       }
 
@@ -222,6 +238,7 @@ export class FlashscoreScraperService {
           const upcomingFixturesToSave: Fixture[] = [];
           const scrapedMatchesForDb: any[] = [];
           const historicalMatchesToSave: HistoricalMatch[] = [];
+          const statusUpdates: Array<{ id: string; status: string; kickOffTime?: string; score?: { home: number; away: number } }> = [];
 
           for (const m of rawMatches) {
             const matchDateObj = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
@@ -256,6 +273,18 @@ export class FlashscoreScraperService {
                 fthg: m.homeScore,
                 ftag: m.awayScore,
                 ftr,
+              });
+              statusUpdates.push({
+                id: `fs_${m.matchId}`,
+                status: 'FINISHED',
+                kickOffTime: 'FT',
+                score: { home: m.homeScore, away: m.awayScore },
+              });
+            } else if (isCancelledOrPostponed) {
+              statusUpdates.push({
+                id: `fs_${m.matchId}`,
+                status: mappedStatus,
+                kickOffTime: mappedStatus,
               });
             } else if (!isFinished && !isCancelledOrPostponed) {
               upcomingFixturesToSave.push({
@@ -308,6 +337,9 @@ export class FlashscoreScraperService {
           if (upcomingFixturesToSave.length > 0) {
             await db.saveUpcomingFixtures(upcomingFixturesToSave);
           }
+          if (statusUpdates.length > 0) {
+            db.updateUpcomingFixtureStatuses(statusUpdates);
+          }
           if (historicalMatchesToSave.length > 0) {
             db.insertHistoricalMatches(historicalMatchesToSave);
           }
@@ -327,15 +359,27 @@ export class FlashscoreScraperService {
    */
   private mapToLeagueCode(tournament: string, country: string): { code: LeagueCode; name: string } {
     const cleanedTournament = tournament.replace(/^[A-Z\s]+:\s*/, '').trim();
-    
-    // Attempt lookup in Global Leagues Dataset
-    const match = GLOBAL_LEAGUES_DATASET.find(l => 
-        l.name.toLowerCase().includes(cleanedTournament.toLowerCase()) && 
-        (l.country?.toLowerCase() === country.toLowerCase() || country.toLowerCase() === 'international')
+    const cleanedLower = cleanedTournament.toLowerCase();
+    const countryLower = (country || '').toLowerCase();
+
+    const matchesCountry = (l: (typeof GLOBAL_LEAGUES_DATASET)[number]) =>
+      l.country?.toLowerCase() === countryLower || countryLower === 'international';
+
+    // 1. Exact league name match first (prevents "LaLiga" matching "LaLiga 2" or "Bundesliga" matching "2. Bundesliga")
+    const exactMatch = GLOBAL_LEAGUES_DATASET.find(
+      (l) => l.name.toLowerCase() === cleanedLower && matchesCountry(l)
+    );
+    if (exactMatch) {
+      return { code: exactMatch.code as LeagueCode, name: exactMatch.name };
+    }
+
+    // 2. Fallback to substring match in Global Leagues Dataset
+    const match = GLOBAL_LEAGUES_DATASET.find(
+      (l) => l.name.toLowerCase().includes(cleanedLower) && matchesCountry(l)
     );
 
     if (match) {
-        return { code: match.code as LeagueCode, name: match.name };
+      return { code: match.code as LeagueCode, name: match.name };
     }
 
     const countryPrefix = country ? country.trim() : 'International';
@@ -351,37 +395,82 @@ export class FlashscoreScraperService {
   }
 
 
+  private hasMultiDayUpcomingCoverage(): boolean {
+    if (db.hasCyrillicUpcomingData()) {
+      db.purgeCyrillicFixtures();
+      return false;
+    }
+    const day0 = getUtcDateStr(0);
+    const day1 = getUtcDateStr(1);
+    const day2 = getUtcDateStr(2);
+    const counts = db.getUpcomingDateCounts([day0, day1, day2]);
+    return (counts[day1] || 0) > 0 && (counts[day2] || 0) > 0;
+  }
+
+  public async ensureUpcomingMultiDayCoverage(): Promise<void> {
+    if (this.hasMultiDayUpcomingCoverage()) {
+      return;
+    }
+    if (Date.now() - this.lastMultiDaySyncAt < 5 * 60 * 1000 && !this.upcomingMultiDaySyncPromise) {
+      return;
+    }
+    try {
+      await this.getUpcomingFixtures(undefined, true);
+    } catch {
+      // Non-fatal fallback; DB returns whatever is currently stored
+    }
+  }
+
   /**
-   * Scrapes upcoming and scheduled fixtures from Flashscore feeds
+   * Scrapes upcoming and scheduled fixtures from Flashscore UTC feeds across days 0..7
    */
-  async getUpcomingFixtures(dateFilter?: string): Promise<Fixture[]> {
-    // 1. Primary lookup: Check local SQLite database for stored upcoming fixtures
-    const sqliteUpcoming = db.getUpcomingFixtures(undefined, dateFilter);
-    if (sqliteUpcoming && sqliteUpcoming.length > 0) {
-      return sqliteUpcoming;
+  async getUpcomingFixtures(dateFilter?: string, forceRefresh = false): Promise<Fixture[]> {
+    const filterUpper = (dateFilter || '').trim().toUpperCase();
+    const isSingleDayFilter = Boolean(dateFilter) && !['ALL', 'NEXT_3_DAYS', 'THIS_WEEK'].includes(filterUpper);
+
+    // 1. Primary lookup: Return cached SQLite fixtures only if multi-day coverage exists (or requested single day is populated)
+    if (!forceRefresh) {
+      const sqliteUpcoming = db.getUpcomingFixtures(undefined, dateFilter);
+      const hasCoverage = isSingleDayFilter
+        ? sqliteUpcoming.length > 0
+        : sqliteUpcoming.length > 0 && this.hasMultiDayUpcomingCoverage();
+      if (hasCoverage) {
+        return sqliteUpcoming;
+      }
     }
 
-    const scrapedFixtures: Fixture[] = [];
-    const scrapedMatchesForDb: any[] = [];
-    const seenMatchIds = new Set<string>();
+    const runMultiDayScrape = async (): Promise<Fixture[]> => {
+      const scrapedFixtures: Fixture[] = [];
+      const scrapedMatchesForDb: any[] = [];
+      const seenMatchIds = new Set<string>();
 
-    // Scrape Day 0 (today) through Day 9 to cover a broader range, using multiple feed types (1, 2, 3)
-    const dayOffsets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const feedTypes = [1, 2, 3];
+      // Scrape Day 0 (today) through Day 7 using canonical UTC feed (t=0)
+      const dayOffsets = [0, 1, 2, 3, 4, 5, 6, 7];
+      const feedResults: Array<{ feedPath: string; feedText: string | null }> = [];
 
-    for (const offset of dayOffsets) {
-      for (const type of feedTypes) {
-        const feedPath = `f_1_${offset}_${type}_en_1`;
-        const feedText = await this.fetchAndPersistRawFeed(feedPath);
+      const batchSize = 4;
+      for (let i = 0; i < dayOffsets.length; i += batchSize) {
+        const batch = dayOffsets.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async (offset) => {
+            const feedPath = `f_1_${offset}_0_en_1`;
+            const feedText = await this.fetchAndPersistRawFeed(feedPath);
+            return { feedPath, feedText };
+          })
+        );
+        feedResults.push(...batchResults);
+      }
+
+      for (const { feedPath, feedText } of feedResults) {
         if (!feedText) continue;
 
         const rawMatches = parseFeedText(feedText);
 
         for (const m of rawMatches) {
-          // Feed already persisted via fetchAndPersistRawFeed(feedPath)
-
-          // Skip finished matches for upcoming fixtures view
-          if (['3', '47', '48', '49'].includes(m.statusCode || '')) continue;
+          // Skip finished, cancelled, and postponed matches
+          if (['3', '4', '5', '6', '10', '11', '36', '37', '38', '47', '48', '49'].includes(m.statusCode || '')) {
+            continue;
+          }
 
           // Guarantee unique fixture ID
           if (seenMatchIds.has(m.matchId)) continue;
@@ -406,6 +495,8 @@ export class FlashscoreScraperService {
             timestamp: m.timestamp,
             homeTeam: m.homeTeam,
             awayTeam: m.awayTeam,
+            homeParticipantId: m.homeParticipantId,
+            awayParticipantId: m.awayParticipantId,
             homeBadge: m.homeBadge ? `${STATIC_IMAGE_BASE}${m.homeBadge}` : undefined,
             awayBadge: m.awayBadge ? `${STATIC_IMAGE_BASE}${m.awayBadge}` : undefined,
             status: isLive ? 'LIVE' : 'SCHEDULED',
@@ -452,40 +543,48 @@ export class FlashscoreScraperService {
               { category: 'Country', value: m.country },
               { category: 'Competition', value: name },
             ],
-            statistics: [],
+            statistics: m.statistics || [],
           });
         }
       }
-    }
 
-    if (scrapedFixtures.length > 0) {
-      // Persist to database
-      await db.saveUpcomingFixtures(scrapedFixtures);
-      db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
+      if (scrapedFixtures.length > 0) {
+        await db.saveUpcomingFixtures(scrapedFixtures);
+        db.saveFlashscoreScrapedMatches(scrapedMatchesForDb);
 
-      loggerService.addLog({
-        level: 'SUCCESS',
-        category: 'DATA_FETCH',
-        source: 'FlashscoreScraper',
-        message: `Fetched ${scrapedFixtures.length} upcoming fixtures from Flashscore feed`,
-        details: { count: scrapedFixtures.length, dateFilter: dateFilter || 'All' },
-      });
+        loggerService.addLog({
+          level: 'SUCCESS',
+          category: 'DATA_FETCH',
+          source: 'FlashscoreScraper',
+          message: `Fetched ${scrapedFixtures.length} upcoming fixtures across days 0..7 from Flashscore UTC feed`,
+          details: { count: scrapedFixtures.length, dateFilter: dateFilter || 'All' },
+        });
 
-      if (dateFilter) {
-        return scrapedFixtures.filter((f) => f.matchDate === dateFilter);
+        return scrapedFixtures;
       }
-      return scrapedFixtures;
+
+      return db.getUpcomingFixtures();
+    };
+
+    if (!this.upcomingMultiDaySyncPromise) {
+      this.upcomingMultiDaySyncPromise = runMultiDayScrape().finally(() => {
+        this.lastMultiDaySyncAt = Date.now();
+        this.upcomingMultiDaySyncPromise = null;
+      });
     }
 
-    // Fallback to SQLite cached fixtures
-    return db.getUpcomingFixtures(undefined, dateFilter);
+    const allFixtures = await this.upcomingMultiDaySyncPromise;
+    if (dateFilter && filterUpper !== 'ALL') {
+      return allFixtures.filter((f) => matchesDateFilter(f, dateFilter));
+    }
+    return allFixtures;
   }
 
   /**
    * Scrapes live in-play scores from Flashscore
    */
   async getLiveScores(): Promise<LiveScore[]> {
-    const feedPath = 'f_1_0_3_en_1';
+    const feedPath = 'f_1_0_0_en_1';
     const feedText = await this.fetchAndPersistRawFeed(feedPath);
     if (!feedText) {
       // Fallback
@@ -664,6 +763,7 @@ export class FlashscoreScraperService {
    */
   public clearCaches(): void {
     this.lastFetchTime = 0;
+    this.lastMultiDaySyncAt = 0;
   }
 
   /**
@@ -907,18 +1007,13 @@ export class FlashscoreScraperService {
   /**
    * Scrapes completed match results from Flashscore to populate historical database
    */
-  async syncHistoricalData(daysBack = 7, shouldClear = true): Promise<{ success: boolean; matchesCount: number; message: string }> {
+  async syncHistoricalData(daysBack = 7, _shouldClear = false): Promise<{ success: boolean; matchesCount: number; message: string }> {
     loggerService.addLog({
       level: 'INFO',
       category: 'SCRAPER',
       source: 'FlashscoreScraperService',
-      message: `Starting syncHistoricalData with multi-year archive crawling (daysBack: ${daysBack}, shouldClear: ${shouldClear})`,
+      message: `Starting syncHistoricalData with multi-year archive crawling (daysBack: ${daysBack})`,
     });
-    // Clear existing data and local caches before refilling if requested
-    if (shouldClear) {
-      db.clearDatabase();
-      this.clearCaches();
-    }
 
     let inserted = 0;
     // Scrape past days down to -7 (Flashscore maximum historical feed range)
@@ -1036,8 +1131,8 @@ export class FlashscoreScraperService {
       inserted = db.insertHistoricalMatches(historicalMatches);
     }
 
-    // Refresh upcoming fixtures as well
-    const upcoming = await this.getUpcomingFixtures();
+    // Refresh upcoming fixtures across all multi-day feeds
+    const upcoming = await this.getUpcomingFixtures(undefined, true);
 
     // Scrape and save standings into SQLite database table during fullsync process
     const popularLeagues = [
@@ -1073,7 +1168,11 @@ export class FlashscoreScraperService {
       'south_korea_k_league_1',
       'saudi_arabia_saudi_professional_league',
     ];
-    await Promise.allSettled(popularLeagues.map((code) => this.fetchAndSaveLeagueStandings(code)));
+    const standingsBatchSize = 4;
+    for (let i = 0; i < popularLeagues.length; i += standingsBatchSize) {
+      const batch = popularLeagues.slice(i, i + standingsBatchSize);
+      await Promise.allSettled(batch.map((code) => this.fetchAndSaveLeagueStandings(code)));
+    }
 
     return {
       success: true,
@@ -1193,69 +1292,299 @@ export class FlashscoreScraperService {
   }
 
   /**
-   * Improvement 3: Automated Bookmaker Odds & Market Consensus Ingestion
-   * Fetches pre-match 1X2 odds feed (df_o_1_{id}) and calculates market implied probabilities and overround.
+   * Scrapes live Flashscore bookmaker odds across 1X2, Double Chance, Over/Under, BTTS, and Correct Score
+   * via Flashscore's odds GraphQL endpoint, computes vig-removed market-implied probabilities,
+   * and persists results in SQLite (match_odds_cache & upcoming_fixtures).
    */
-  async fetchMatchOdds(matchId: string): Promise<{
-    homeOdds?: number;
-    drawOdds?: number;
-    awayOdds?: number;
-    homeImpliedProb?: number;
-    drawImpliedProb?: number;
-    awayImpliedProb?: number;
-  } | null> {
+  async fetchMatchOdds(
+    matchId: string,
+    options?: {
+      homeParticipantId?: string;
+      awayParticipantId?: string;
+      forceRefresh?: boolean;
+      skipDbSave?: boolean;
+    }
+  ): Promise<ScrapedMarketOdds | null> {
     const cleanId = String(matchId || '').replace(/^fs_/, '').replace(/^hist_/, '').trim();
     if (!cleanId) return null;
 
+    if (!options?.forceRefresh) {
+      const cached = db.getMatchOddsCache(cleanId);
+      if (cached && cached.homeOdds && cached.awayOdds) {
+        return cached;
+      }
+    }
+
+    const avg = (arr: number[]): number | undefined => {
+      if (!arr || arr.length === 0) return undefined;
+      const sum = arr.reduce((a, b) => a + b, 0);
+      return Number((sum / arr.length).toFixed(2));
+    };
+
+    const removeVig2Way = (o1?: number, o2?: number): [number | undefined, number | undefined] => {
+      if (!o1 || !o2 || o1 <= 1 || o2 <= 1) return [undefined, undefined];
+      const p1 = 1 / o1;
+      const p2 = 1 / o2;
+      const tot = p1 + p2;
+      return [Number((p1 / tot).toFixed(4)), Number((p2 / tot).toFixed(4))];
+    };
+
+    const removeVig3Way = (o1?: number, o2?: number, o3?: number): [number | undefined, number | undefined, number | undefined] => {
+      if (!o1 || !o2 || !o3 || o1 <= 1 || o2 <= 1 || o3 <= 1) return [undefined, undefined, undefined];
+      const p1 = 1 / o1;
+      const p2 = 1 / o2;
+      const p3 = 1 / o3;
+      const tot = p1 + p2 + p3;
+      return [
+        Number((p1 / tot).toFixed(4)),
+        Number((p2 / tot).toFixed(4)),
+        Number((p3 / tot).toFixed(4)),
+      ];
+    };
+
+    let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
-      const feedText = await this.fetchFlashscoreFeed(`df_o_1_${cleanId}`);
-      if (!feedText || feedText.length < 5) return null;
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), 5000);
+      const urls = [
+        `https://global.ds.lsapp.eu/odds/pq_graphql?_hash=oce&eventId=${encodeURIComponent(cleanId)}&projectId=2&geoIpCode=GB&geoIpSubdivisionCode=`,
+        `https://global.ds.lsapp.eu/odds/pq_graphql?_hash=oce&eventId=${encodeURIComponent(cleanId)}&projectId=2&geoIpCode=US&geoIpSubdivisionCode=USNY`,
+      ];
 
-      // Parse Flashscore odds feed key-value format
-      const sections = feedText.split('~');
-      let homeOdds = NaN;
-      let drawOdds = NaN;
-      let awayOdds = NaN;
-
-      for (const section of sections) {
-        if (!section) continue;
-        const parts = section.split('¬');
-        const d: Record<string, string> = {};
-        for (const p of parts) {
-          const sep = p.indexOf('÷');
-          if (sep > 0) {
-            d[p.slice(0, sep)] = p.slice(sep + 1);
-          }
+      let oddsEntries: any[] | null = null;
+      for (const url of urls) {
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Origin': 'https://www.flashscore.com',
+            'Referer': 'https://www.flashscore.com/',
+            'Accept': 'application/json',
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) continue;
+        const json = (await res.json()) as any;
+        const entries = json?.data?.findOddsByEventId?.odds;
+        if (Array.isArray(entries) && entries.length > 0) {
+          oddsEntries = entries;
+          break;
         }
-        // FS odds keys typically include DE/DF or odds values
-        for (const val of Object.values(d)) {
-          const num = parseFloat(val);
-          if (!isNaN(num) && num > 1.01 && num < 50) {
-            if (isNaN(homeOdds)) homeOdds = num;
-            else if (isNaN(drawOdds)) drawOdds = num;
-            else if (isNaN(awayOdds)) awayOdds = num;
+      }
+
+      if (!Array.isArray(oddsEntries) || oddsEntries.length === 0) return null;
+
+      let homePid = options?.homeParticipantId;
+      let awayPid = options?.awayParticipantId;
+
+      const fullTime1X2Entries = oddsEntries.filter(
+        (o: any) => o.bettingType === 'HOME_DRAW_AWAY' && o.bettingScope === 'FULL_TIME' && Array.isArray(o.odds)
+      );
+
+      // Infer participant IDs cleanly from HOME_DRAW_AWAY FULL_TIME order [Home, Away, Draw] if missing
+      if (!homePid || !awayPid) {
+        for (const entry of fullTime1X2Entries) {
+          const nonNullPids = entry.odds
+            .map((item: any) => item?.eventParticipantId)
+            .filter((pid: any) => typeof pid === 'string' && pid.length > 0);
+          if (nonNullPids.length >= 2) {
+            homePid = homePid || nonNullPids[0];
+            awayPid = awayPid || nonNullPids[1];
+            break;
           }
         }
       }
 
-      if (!isNaN(homeOdds) && !isNaN(drawOdds) && !isNaN(awayOdds)) {
-        const rawH = 1 / homeOdds;
-        const rawD = 1 / drawOdds;
-        const rawA = 1 / awayOdds;
-        const total = rawH + rawD + rawA;
+      const bookmakerIds = new Set<number>();
+      const h1Arr: number[] = [];
+      const dXArr: number[] = [];
+      const a2Arr: number[] = [];
+      const dc1XArr: number[] = [];
+      const dc12Arr: number[] = [];
+      const dcX2Arr: number[] = [];
+      const o15Arr: number[] = [];
+      const u15Arr: number[] = [];
+      const o25Arr: number[] = [];
+      const u25Arr: number[] = [];
+      const o35Arr: number[] = [];
+      const u35Arr: number[] = [];
+      const bttsYesArr: number[] = [];
+      const bttsNoArr: number[] = [];
+      const csMap = new Map<string, number[]>();
 
-        return {
-          homeOdds,
-          drawOdds,
-          awayOdds,
-          homeImpliedProb: Number((rawH / total).toFixed(3)),
-          drawImpliedProb: Number((rawD / total).toFixed(3)),
-          awayImpliedProb: Number((rawA / total).toFixed(3)),
-        };
+      for (const entry of oddsEntries) {
+        if (entry?.bettingScope !== 'FULL_TIME' || !Array.isArray(entry.odds)) continue;
+        if (typeof entry.bookmakerId === 'number') {
+          bookmakerIds.add(entry.bookmakerId);
+        }
+
+        if (entry.bettingType === 'HOME_DRAW_AWAY') {
+          for (const item of entry.odds) {
+            const val = parseFloat(item?.value);
+            if (!Number.isFinite(val) || val <= 1.01) continue;
+            if (item.eventParticipantId === null || item.eventParticipantId === undefined) {
+              dXArr.push(val);
+            } else if (homePid && item.eventParticipantId === homePid) {
+              h1Arr.push(val);
+            } else if (awayPid && item.eventParticipantId === awayPid) {
+              a2Arr.push(val);
+            }
+          }
+        } else if (entry.bettingType === 'DOUBLE_CHANCE') {
+          for (const item of entry.odds) {
+            const val = parseFloat(item?.value);
+            if (!Number.isFinite(val) || val <= 1.01) continue;
+            if (item.eventParticipantId === null || item.eventParticipantId === undefined) {
+              dc12Arr.push(val);
+            } else if (homePid && item.eventParticipantId === homePid) {
+              dc1XArr.push(val);
+            } else if (awayPid && item.eventParticipantId === awayPid) {
+              dcX2Arr.push(val);
+            }
+          }
+        } else if (entry.bettingType === 'OVER_UNDER') {
+          for (const item of entry.odds) {
+            const val = parseFloat(item?.value);
+            const hcap = String(item?.handicap?.value || '').trim();
+            const sel = String(item?.selection || '').toUpperCase();
+            if (!Number.isFinite(val) || val <= 1.01) continue;
+            if (hcap === '1.5') {
+              if (sel === 'OVER') o15Arr.push(val);
+              else if (sel === 'UNDER') u15Arr.push(val);
+            } else if (hcap === '2.5') {
+              if (sel === 'OVER') o25Arr.push(val);
+              else if (sel === 'UNDER') u25Arr.push(val);
+            } else if (hcap === '3.5') {
+              if (sel === 'OVER') o35Arr.push(val);
+              else if (sel === 'UNDER') u35Arr.push(val);
+            }
+          }
+        } else if (entry.bettingType === 'BOTH_TEAMS_TO_SCORE') {
+          for (const item of entry.odds) {
+            const val = parseFloat(item?.value);
+            if (!Number.isFinite(val) || val <= 1.01) continue;
+            if (item.bothTeamsToScore === true) bttsYesArr.push(val);
+            else if (item.bothTeamsToScore === false) bttsNoArr.push(val);
+          }
+        } else if (entry.bettingType === 'CORRECT_SCORE') {
+          for (const item of entry.odds) {
+            const val = parseFloat(item?.value);
+            const rawScore = String(item?.score || '').trim();
+            if (!Number.isFinite(val) || val <= 1.01 || !rawScore) continue;
+            const normScore = rawScore.replace(':', '-');
+            const list = csMap.get(normScore) || [];
+            list.push(val);
+            csMap.set(normScore, list);
+          }
+        }
       }
-    } catch {}
 
-    return null;
+      const homeOdds = avg(h1Arr);
+      const drawOdds = avg(dXArr);
+      const awayOdds = avg(a2Arr);
+      const [homeImpliedProb, drawImpliedProb, awayImpliedProb] = removeVig3Way(homeOdds, drawOdds, awayOdds);
+
+      const dc1XOdds = avg(dc1XArr);
+      const dc12Odds = avg(dc12Arr);
+      const dcX2Odds = avg(dcX2Arr);
+      // 1X implied = (Home + Draw), X2 implied = (Draw + Away) when 1X2 exists, else vig-adjusted reciprocal
+      const dc1XImpliedProb =
+        homeImpliedProb !== undefined && drawImpliedProb !== undefined
+          ? Number(Math.min(0.99, homeImpliedProb + drawImpliedProb).toFixed(4))
+          : dc1XOdds && dc1XOdds > 1
+          ? Number(Math.min(0.99, (1 / dc1XOdds) * 0.94).toFixed(4))
+          : undefined;
+      const dcX2ImpliedProb =
+        awayImpliedProb !== undefined && drawImpliedProb !== undefined
+          ? Number(Math.min(0.99, awayImpliedProb + drawImpliedProb).toFixed(4))
+          : dcX2Odds && dcX2Odds > 1
+          ? Number(Math.min(0.99, (1 / dcX2Odds) * 0.94).toFixed(4))
+          : undefined;
+
+      const over15Odds = avg(o15Arr);
+      const under15Odds = avg(u15Arr);
+      const [over15ImpliedProb] = removeVig2Way(over15Odds, under15Odds);
+
+      const over25Odds = avg(o25Arr);
+      const under25Odds = avg(u25Arr);
+      const [over25ImpliedProb, under25ImpliedProb] = removeVig2Way(over25Odds, under25Odds);
+
+      const over35Odds = avg(o35Arr);
+      const under35Odds = avg(u35Arr);
+      const [over35ImpliedProb] = removeVig2Way(over35Odds, under35Odds);
+
+      const bttsYesOdds = avg(bttsYesArr);
+      const bttsNoOdds = avg(bttsNoArr);
+      const [bttsYesImpliedProb, bttsNoImpliedProb] = removeVig2Way(bttsYesOdds, bttsNoOdds);
+
+      const allCs = Array.from(csMap.entries())
+        .map(([score, vals]) => {
+          const o = avg(vals)!;
+          return { score, odds: o, rawProb: 1 / o };
+        })
+        .sort((a, b) => a.odds - b.odds);
+      const csOverround = allCs.reduce((sum, x) => sum + x.rawProb, 0) || 1;
+      const topCorrectScores = allCs.slice(0, 5).map((x) => ({
+        score: x.score,
+        odds: x.odds,
+        impliedProb: Number((x.rawProb / csOverround).toFixed(4)),
+      }));
+
+      if (
+        homeOdds === undefined &&
+        awayOdds === undefined &&
+        over25Odds === undefined &&
+        bttsYesOdds === undefined
+      ) {
+        return null;
+      }
+
+      const result: ScrapedMarketOdds = {
+        provider: 'FLASHSCORE',
+        fetchedAt: new Date().toISOString(),
+        bookmakersCount: bookmakerIds.size > 0 ? bookmakerIds.size : undefined,
+        homeParticipantId: homePid,
+        awayParticipantId: awayPid,
+        homeOdds,
+        drawOdds,
+        awayOdds,
+        homeImpliedProb,
+        drawImpliedProb,
+        awayImpliedProb,
+        dc1XOdds,
+        dc12Odds,
+        dcX2Odds,
+        dc1XImpliedProb,
+        dcX2ImpliedProb,
+        over15Odds,
+        under15Odds,
+        over15ImpliedProb,
+        over25Odds,
+        under25Odds,
+        over25ImpliedProb,
+        under25ImpliedProb,
+        over35Odds,
+        under35Odds,
+        over35ImpliedProb,
+        bttsYesOdds,
+        bttsNoOdds,
+        bttsYesImpliedProb,
+        bttsNoImpliedProb,
+        topCorrectScores: topCorrectScores.length > 0 ? topCorrectScores : undefined,
+      };
+
+      if (!options?.skipDbSave) {
+        db.saveMatchOddsCache(cleanId, result);
+      }
+
+      return result;
+    } catch {
+      return null;
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+    }
   }
 
   /**
@@ -1488,6 +1817,88 @@ export class FlashscoreScraperService {
       }
     }
     return count;
+  }
+
+  /**
+   * Prefetches and persists Flashscore pre-match market odds into SQLite (match_odds_cache & upcoming_fixtures)
+   * during Full Sync, prioritizing popular competitions and imminent fixtures.
+   */
+  async prefetchOddsForUpcomingFixtures(
+    upcoming: Fixture[],
+    limit = 200,
+    concurrency = 10
+  ): Promise<number> {
+    if (!upcoming || upcoming.length === 0) return 0;
+
+    const existingOddsMap = db.getAllMatchOddsCache();
+
+    // Hydrate any already-cached odds onto incoming fixtures first
+    for (const f of upcoming) {
+      const cleanId = f.id.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+      const cached = existingOddsMap.get(cleanId) || existingOddsMap.get(f.id);
+      if (cached && !f.marketOdds) {
+        f.marketOdds = cached;
+      }
+    }
+
+    const candidates = upcoming
+      .filter((f) => {
+        if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') return false;
+        const cleanId = f.id.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+        return Boolean(cleanId) && !existingOddsMap.has(cleanId) && !existingOddsMap.has(f.id);
+      })
+      .sort((a, b) => {
+        const pa = getLeaguePriority(a.league, a.leagueName);
+        const pb = getLeaguePriority(b.league, b.leagueName);
+        if (pa !== pb) return pb - pa;
+        const da = `${a.matchDate} ${a.kickOffTime}`;
+        const dbDate = `${b.matchDate} ${b.kickOffTime}`;
+        return da.localeCompare(dbDate);
+      })
+      .slice(0, limit);
+
+    if (candidates.length === 0) return existingOddsMap.size;
+
+    let fetchedCount = 0;
+    const savedBatch: Array<{ fixtureId: string; odds: ScrapedMarketOdds }> = [];
+
+    for (let i = 0; i < candidates.length; i += concurrency) {
+      const slice = candidates.slice(i, i + concurrency);
+      const results = await Promise.all(
+        slice.map(async (f) => {
+          const cleanId = f.id.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+          const odds = await this.fetchMatchOdds(cleanId, {
+            homeParticipantId: f.homeParticipantId,
+            awayParticipantId: f.awayParticipantId,
+            forceRefresh: true,
+            skipDbSave: true,
+          }).catch(() => null);
+          return { fixture: f, cleanId, odds };
+        })
+      );
+
+      for (const { fixture, cleanId, odds } of results) {
+        if (odds) {
+          fixture.marketOdds = odds;
+          savedBatch.push({ fixtureId: cleanId, odds });
+          fetchedCount++;
+        }
+      }
+    }
+
+    if (savedBatch.length > 0) {
+      db.saveMatchOddsBatch(savedBatch);
+    }
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'SCRAPER',
+      source: 'FlashscoreScraper',
+      message: `Scraped & persisted Flashscore market odds for ${fetchedCount}/${candidates.length} upcoming fixtures into SQLite`,
+      details: { fetchedCount, totalAttempted: candidates.length, totalCached: existingOddsMap.size + fetchedCount },
+    });
+
+    return fetchedCount;
   }
 
   /**

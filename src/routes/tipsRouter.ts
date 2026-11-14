@@ -40,12 +40,48 @@ function generateLocalTips(): TrendingTipsData {
   };
 }
 
+function persistTipsToDb(data: TrendingTipsData): void {
+  db.saveTipsCache(
+    JSON.stringify(data.tips || []),
+    data.headlineSummary,
+    data.rawAnalysisMarkdown,
+    JSON.stringify(data.groundingSources || [])
+  );
+}
+
 tipsRouter.get('/', async (req, res) => {
   try {
+    const cached = db.getTipsCache();
+    if (cached) {
+      try {
+        const parsedTips = JSON.parse(cached.tipsJson || '[]');
+        const parsedSources = JSON.parse(cached.sourcesJson || '[]');
+        if (Array.isArray(parsedTips) && parsedTips.length > 0) {
+          return res.json({
+            success: true,
+            fromCache: true,
+            data: {
+              lastUpdated: cached.updatedAt,
+              headlineSummary: cached.headlineSummary,
+              rawAnalysisMarkdown: cached.rawMarkdown,
+              tips: parsedTips,
+              groundingSources: Array.isArray(parsedSources) ? parsedSources : [],
+              isRealGrounding: false,
+            } as TrendingTipsData,
+          });
+        }
+      } catch {
+        // Fall through to regenerate if cache JSON is invalid
+      }
+    }
+
     const data = generateLocalTips();
+    if (data.tips.length > 0) {
+      persistTipsToDb(data);
+    }
     res.json({
       success: true,
-      fromCache: true,
+      fromCache: false,
       data,
     });
   } catch (err: any) {
@@ -56,6 +92,7 @@ tipsRouter.get('/', async (req, res) => {
 tipsRouter.post('/refresh', async (req, res) => {
   try {
     const data = generateLocalTips();
+    persistTipsToDb(data);
     res.json({
       success: true,
       data,

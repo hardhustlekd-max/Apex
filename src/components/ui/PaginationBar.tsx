@@ -17,6 +17,7 @@ export interface PaginationBarProps {
   pageSizeOptions?: number[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  embedded?: boolean;
 }
 
 export const PaginationBar: React.FC<PaginationBarProps> = ({
@@ -29,6 +30,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
   pageSizeOptions = [10, 25, 50, 100],
   onPageChange,
   onPageSizeChange,
+  embedded = false,
 }) => {
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1)
     .filter((p) => {
@@ -49,7 +51,13 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
     }, []);
 
   return (
-    <div className="px-3 py-2 bg-theme-card flex flex-wrap items-center justify-between gap-2 text-xs rounded-xl sm:rounded-full shadow-theme-sm">
+    <div
+      className={
+        embedded
+          ? 'px-3 sm:px-3.5 py-2 bg-theme-card-elevated/60 border-t border-theme-subdued flex flex-wrap items-center justify-between gap-2 text-xs'
+          : 'px-3 py-2 bg-theme-card flex flex-wrap items-center justify-between gap-2 text-xs rounded-xl sm:rounded-full shadow-theme-sm'
+      }
+    >
       <div className="flex items-center gap-2 flex-wrap min-w-0">
         <span className="text-theme-sub font-mono tabular-nums text-xs whitespace-nowrap">
           Showing{' '}

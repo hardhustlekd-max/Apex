@@ -25,6 +25,7 @@ import {
   ProgressBar,
   SectionHeader,
   SegmentedTabs,
+  Select,
   StatTile,
 } from './ui/index.js';
 
@@ -121,11 +122,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportToast, setExportToast] = useState<string | null>(null);
 
+  const [exportSort, setExportSort] = useState<'default' | 'desc' | 'asc'>('default');
+
   const handleExportPredictions = async () => {
     setIsExporting(true);
     setExportToast(null);
     try {
-      const res = await EngineService.downloadPredictionsJson();
+      const sortParam = exportSort === 'default' ? undefined : exportSort;
+      const res = await EngineService.downloadPredictionsJson(sortParam);
       if (res.success) {
         setExportToast(`Exported ${res.count ?? 0} predictions to ${res.filename}`);
       } else {
@@ -759,6 +763,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>{exportToast}</span>
                 </div>
               )}
+
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[10px] font-mono font-bold text-theme-sub uppercase block">
+                  Sort Order (Probability %)
+                </label>
+                <Select
+                  aria-label="Export sort order"
+                  value={exportSort}
+                  onChange={(e) => setExportSort(e.target.value as any)}
+                  surface="subtle"
+                  selectSize="sm"
+                  options={[
+                    { value: 'default', label: 'Default Date Order' },
+                    { value: 'desc', label: 'Highest Probability First (Descending)' },
+                    { value: 'asc', label: 'Lowest Probability First (Ascending)' },
+                  ]}
+                />
+              </div>
 
               <Button
                 id="export-predictions-json-btn"

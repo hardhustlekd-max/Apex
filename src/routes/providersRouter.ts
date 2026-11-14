@@ -57,7 +57,8 @@ providersRouter.get('/live-scores', async (req, res) => {
 providersRouter.get('/flashscore/scrape', async (req, res) => {
   try {
     const date = req.query.date as string | undefined;
-    const fixtures = await flashscoreScraperService.getUpcomingFixtures(date);
+    const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const fixtures = await flashscoreScraperService.getUpcomingFixtures(date, forceRefresh);
     res.json({
       success: true,
       count: fixtures.length,
@@ -76,8 +77,8 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
       source: 'SyncEngine',
       message: 'Purging database tables, raw feeds, and cached predictions...',
     });
-    db.clearAllData(options.resetRawFeeds);
-    predictionsDb.clearAll();
+    await db.clearAllData(options.resetRawFeeds, 'fullsync');
+    await predictionsDb.clearAll('fullsync');
     flashscoreScraperService.clearCaches();
   }
 
@@ -90,13 +91,13 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
 
   try {
     await predictionsDb.reconcileStaleMatches();
-    const syncRes = await flashscoreScraperService.syncHistoricalData(7, false);
-    const upcoming = await flashscoreScraperService.getUpcomingFixtures();
+    const upcoming = await flashscoreScraperService.getUpcomingFixtures(undefined, true);
     await flashscoreScraperService.prefetchH2HForUpcomingFixtures(upcoming);
+    await flashscoreScraperService.prefetchOddsForUpcomingFixtures(upcoming, 200, 10).catch(() => 0);
 
-    const eligibleUpcoming = upcoming.filter((f) => !isMatchStarted(f));
-    if (eligibleUpcoming.length > 0) {
-      await ServerEngine.recalculateUpcomingFromDbInChunks(eligibleUpcoming, 50, undefined, { skipRemoteH2H: true });
+    const unstarted = upcoming.filter((f) => !isMatchStarted(f));
+    if (unstarted.length > 0) {
+      await ServerEngine.recalculateUpcomingFromDbInChunks(unstarted, 100, undefined, { skipRemoteH2H: true });
     }
 
     const histPredCount = predictionsDb.countHistoricalPredictions();
@@ -153,7 +154,7 @@ async function runSyncWorkflow(options: { resetDatabase: boolean; resetRawFeeds:
       message: options.resetDatabase || options.resetRawFeeds
         ? `Database & raw feeds reset and fully synchronized (${upcoming.length} upcoming fixtures, ${totalPredCount} predictions)`
         : `Database synchronized (${upcoming.length} upcoming fixtures refreshed, ${totalPredCount} predictions)`,
-      matchesCount: syncRes.matchesCount,
+      matchesCount: upcoming.length,
       upcomingCount: upcoming.length,
       predictionsCount: totalPredCount,
       historicalPredictionsCount: histPredCount,

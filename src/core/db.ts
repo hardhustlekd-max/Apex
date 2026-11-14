@@ -1,4 +1,4 @@
-import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement } from './types.js';
+import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds } from './types.js';
 import { getPossibleDateStrs, normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import {
@@ -7,7 +7,19 @@ import {
   compressString,
   decompressBuffer,
   getSqliteDbStats,
+  checkpointSqliteWal,
 } from './sqliteClient.js';
+
+export type DbClearOrigin = 'fullsync' | 'update_predictions';
+
+function safeJsonParse<T>(raw: any, fallback: T): T {
+  if (!raw || typeof raw !== 'string') return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 export class FootballDB {
   private isInitialized = false;
@@ -33,6 +45,9 @@ export class FootballDB {
         } catch {}
       }
 
+      // Remove any stale Russian/Cyrillic rows previously ingested from /46/ mirrors
+      this.purgeCyrillicFixtures();
+
       console.log('[FootballDB] Initialized persistent SQLite database (data/football_engine.db) in WAL mode.');
     } catch (err: any) {
       console.error('[FootballDB] SQLite initialization error:', err?.message);
@@ -47,7 +62,18 @@ export class FootballDB {
     this.isInitialized = true;
   }
 
-  async clearAllData(clearRaw = true): Promise<void> {
+  async clearAllData(clearRaw = true, origin?: DbClearOrigin): Promise<void> {
+    if (origin !== 'fullsync') {
+      console.warn(`[FootballDB] Blocked unauthorized clearAllData call (origin=${String(origin || 'none')}). Only fullsync may empty all tables.`);
+      loggerService.addLog({
+        level: 'WARN',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: `Blocked unauthorized clearAllData attempt (origin=${String(origin || 'none')})`,
+      });
+      return;
+    }
+
     try {
       const runDelete = sqliteDb.transaction(() => {
         sqliteDb.exec('DELETE FROM historical_matches;');
@@ -55,18 +81,20 @@ export class FootballDB {
         sqliteDb.exec('DELETE FROM flashscore_scraped_matches;');
         sqliteDb.exec('DELETE FROM predictions;');
         sqliteDb.exec('DELETE FROM prediction_measurements_cache;');
+        sqliteDb.exec('DELETE FROM match_odds_cache;');
         sqliteDb.exec('DELETE FROM league_standings;');
         if (clearRaw) {
           sqliteDb.exec('DELETE FROM raw_feed_data;');
         }
       });
       runDelete();
+      checkpointSqliteWal('TRUNCATE');
 
       loggerService.addLog({
         level: 'SUCCESS',
         category: 'DATABASE',
         source: 'FootballDB',
-        message: `Database tables ${clearRaw ? 'and compressed raw feeds ' : ''}cleared from SQLite`,
+        message: `Database tables ${clearRaw ? 'and compressed raw feeds ' : ''}cleared from SQLite (origin: ${origin})`,
       });
     } catch (err: any) {
       console.error('[FootballDB] Error clearing SQLite tables:', err?.message);
@@ -79,8 +107,8 @@ export class FootballDB {
     }
   }
 
-  clearDatabase(clearRaw = false): void {
-    this.clearAllData(clearRaw);
+  clearDatabase(clearRaw = false, origin?: DbClearOrigin): void {
+    void this.clearAllData(clearRaw, origin);
   }
 
   insertHistoricalMatches(matches: HistoricalMatch[]): number {
@@ -88,10 +116,23 @@ export class FootballDB {
 
     try {
       const insertStmt = sqliteDb.prepare(`
-        INSERT OR REPLACE INTO historical_matches (
+        INSERT INTO historical_matches (
           id, div, season, match_date, home_team, away_team,
           fthg, ftag, ftr, hs, as_shots, hst, ast
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          div = COALESCE(NULLIF(excluded.div, ''), historical_matches.div),
+          season = COALESCE(NULLIF(excluded.season, ''), historical_matches.season),
+          match_date = COALESCE(NULLIF(excluded.match_date, ''), historical_matches.match_date),
+          home_team = excluded.home_team,
+          away_team = excluded.away_team,
+          fthg = excluded.fthg,
+          ftag = excluded.ftag,
+          ftr = excluded.ftr,
+          hs = COALESCE(excluded.hs, historical_matches.hs),
+          as_shots = COALESCE(excluded.as_shots, historical_matches.as_shots),
+          hst = COALESCE(excluded.hst, historical_matches.hst),
+          ast = COALESCE(excluded.ast, historical_matches.ast)
       `);
 
       const insertMany = sqliteDb.transaction((rows: HistoricalMatch[]) => {
@@ -115,6 +156,9 @@ export class FootballDB {
       });
 
       insertMany(matches);
+      if (matches.length >= 20) {
+        checkpointSqliteWal('PASSIVE');
+      }
       return matches.length;
     } catch (err: any) {
       console.error('[FootballDB] Error inserting historical matches into SQLite:', err?.message);
@@ -140,25 +184,60 @@ export class FootballDB {
 
     try {
       const insertStmt = sqliteDb.prepare(`
-        INSERT OR REPLACE INTO upcoming_fixtures (
+        INSERT INTO upcoming_fixtures (
           id, provider_id, league, league_name, match_date, kick_off_time,
           home_team, away_team, home_badge, away_badge, stage,
           rest_days_home, rest_days_away,
           status, score_json,
-          prediction_json, markets_json,
+          prediction_json, markets_json, best_value_market_json,
           home_stats_json, away_stats_json, measurements_json, h2h_matches_json,
-          information_json, statistics_json,
+          information_json, statistics_json, market_odds_json,
           feed_path, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?,
           ?, ?,
-          ?, ?,
+          ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?,
+          ?, ?, ?,
           ?, ?
         )
+        ON CONFLICT(id) DO UPDATE SET
+          provider_id = excluded.provider_id,
+          league = COALESCE(NULLIF(excluded.league, ''), upcoming_fixtures.league),
+          league_name = COALESCE(NULLIF(excluded.league_name, ''), upcoming_fixtures.league_name),
+          match_date = excluded.match_date,
+          kick_off_time = excluded.kick_off_time,
+          home_team = excluded.home_team,
+          away_team = excluded.away_team,
+          home_badge = COALESCE(excluded.home_badge, upcoming_fixtures.home_badge),
+          away_badge = COALESCE(excluded.away_badge, upcoming_fixtures.away_badge),
+          stage = COALESCE(excluded.stage, upcoming_fixtures.stage),
+          rest_days_home = COALESCE(excluded.rest_days_home, upcoming_fixtures.rest_days_home),
+          rest_days_away = COALESCE(excluded.rest_days_away, upcoming_fixtures.rest_days_away),
+          status = excluded.status,
+          score_json = COALESCE(excluded.score_json, upcoming_fixtures.score_json),
+          prediction_json = COALESCE(excluded.prediction_json, upcoming_fixtures.prediction_json),
+          markets_json = COALESCE(excluded.markets_json, upcoming_fixtures.markets_json),
+          best_value_market_json = COALESCE(excluded.best_value_market_json, upcoming_fixtures.best_value_market_json),
+          home_stats_json = COALESCE(excluded.home_stats_json, upcoming_fixtures.home_stats_json),
+          away_stats_json = COALESCE(excluded.away_stats_json, upcoming_fixtures.away_stats_json),
+          measurements_json = COALESCE(excluded.measurements_json, upcoming_fixtures.measurements_json),
+          h2h_matches_json = COALESCE(excluded.h2h_matches_json, upcoming_fixtures.h2h_matches_json),
+          information_json = CASE
+            WHEN excluded.information_json IS NOT NULL AND excluded.information_json != '[]'
+            THEN excluded.information_json
+            ELSE upcoming_fixtures.information_json
+          END,
+          statistics_json = CASE
+            WHEN excluded.statistics_json IS NOT NULL AND excluded.statistics_json != '[]'
+            THEN excluded.statistics_json
+            ELSE upcoming_fixtures.statistics_json
+          END,
+          market_odds_json = COALESCE(excluded.market_odds_json, upcoming_fixtures.market_odds_json),
+          feed_path = COALESCE(excluded.feed_path, upcoming_fixtures.feed_path),
+          updated_at = excluded.updated_at
       `);
 
       const now = new Date().toISOString();
@@ -182,12 +261,14 @@ export class FootballDB {
             f.score ? JSON.stringify(f.score) : null,
             f.prediction ? JSON.stringify(f.prediction) : null,
             f.markets ? JSON.stringify(f.markets) : null,
+            f.mostLikelyOutcome ? JSON.stringify(f.mostLikelyOutcome) : null,
             f.homeStats ? JSON.stringify(f.homeStats) : null,
             f.awayStats ? JSON.stringify(f.awayStats) : null,
             f.measurements ? JSON.stringify(f.measurements) : null,
             f.h2hMatches ? JSON.stringify(f.h2hMatches) : null,
             f.information ? JSON.stringify(f.information) : null,
             f.statistics ? JSON.stringify(f.statistics) : null,
+            f.marketOdds ? JSON.stringify(f.marketOdds) : null,
             (f as any).feed_path || null,
             now
           );
@@ -195,6 +276,9 @@ export class FootballDB {
       });
 
       insertMany(unique);
+      if (unique.length >= 20) {
+        checkpointSqliteWal('PASSIVE');
+      }
     } catch (err: any) {
       console.error('[FootballDB] Error saving upcoming fixtures to SQLite:', err?.message);
       loggerService.addLog({
@@ -203,6 +287,39 @@ export class FootballDB {
         source: 'FootballDB',
         message: `Error saving upcoming fixtures: ${err?.message}`,
       });
+    }
+  }
+
+  updateUpcomingFixtureStatuses(
+    updates: Array<{ id: string; status: string; kickOffTime?: string; score?: { home: number; away: number } }>
+  ): void {
+    if (!updates || updates.length === 0) return;
+    try {
+      const stmt = sqliteDb.prepare(`
+        UPDATE upcoming_fixtures
+        SET status = ?,
+            kick_off_time = COALESCE(?, kick_off_time),
+            score_json = COALESCE(?, score_json),
+            updated_at = ?
+        WHERE id IN (?, ?)
+      `);
+      const now = new Date().toISOString();
+      const applyUpdates = sqliteDb.transaction((items: typeof updates) => {
+        for (const u of items) {
+          const cleanId = u.id.replace(/^fs_/, '');
+          stmt.run(
+            u.status,
+            u.kickOffTime || null,
+            u.score ? JSON.stringify(u.score) : null,
+            now,
+            u.id,
+            `fs_${cleanId}`
+          );
+        }
+      });
+      applyUpdates(updates);
+    } catch (err: any) {
+      console.warn('[FootballDB] Notice updating upcoming fixture statuses:', err?.message);
     }
   }
 
@@ -217,6 +334,91 @@ export class FootballDB {
       return row ? Number(row.count) : 0;
     } catch (err: any) {
       console.error('[FootballDB] Error getting upcoming fixtures count:', err?.message);
+      return 0;
+    }
+  }
+
+  getUpcomingDateCounts(dates: string[]): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const d of dates) {
+      counts[d] = 0;
+    }
+    if (dates.length === 0) return counts;
+    try {
+      const placeholders = dates.map(() => '?').join(', ');
+      const rows = sqliteDb
+        .prepare(
+          `SELECT match_date, COUNT(*) as count FROM upcoming_fixtures WHERE status NOT IN ('FINISHED', 'CANCELLED', 'POSTPONED') AND match_date IN (${placeholders}) GROUP BY match_date`
+        )
+        .all(...dates) as any[];
+      for (const r of rows) {
+        counts[String(r.match_date)] = Number(r.count) || 0;
+      }
+      return counts;
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting upcoming date counts:', err?.message);
+      return counts;
+    }
+  }
+
+  hasCyrillicUpcomingData(): boolean {
+    try {
+      const row = sqliteDb
+        .prepare(
+          "SELECT 1 as found FROM upcoming_fixtures WHERE league_name GLOB '*[А-Яа-яЁё]*' OR stage GLOB '*[А-Яа-яЁё]*' OR home_team GLOB '*[А-Яа-яЁё]*' OR away_team GLOB '*[А-Яа-яЁё]*' LIMIT 1"
+        )
+        .get() as any;
+      return Boolean(row?.found);
+    } catch {
+      return false;
+    }
+  }
+
+  purgeCyrillicFixtures(): number {
+    try {
+      let removed = 0;
+      const runClean = sqliteDb.transaction(() => {
+        const res1 = sqliteDb
+          .prepare(
+            "DELETE FROM upcoming_fixtures WHERE league_name GLOB '*[А-Яа-яЁё]*' OR stage GLOB '*[А-Яа-яЁё]*' OR home_team GLOB '*[А-Яа-яЁё]*' OR away_team GLOB '*[А-Яа-яЁё]*'"
+          )
+          .run();
+        const res2 = sqliteDb
+          .prepare(
+            "DELETE FROM flashscore_scraped_matches WHERE league_name GLOB '*[А-Яа-яЁё]*' OR country GLOB '*[А-Яа-яЁё]*' OR stage GLOB '*[А-Яа-яЁё]*' OR home_name GLOB '*[А-Яа-яЁё]*' OR away_name GLOB '*[А-Яа-яЁё]*'"
+          )
+          .run();
+        const res3 = sqliteDb
+          .prepare(
+            "DELETE FROM predictions WHERE league_name GLOB '*[А-Яа-яЁё]*' OR home_team GLOB '*[А-Яа-яЁё]*' OR away_team GLOB '*[А-Яа-яЁё]*'"
+          )
+          .run();
+        removed = (res1.changes || 0) + (res2.changes || 0) + (res3.changes || 0);
+
+        const rawRows = sqliteDb.prepare('SELECT feed_path, compressed_data FROM raw_feed_data').all() as any[];
+        const delRaw = sqliteDb.prepare('DELETE FROM raw_feed_data WHERE feed_path = ?');
+        for (const r of rawRows) {
+          if (r.compressed_data) {
+            const text = decompressBuffer(r.compressed_data);
+            if (/[\u0400-\u04FF]/.test(text)) {
+              delRaw.run(r.feed_path);
+              removed++;
+            }
+          }
+        }
+      });
+      runClean();
+      if (removed > 0) {
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'DATABASE',
+          source: 'FootballDB',
+          message: `Purged ${removed} Russian/Cyrillic-encoded cached records so English feeds reload cleanly`,
+        });
+      }
+      return removed;
+    } catch (err: any) {
+      console.error('[FootballDB] Error purging Cyrillic fixtures:', err?.message);
       return 0;
     }
   }
@@ -244,15 +446,17 @@ export class FootballDB {
           restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : undefined,
           restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : undefined,
           status: (row.status as any) || 'SCHEDULED',
-          score: row.score_json ? JSON.parse(row.score_json) : undefined,
-          prediction: row.prediction_json ? JSON.parse(row.prediction_json) : undefined,
-          markets: row.markets_json ? JSON.parse(row.markets_json) : undefined,
-          homeStats: row.home_stats_json ? JSON.parse(row.home_stats_json) : undefined,
-          awayStats: row.away_stats_json ? JSON.parse(row.away_stats_json) : undefined,
-          measurements: row.measurements_json ? JSON.parse(row.measurements_json) : undefined,
-          h2hMatches: row.h2h_matches_json ? JSON.parse(row.h2h_matches_json) : undefined,
-          information: row.information_json ? JSON.parse(row.information_json) : undefined,
-          statistics: row.statistics_json ? JSON.parse(row.statistics_json) : undefined,
+          score: safeJsonParse(row.score_json, undefined),
+          prediction: safeJsonParse(row.prediction_json, undefined),
+          markets: safeJsonParse(row.markets_json, undefined),
+          mostLikelyOutcome: safeJsonParse(row.best_value_market_json, undefined),
+          homeStats: safeJsonParse(row.home_stats_json, undefined),
+          awayStats: safeJsonParse(row.away_stats_json, undefined),
+          measurements: safeJsonParse(row.measurements_json, undefined),
+          h2hMatches: safeJsonParse(row.h2h_matches_json, undefined),
+          information: safeJsonParse(row.information_json, undefined),
+          statistics: safeJsonParse(row.statistics_json, undefined),
+          marketOdds: safeJsonParse(row.market_odds_json, undefined),
         };
       }
 
@@ -354,7 +558,7 @@ export class FootballDB {
         }
       }
 
-      query += " ORDER BY match_date ASC, kick_off_time ASC LIMIT 5000";
+      query += " ORDER BY match_date ASC, kick_off_time ASC LIMIT 20000";
 
       const rows = sqliteDb.prepare(query).all(...params) as any[];
       return rows.map((row) => ({
@@ -372,15 +576,17 @@ export class FootballDB {
         restDaysHome: row.rest_days_home !== null ? Number(row.rest_days_home) : undefined,
         restDaysAway: row.rest_days_away !== null ? Number(row.rest_days_away) : undefined,
         status: (row.status as any) || 'SCHEDULED',
-        score: row.score_json ? JSON.parse(row.score_json) : undefined,
-        prediction: row.prediction_json ? JSON.parse(row.prediction_json) : undefined,
-        markets: row.markets_json ? JSON.parse(row.markets_json) : undefined,
-        homeStats: row.home_stats_json ? JSON.parse(row.home_stats_json) : undefined,
-        awayStats: row.away_stats_json ? JSON.parse(row.away_stats_json) : undefined,
-        measurements: row.measurements_json ? JSON.parse(row.measurements_json) : undefined,
-        h2hMatches: row.h2h_matches_json ? JSON.parse(row.h2h_matches_json) : undefined,
-        information: row.information_json ? JSON.parse(row.information_json) : undefined,
-        statistics: row.statistics_json ? JSON.parse(row.statistics_json) : undefined,
+        score: safeJsonParse(row.score_json, undefined),
+        prediction: safeJsonParse(row.prediction_json, undefined),
+        markets: safeJsonParse(row.markets_json, undefined),
+        mostLikelyOutcome: safeJsonParse(row.best_value_market_json, undefined),
+        homeStats: safeJsonParse(row.home_stats_json, undefined),
+        awayStats: safeJsonParse(row.away_stats_json, undefined),
+        measurements: safeJsonParse(row.measurements_json, undefined),
+        h2hMatches: safeJsonParse(row.h2h_matches_json, undefined),
+        information: safeJsonParse(row.information_json, undefined),
+        statistics: safeJsonParse(row.statistics_json, undefined),
+        marketOdds: safeJsonParse(row.market_odds_json, undefined),
       }));
     } catch (err: any) {
       console.error('[FootballDB] Error getting upcoming fixtures:', err?.message);
@@ -535,9 +741,14 @@ export class FootballDB {
     }
   }
 
-  clearHistoricalData(): void {
+  clearHistoricalData(origin?: DbClearOrigin): void {
+    if (origin !== 'fullsync') {
+      console.warn(`[FootballDB] Blocked unauthorized clearHistoricalData call (origin=${String(origin || 'none')}).`);
+      return;
+    }
     try {
       sqliteDb.exec('DELETE FROM historical_matches;');
+      checkpointSqliteWal('PASSIVE');
     } catch (err: any) {
       console.error('[FootballDB] Error clearing historical data:', err?.message);
     }
@@ -590,12 +801,37 @@ export class FootballDB {
 
     try {
       const stmt = sqliteDb.prepare(`
-        INSERT OR REPLACE INTO flashscore_scraped_matches (
+        INSERT INTO flashscore_scraped_matches (
           match_id, stage, status, match_date, country, league_name,
           home_name, home_image, away_name, away_image,
           home_score, away_score, regulation_time, penalties,
           information_json, statistics_json, scraped_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(match_id) DO UPDATE SET
+          stage = COALESCE(excluded.stage, flashscore_scraped_matches.stage),
+          status = excluded.status,
+          match_date = COALESCE(NULLIF(excluded.match_date, ''), flashscore_scraped_matches.match_date),
+          country = COALESCE(excluded.country, flashscore_scraped_matches.country),
+          league_name = COALESCE(excluded.league_name, flashscore_scraped_matches.league_name),
+          home_name = excluded.home_name,
+          home_image = COALESCE(excluded.home_image, flashscore_scraped_matches.home_image),
+          away_name = excluded.away_name,
+          away_image = COALESCE(excluded.away_image, flashscore_scraped_matches.away_image),
+          home_score = COALESCE(excluded.home_score, flashscore_scraped_matches.home_score),
+          away_score = COALESCE(excluded.away_score, flashscore_scraped_matches.away_score),
+          regulation_time = COALESCE(excluded.regulation_time, flashscore_scraped_matches.regulation_time),
+          penalties = COALESCE(excluded.penalties, flashscore_scraped_matches.penalties),
+          information_json = CASE
+            WHEN excluded.information_json IS NOT NULL AND excluded.information_json != '[]'
+            THEN excluded.information_json
+            ELSE flashscore_scraped_matches.information_json
+          END,
+          statistics_json = CASE
+            WHEN excluded.statistics_json IS NOT NULL AND excluded.statistics_json != '[]'
+            THEN excluded.statistics_json
+            ELSE flashscore_scraped_matches.statistics_json
+          END,
+          scraped_at = excluded.scraped_at
       `);
 
       const now = new Date().toISOString();
@@ -623,6 +859,9 @@ export class FootballDB {
         }
       });
       insertMany(matches);
+      if (matches.length >= 20) {
+        checkpointSqliteWal('PASSIVE');
+      }
     } catch (err: any) {
       console.error('[FootballDB] Error saving scraped matches:', err?.message);
       loggerService.addLog({
@@ -715,7 +954,7 @@ export class FootballDB {
     // This method is primarily used for stats or massive bulk operations
     const measurements = new Map<string, HeadToHeadMeasurement>();
     try {
-      const rows = sqliteDb.prepare("SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 1000").all() as any[];
+      const rows = sqliteDb.prepare("SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 20000").all() as any[];
       for (const row of rows) {
         try {
           const parsed = JSON.parse(row.h2h_json) as HeadToHeadMeasurement;
@@ -728,6 +967,101 @@ export class FootballDB {
       console.error('[FootballDB] Error getting all prediction measurements:', err?.message);
     }
     return measurements;
+  }
+
+  saveMatchOddsCache(fixtureId: string, odds: ScrapedMarketOdds): void {
+    if (!fixtureId || !odds) return;
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    if (!cleanId) return;
+    const now = new Date().toISOString();
+    const serialized = JSON.stringify(odds);
+
+    try {
+      sqliteDb.prepare(`
+        INSERT INTO match_odds_cache (fixture_id, odds_json, fetched_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(fixture_id) DO UPDATE SET
+          odds_json = excluded.odds_json,
+          fetched_at = excluded.fetched_at
+      `).run(cleanId, serialized, now);
+
+      sqliteDb.prepare(`
+        UPDATE upcoming_fixtures
+        SET market_odds_json = ?, updated_at = ?
+        WHERE id = ? OR id = ?
+      `).run(serialized, now, cleanId, `fs_${cleanId}`);
+    } catch (err: any) {
+      console.error('[FootballDB] Error saving match odds cache:', err?.message);
+    }
+  }
+
+  saveMatchOddsBatch(items: Array<{ fixtureId: string; odds: ScrapedMarketOdds }>): void {
+    if (!items || items.length === 0) return;
+    const now = new Date().toISOString();
+    try {
+      const cacheStmt = sqliteDb.prepare(`
+        INSERT INTO match_odds_cache (fixture_id, odds_json, fetched_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(fixture_id) DO UPDATE SET
+          odds_json = excluded.odds_json,
+          fetched_at = excluded.fetched_at
+      `);
+      const upStmt = sqliteDb.prepare(`
+        UPDATE upcoming_fixtures
+        SET market_odds_json = ?, updated_at = ?
+        WHERE id = ? OR id = ?
+      `);
+
+      const saveTx = sqliteDb.transaction((entries: Array<{ fixtureId: string; odds: ScrapedMarketOdds }>) => {
+        for (const item of entries) {
+          const cleanId = item.fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+          if (!cleanId || !item.odds) continue;
+          const serialized = JSON.stringify(item.odds);
+          cacheStmt.run(cleanId, serialized, now);
+          upStmt.run(serialized, now, cleanId, `fs_${cleanId}`);
+        }
+      });
+      saveTx(items);
+      if (items.length >= 10) {
+        checkpointSqliteWal('PASSIVE');
+      }
+    } catch (err: any) {
+      console.error('[FootballDB] Error batch saving match odds cache:', err?.message);
+    }
+  }
+
+  getMatchOddsCache(fixtureId: string): ScrapedMarketOdds | null {
+    if (!fixtureId) return null;
+    const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
+    if (!cleanId) return null;
+
+    try {
+      const row = sqliteDb.prepare(
+        "SELECT odds_json FROM match_odds_cache WHERE fixture_id = ? OR fixture_id = ?"
+      ).get(cleanId, fixtureId) as any;
+      if (row && row.odds_json) {
+        return safeJsonParse<ScrapedMarketOdds | null>(row.odds_json, null);
+      }
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting match odds cache:', err?.message);
+    }
+    return null;
+  }
+
+  getAllMatchOddsCache(): Map<string, ScrapedMarketOdds> {
+    const oddsMap = new Map<string, ScrapedMarketOdds>();
+    try {
+      const rows = sqliteDb.prepare("SELECT fixture_id, odds_json FROM match_odds_cache LIMIT 20000").all() as any[];
+      for (const row of rows) {
+        const parsed = safeJsonParse<ScrapedMarketOdds | null>(row.odds_json, null);
+        if (parsed) {
+          oddsMap.set(String(row.fixture_id), parsed);
+        }
+      }
+    } catch (err: any) {
+      console.error('[FootballDB] Error loading all match odds cache:', err?.message);
+    }
+    return oddsMap;
   }
 
   private computeFeedHash(text: string): string {
@@ -815,14 +1149,17 @@ export class FootballDB {
   }
 
   saveMatchStatistics(matchId: string, statistics: any[]): void {
-    // This was primarily in-memory, but we can save it to scraped matches if we have the ID
     if (!matchId || !statistics || statistics.length === 0) return;
     const cleanId = matchId.replace(/^fs_/, '').trim();
-    
+    const statsJson = JSON.stringify(statistics);
+
     try {
       sqliteDb.prepare(`
         UPDATE flashscore_scraped_matches SET statistics_json = ? WHERE match_id = ?
-      `).run(JSON.stringify(statistics), cleanId);
+      `).run(statsJson, cleanId);
+      sqliteDb.prepare(`
+        UPDATE upcoming_fixtures SET statistics_json = ? WHERE id IN (?, ?)
+      `).run(statsJson, cleanId, `fs_${cleanId}`);
     } catch (err: any) {
       console.error('[FootballDB] Error updating match statistics:', err?.message);
     }
@@ -885,19 +1222,48 @@ export class FootballDB {
   }
 
   getLeagueStandings(leagueCode: string): any {
+    const aliasMap: Record<string, string[]> = {
+      'e0': ['england_premier_league'],
+      'england_premier_league': ['e0'],
+      'e1': ['england_championship'],
+      'england_championship': ['e1'],
+      'sp1': ['spain_la_liga'],
+      'spain_la_liga': ['sp1'],
+      'd1': ['germany_bundesliga'],
+      'germany_bundesliga': ['d1'],
+      'i1': ['italy_serie_a'],
+      'italy_serie_a': ['i1'],
+      'f1': ['france_ligue_1'],
+      'france_ligue_1': ['f1'],
+      'n1': ['netherlands_eredivisie'],
+      'netherlands_eredivisie': ['n1'],
+      'p1': ['portugal_primeira_liga'],
+      'portugal_primeira_liga': ['p1'],
+      'ucl': ['europe_champions_league_league_phase', 'europe_champions_league', 'europe_uefa_champions_league'],
+      'europe_champions_league': ['europe_champions_league_league_phase', 'ucl'],
+      'europe_champions_league_league_phase': ['europe_champions_league', 'ucl'],
+      'uel': ['europe_europa_league_league_phase', 'europe_europa_league', 'europe_uefa_europa_league'],
+      'europe_europa_league': ['europe_europa_league_league_phase', 'uel'],
+      'europe_europa_league_league_phase': ['europe_europa_league', 'uel'],
+    };
+
     try {
-      const row = sqliteDb.prepare("SELECT * FROM league_standings WHERE league_code = ?").get(leagueCode) as any;
-      if (row && row.standings_json) {
-        const parsedTable = JSON.parse(row.standings_json);
-        return {
-          leagueCode: row.league_code,
-          leagueName: row.league_name,
-          country: row.country,
-          table: parsedTable,
-          standings: parsedTable,
-          source: row.source,
-          updatedAt: row.updated_at,
-        };
+      const clean = String(leagueCode || '').toLowerCase().trim();
+      const candidates = [leagueCode, clean, ...(aliasMap[clean] || [])];
+      for (const code of candidates) {
+        const row = sqliteDb.prepare("SELECT * FROM league_standings WHERE LOWER(league_code) = LOWER(?)").get(code) as any;
+        if (row && row.standings_json) {
+          const parsedTable = safeJsonParse(row.standings_json, []);
+          return {
+            leagueCode: row.league_code,
+            leagueName: row.league_name,
+            country: row.country,
+            table: parsedTable,
+            standings: parsedTable,
+            source: row.source,
+            updatedAt: row.updated_at,
+          };
+        }
       }
     } catch (err: any) {
       console.error('[FootballDB] Error getting league standings:', err?.message);

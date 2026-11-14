@@ -18,10 +18,15 @@ import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
 import { FixturesFilterModal } from './FixturesFilterModal.js';
 import { EngineService } from '../services/engineService.js';
-import { getLeaguePriority } from '../core/leaguePriority.js';
+import {
+  compareFixturesByPopularityAndDateTimeDesc,
+  getFixtureSortableDateTime,
+  getLeaguePopularityScore,
+  sortFixturesByMajorLeaguePriority,
+} from '../core/leaguePriority.js';
 import { matchesLeague } from '../core/leagueMapper.js';
 import { getProbValue } from '../core/formatters.js';
-import { Button, EmptyState, LoadingState, SegmentedTabs } from './ui/index.js';
+import { Button, EmptyState, LoadingState, PaginationBar, SegmentedTabs } from './ui/index.js';
 
 interface FixturesListProps {
   fixtures: Fixture[];
@@ -101,6 +106,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   } | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [expandedLeagues, setExpandedLeagues] = useState<Record<string, boolean>>({});
+  const [cardsPageSize, setCardsPageSize] = useState<number>(10);
+  const [cardsLeaguePages, setCardsLeaguePages] = useState<Record<string, number>>({});
+
+  const toggleLeagueExpand = (headerKey: string) => {
+    setExpandedLeagues(prev => ({
+      ...prev,
+      [headerKey]: !prev[headerKey]
+    }));
+  };
 
   const dateOptions = useMemo(() => getDateFilterOptions(), []);
 
@@ -120,10 +135,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     { key: 'AWAY_DESC', label: 'Highest Away Win % (2)' },
   ];
 
-  const leagueOptions = [
-    { code: 'ALL', name: 'All Leagues Worldwide' },
-    ...GLOBAL_LEAGUES_DATASET.map((l) => ({ code: l.code, name: `${l.name} (${l.country || 'Global'})` })),
-  ];
+  const leagueOptions = useMemo(() => {
+    const sortedDataset = GLOBAL_LEAGUES_DATASET.slice().sort((a, b) => {
+      const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
+      const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return a.name.localeCompare(b.name);
+    });
+    return [
+      { code: 'ALL', name: 'All Leagues Worldwide' },
+      ...sortedDataset.map((l) => ({ code: l.code, name: `${l.name} (${l.country || 'Global'})` })),
+    ];
+  }, []);
 
   const utcToday = getUtcDateStr(0);
   const resolvedDateFilter = useMemo(() => resolveDateFilter(dateFilter), [dateFilter]);
@@ -203,13 +226,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       return true;
     });
 
-    return matches.slice().sort((a, b) => {
-      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      if (a.matchDate !== b.matchDate) return a.matchDate.localeCompare(b.matchDate);
-      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-    });
+    return sortFixturesByMajorLeaguePriority(matches);
   }, [uniqueFixtures, liveIdSet, canonicalDateFilter, selectedLeague, searchQuery]);
 
   const liveFixtures: Fixture[] = useMemo(() => {
@@ -250,14 +267,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       };
     });
 
-    combined.sort((a, b) => {
-      const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-      const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-    });
-
-    return combined;
+    return sortFixturesByMajorLeaguePriority(combined);
   }, [liveScores, livePredictions, uniqueFixtures, utcToday]);
 
   const displayedFixtures = useMemo(() => {
@@ -302,22 +312,53 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           }
           return true;
         })
-        .sort((a, b) => {
-          const dateA = normalizeDateStr(a.matchDate);
-          const dateB = normalizeDateStr(b.matchDate);
-          if (dateA !== dateB) return dateB.localeCompare(dateA);
-          const priorityA = getLeaguePriority(a.league, a.leagueName, a.stage);
-          const priorityB = getLeaguePriority(b.league, b.leagueName, b.stage);
-          if (priorityA !== priorityB) return priorityA - priorityB;
-          const timeA = normalizeTimeStr(a.kickOffTime || '00:00');
-          const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
-          return timeB.localeCompare(timeA);
-        });
+        .sort(compareFixturesByPopularityAndDateTimeDesc);
       return applySort(filtered);
     }
 
     return applySort(filteredUpcomingFixtures);
   }, [activeScope, filteredUpcomingFixtures, liveFixtures, historyFixtures, selectedLeague, searchQuery, sortBy]);
+
+  const groupedByLeague = useMemo(() => {
+    interface LeagueGroup {
+      leagueKey: string;
+      leagueName: string;
+      subDivision?: string;
+      headerKey: string;
+      popularityScore: number;
+      latestDateTime: number;
+      fixtures: Fixture[];
+    }
+    const map = new Map<string, LeagueGroup>();
+    for (const f of displayedFixtures) {
+      const leagueKey = f.league || 'ALL';
+      const leagueName = f.leagueName || f.league || 'Other Competition';
+      const subDivision = f.stage || f.leagueName || f.league;
+      const headerKey = `${leagueKey}_${subDivision}`;
+      const dt = getFixtureSortableDateTime(f);
+      if (!map.has(headerKey)) {
+        map.set(headerKey, {
+          leagueKey,
+          leagueName,
+          subDivision,
+          headerKey,
+          popularityScore: getLeaguePopularityScore(leagueKey, leagueName, f.stage),
+          latestDateTime: dt,
+          fixtures: [],
+        });
+      }
+      const group = map.get(headerKey)!;
+      if (dt > group.latestDateTime) {
+        group.latestDateTime = dt;
+      }
+      group.fixtures.push(f);
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.popularityScore !== b.popularityScore) return b.popularityScore - a.popularityScore;
+      if (a.latestDateTime !== b.latestDateTime) return b.latestDateTime - a.latestDateTime;
+      return a.leagueName.localeCompare(b.leagueName);
+    });
+  }, [displayedFixtures]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -620,15 +661,92 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           }
         />
       ) : viewMode === 'CARDS' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {displayedFixtures.map((fixture) => (
-            <FixtureCard
-              key={fixture.id}
-              fixture={fixture}
-              onSelectDetail={onSelectDetail}
-              isSelected={selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id)}
-            />
-          ))}
+        <div className="space-y-3">
+          {groupedByLeague.map((group) => {
+            const isExpanded = !!expandedLeagues[group.headerKey];
+            const isCollapsed = !isExpanded;
+            const panelId = `cards-accordion-${group.headerKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            const totalGroupMatches = group.fixtures.length;
+            const showLeaguePagination = totalGroupMatches > cardsPageSize;
+            const totalGroupPages = Math.max(1, Math.ceil(totalGroupMatches / cardsPageSize));
+            const rawGroupPage = cardsLeaguePages[group.headerKey] || 1;
+            const safeGroupPage = Math.min(rawGroupPage, totalGroupPages);
+            const groupStartIdx = (safeGroupPage - 1) * cardsPageSize;
+            const visibleGroupFixtures = showLeaguePagination
+              ? group.fixtures.slice(groupStartIdx, groupStartIdx + cardsPageSize)
+              : group.fixtures;
+
+            return (
+              <div key={group.headerKey} className="bg-theme-card rounded-2xl border border-theme overflow-hidden shadow-theme-sm">
+                <button
+                  type="button"
+                  onClick={() => toggleLeagueExpand(group.headerKey)}
+                  aria-expanded={isExpanded}
+                  aria-controls={panelId}
+                  className="w-full min-h-[44px] flex items-center justify-between px-4 py-2.5 bg-theme-card-elevated hover:bg-theme-subtle transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ChevronDown
+                      className={`w-4 h-4 text-theme-sub shrink-0 transition-transform duration-150 ${
+                        isCollapsed ? '-rotate-90' : 'rotate-0'
+                      }`}
+                    />
+                    <span className="font-extrabold text-sm sm:text-[15px] text-theme-main truncate">
+                      {group.leagueName}
+                    </span>
+                    {group.subDivision && group.subDivision !== group.leagueName && (
+                      <span className="text-xs text-theme-sub truncate hidden sm:inline">
+                        · {group.subDivision}
+                      </span>
+                    )}
+                    <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
+                    <span className="text-xs text-theme-sub font-mono tabular-nums shrink-0">
+                      {totalGroupMatches} {totalGroupMatches === 1 ? 'match' : 'matches'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold text-theme-sub hidden sm:inline shrink-0">
+                    {isCollapsed ? 'Expand' : 'Collapse'}
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <div id={panelId} className="bg-theme-card border-t border-theme-subdued">
+                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {visibleGroupFixtures.map((fixture) => (
+                        <FixtureCard
+                          key={fixture.id}
+                          fixture={fixture}
+                          onSelectDetail={onSelectDetail}
+                          isSelected={selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id)}
+                        />
+                      ))}
+                    </div>
+                    {showLeaguePagination && (
+                      <PaginationBar
+                        embedded
+                        currentPage={safeGroupPage}
+                        totalPages={totalGroupPages}
+                        totalItems={totalGroupMatches}
+                        startIndex={groupStartIdx + 1}
+                        endIndex={Math.min(safeGroupPage * cardsPageSize, totalGroupMatches)}
+                        pageSize={cardsPageSize}
+                        onPageChange={(nextPage) =>
+                          setCardsLeaguePages((prev) => ({
+                            ...prev,
+                            [group.headerKey]: nextPage,
+                          }))
+                        }
+                        onPageSizeChange={(size) => {
+                          setCardsPageSize(size);
+                          setCardsLeaguePages({});
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <SimplifiedPredictionsWireframe

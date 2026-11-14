@@ -67,9 +67,10 @@ settingsRouter.get('/scraper-status', (req, res) => {
       rawFeedsCount,
       mirrors: [
         { name: 'Primary Flashscore Feed', url: 'https://www.flashscore.com/x/feed', status: 'ONLINE' },
-        { name: 'Ninja CDN Primary', url: 'https://46.flashscore.ninja/46/x/feed', status: 'ONLINE' },
-        { name: 'Ninja CDN Mirror 1', url: 'https://1.flashscore.ninja/46/x/feed', status: 'ONLINE' },
-        { name: 'Ninja CDN Mirror 2', url: 'https://2.flashscore.ninja/46/x/feed', status: 'ONLINE' },
+        { name: 'Ninja CDN English Primary', url: 'https://2.flashscore.ninja/2/x/feed', status: 'ONLINE' },
+        { name: 'Ninja CDN English Mirror 1', url: 'https://1.flashscore.ninja/2/x/feed', status: 'ONLINE' },
+        { name: 'Flashscore UK Mirror', url: 'https://www.flashscore.co.uk/x/feed', status: 'ONLINE' },
+        { name: 'Flashscore Global Mirror', url: 'https://www.flashscore.in/x/feed', status: 'ONLINE' },
       ],
     });
   } catch (err: any) {
@@ -123,7 +124,6 @@ settingsRouter.post('/update-predictions', async (req, res) => {
 
 settingsRouter.post('/update-predictions-sync', async (req, res) => {
   try {
-    await predictionsDb.clearAll();
     let upcoming = db.getUpcomingFixtures();
     if (!upcoming || upcoming.length === 0) {
       const allPreds = predictionsDb.getPredictions({ state: 'all' });
@@ -143,6 +143,8 @@ settingsRouter.post('/update-predictions-sync', async (req, res) => {
         message: 'No upcoming fixtures found in database to update.',
       });
     }
+
+    await predictionsDb.clearPredictions('upcoming', 'update_predictions');
 
     const { predictedCount, skippedCount } = await ServerEngine.recalculateUpcomingFromDbInChunks(
       upcoming,

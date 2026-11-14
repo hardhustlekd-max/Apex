@@ -1,7 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Fixture } from '../core/types.js';
-import { getLeaguePriority } from '../core/leaguePriority.js';
+import {
+  compareFixturesByPopularityAndDateTimeDesc,
+  getFixtureSortableDateTime,
+  getLeaguePopularityScore,
+} from '../core/leaguePriority.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
 import { getProbValue, getAuthoritative1X2Pick, getHighestPredictionAcrossAllMarkets } from '../core/formatters.js';
 import { PaginationBar, TeamAvatar } from './ui/index.js';
@@ -71,11 +76,21 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
   selectedFixtureId,
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [expandedLeagues, setExpandedLeagues] = useState<Record<string, boolean>>({});
+  const [leaguePages, setLeaguePages] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setCurrentPage(1);
+    setLeaguePages({});
   }, [marketFilter, sortBy]);
+
+  const toggleLeagueExpand = (headerKey: string) => {
+    setExpandedLeagues((prev) => ({
+      ...prev,
+      [headerKey]: !prev[headerKey],
+    }));
+  };
 
   const uniqueFixtures = useMemo(() => {
     const seen = new Set<string>();
@@ -96,13 +111,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
       });
     }
 
-    return list.slice().sort((a, b) => {
-      const pa = getLeaguePriority(a.league, a.leagueName, a.stage);
-      const pb = getLeaguePriority(b.league, b.leagueName, b.stage);
-      if (pa !== pb) return pa - pb;
-      if (a.matchDate !== b.matchDate) return a.matchDate.localeCompare(b.matchDate);
-      return (a.kickOffTime || '').localeCompare(b.kickOffTime || '');
-    });
+    return list.slice().sort(compareFixturesByPopularityAndDateTimeDesc);
   }, [fixtures, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(uniqueFixtures.length / pageSize));
@@ -127,30 +136,43 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
       leagueName: string;
       subDivision?: string;
       headerKey: string;
+      popularityScore: number;
+      latestDateTime: number;
       fixtures: Fixture[];
     }
 
     const groupMap = new Map<string, LeagueGroup>();
 
-    for (const fixture of paginatedFixtures) {
+    for (const fixture of uniqueFixtures) {
       const leagueKey = fixture.league || 'Other';
       const leagueName = fixture.leagueName || fixture.league || 'Other Competition';
       const subDivision = fixture.stage || fixture.leagueName || fixture.league;
       const headerKey = `${leagueKey}_${subDivision}`;
+      const dt = getFixtureSortableDateTime(fixture);
 
       if (!groupMap.has(headerKey)) {
         groupMap.set(headerKey, {
           leagueName,
           subDivision,
           headerKey,
+          popularityScore: getLeaguePopularityScore(leagueKey, leagueName, fixture.stage),
+          latestDateTime: dt,
           fixtures: [],
         });
       }
-      groupMap.get(headerKey)!.fixtures.push(fixture);
+      const group = groupMap.get(headerKey)!;
+      if (dt > group.latestDateTime) {
+        group.latestDateTime = dt;
+      }
+      group.fixtures.push(fixture);
     }
 
-    return Array.from(groupMap.values());
-  }, [paginatedFixtures]);
+    return Array.from(groupMap.values()).sort((a, b) => {
+      if (a.popularityScore !== b.popularityScore) return b.popularityScore - a.popularityScore;
+      if (a.latestDateTime !== b.latestDateTime) return b.latestDateTime - a.latestDateTime;
+      return (a.subDivision || a.leagueName).localeCompare(b.subDivision || b.leagueName);
+    });
+  }, [uniqueFixtures]);
 
   const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean) => {
     const isLive = fixture.status === 'LIVE';
@@ -379,10 +401,24 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
   };
 
   const isPercentageSortActive = sortBy && sortBy !== 'DEFAULT';
+  const areAllLeaguesExpanded =
+    groupedByLeague.length > 0 && groupedByLeague.every((g) => !!expandedLeagues[g.headerKey]);
+
+  const handleToggleAllLeagues = () => {
+    if (areAllLeaguesExpanded) {
+      setExpandedLeagues({});
+    } else {
+      const next: Record<string, boolean> = {};
+      for (const g of groupedByLeague) {
+        next[g.headerKey] = true;
+      }
+      setExpandedLeagues(next);
+    }
+  };
 
   return (
     <div className="w-full max-w-full space-y-2.5 text-theme-main font-sans">
-      {paginatedFixtures.length === 0 ? (
+      {uniqueFixtures.length === 0 ? (
         <div className="p-8 text-center text-theme-sub bg-theme-card rounded-2xl shadow-theme-sm font-bold text-xs">
           No matches found for the selected filters.
         </div>
@@ -476,94 +512,203 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           </div>
         </div>
       ) : (
-        groupedByLeague.map((group) => (
-          <div
-            key={group.headerKey}
-            className="rounded-xl sm:rounded-2xl overflow-hidden bg-theme-card shadow-theme-sm mb-2 transition-all"
-          >
-            <div className="bg-theme-card-elevated grid grid-cols-12 items-center px-3 sm:px-3.5 py-1.5 sm:py-2 gap-2 font-bold text-xs select-none">
-              <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5">
-                <span className="truncate whitespace-nowrap font-extrabold text-theme-main text-xs sm:text-[13px] uppercase tracking-wide">
-                  {group.subDivision || group.leagueName}
-                </span>
-              </div>
-              <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
-                <div className="flex items-center justify-center shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onSelectSortBy?.('PROB_DESC')}
-                    className="min-h-[32px] flex items-center justify-center gap-1 font-mono tabular-nums text-xs font-bold text-theme-sub hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-                    title="Click to sort table by Model Pick %"
-                    aria-label="Sort table by Model Pick %"
-                  >
-                    <span>PICK</span>
-                    <ArrowUpDown className="w-3 h-3 opacity-50" />
-                  </button>
+        <div className="space-y-2">
+          {groupedByLeague.length > 1 && (
+            <div className="flex items-center justify-between px-1 py-0.5 text-xs text-theme-sub">
+              <span className="font-medium tabular-nums">
+                {groupedByLeague.length} competitions · {uniqueFixtures.length} {uniqueFixtures.length === 1 ? 'match' : 'matches'}
+              </span>
+              <button
+                type="button"
+                onClick={handleToggleAllLeagues}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-theme-sub hover:text-theme-primary transition-colors cursor-pointer py-1 px-1.5 rounded-lg whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              >
+                {areAllLeaguesExpanded ? (
+                  <>
+                    <ChevronsDownUp className="w-3.5 h-3.5" />
+                    <span>Collapse all</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronsUpDown className="w-3.5 h-3.5" />
+                    <span>Expand all</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {groupedByLeague.map((group) => {
+            const isExpanded = !!expandedLeagues[group.headerKey];
+            const isCollapsed = !isExpanded;
+            const panelId = `league-accordion-${group.headerKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            const totalGroupMatches = group.fixtures.length;
+            const showLeaguePagination = totalGroupMatches > pageSize;
+            const totalGroupPages = Math.max(1, Math.ceil(totalGroupMatches / pageSize));
+            const rawGroupPage = leaguePages[group.headerKey] || 1;
+            const safeGroupPage = Math.min(rawGroupPage, totalGroupPages);
+            const groupStartIdx = (safeGroupPage - 1) * pageSize;
+            const visibleGroupFixtures = showLeaguePagination
+              ? group.fixtures.slice(groupStartIdx, groupStartIdx + pageSize)
+              : group.fixtures;
+
+            return (
+              <div
+                key={group.headerKey}
+                className="rounded-xl sm:rounded-2xl overflow-hidden bg-theme-card shadow-theme-sm transition-colors"
+              >
+                <div className="bg-theme-card-elevated grid grid-cols-12 items-center px-3 sm:px-3.5 py-1 sm:py-1.5 gap-2 font-bold text-xs select-none">
+                  <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleLeagueExpand(group.headerKey)}
+                      aria-expanded={isExpanded}
+                      aria-controls={panelId}
+                      className="w-full min-h-[36px] flex items-center gap-2 text-left cursor-pointer rounded-lg hover:text-theme-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent min-w-0"
+                    >
+                      <ChevronDown
+                        className={`w-4 h-4 text-theme-sub shrink-0 transition-transform duration-150 ${
+                          isCollapsed ? '-rotate-90' : 'rotate-0'
+                        }`}
+                      />
+                      <span className="truncate whitespace-nowrap font-extrabold text-theme-main text-xs sm:text-[13px] tracking-wide">
+                        {group.subDivision || group.leagueName}
+                      </span>
+                      <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
+                      <span className="text-[11px] font-mono tabular-nums font-semibold text-theme-sub shrink-0">
+                        {totalGroupMatches}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+                    {isCollapsed ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleLeagueExpand(group.headerKey)}
+                        className="min-h-[36px] flex items-center gap-1 text-xs font-semibold text-theme-sub hover:text-theme-primary cursor-pointer px-1.5 rounded-lg whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                      >
+                        <span>
+                          {totalGroupMatches} {totalGroupMatches === 1 ? 'match' : 'matches'}
+                        </span>
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-center shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => onSelectSortBy?.('PROB_DESC')}
+                            className="min-h-[36px] flex items-center justify-center gap-1 font-mono tabular-nums text-xs font-bold text-theme-sub hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                            title="Click to sort table by Model Pick %"
+                            aria-label="Sort table by Model Pick %"
+                          >
+                            <span>PICK</span>
+                            <ArrowUpDown className="w-3 h-3 opacity-50" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-end gap-1 font-mono tabular-nums text-xs font-bold text-theme-sub shrink-0">
+                          {marketFilter === 'OVER_UNDER' ? (
+                            <>
+                              <span className="w-8 sm:w-9 text-center">O 2.5</span>
+                              <span className="w-8 sm:w-9 text-center">U 2.5</span>
+                            </>
+                          ) : marketFilter === 'BTTS' ? (
+                            <>
+                              <span className="w-8 sm:w-9 text-center">YES</span>
+                              <span className="w-8 sm:w-9 text-center">NO</span>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onSelectSortBy?.('HOME_DESC')}
+                                className="min-h-[36px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                                title="Sort by Home Win %"
+                                aria-label="Sort by Home Win %"
+                              >
+                                1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onSelectSortBy?.('DRAW_DESC')}
+                                className="min-h-[36px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                                title="Sort by Draw %"
+                                aria-label="Sort by Draw %"
+                              >
+                                X
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onSelectSortBy?.('AWAY_DESC')}
+                                className="min-h-[36px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                                title="Sort by Away Win %"
+                                aria-label="Sort by Away Win %"
+                              >
+                                2
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-1 font-mono tabular-nums text-xs font-bold text-theme-sub shrink-0">
-                  {marketFilter === 'OVER_UNDER' ? (
-                    <>
-                      <span className="w-8 sm:w-9 text-center">O 2.5</span>
-                      <span className="w-8 sm:w-9 text-center">U 2.5</span>
-                    </>
-                  ) : marketFilter === 'BTTS' ? (
-                    <>
-                      <span className="w-8 sm:w-9 text-center">YES</span>
-                      <span className="w-8 sm:w-9 text-center">NO</span>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onSelectSortBy?.('HOME_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-                        title="Sort by Home Win %"
-                        aria-label="Sort by Home Win %"
-                      >
-                        1
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectSortBy?.('DRAW_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-                        title="Sort by Draw %"
-                        aria-label="Sort by Draw %"
-                      >
-                        X
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectSortBy?.('AWAY_DESC')}
-                        className="min-h-[32px] w-8 sm:w-8.5 flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-                        title="Sort by Away Win %"
-                        aria-label="Sort by Away Win %"
-                      >
-                        2
-                      </button>
-                    </>
+
+                <AnimatePresence initial={false}>
+                  {!isCollapsed && (
+                    <motion.div
+                      id={panelId}
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      className="bg-theme-card border-t border-theme-subdued"
+                    >
+                      {visibleGroupFixtures.map((fixture) => renderFixtureRow(fixture, false))}
+                      {showLeaguePagination && (
+                        <PaginationBar
+                          embedded
+                          currentPage={safeGroupPage}
+                          totalPages={totalGroupPages}
+                          totalItems={totalGroupMatches}
+                          startIndex={groupStartIdx + 1}
+                          endIndex={Math.min(safeGroupPage * pageSize, totalGroupMatches)}
+                          pageSize={pageSize}
+                          onPageChange={(nextPage) =>
+                            setLeaguePages((prev) => ({
+                              ...prev,
+                              [group.headerKey]: nextPage,
+                            }))
+                          }
+                          onPageSizeChange={(size) => {
+                            setPageSize(size);
+                            setLeaguePages({});
+                            setCurrentPage(1);
+                          }}
+                        />
+                      )}
+                    </motion.div>
                   )}
-                </div>
+                </AnimatePresence>
               </div>
-            </div>
-            <div className="bg-theme-card">
-              {group.fixtures.map((fixture) => renderFixtureRow(fixture, false))}
-            </div>
-          </div>
-        ))
+            );
+          })}
+        </div>
       )}
 
-      {/* Pagination Bar */}
-      {fixtures.length > 0 && (
+      {/* Flat list pagination only when percentage sort is active and matches exceed pageSize */}
+      {isPercentageSortActive && uniqueFixtures.length > pageSize && (
         <PaginationBar
           currentPage={safeCurrentPage}
           totalPages={totalPages}
-          totalItems={fixtures.length}
+          totalItems={uniqueFixtures.length}
           startIndex={startItemIndex}
           endIndex={endItemIndex}
           pageSize={pageSize}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {
             setPageSize(size);
+            setLeaguePages({});
             setCurrentPage(1);
           }}
         />

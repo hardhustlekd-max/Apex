@@ -5,6 +5,7 @@ import { Fixture, EngineSettings, AccumulatorSlip } from '../core/types.js';
 import { getRelativeDateStr } from '../core/dateUtils.js';
 import { loggerService } from './loggerService.js';
 import { AccumulatorGenerator, isMatchStarted } from '../core/accumulator.js';
+import { flashscoreScraperService } from './flashscoreScraperService.js';
 
 export interface SelectHighValueOptions {
   minEV?: number;
@@ -27,6 +28,9 @@ export class ServerPredictionGeneratorService {
   }): Promise<Fixture[]> {
     await db.init();
     await predictionsDb.init();
+
+    // Ensure future dates (tomorrow / day+2+) are hydrated when missing from SQLite
+    await flashscoreScraperService.ensureUpcomingMultiDayCoverage();
 
     // 1. Retrieve all upcoming fixtures from db
     const upcomingList = db.getUpcomingFixtures(filters);

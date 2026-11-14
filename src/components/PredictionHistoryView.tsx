@@ -100,6 +100,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [importedEvaluation, setImportedEvaluation] = useState<ImportedEvaluationData | null>(null);
   const [importedFilter, setImportedFilter] = useState<'ALL' | 'WON' | 'LOST' | 'PENDING'>('ALL');
+  const [sortMode, setSortMode] = useState<'DATE_DESC' | 'PROB_DESC' | 'PROB_ASC'>('DATE_DESC');
 
   const fetchHistory = async (recordLimit = limit, showRefreshing = false) => {
     if (showRefreshing) {
@@ -120,6 +121,12 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       );
 
       const sorted = evaluatedOnly.slice().sort((a, b) => {
+        if (sortMode === 'PROB_DESC') {
+          return evaluatePrediction(b).topProb - evaluatePrediction(a).topProb;
+        }
+        if (sortMode === 'PROB_ASC') {
+          return evaluatePrediction(a).topProb - evaluatePrediction(b).topProb;
+        }
         const dateA = normalizeDateStr(a.matchDate);
         const dateB = normalizeDateStr(b.matchDate);
 
@@ -248,12 +255,22 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const correctCount = history.reduce((acc, f) => acc + (evaluatePrediction(f).isCorrect ? 1 : 0), 0);
   const accuracyPct = totalEvaluated > 0 ? ((correctCount / totalEvaluated) * 100).toFixed(1) : '0.0';
 
-  // Filter imported matches according to active filter tab
+  // Filter imported matches according to active filter tab and sort mode
   const filteredImportedMatches = importedEvaluation
-    ? importedEvaluation.evaluated.filter((item) => {
-        if (importedFilter === 'ALL') return true;
-        return item.evaluationState === importedFilter;
-      })
+    ? importedEvaluation.evaluated
+        .filter((item) => {
+          if (importedFilter === 'ALL') return true;
+          return item.evaluationState === importedFilter;
+        })
+        .sort((a, b) => {
+          if (sortMode === 'PROB_DESC') {
+            return b.tipProb - a.tipProb;
+          }
+          if (sortMode === 'PROB_ASC') {
+            return a.tipProb - b.tipProb;
+          }
+          return b.matchDate.localeCompare(a.matchDate);
+        })
     : [];
 
   if (isLoading && !importedEvaluation) {
@@ -370,6 +387,19 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                   { value: 50, label: '50 Matches' },
                   { value: 100, label: '100 Matches' },
                   { value: 200, label: '200 Matches' },
+                ]}
+              />
+
+              <Select
+                aria-label="Sort predictions"
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as any)}
+                surface="subtle"
+                selectSize="sm"
+                options={[
+                  { value: 'DATE_DESC', label: 'Sort: Newest Date' },
+                  { value: 'PROB_DESC', label: 'Sort: Highest Probability %' },
+                  { value: 'PROB_ASC', label: 'Sort: Lowest Probability %' },
                 ]}
               />
 

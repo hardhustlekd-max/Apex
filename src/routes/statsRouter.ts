@@ -33,38 +33,16 @@ statsRouter.get('/', async (req, res) => {
   }
 });
 
-statsRouter.post('/reset', (req, res) => {
-  try {
-    const clearRaw = req.body?.clearRaw !== false;
-    db.clearAllData(clearRaw);
-    predictionsDb.clearAll();
-    const baseStats = db.getStatsSummary();
-    const stats = {
-      ...baseStats,
-      rawFeedsCount: db.getRawFeedsCount(),
-      upcomingCount: db.getUpcomingFixturesCount(),
-      predictionsCount: predictionsDb.count('all'),
-    };
-    res.json({
-      success: true,
-      message: 'Database tables, raw feeds, and predictions successfully reset.',
-      stats,
-    });
-  } catch (err: any) {
-    console.error('Reset error:', err);
-    res.status(500).json({ success: false, error: err?.message || 'Failed to reset database' });
-  }
+statsRouter.post('/reset', (_req, res) => {
+  res.status(403).json({
+    success: false,
+    error: 'Database clearing is restricted strictly to Full Sync and Update Predictions processes.',
+  });
 });
 
-statsRouter.post('/clear', (req, res) => {
-  try {
-    db.clearAllData(true);
-    predictionsDb.clearAll();
-    res.json({
-      success: true,
-      message: 'Historical matches table and caches cleared.',
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Failed to clear database' });
-  }
+statsRouter.post('/clear', (_req, res) => {
+  res.status(403).json({
+    success: false,
+    error: 'Database clearing is restricted strictly to Full Sync and Update Predictions processes.',
+  });
 });
