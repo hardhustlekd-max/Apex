@@ -4,11 +4,8 @@ import fs from 'fs';
 import zlib from 'zlib';
 import { loggerService } from '../services/loggerService.js';
 
-const DEFAULT_DATA_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = process.env.SQLITE_DB_PATH
-  ? path.resolve(process.env.SQLITE_DB_PATH)
-  : path.join(DEFAULT_DATA_DIR, 'football_engine.db');
-const DATA_DIR = path.dirname(DB_PATH);
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
 
 let rawDbInstance: Database.Database | null = null;
 let isRecoveringDb = false;

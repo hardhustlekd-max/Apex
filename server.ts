@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { db } from './src/core/db.js';
 import { predictionsDb } from './src/core/predictionsDb.js';
 import { app } from './src/app.js';
@@ -17,9 +16,9 @@ async function startServer() {
     console.warn('predictionsDb init notice:', err);
   }
 
-
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -28,7 +27,10 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use('/api', (_req, res) => {
+      res.status(404).json({ error: 'API endpoint not found' });
+    });
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -40,4 +42,5 @@ async function startServer() {
 
 startServer().catch((err) => {
   console.error('Fatal server startup error:', err);
+  process.exit(1);
 });
