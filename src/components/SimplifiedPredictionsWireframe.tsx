@@ -557,8 +557,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 key={group.headerKey}
                 className="rounded-xl sm:rounded-2xl overflow-hidden bg-theme-card shadow-theme-sm transition-colors"
               >
-                <div className="bg-theme-card-elevated grid grid-cols-12 items-center px-3 sm:px-3.5 py-1 sm:py-1.5 gap-2 font-bold text-xs select-none">
-                  <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5">
+                <div className={`grid grid-cols-12 items-center px-3 sm:px-3.5 py-1 sm:py-1.5 gap-2 font-bold text-xs select-none transition-colors ${
+                  isCollapsed ? 'bg-theme-card' : 'bg-theme-card-elevated'
+                }`}>
+                  <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1.5 flex-wrap">
                     <button
                       type="button"
                       onClick={() => toggleLeagueExpand(group.headerKey)}
@@ -571,16 +573,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                           isCollapsed ? '-rotate-90' : 'rotate-0'
                         }`}
                       />
-                      <span className="truncate whitespace-nowrap font-extrabold text-theme-main text-xs sm:text-[13px] tracking-wide">
+                      <span className="font-extrabold text-theme-main text-xs sm:text-[13px] tracking-wide break-words">
                         {group.subDivision || group.leagueName}
                       </span>
                       {!isCollapsed && (
-                        <>
-                          <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
-                          <span className="text-[11px] font-mono tabular-nums font-semibold text-theme-sub shrink-0">
-                            {totalGroupMatches}
-                          </span>
-                        </>
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-theme-subtle text-theme-sub font-mono tabular-nums text-xs font-semibold shrink-0 ml-1">
+                          {totalGroupMatches}
+                        </span>
                       )}
                     </button>
                   </div>
@@ -592,8 +591,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                         onClick={() => toggleLeagueExpand(group.headerKey)}
                         className="min-h-[36px] flex items-center gap-1 text-xs font-semibold text-theme-sub hover:text-theme-primary cursor-pointer px-1.5 rounded-lg whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                       >
-                        <span>
-                          {totalGroupMatches} {totalGroupMatches === 1 ? 'match' : 'matches'}
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-theme-subtle text-theme-sub font-mono tabular-nums text-xs font-semibold shrink-0">
+                          {totalGroupMatches}
                         </span>
                       </button>
                     ) : (

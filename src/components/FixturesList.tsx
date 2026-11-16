@@ -685,25 +685,26 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                   onClick={() => toggleLeagueExpand(group.headerKey)}
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
-                  className="w-full min-h-[44px] flex items-center justify-between px-4 py-2.5 bg-theme-card-elevated hover:bg-theme-subtle transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                  className={`w-full min-h-[44px] flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                    isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-card-elevated hover:bg-theme-card'
+                  }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     <ChevronDown
                       className={`w-4 h-4 text-theme-sub shrink-0 transition-transform duration-150 ${
                         isCollapsed ? '-rotate-90' : 'rotate-0'
                       }`}
                     />
-                    <span className="font-extrabold text-sm sm:text-[15px] text-theme-main truncate">
+                    <span className="font-extrabold text-sm sm:text-[15px] text-theme-main break-words">
                       {group.leagueName}
                     </span>
                     {group.subDivision && group.subDivision !== group.leagueName && (
-                      <span className="text-xs text-theme-sub truncate hidden sm:inline">
+                      <span className="text-xs text-theme-sub break-words">
                         · {group.subDivision}
                       </span>
                     )}
-                    <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
-                    <span className="text-xs text-theme-sub font-mono tabular-nums shrink-0">
-                      {totalGroupMatches} {totalGroupMatches === 1 ? 'match' : 'matches'}
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-theme-subtle text-theme-sub font-mono tabular-nums text-xs font-semibold shrink-0">
+                      {totalGroupMatches}
                     </span>
                   </div>
                   <span className="text-xs font-semibold text-theme-sub hidden sm:inline shrink-0">

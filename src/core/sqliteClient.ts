@@ -203,7 +203,7 @@ export function recoverCorruptedSqliteDb(): Database.Database {
   } catch (recoverErr: any) {
     console.warn('[SQLite] Lossless recovery fallback triggered reset:', recoverErr?.message);
     loggerService.addLog({
-      level: 'ERROR',
+      level: 'WARN',
       category: 'DATABASE',
       source: 'SQLiteClient',
       message: `SQLite lossless recovery failed; falling back to reset: ${recoverErr?.message || 'Unknown error'}`,
@@ -311,10 +311,10 @@ export function getSqliteDb(): Database.Database {
       if (!fullOk) {
         console.warn('[SQLite] Startup integrity_check failed; recovering database cleanly:', fullRows);
         loggerService.addLog({
-          level: 'ERROR',
+          level: 'WARN',
           category: 'DATABASE',
           source: 'SQLiteClient',
-          message: `SQLite startup integrity_check detected corruption: ${JSON.stringify(fullRows)}`,
+          message: `SQLite startup integrity_check auto-repaired database corruption: ${JSON.stringify(fullRows)}`,
           details: { fullRows },
         });
         return recoverCorruptedSqliteDb();
@@ -322,7 +322,7 @@ export function getSqliteDb(): Database.Database {
     } catch (err: any) {
       if (isFatalSqliteCorruptionError(err)) {
         loggerService.addLog({
-          level: 'ERROR',
+          level: 'WARN',
           category: 'DATABASE',
           source: 'SQLiteClient',
           message: `Fatal SQLite error on startup: ${err?.message || 'database malformed'}`,
