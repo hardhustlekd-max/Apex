@@ -380,11 +380,13 @@ class FixturesWorkerService {
       try {
         await db.init();
         await predictionsDb.init();
-        await flashscoreScraperService.ensureUpcomingMultiDayCoverage();
 
         const upcomingList = db.getUpcomingFixtures({ skipSort: true, skipPredictionBlobs: true });
         const predictionsList = await predictionsDb.getPredictionsAsync({ state: 'all', skipSort: true });
         const oddsMap = db.getAllMatchOddsCache();
+
+        // Run multi-day coverage sync in background asynchronously without blocking index boot
+        void flashscoreScraperService.ensureUpcomingMultiDayCoverage().catch(() => {});
 
         const predMap = new Map<string, Fixture>();
         for (const p of predictionsList) {
