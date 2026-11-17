@@ -771,16 +771,17 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     <div className="space-y-1 font-mono tabular-nums text-xs">
                       {side.recentMatches.slice(0, 8).map((m, idx) => (
                         <div key={idx} className="p-2 rounded-xl bg-theme-card flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <span
-                              className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
-                                m.isHome ? 'bg-theme-subtle text-theme-main' : 'bg-theme-subtle text-theme-sub'
-                              }`}
-                            >
-                              {m.isHome ? 'H' : 'A'}
-                            </span>
-                            <span className="font-bold text-theme-main truncate">vs {m.opponent}</span>
-                          </div>
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] text-theme-sub shrink-0 font-sans">{m.date}</span>
+                          <span
+                            className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center shrink-0 ${
+                              m.isHome ? 'bg-theme-subtle text-theme-main' : 'bg-theme-subtle text-theme-sub'
+                            }`}
+                          >
+                            {m.isHome ? 'H' : 'A'}
+                          </span>
+                          <span className="font-bold text-theme-main truncate">vs {m.opponent}</span>
+                        </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className="font-bold text-theme-main">
