@@ -1,16 +1,17 @@
 import {
   Fixture,
+  FixturesQueryResponse,
+  FeaturedTipsResponse,
+  LiveFixturesResponse,
+  LeagueOptionDTO,
+  LeagueGroupDTO,
   EngineSettings,
   ProviderStatus,
-  AccumulatorSlip,
-  HistoricalMatch,
-  TrendingTipsData,
   HeadToHeadMeasurement,
-  TeamFormMatch,
-  LeagueStandingTable,
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
+import { ClientCache } from '../core/clientCache.js';
 
 let localSettings: EngineSettings = {
   rollingMatchWindow: 15,
@@ -51,7 +52,7 @@ export class EngineService {
       }
 
       const res = await fetch(url, {
-        cache: 'no-store',
+        cache: options?.cache ?? 'default',
         ...options,
         headers: fetchHeaders,
         signal: controller.signal,
@@ -132,33 +133,190 @@ export class EngineService {
     }
   }
 
-  public static async getFixtures(
-    league = 'ALL',
-    dateFilter?: string,
-    customStartDate?: string,
-    customEndDate?: string
-  ): Promise<Fixture[]> {
-    const params = new URLSearchParams();
-    if (league !== 'ALL') params.set('league', league);
-    if (dateFilter && dateFilter !== 'ALL') params.set('dateFilter', dateFilter);
-    if (customStartDate) params.set('startDate', customStartDate);
-    if (customEndDate) params.set('endDate', customEndDate);
+  public static buildQueryFixturesCacheKey(params?: {
+    league?: string;
+    dateFilter?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    sortBy?: string;
+    marketFilter?: string;
+  }): string {
+    return [
+      'query',
+      params?.league || 'ALL',
+      params?.dateFilter || 'ALL',
+      params?.startDate || '',
+      params?.endDate || '',
+      (params?.search || '').trim().toLowerCase(),
+      params?.sortBy || 'DEFAULT',
+      params?.marketFilter || 'MOST_LIKELY',
+    ].join('_');
+  }
 
-    const query = params.toString();
-    const url = query ? `/api/fixtures?${query}` : '/api/fixtures';
-    const serverData = await this.safeJsonFetch(url);
+  public static async queryFixtures(
+    params?: {
+      league?: string;
+      dateFilter?: string;
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+      sortBy?: string;
+      marketFilter?: string;
+    },
+    options?: { forceRefresh?: boolean; signal?: AbortSignal }
+  ): Promise<FixturesQueryResponse> {
+    const cacheKey = this.buildQueryFixturesCacheKey(params);
+    const cached = options?.forceRefresh ? null : await ClientCache.getCachedQueryResponse(cacheKey);
 
-    if (serverData && serverData.success && Array.isArray(serverData.fixtures)) {
-      return serverData.fixtures;
+    const urlParams = new URLSearchParams();
+    if (params?.league && params.league !== 'ALL') urlParams.set('league', params.league);
+    if (params?.dateFilter) urlParams.set('dateFilter', params.dateFilter);
+    if (params?.startDate) urlParams.set('startDate', params.startDate);
+    if (params?.endDate) urlParams.set('endDate', params.endDate);
+    if (params?.search && params.search.trim()) urlParams.set('search', params.search.trim());
+    if (params?.sortBy && params.sortBy !== 'DEFAULT') urlParams.set('sortBy', params.sortBy);
+    if (params?.marketFilter && params.marketFilter !== 'MOST_LIKELY') {
+      urlParams.set('marketFilter', params.marketFilter);
+    }
+    if (options?.forceRefresh) urlParams.set('force', '1');
+
+    const qs = urlParams.toString();
+    const url = qs ? `/api/fixtures?${qs}` : '/api/fixtures';
+
+    const fetchHeaders: Record<string, string> = { Accept: 'application/json' };
+    if (!options?.forceRefresh && cached?.etag) {
+      fetchHeaders['If-None-Match'] = cached.etag;
     }
 
-    return [];
+    const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (options?.signal) {
+      if (options.signal.aborted) controller.abort();
+      else options.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+    const timeoutId = setTimeout(() => controller.abort(), 75000);
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: fetchHeaders,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+
+      if (res.ok) {
+        const text = await res.text();
+        if (text) {
+          const serverData = JSON.parse(text) as FixturesQueryResponse;
+          if (serverData && serverData.success && Array.isArray(serverData.fixtures)) {
+            const etag = res.headers.get('ETag') || undefined;
+            void ClientCache.setCachedQueryResponse(cacheKey, serverData, etag);
+            // Also cache under resolved dateFilter key so AUTO -> TODAY reuses immediately
+            if (params?.dateFilter === 'AUTO' && serverData.resolvedDateFilter) {
+              const resolvedKey = this.buildQueryFixturesCacheKey({
+                ...params,
+                dateFilter: serverData.resolvedDateFilter,
+              });
+              void ClientCache.setCachedQueryResponse(resolvedKey, serverData, etag);
+            }
+            return serverData;
+          }
+        }
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name !== 'AbortError') {
+        console.warn('[EngineService] Network notice querying fixtures:', err?.message);
+      }
+    } finally {
+      if (options?.signal) {
+        options.signal.removeEventListener('abort', onExternalAbort);
+      }
+    }
+
+    if (cached?.data) {
+      return cached.data;
+    }
+
+    return {
+      success: false,
+      provider: 'FLASHSCORE',
+      count: 0,
+      totalDatabaseCount: 0,
+      resolvedDateFilter: params?.dateFilter === 'AUTO' ? 'TODAY' : (params?.dateFilter || 'ALL'),
+      fixtures: [],
+      groups: [],
+    };
+  }
+
+  public static async getFeaturedTips(forceRefresh = false): Promise<FeaturedTipsResponse> {
+    const cached = forceRefresh ? null : await ClientCache.getCachedFeaturedTips();
+    const url = forceRefresh ? '/api/fixtures/featured-tips?force=1' : '/api/fixtures/featured-tips';
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (!forceRefresh && cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
+    }
+
+    try {
+      const res = await fetch(url, { method: 'GET', headers });
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+      if (res.ok) {
+        const data = (await res.json()) as FeaturedTipsResponse;
+        if (data && data.success && Array.isArray(data.tips)) {
+          const etag = res.headers.get('ETag') || undefined;
+          void ClientCache.setCachedFeaturedTips(data, etag);
+          return data;
+        }
+      }
+    } catch (err: any) {
+      console.warn('[EngineService] Featured tips fetch notice:', err?.message);
+    }
+
+    return cached?.data || { success: false, count: 0, totalOdds: 1.0, tips: [] };
+  }
+
+  public static async getLeaguesCatalog(): Promise<LeagueOptionDTO[]> {
+    const cached = await ClientCache.getCachedLeagues();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
+    }
+
+    try {
+      const res = await fetch('/api/fixtures/leagues', { method: 'GET', headers });
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.leagues)) {
+          const etag = res.headers.get('ETag') || undefined;
+          void ClientCache.setCachedLeagues(data.leagues, etag);
+          return data.leagues;
+        }
+      }
+    } catch {}
+
+    return cached?.data || [];
   }
 
   public static async getSettings(): Promise<EngineSettings> {
+    const cached = await ClientCache.getCachedSettings();
+    if (cached) {
+      localSettings = cached;
+    }
+
     const serverData = await this.safeJsonFetch('/api/settings');
     if (serverData && serverData.success && serverData.settings) {
       localSettings = serverData.settings;
+      void ClientCache.setCachedSettings(serverData.settings);
       return serverData.settings;
     }
     return localSettings;
@@ -536,20 +694,6 @@ export class EngineService {
     };
   }
 
-  public static async syncFlashscoreData(onProgress?: (job: any) => void, signal?: AbortSignal): Promise<{
-    success: boolean;
-    message: string;
-    matchesCount?: number;
-    upcomingCount?: number;
-    predictionsCount?: number;
-    historicalPredictionsCount?: number;
-    livePredictionsCount?: number;
-    stats?: any;
-    cancelled?: boolean;
-  }> {
-    return this.resetAndSyncDatabase(onProgress, signal);
-  }
-
   public static async syncHistoryOnly(): Promise<{
     success: boolean;
     message: string;
@@ -575,10 +719,6 @@ export class EngineService {
     }
 
     return PROVIDER_METADATA;
-  }
-
-  public static async switchProvider(): Promise<boolean> {
-    return true;
   }
 
   public static async getStats(): Promise<{
@@ -632,53 +772,89 @@ export class EngineService {
     return null;
   }
 
-  public static async parseMatchOnDemand(fixtureId: string) {
-    return this.getMatchDetail(fixtureId);
-  }
+  public static async queryLiveFixtures(params?: {
+    league?: string;
+    search?: string;
+    sortBy?: string;
+    marketFilter?: string;
+    limit?: number;
+  }): Promise<LiveFixturesResponse> {
+    const league = params?.league || 'ALL';
+    const search = (params?.search || '').trim();
+    const sortBy = params?.sortBy || 'DEFAULT';
+    const marketFilter = params?.marketFilter || 'MOST_LIKELY';
+    const limit = params?.limit ?? 200;
 
-  public static async parseH2HOnDemand(fixtureId: string, homeTeam?: string, awayTeam?: string) {
-    return this.getMatchHeadToHead(fixtureId, homeTeam, awayTeam);
-  }
+    const cacheKey = `live_${league}_${search.toLowerCase()}_${sortBy}_${marketFilter}`;
+    const cached = await ClientCache.getCachedLiveFixtures(cacheKey);
 
-  public static async getClubRecentMatches(
-    clubName: string,
-    matchId?: string
-  ): Promise<TeamFormMatch[]> {
-    const query = matchId ? `?matchId=${encodeURIComponent(matchId)}` : '';
-    const serverData = await this.safeJsonFetch(`/api/fixtures/club/${encodeURIComponent(clubName)}/recent${query}`);
-    if (serverData && serverData.success && Array.isArray(serverData.matches)) {
-      return serverData.matches;
-    }
-    return [];
-  }
+    const urlParams = new URLSearchParams();
+    if (league !== 'ALL') urlParams.set('league', league);
+    if (search) urlParams.set('search', search);
+    if (sortBy !== 'DEFAULT') urlParams.set('sortBy', sortBy);
+    if (marketFilter !== 'MOST_LIKELY') urlParams.set('marketFilter', marketFilter);
+    urlParams.set('limit', String(limit));
 
-  public static async getLivePredictions(league = 'ALL', limit = 100): Promise<Fixture[]> {
-    const params = new URLSearchParams();
-    if (league !== 'ALL') params.set('league', league);
-    params.set('limit', String(limit));
-
-    const serverData = await this.safeJsonFetch(`/api/fixtures/live?${params.toString()}`);
-    if (serverData && serverData.success && Array.isArray(serverData.fixtures)) {
-      return serverData.fixtures;
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
     }
 
-    return [];
+    try {
+      const res = await fetch(`/api/fixtures/live?${urlParams.toString()}`, { method: 'GET', headers });
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+      if (res.ok) {
+        const data = (await res.json()) as LiveFixturesResponse;
+        if (data && data.success && Array.isArray(data.fixtures)) {
+          const etag = res.headers.get('ETag') || undefined;
+          void ClientCache.setCachedLiveFixtures(cacheKey, data, etag);
+          return data;
+        }
+      }
+    } catch {}
+
+    return cached?.data || { success: false, provider: 'FLASHSCORE', count: 0, fixtures: [], groups: [] };
   }
 
   public static async getLiveScores(): Promise<LiveScore[]> {
-    const data = await this.safeJsonFetch('/api/providers/live-scores');
-    if (data && data.success && Array.isArray(data.scores)) {
-      return data.scores;
+    const cached = await ClientCache.getCachedLiveScores();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
     }
-    return [];
+
+    try {
+      const res = await fetch('/api/providers/live-scores', { method: 'GET', headers });
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.scores)) {
+          const etag = res.headers.get('ETag') || undefined;
+          void ClientCache.setCachedLiveScores(data.scores, etag);
+          return data.scores;
+        }
+      }
+    } catch {}
+
+    return cached?.data || [];
   }
 
   public static async getHistoricalEvaluation(
     league = 'ALL',
     limit = 200,
-    refresh = false
+    refresh = false,
+    options?: {
+      search?: string;
+      sortBy?: string;
+      marketFilter?: string;
+    }
   ): Promise<{
     matches: Fixture[];
+    groups: LeagueGroupDTO[];
     summary: {
       upcomingFixturesInDb: number;
       totalPredictions: number;
@@ -688,25 +864,48 @@ export class EngineService {
       completedAwaitingScore: number;
     } | null;
   }> {
+    const search = (options?.search || '').trim();
+    const sortBy = options?.sortBy || 'DEFAULT';
+    const marketFilter = options?.marketFilter || 'MOST_LIKELY';
+    const cacheKey = `history_${league}_${limit}_${search.toLowerCase()}_${sortBy}_${marketFilter}`;
+    const cached = refresh
+      ? null
+      : await ClientCache.getEntry<{ matches: Fixture[]; groups: LeagueGroupDTO[]; summary: any }>(cacheKey);
+
     const params = new URLSearchParams();
     if (league !== 'ALL') params.set('league', league);
     params.set('limit', String(limit));
+    if (search) params.set('search', search);
+    if (sortBy !== 'DEFAULT') params.set('sortBy', sortBy);
+    if (marketFilter !== 'MOST_LIKELY') params.set('marketFilter', marketFilter);
     if (refresh) params.set('refresh', 'true');
 
-    const serverData = await this.safeJsonFetch(`/api/fixtures/history?${params.toString()}`);
-    if (serverData && serverData.success && Array.isArray(serverData.matches)) {
-      return {
-        matches: serverData.matches,
-        summary: serverData.summary || null,
-      };
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (!refresh && cached?.etag) {
+      headers['If-None-Match'] = cached.etag;
     }
 
-    return { matches: [], summary: null };
-  }
+    try {
+      const res = await fetch(`/api/fixtures/history?${params.toString()}`, { method: 'GET', headers });
+      if (res.status === 304 && cached?.data) {
+        return cached.data;
+      }
+      if (res.ok) {
+        const serverData = await res.json();
+        if (serverData && serverData.success && Array.isArray(serverData.matches)) {
+          const result = {
+            matches: serverData.matches,
+            groups: Array.isArray(serverData.groups) ? serverData.groups : [],
+            summary: serverData.summary || null,
+          };
+          const etag = res.headers.get('ETag') || undefined;
+          void ClientCache.setEntry(cacheKey, result, etag);
+          return result;
+        }
+      }
+    } catch {}
 
-  public static async getHistoricalMatches(league = 'ALL', limit = 200, refresh = false): Promise<Fixture[]> {
-    const res = await this.getHistoricalEvaluation(league, limit, refresh);
-    return res.matches;
+    return cached?.data || { matches: [], groups: [], summary: null };
   }
 
   public static async exportPredictions(sortByProb?: 'desc' | 'asc'): Promise<{
@@ -842,85 +1041,5 @@ export class EngineService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry),
     });
-  }
-
-  public static async getPrebuiltAccumulators(
-    dateScope = 'TODAY',
-    stake = 10,
-    fixtures?: Fixture[]
-  ): Promise<Record<string, AccumulatorSlip>> {
-    const serverData = await this.safeJsonFetch('/api/accumulator/prebuilt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dateScope, stake, fixtures }),
-    });
-
-    if (serverData && serverData.success && serverData.slips) {
-      return serverData.slips;
-    }
-
-    return {};
-  }
-
-  public static async generateAccumulator(params: any): Promise<AccumulatorSlip> {
-    const serverData = await this.safeJsonFetch('/api/accumulator/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-
-    if (serverData && serverData.success && serverData.slip) {
-      return serverData.slip;
-    }
-
-    throw new Error(serverData?.error || 'Failed to generate accumulator slip from server');
-  }
-
-  public static async resetDatabase(): Promise<{ success: boolean; message: string; stats: any }> {
-    const serverData = await this.safeJsonFetch('/api/stats/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (serverData && serverData.success) {
-      return serverData;
-    }
-
-    return {
-      success: false,
-      message: serverData?.error || 'Database reset failed.',
-      stats: await this.getStats(),
-    };
-  }
-
-  public static async getTrendingTips(): Promise<TrendingTipsData | null> {
-    const serverData = await this.safeJsonFetch('/api/tips');
-    if (serverData && serverData.success && serverData.data) {
-      return serverData.data;
-    }
-    return null;
-  }
-
-  public static async refreshTrendingTips(): Promise<TrendingTipsData | null> {
-    const serverData = await this.safeJsonFetch('/api/tips/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (serverData && serverData.success && serverData.data) {
-      return serverData.data;
-    }
-    return null;
-  }
-
-  public static async getLeagueStandings(league = 'england_premier_league'): Promise<LeagueStandingTable | null> {
-    const serverData = await this.safeJsonFetch(`/api/standings/${encodeURIComponent(league)}`);
-    if (serverData && serverData.success && serverData.standings) {
-      return serverData.standings;
-    }
-    const fixturesStandings = await this.safeJsonFetch(`/api/fixtures/standings/${encodeURIComponent(league)}`);
-    if (fixturesStandings && fixturesStandings.success && fixturesStandings.standings) {
-      return fixturesStandings.standings;
-    }
-    return null;
   }
 }

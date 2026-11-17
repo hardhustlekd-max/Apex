@@ -1,7 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Fixture } from '../core/types.js';
-import { formatProb, getAuthoritative1X2Pick } from '../core/formatters.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
 import { Badge, Card, TeamAvatar } from './ui/index.js';
 
@@ -16,14 +15,19 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
   onSelectDetail,
   isSelected = false,
 }) => {
-  const pred = fixture.prediction;
-  const pick = pred ? getAuthoritative1X2Pick(fixture) : null;
+  const probs = fixture.probs;
+  const hasPred = Boolean(fixture.hasPrediction || fixture.prediction || probs);
+  const pick = fixture.authoritativePick || null;
   const topPredictionLabel = pick
     ? `${pick.label} (${pick.probabilityFormatted})`
     : null;
 
   const isHighConfidence = Boolean(pick && pick.probabilityPercent >= 65);
   const { dateStr: localDate, timeStr: localTime } = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp);
+
+  const homePct = probs ? probs.home : (fixture.prediction ? Math.round((fixture.prediction.homeWinProb ?? 0) * 1000) / 10 : 0);
+  const drawPct = probs ? probs.draw : (fixture.prediction ? Math.round((fixture.prediction.drawProb ?? 0) * 1000) / 10 : 0);
+  const awayPct = probs ? probs.away : (fixture.prediction ? Math.round((fixture.prediction.awayWinProb ?? 0) * 1000) / 10 : 0);
 
   return (
     <Card
@@ -64,7 +68,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               <Badge variant="accent" pill size="xs">
                 HIGH CONFIDENCE
               </Badge>
-            ) : !pred && fixture.status !== 'FINISHED' ? (
+            ) : !hasPred && fixture.status !== 'FINISHED' ? (
               <Badge variant="default" pill size="xs" className="font-medium text-theme-sub">
                 UNPREDICTED
               </Badge>
@@ -107,35 +111,35 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         </div>
 
         {/* Probability Bar Indicator */}
-        {pred && (
+        {hasPred && (
           <div className="my-2 space-y-1">
             <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-theme-sub">
-              <span className="font-bold text-theme-main">1: {formatProb(pred.homeWinProb, 1)}</span>
-              <span className="font-medium text-theme-sub">X: {formatProb(pred.drawProb, 1)}</span>
-              <span className="font-bold text-theme-main">2: {formatProb(pred.awayWinProb, 1)}</span>
+              <span className="font-bold text-theme-main">1: {homePct.toFixed(1)}%</span>
+              <span className="font-medium text-theme-sub">X: {drawPct.toFixed(1)}%</span>
+              <span className="font-bold text-theme-main">2: {awayPct.toFixed(1)}%</span>
             </div>
             <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
               <div
-                style={{ width: `${pred.homeWinProb * 100}%` }}
+                style={{ width: `${homePct}%` }}
                 className="bg-theme-primary rounded-full transition-all duration-300"
-                title={`Home Win: ${formatProb(pred.homeWinProb, 1)}`}
+                title={`Home Win: ${homePct.toFixed(1)}%`}
               />
               <div
-                style={{ width: `${pred.drawProb * 100}%` }}
+                style={{ width: `${drawPct}%` }}
                 className="bg-theme-dim/40 rounded-full transition-all duration-300"
-                title={`Draw: ${formatProb(pred.drawProb, 1)}`}
+                title={`Draw: ${drawPct.toFixed(1)}%`}
               />
               <div
-                style={{ width: `${pred.awayWinProb * 100}%` }}
+                style={{ width: `${awayPct}%` }}
                 className="bg-theme-main/70 rounded-full transition-all duration-300"
-                title={`Away Win: ${formatProb(pred.awayWinProb, 1)}`}
+                title={`Away Win: ${awayPct.toFixed(1)}%`}
               />
             </div>
           </div>
         )}
 
         {/* Highest Predicted Outcome */}
-        {pred && topPredictionLabel && (
+        {hasPred && topPredictionLabel && (
           <div className="mt-2 p-2 rounded-xl bg-theme-card-elevated flex items-center justify-between text-xs min-w-0">
             <div className="flex items-center gap-2 min-w-0 truncate">
               <span className="text-theme-sub font-medium shrink-0">Predicted Pick:</span>

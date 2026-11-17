@@ -7,6 +7,7 @@ import { EngineService } from '../services/engineService.js';
 import { LeagueStandings } from './LeagueStandings.js';
 import { getProbValue } from '../core/formatters.js';
 import { teamMatchScore, resolveFixtureAlignment, resolveTeamSide } from '../core/feedParser.js';
+import { formatMatchDateTime } from '../core/dateUtils.js';
 import { Card, SegmentedTabs, StatTile, EmptyState, SectionHeader, TeamAvatar } from './ui/index.js';
 
 export interface MatchDetailViewProps {
@@ -140,7 +141,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
       let resolvedTeamForm = hasValidH2H;
 
-      if (!fixture.statistics?.length || !fixture.information?.length || !fixture.prediction || !fixture.marketOdds) {
+      if (
+        !fixture.statistics?.length ||
+        !fixture.information?.length ||
+        !fixture.prediction ||
+        !fixture.markets?.length ||
+        !fixture.prediction?.topCorrectScores?.length ||
+        !fixture.marketOdds
+      ) {
         setIsParsing(true);
         try {
           const detail = await EngineService.getMatchDetail(fixture.id);
@@ -363,6 +371,10 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
             <span className="font-bold text-theme-main truncate whitespace-nowrap">
               {fixture.stage || fixture.leagueName}
             </span>
+            <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
+            <span className="font-mono tabular-nums text-theme-sub shrink-0">
+              {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}
+            </span>
           </div>
           {onClose && (
             <button
@@ -400,7 +412,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               {fixture.score ? `${fixture.score.home}-${fixture.score.away}` : 'VS'}
             </span>
             <span className="text-[9.5px] font-bold text-theme-sub uppercase mt-0.5">
-              {fixture.status === 'LIVE' ? 'LIVE' : fixture.status === 'FINISHED' ? 'FT' : fixture.kickOffTime}
+              {fixture.status === 'LIVE' ? 'LIVE' : fixture.status === 'FINISHED' ? 'FT' : formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
             </span>
           </div>
 

@@ -14,7 +14,6 @@ export interface TerminalLogEntry {
 class LoggerService {
   private logs: TerminalLogEntry[] = [];
   private maxLogs = 500;
-  private listeners: Array<(entry: TerminalLogEntry) => void> = [];
 
   constructor() {
     this.addLog({
@@ -42,15 +41,6 @@ class LoggerService {
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(0, this.maxLogs);
     }
-
-    // Notify listeners
-    this.listeners.forEach((listener) => {
-      try {
-        listener(fullEntry);
-      } catch (e) {
-        console.error('Error in log listener:', e);
-      }
-    });
 
     // Also output to console in development
     const prefix = `[${fullEntry.timestamp.slice(11, 19)}] [${fullEntry.category}] [${fullEntry.source}]`;
@@ -103,13 +93,6 @@ class LoggerService {
       source: 'Terminal',
       message: 'Terminal logs cleared',
     });
-  }
-
-  public subscribe(listener: (entry: TerminalLogEntry) => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    };
   }
 }
 

@@ -3,6 +3,23 @@ import path from 'path';
 import fs from 'fs';
 import zlib from 'zlib';
 import { loggerService } from '../services/loggerService.js';
+import { DEFAULT_ENGINE_SETTINGS } from './types.js';
+
+const dbMutationListeners: Array<() => void> = [];
+
+export function registerDbMutationListener(listener: () => void): void {
+  if (!dbMutationListeners.includes(listener)) {
+    dbMutationListeners.push(listener);
+  }
+}
+
+export function notifyDbMutation(): void {
+  for (const listener of dbMutationListeners) {
+    try {
+      listener();
+    } catch {}
+  }
+}
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
@@ -20,7 +37,6 @@ const RECOVERY_TABLES = [
   'raw_feed_data',
   'flashscore_scraped_matches',
   'league_standings',
-  'football_tips_cache',
 ];
 
 function createRawDbInstance(): Database.Database {
@@ -28,13 +44,18 @@ function createRawDbInstance(): Database.Database {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
+  // Clean up any legacy WAL/SHM sidecars to prevent cross-restart page errors
+  try {
+    if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
+    if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
+  } catch {}
+
   const db = new Database(DB_PATH, { timeout: 10000 });
   db.pragma('busy_timeout = 10000');
-  db.pragma('journal_mode = WAL');
+  db.pragma('journal_mode = DELETE');
   db.pragma('synchronous = FULL');
   db.pragma('temp_store = MEMORY');
   db.pragma('cache_size = -64000'); // 64 MB memory page cache
-  db.pragma('wal_autocheckpoint = 1000');
   db.pragma('foreign_keys = ON');
   return db;
 }
@@ -305,20 +326,6 @@ export function getSqliteDb(): Database.Database {
   if (!rawDbInstance) {
     try {
       rawDbInstance = createRawDbInstance();
-      // Single-pass B-tree + index integrity check on boot to auto-heal prior crash corruption immediately
-      const fullRows = rawDbInstance.pragma('integrity_check(10)') as Array<{ integrity_check: string }>;
-      const fullOk = fullRows.length === 1 && String(fullRows[0]?.integrity_check || '') === 'ok';
-      if (!fullOk) {
-        console.warn('[SQLite] Startup integrity_check failed; recovering database cleanly:', fullRows);
-        loggerService.addLog({
-          level: 'WARN',
-          category: 'DATABASE',
-          source: 'SQLiteClient',
-          message: `SQLite startup integrity_check auto-repaired database corruption: ${JSON.stringify(fullRows)}`,
-          details: { fullRows },
-        });
-        return recoverCorruptedSqliteDb();
-      }
     } catch (err: any) {
       if (isFatalSqliteCorruptionError(err)) {
         loggerService.addLog({
@@ -328,7 +335,7 @@ export function getSqliteDb(): Database.Database {
           message: `Fatal SQLite error on startup: ${err?.message || 'database malformed'}`,
           details: { code: err?.code, stack: err?.stack },
         });
-        return recoverCorruptedSqliteDb();
+        return resetCorruptedSqliteDb();
       }
       throw err;
     }
@@ -491,6 +498,7 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       league_name TEXT NOT NULL,
       match_date TEXT NOT NULL,
       kick_off_time TEXT NOT NULL,
+      timestamp INTEGER,
       home_team TEXT NOT NULL,
       away_team TEXT NOT NULL,
       home_badge TEXT,
@@ -515,6 +523,7 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);
     CREATE INDEX IF NOT EXISTS idx_upcoming_league ON upcoming_fixtures(league);
+    CREATE INDEX IF NOT EXISTS idx_upcoming_status_date ON upcoming_fixtures(status, match_date);
 
     -- UNIFIED PREDICTIONS TABLE: Dixon-Coles Poisson Predictions
     -- Used for upcoming, live, and historical evaluation
@@ -551,6 +560,8 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_predictions_date ON predictions(match_date);
     CREATE INDEX IF NOT EXISTS idx_predictions_league ON predictions(league);
     CREATE INDEX IF NOT EXISTS idx_predictions_state ON predictions(match_state);
+    CREATE INDEX IF NOT EXISTS idx_predictions_state_league ON predictions(match_state, league);
+    CREATE INDEX IF NOT EXISTS idx_predictions_status ON predictions(status);
 
     -- PILLAR 2: Head-to-Head & Venue Splits Measurement Cache
     CREATE TABLE IF NOT EXISTS prediction_measurements_cache (
@@ -595,6 +606,8 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       statistics_json TEXT,
       scraped_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_scraped_scraped_at ON flashscore_scraped_matches(scraped_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_scraped_teams_date ON flashscore_scraped_matches(home_name, away_name, match_date);
 
     CREATE TABLE IF NOT EXISTS league_standings (
       league_code TEXT PRIMARY KEY,
@@ -608,15 +621,6 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS football_tips_cache (
-      id TEXT PRIMARY KEY,
-      tips_json TEXT NOT NULL,
-      headline_summary TEXT NOT NULL,
-      raw_markdown TEXT NOT NULL,
-      sources_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL
     );
   `);
 }
@@ -650,6 +654,11 @@ export function initSqliteSchema(): void {
         console.log('[SQLite] Migrating upcoming_fixtures: Adding market_odds_json column');
         db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN market_odds_json TEXT;");
       }
+      if (!columnNames.includes('timestamp')) {
+        console.log('[SQLite] Migrating upcoming_fixtures: Adding timestamp column and backfilling');
+        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN timestamp INTEGER;");
+        db.exec("UPDATE upcoming_fixtures SET timestamp = CAST(strftime('%s', match_date || ' ' || kick_off_time || ':00') AS INTEGER) WHERE timestamp IS NULL AND kick_off_time LIKE '%:%';");
+      }
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
@@ -663,6 +672,13 @@ export function initSqliteSchema(): void {
         db.exec("DROP TABLE IF EXISTS upcoming_predictions;");
         db.exec("DROP TABLE IF EXISTS live_predictions;");
         db.exec("DROP TABLE IF EXISTS historical_predictions;");
+      } else {
+        const predCols = db.prepare("PRAGMA table_info(predictions)").all() as any[];
+        if (!predCols.map(c => c.name).includes('timestamp')) {
+          console.log('[SQLite] Migrating predictions: Adding timestamp column');
+          db.exec("ALTER TABLE predictions ADD COLUMN timestamp INTEGER;");
+          db.exec("UPDATE predictions SET timestamp = CAST(strftime('%s', match_date || ' ' || kick_off_time || ':00') AS INTEGER) WHERE timestamp IS NULL AND kick_off_time LIKE '%:%';");
+        }
       }
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for unified predictions:', migErr?.message);
@@ -683,13 +699,7 @@ export function initSqliteSchema(): void {
     // Ensure default engine_settings row exists in app_settings
     try {
       db.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('engine_settings', ?)").run(
-        JSON.stringify({
-          rollingMatchWindow: 15,
-          safeWinThreshold: 0.72,
-          homeAdvantageFactor: 1.12,
-          formDecayRate: 0.85,
-          autoSyncDaily: true,
-        })
+        JSON.stringify(DEFAULT_ENGINE_SETTINGS)
       );
     } catch {}
 

@@ -1,18 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Fixture } from '../core/types.js';
-import {
-  compareFixturesByPopularityAndDateTimeDesc,
-  getFixtureSortableDateTime,
-  getLeaguePopularityScore,
-} from '../core/leaguePriority.js';
+import { Fixture, LeagueGroupDTO } from '../core/types.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
-import { getProbValue, getAuthoritative1X2Pick, getHighestPredictionAcrossAllMarkets } from '../core/formatters.js';
 import { PaginationBar, TeamAvatar } from './ui/index.js';
 
 interface SimplifiedPredictionsWireframeProps {
   fixtures: Fixture[];
+  groups?: LeagueGroupDTO[];
   onSelectDetail: (fixture: Fixture) => void;
   marketFilter?: 'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS';
   sortBy?: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
@@ -20,55 +15,9 @@ interface SimplifiedPredictionsWireframeProps {
   selectedFixtureId?: string | number;
 }
 
-function getTipProb(fixture: Fixture, marketFilter: string = 'MOST_LIKELY'): number {
-  if (marketFilter === 'OVER_UNDER') {
-    const o = getProbValue(fixture.prediction?.over25Prob, 1);
-    return Math.max(o, getProbValue(100 - o, 1));
-  }
-  if (marketFilter === 'BTTS') {
-    const y = getProbValue(fixture.prediction?.bttsProb, 1);
-    return Math.max(y, getProbValue(100 - y, 1));
-  }
-  if (marketFilter === '1X2') {
-    const pick = getAuthoritative1X2Pick(fixture);
-    return pick ? pick.probabilityPercent : 0;
-  }
-  const highest = getHighestPredictionAcrossAllMarkets(fixture);
-  return highest ? highest.probabilityPercent : 0;
-}
-
-function getHomeProb(fixture: Fixture): number {
-  return getProbValue(fixture.prediction?.homeWinProb, 1);
-}
-
-function getDrawProb(fixture: Fixture): number {
-  return getProbValue(fixture.prediction?.drawProb, 1);
-}
-
-function getAwayProb(fixture: Fixture): number {
-  return getProbValue(fixture.prediction?.awayWinProb, 1);
-}
-
-function getOver25Prob(fixture: Fixture): number {
-  return getProbValue(fixture.prediction?.over25Prob, 1);
-}
-
-function getUnder25Prob(fixture: Fixture): number {
-  const over = getProbValue(fixture.prediction?.over25Prob, 1);
-  return Number((100 - over).toFixed(1));
-}
-
-function getBttsYesProb(fixture: Fixture): number {
-  return getProbValue(fixture.prediction?.bttsProb, 1);
-}
-
-function getBttsNoProb(fixture: Fixture): number {
-  const yes = getProbValue(fixture.prediction?.bttsProb, 1);
-  return Number((100 - yes).toFixed(1));
-}
-
 export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWireframeProps> = ({
   fixtures,
+  groups,
   onSelectDetail,
   marketFilter = 'MOST_LIKELY',
   sortBy = 'DEFAULT',
@@ -92,29 +41,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     }));
   };
 
-  const uniqueFixtures = useMemo(() => {
-    const seen = new Set<string>();
-    const list = fixtures.filter((f) => {
-      if (!f.id || seen.has(f.id)) return false;
-      seen.add(f.id);
-      return true;
-    });
+  // Server already deduplicates and sorts fixtures by active sortBy/marketFilter
+  const orderedFixtures = fixtures;
 
-    if (sortBy && sortBy !== 'DEFAULT') {
-      return list.slice().sort((a, b) => {
-        if (sortBy === 'PROB_DESC') return getTipProb(b) - getTipProb(a);
-        if (sortBy === 'PROB_ASC') return getTipProb(a) - getTipProb(b);
-        if (sortBy === 'HOME_DESC') return getHomeProb(b) - getHomeProb(a);
-        if (sortBy === 'DRAW_DESC') return getDrawProb(b) - getDrawProb(a);
-        if (sortBy === 'AWAY_DESC') return getAwayProb(b) - getAwayProb(a);
-        return 0;
-      });
-    }
-
-    return list.slice().sort(compareFixturesByPopularityAndDateTimeDesc);
-  }, [fixtures, sortBy]);
-
-  const totalPages = Math.max(1, Math.ceil(uniqueFixtures.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(orderedFixtures.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   useEffect(() => {
@@ -125,68 +55,85 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   const paginatedFixtures = useMemo(() => {
     const startIndex = (safeCurrentPage - 1) * pageSize;
-    return uniqueFixtures.slice(startIndex, startIndex + pageSize);
-  }, [uniqueFixtures, safeCurrentPage, pageSize]);
+    return orderedFixtures.slice(startIndex, startIndex + pageSize);
+  }, [orderedFixtures, safeCurrentPage, pageSize]);
 
-  const startItemIndex = uniqueFixtures.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
-  const endItemIndex = Math.min(safeCurrentPage * pageSize, uniqueFixtures.length);
+  const startItemIndex = orderedFixtures.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
+  const endItemIndex = Math.min(safeCurrentPage * pageSize, orderedFixtures.length);
 
+  // O(N) Map reconstruction from server-ordered LeagueGroupDTO[] (zero client sorting or scoring)
   const groupedByLeague = useMemo(() => {
-    interface LeagueGroup {
+    interface LeagueGroupView {
       leagueName: string;
       subDivision?: string;
       headerKey: string;
-      popularityScore: number;
-      latestDateTime: number;
       fixtures: Fixture[];
     }
 
-    const groupMap = new Map<string, LeagueGroup>();
+    if (groups && groups.length > 0) {
+      const fixtureById = new Map<string, Fixture>();
+      for (const f of orderedFixtures) {
+        if (f.id) fixtureById.set(f.id, f);
+      }
 
-    for (const fixture of uniqueFixtures) {
+      const hydrated: LeagueGroupView[] = [];
+      for (const g of groups) {
+        const matched: Fixture[] = [];
+        for (const id of g.fixtureIds) {
+          const item = fixtureById.get(id);
+          if (item) matched.push(item);
+        }
+        if (matched.length > 0) {
+          hydrated.push({
+            leagueName: g.leagueName,
+            subDivision: g.subDivision,
+            headerKey: g.headerKey,
+            fixtures: matched,
+          });
+        }
+      }
+      if (hydrated.length > 0) {
+        return hydrated;
+      }
+    }
+
+    const groupMap = new Map<string, LeagueGroupView>();
+    for (const fixture of orderedFixtures) {
       const leagueKey = fixture.league || 'Other';
       const leagueName = fixture.leagueName || fixture.league || 'Other Competition';
       const subDivision = fixture.stage || fixture.leagueName || fixture.league;
       const headerKey = `${leagueKey}_${subDivision}`;
-      const dt = getFixtureSortableDateTime(fixture);
 
-      if (!groupMap.has(headerKey)) {
-        groupMap.set(headerKey, {
+      let group = groupMap.get(headerKey);
+      if (!group) {
+        group = {
           leagueName,
           subDivision,
           headerKey,
-          popularityScore: getLeaguePopularityScore(leagueKey, leagueName, fixture.stage),
-          latestDateTime: dt,
           fixtures: [],
-        });
-      }
-      const group = groupMap.get(headerKey)!;
-      if (dt > group.latestDateTime) {
-        group.latestDateTime = dt;
+        };
+        groupMap.set(headerKey, group);
       }
       group.fixtures.push(fixture);
     }
-
-    return Array.from(groupMap.values()).sort((a, b) => {
-      if (a.popularityScore !== b.popularityScore) return b.popularityScore - a.popularityScore;
-      if (a.latestDateTime !== b.latestDateTime) return b.latestDateTime - a.latestDateTime;
-      return (a.subDivision || a.leagueName).localeCompare(b.subDivision || b.leagueName);
-    });
-  }, [uniqueFixtures]);
+    return Array.from(groupMap.values());
+  }, [orderedFixtures, groups]);
 
   const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean) => {
     const isLive = fixture.status === 'LIVE';
     const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
-    const pick = getAuthoritative1X2Pick(fixture);
+    const hasPred = fixture.hasPrediction ?? Boolean(fixture.prediction || fixture.probs);
+    const pick = fixture.authoritativePick;
+    const probs = fixture.probs;
 
-    const homeProb = fixture.prediction ? getHomeProb(fixture) : null;
-    const drawProb = fixture.prediction ? getDrawProb(fixture) : null;
-    const awayProb = fixture.prediction ? getAwayProb(fixture) : null;
-    const over25 = fixture.prediction ? getOver25Prob(fixture) : null;
-    const under25 = fixture.prediction ? getUnder25Prob(fixture) : null;
-    const bttsYes = fixture.prediction ? getBttsYesProb(fixture) : null;
-    const bttsNo = fixture.prediction ? getBttsNoProb(fixture) : null;
+    const homeProb = hasPred && probs ? probs.home : null;
+    const drawProb = hasPred && probs ? probs.draw : null;
+    const awayProb = hasPred && probs ? probs.away : null;
+    const over25 = hasPred && probs ? probs.over25 : null;
+    const under25 = hasPred && probs ? probs.under25 : null;
+    const bttsYes = hasPred && probs ? probs.bttsYes : null;
+    const bttsNo = hasPred && probs ? probs.bttsNo : null;
 
     return (
       <div
@@ -297,10 +244,10 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             className="flex items-center justify-center shrink-0"
             title={pick ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})` : 'No Prediction in Database'}
           >
-            {pick && fixture.prediction ? (
+            {pick && hasPred ? (
               <div className="flex items-center gap-1 font-mono tabular-nums">
                 <span className="w-8 sm:w-9 h-6 sm:h-6.5 flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text text-xs font-black whitespace-nowrap shrink-0 font-mono tabular-nums">
-                  {pick.shortLabel}
+                  {pick.shortLabel || pick.type || '1'}
                 </span>
                 <span className="hidden sm:inline text-xs font-bold text-theme-main font-mono tabular-nums">
                   {pick.probabilityPercent.toFixed(0)}%
@@ -418,7 +365,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
   return (
     <div className="w-full max-w-full space-y-2.5 text-theme-main font-sans">
-      {uniqueFixtures.length === 0 ? (
+      {orderedFixtures.length === 0 ? (
         <div className="p-8 text-center text-theme-sub bg-theme-card rounded-2xl shadow-theme-sm font-bold text-xs">
           No matches found for the selected filters.
         </div>
@@ -516,7 +463,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           {groupedByLeague.length > 1 && (
             <div className="flex items-center justify-between px-1 py-0.5 text-xs text-theme-sub">
               <span className="font-medium tabular-nums">
-                {groupedByLeague.length} competitions · {uniqueFixtures.length} {uniqueFixtures.length === 1 ? 'match' : 'matches'}
+                {groupedByLeague.length} competitions · {orderedFixtures.length} {orderedFixtures.length === 1 ? 'match' : 'matches'}
               </span>
               <button
                 type="button"
@@ -700,11 +647,11 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
       )}
 
       {/* Flat list pagination only when percentage sort is active and matches exceed pageSize */}
-      {isPercentageSortActive && uniqueFixtures.length > pageSize && (
+      {isPercentageSortActive && orderedFixtures.length > pageSize && (
         <PaginationBar
           currentPage={safeCurrentPage}
           totalPages={totalPages}
-          totalItems={uniqueFixtures.length}
+          totalItems={orderedFixtures.length}
           startIndex={startItemIndex}
           endIndex={endItemIndex}
           pageSize={pageSize}

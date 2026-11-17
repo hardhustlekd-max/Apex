@@ -6,6 +6,9 @@
  * - Full ISO: YYYY-MM-DDTHH:mm:ss.sssZ
  */
 
+let cachedSeasonKey = '';
+let cachedSeasonVal = '';
+
 /**
  * Gets current season string (e.g. 2024/2025).
  */
@@ -13,19 +16,39 @@ export function getCurrentSeason(): string {
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth();
-  return month >= 6 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+  const dayKey = year * 16 + month;
+  if (dayKey !== Number(cachedSeasonKey)) {
+    cachedSeasonKey = String(dayKey);
+    cachedSeasonVal = month >= 6 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+  }
+  return cachedSeasonVal;
 }
 
 /**
  * Gets current UTC date string (YYYY-MM-DD).
  */
 export function getUtcDateStr(offsetDays = 0, baseDate: Date = new Date()): string {
-  const d = new Date(baseDate.getTime());
-  d.setUTCDate(d.getUTCDate() + offsetDays);
+  const d = offsetDays === 0 ? baseDate : new Date(baseDate.getTime() + offsetDays * 86400000);
   const year = d.getUTCFullYear();
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Fast timestamp parser treating bare YYYY-MM-DD strings as UTC noon (matching JS Date ISO convention consistently).
+ */
+export function parseDateMsNoon(dateStr?: string): number {
+  if (!dateStr) return NaN;
+  if (dateStr.length === 10 && dateStr.charCodeAt(4) === 45 && dateStr.charCodeAt(7) === 45) {
+    const y = Number(dateStr.slice(0, 4));
+    const m = Number(dateStr.slice(5, 7));
+    const d = Number(dateStr.slice(8, 10));
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return Date.UTC(y, m - 1, d, 12, 0, 0);
+    }
+  }
+  return new Date(dateStr.length === 10 ? `${dateStr}T12:00:00Z` : dateStr).getTime();
 }
 
 /**
@@ -43,28 +66,10 @@ export function getStandardDateStr(d: Date | string | number = new Date()): stri
 }
 
 /**
- * Gets a standardized UTC time string (HH:mm) in 24h format.
- */
-export function getStandardTimeStr(d: Date | string | number = new Date()): string {
-  const dateObj = typeof d === 'object' ? d : new Date(d);
-  if (isNaN(dateObj.getTime())) return '12:00';
-  const hours = String(dateObj.getUTCHours()).padStart(2, '0');
-  const minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-/**
  * Gets a date string relative to today in standard UTC YYYY-MM-DD format.
  */
 export function getRelativeDateStr(offsetDays = 0): string {
   return getUtcDateStr(offsetDays);
-}
-
-/**
- * Returns the UTC date string for a relative day offset.
- */
-export function getPossibleDateStrs(offsetDays = 0): string[] {
-  return [getUtcDateStr(offsetDays)];
 }
 
 /**
@@ -74,7 +79,19 @@ export function normalizeDateStr(dateStr: string): string {
   if (!dateStr) return getStandardDateStr();
   const trimmed = dateStr.trim();
 
-  // If already YYYY-MM-DD, YYYY/MM/DD, or YYYY.MM.DD
+  // Fast path: already exact YYYY-MM-DD (most frequent in SQLite/feeds)
+  if (
+    trimmed.length >= 10 &&
+    trimmed.charCodeAt(4) === 45 &&
+    trimmed.charCodeAt(7) === 45 &&
+    trimmed.charCodeAt(0) >= 48 &&
+    trimmed.charCodeAt(0) <= 57
+  ) {
+    const sub = trimmed.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(sub)) return sub;
+  }
+
+  // If already YYYY/MM/DD or YYYY.MM.DD
   if (/^\d{4}[-/.]\d{2}[-/.]\d{2}/.test(trimmed)) {
     return trimmed.substring(0, 10).replace(/[/.]/g, '-');
   }
@@ -138,13 +155,6 @@ export function normalizeTimeStr(timeStr: string): string {
 }
 
 /**
- * Gets current UTC date and time in a sortable format (YYYY-MM-DD HH:mm).
- */
-export function getCurrentDateTimeStr(): string {
-  return `${getStandardDateStr()} ${getStandardTimeStr()}`;
-}
-
-/**
  * Checks if a match at a given date/time or epoch timestamp has officially kicked off.
  * Strictly uses Flashscore UTC standard time.
  */
@@ -194,25 +204,12 @@ export function hasMatchStarted(matchDate: string, kickOffTime: string, epochTim
 export function formatMatchDateTime(
   matchDate: string,
   kickOffTime: string,
-  epochTimestamp?: number
+  epochTimestamp?: number | string
 ): { dateStr: string; timeStr: string } {
-  if (epochTimestamp && epochTimestamp > 0) {
-    const d = new Date(epochTimestamp > 1e11 ? epochTimestamp : epochTimestamp * 1000);
-    if (!isNaN(d.getTime())) {
-      const year = d.getUTCFullYear();
-      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(d.getUTCDate()).padStart(2, '0');
-      const hours = String(d.getUTCHours()).padStart(2, '0');
-      const minutes = String(d.getUTCMinutes()).padStart(2, '0');
-      return {
-        dateStr: `${year}-${month}-${day}`,
-        timeStr: `${hours}:${minutes}`,
-      };
-    }
-  }
-
   const normTime = normalizeTimeStr(kickOffTime);
   const upperTime = normTime.toUpperCase();
+
+  // Non-clock statuses like FT, HT, LIVE, POSTPONED, or live minute (e.g. 45') are returned as-is
   if (
     ['FT', 'HT', 'AET', 'AP', 'LIVE', 'FINISHED', 'IN_PLAY', 'TBD', 'POSTPONED', 'PST', 'CANCELLED', 'CAN'].includes(upperTime) ||
     upperTime.endsWith("'")
@@ -223,6 +220,49 @@ export function formatMatchDateTime(
     };
   }
 
+  // 1. If epochTimestamp is provided and valid, format in local browser timezone
+  const numericTs = epochTimestamp ? Number(epochTimestamp) : undefined;
+  if (numericTs && !isNaN(numericTs) && numericTs > 0) {
+    const d = new Date(numericTs > 1e11 ? numericTs : numericTs * 1000);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return {
+        dateStr: `${year}-${month}-${day}`,
+        timeStr: `${hours}:${minutes}`,
+      };
+    }
+  }
+
+  // 2. If epochTimestamp is missing, parse matchDate + normTime as canonical UTC.
+  // Flashscore feeds store kickOffTime and matchDate in UTC (e.g. "19:45" UTC).
+  // In the browser, Date.UTC(...) converted to local Date displays in the user's local timezone.
+  const timeMatch = normTime.match(/^(\d{1,2}):(\d{2})$/);
+  if (timeMatch) {
+    const normDate = normalizeDateStr(matchDate);
+    const dateParts = normDate.split('-').map((p) => parseInt(p, 10));
+    if (dateParts.length === 3 && !dateParts.some(isNaN)) {
+      const hoursUtc = parseInt(timeMatch[1], 10);
+      const minutesUtc = parseInt(timeMatch[2], 10);
+      const utcMs = Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], hoursUtc, minutesUtc);
+      const d = new Date(utcMs);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return {
+          dateStr: `${year}-${month}-${day}`,
+          timeStr: `${hours}:${minutes}`,
+        };
+      }
+    }
+  }
+
   return {
     dateStr: normalizeDateStr(matchDate),
     timeStr: normTime,
@@ -230,27 +270,10 @@ export function formatMatchDateTime(
 }
 
 /**
- * Convenience helper to return formatted UTC kickoff time (HH:mm or status string).
- */
-export function formatUtcKickoffTime(
-  fixtureOrTime: { matchDate?: string; kickOffTime?: string; timestamp?: number } | string,
-  matchDate?: string
-): string {
-  if (typeof fixtureOrTime === 'string') {
-    return formatMatchDateTime(matchDate || '', fixtureOrTime).timeStr;
-  }
-  return formatMatchDateTime(
-    fixtureOrTime.matchDate || '',
-    fixtureOrTime.kickOffTime || '',
-    fixtureOrTime.timestamp
-  ).timeStr;
-}
-
-/**
  * Convenience helper to return formatted UTC match date (YYYY-MM-DD).
  */
 export function getFixtureUtcDate(
-  fixture: { matchDate?: string; kickOffTime?: string; timestamp?: number }
+  fixture: { matchDate?: string; kickOffTime?: string; timestamp?: number | string }
 ): string {
   return formatMatchDateTime(
     fixture.matchDate || '',
@@ -289,10 +312,17 @@ const DAY_TWO_LETTER_MAP: Record<string, string> = {
   Sat: 'Sa',
 };
 
+const calendarStripCache = new Map<string, CalendarStripDay[]>();
+
 /**
  * Generates the unified 7-day UTC calendar strip shared by the top day selector bar and filter modal.
+ * Cached per UTC day & count to eliminate repeated Intl toLocaleDateString formatting overhead in loops.
  */
 export function getCalendarStripDays(count = 7, baseDate: Date = new Date()): CalendarStripDay[] {
+  const baseKey = `${getUtcDateStr(0, baseDate)}:${count}`;
+  const cached = calendarStripCache.get(baseKey);
+  if (cached) return cached;
+
   const days: CalendarStripDay[] = [];
   for (let i = 0; i < count; i++) {
     const dateStr = getUtcDateStr(i, baseDate);
@@ -319,6 +349,9 @@ export function getCalendarStripDays(count = 7, baseDate: Date = new Date()): Ca
       fullLabel,
     });
   }
+
+  if (calendarStripCache.size > 16) calendarStripCache.clear();
+  calendarStripCache.set(baseKey, days);
   return days;
 }
 
@@ -407,14 +440,12 @@ export function resolveDateFilter(
 }
 
 /**
- * Checks whether a fixture matches a given dateFilter (single day, multi-day range, or all dates).
+ * Checks whether a fixture matches a pre-resolved date filter (avoids re-resolving inside hot loops).
  */
-export function matchesDateFilter(
+export function matchesResolvedDateFilter(
   fixture: { matchDate?: string; kickOffTime?: string; timestamp?: number },
-  dateFilter?: string | null,
-  baseDate: Date = new Date()
+  resolved: ResolvedDateFilter
 ): boolean {
-  const resolved = resolveDateFilter(dateFilter, baseDate);
   if (resolved.kind === 'ALL') return true;
 
   const matchDateNorm = normalizeDateStr(fixture.matchDate || '');
@@ -428,6 +459,17 @@ export function matchesDateFilter(
     (matchDateNorm >= resolved.startDate && matchDateNorm <= resolved.endDate) ||
     (utcDateNorm >= resolved.startDate && utcDateNorm <= resolved.endDate)
   );
+}
+
+/**
+ * Checks whether a fixture matches a given dateFilter (single day, multi-day range, or all dates).
+ */
+export function matchesDateFilter(
+  fixture: { matchDate?: string; kickOffTime?: string; timestamp?: number },
+  dateFilter?: string | null,
+  baseDate: Date = new Date()
+): boolean {
+  return matchesResolvedDateFilter(fixture, resolveDateFilter(dateFilter, baseDate));
 }
 
 /**
@@ -471,6 +513,53 @@ export function getDateFilterDisplayLabel(
     return resolved.targetDate;
   }
   return String(dateFilter || 'Today');
+}
+
+/**
+ * Determines whether a football match has already kicked off or finished.
+ */
+export function isMatchStarted(f?: {
+  status?: string;
+  score?: { home?: number; away?: number };
+  matchDate?: string;
+  kickOffTime?: string;
+}): boolean {
+  if (!f) return true;
+
+  if (f.status) {
+    const s = String(f.status).toUpperCase().trim();
+    if (
+      s === 'LIVE' ||
+      s === 'FINISHED' ||
+      s === 'IN_PLAY' ||
+      s === 'IN' ||
+      s === 'POST' ||
+      s === 'FT' ||
+      s === 'HT' ||
+      s === 'POSTPONED' ||
+      s === 'CANCELLED' ||
+      s === 'SUSPENDED' ||
+      s === 'ABANDONED' ||
+      s === 'AET' ||
+      s === 'PEN' ||
+      s === '1H' ||
+      s === '2H' ||
+      s === 'BREAK' ||
+      s === 'INT' ||
+      s === 'EXTRA_TIME' ||
+      s === 'PENALTIES'
+    ) {
+      return true;
+    }
+  }
+
+  if (f.score && (f.score.home !== undefined || f.score.away !== undefined)) {
+    if ((f.score.home || 0) > 0 || (f.score.away || 0) > 0) {
+      if (f.status !== 'SCHEDULED' && f.status !== 'TIMED') return true;
+    }
+  }
+
+  return hasMatchStarted(f.matchDate || '', f.kickOffTime || '');
 }
 
 

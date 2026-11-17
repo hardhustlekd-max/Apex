@@ -1,8 +1,8 @@
-import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds } from './types.js';
-import { getPossibleDateStrs, normalizeDateStr, resolveDateFilter } from './dateUtils.js';
+import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, DEFAULT_ENGINE_SETTINGS, cleanFixtureId } from './types.js';
+import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
-import { compareFixturesByPopularityAndDateTimeDesc, sortFixturesByPopularityInPlace } from './leaguePriority.js';
-import { teamMatchScore } from './feedParser.js';
+import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
+import { resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
 import {
   sqliteDb,
   initSqliteSchema,
@@ -10,6 +10,7 @@ import {
   decompressBuffer,
   getSqliteDbStats,
   checkpointSqliteWal,
+  notifyDbMutation,
 } from './sqliteClient.js';
 
 export type DbClearOrigin = 'fullsync' | 'update_predictions';
@@ -23,15 +24,49 @@ function safeJsonParse<T>(raw: any, fallback: T): T {
   }
 }
 
+function mapHistoricalMatchRow(r: any): HistoricalMatch {
+  return {
+    id: String(r.id),
+    div: String(r.div),
+    season: String(r.season),
+    matchDate: String(r.match_date),
+    homeTeam: String(r.home_team),
+    awayTeam: String(r.away_team),
+    fthg: Number(r.fthg),
+    ftag: Number(r.ftag),
+    ftr: (r.ftr as 'H' | 'D' | 'A') || 'D',
+    hs: r.hs !== null && r.hs !== undefined ? Number(r.hs) : undefined,
+    asShots: r.as_shots !== null && r.as_shots !== undefined ? Number(r.as_shots) : undefined,
+    hst: r.hst !== null && r.hst !== undefined ? Number(r.hst) : undefined,
+    ast: r.ast !== null && r.ast !== undefined ? Number(r.ast) : undefined,
+  };
+}
+
+function mapScrapedMatchRow(row: any, includeJsonBlobs = true): any {
+  return {
+    matchId: row.match_id,
+    stage: row.stage,
+    status: row.status,
+    date: row.match_date,
+    country: row.country,
+    leagueName: row.league_name,
+    home: { name: row.home_name, image: row.home_image },
+    away: { name: row.away_name, image: row.away_image },
+    result: {
+      home: row.home_score,
+      away: row.away_score,
+      regulationTime: row.regulation_time,
+      penalties: row.penalties,
+    },
+    information: includeJsonBlobs && row.information_json ? safeJsonParse(row.information_json, []) : [],
+    statistics: includeJsonBlobs && row.statistics_json ? safeJsonParse(row.statistics_json, []) : [],
+    scraped_at: row.scraped_at,
+  };
+}
+
 export class FootballDB {
   private isInitialized = false;
-  private fallbackSettings: EngineSettings = {
-    rollingMatchWindow: 15,
-    safeWinThreshold: 0.72,
-    homeAdvantageFactor: 1.12,
-    formDecayRate: 0.85,
-    autoSyncDaily: true,
-  };
+  private fallbackSettings: EngineSettings = { ...DEFAULT_ENGINE_SETTINGS };
 
   async init(): Promise<void> {
     if (this.isInitialized) return;
@@ -91,6 +126,7 @@ export class FootballDB {
       });
       runDelete();
       checkpointSqliteWal('TRUNCATE');
+      notifyDbMutation();
 
       loggerService.addLog({
         level: 'SUCCESS',
@@ -107,10 +143,6 @@ export class FootballDB {
         message: `Error clearing SQLite tables: ${err?.message}`,
       });
     }
-  }
-
-  clearDatabase(clearRaw = false, origin?: DbClearOrigin): void {
-    void this.clearAllData(clearRaw, origin);
   }
 
   insertHistoricalMatches(matches: HistoricalMatch[]): number {
@@ -191,7 +223,7 @@ export class FootballDB {
     try {
       const insertStmt = sqliteDb.prepare(`
         INSERT INTO upcoming_fixtures (
-          id, provider_id, league, league_name, match_date, kick_off_time,
+          id, provider_id, league, league_name, match_date, kick_off_time, timestamp,
           home_team, away_team, home_badge, away_badge, stage,
           rest_days_home, rest_days_away,
           status, score_json,
@@ -200,7 +232,7 @@ export class FootballDB {
           information_json, statistics_json, market_odds_json,
           feed_path, updated_at
         ) VALUES (
-          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?,
           ?, ?,
@@ -215,6 +247,7 @@ export class FootballDB {
           league_name = COALESCE(NULLIF(excluded.league_name, ''), upcoming_fixtures.league_name),
           match_date = excluded.match_date,
           kick_off_time = excluded.kick_off_time,
+          timestamp = COALESCE(excluded.timestamp, upcoming_fixtures.timestamp),
           home_team = excluded.home_team,
           away_team = excluded.away_team,
           home_badge = COALESCE(excluded.home_badge, upcoming_fixtures.home_badge),
@@ -256,6 +289,7 @@ export class FootballDB {
             f.leagueName,
             f.matchDate,
             f.kickOffTime,
+            f.timestamp ? Number(f.timestamp) : null,
             f.homeTeam,
             f.awayTeam,
             f.homeBadge || null,
@@ -282,6 +316,7 @@ export class FootballDB {
       });
 
       insertMany(unique);
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[FootballDB] Error saving upcoming fixtures to SQLite:', err?.message);
       loggerService.addLog({
@@ -314,6 +349,7 @@ export class FootballDB {
         }
       });
       clearTx(fixtureIds);
+      notifyDbMutation();
     } catch (err: any) {
       console.warn('[FootballDB] Notice clearing stale predictions on upcoming_fixtures:', err?.message);
     }
@@ -347,14 +383,10 @@ export class FootballDB {
         }
       });
       applyUpdates(updates);
+      notifyDbMutation();
     } catch (err: any) {
       console.warn('[FootballDB] Notice updating upcoming fixture statuses:', err?.message);
     }
-  }
-
-  async insertUpcomingFixtures(fixtures: Fixture[]): Promise<number> {
-    await this.saveUpcomingFixtures(fixtures);
-    return fixtures.length;
   }
 
   getUpcomingFixturesCount(): number {
@@ -581,7 +613,7 @@ export class FootballDB {
       }
 
       const selectCols = skipPredictionBlobs
-        ? `id, provider_id, league, league_name, match_date, kick_off_time,
+        ? `id, provider_id, league, league_name, match_date, kick_off_time, timestamp,
            home_team, away_team, home_badge, away_badge, stage,
            rest_days_home, rest_days_away, status, score_json,
            (prediction_json IS NOT NULL) AS has_prediction,
@@ -627,6 +659,11 @@ export class FootballDB {
           leagueName: String(row.league_name || row.league || ''),
           matchDate: String(row.match_date || ''),
           kickOffTime: String(row.kick_off_time || ''),
+          timestamp: row.timestamp
+            ? Number(row.timestamp)
+            : (row.match_date && row.kick_off_time && String(row.kick_off_time).includes(':')
+                ? Math.floor(new Date(`${row.match_date}T${row.kick_off_time}:00.000Z`).getTime() / 1000)
+                : undefined),
           homeTeam: String(row.home_team || ''),
           awayTeam: String(row.away_team || ''),
           homeBadge: row.home_badge ? String(row.home_badge) : undefined,
@@ -715,52 +752,40 @@ export class FootballDB {
         }
       }
 
-      return rows.map((r) => ({
-        id: String(r.id),
-        div: String(r.div),
-        season: String(r.season),
-        matchDate: String(r.match_date),
-        homeTeam: String(r.home_team),
-        awayTeam: String(r.away_team),
-        fthg: Number(r.fthg),
-        ftag: Number(r.ftag),
-        ftr: (r.ftr as 'H' | 'D' | 'A') || 'D',
-        hs: r.hs !== null ? Number(r.hs) : undefined,
-        asShots: r.as_shots !== null ? Number(r.as_shots) : undefined,
-        hst: r.hst !== null ? Number(r.hst) : undefined,
-        ast: r.ast !== null ? Number(r.ast) : undefined,
-      }));
+      return rows.map(mapHistoricalMatchRow);
     } catch (err: any) {
       console.error('[FootballDB] Error getting team historical matches:', err?.message);
       return [];
     }
   }
 
-  getLeagueHistoricalMatches(leagueCode: string, limit = 400): HistoricalMatch[] {
+  getHistoricalMatchById(matchId: string): HistoricalMatch | null {
+    if (!matchId) return null;
+    const cleanId = cleanFixtureId(matchId);
     try {
-      const rows = sqliteDb.prepare(`
-        SELECT * FROM historical_matches 
-        WHERE UPPER(div) = ? 
-        ORDER BY match_date DESC LIMIT ?
-      `).all(leagueCode.toUpperCase(), limit) as any[];
-
-      return rows.map((r) => ({
-        id: String(r.id),
-        div: String(r.div),
-        season: String(r.season),
-        matchDate: String(r.match_date),
-        homeTeam: String(r.home_team),
-        awayTeam: String(r.away_team),
-        fthg: Number(r.fthg),
-        ftag: Number(r.ftag),
-        ftr: (r.ftr as 'H' | 'D' | 'A') || 'D',
-        hs: r.hs !== null ? Number(r.hs) : undefined,
-        asShots: r.as_shots !== null ? Number(r.as_shots) : undefined,
-        hst: r.hst !== null ? Number(r.hst) : undefined,
-        ast: r.ast !== null ? Number(r.ast) : undefined,
-      }));
+      const row = sqliteDb
+        .prepare(
+          'SELECT * FROM historical_matches WHERE id IN (?, ?, ?, ?) LIMIT 1'
+        )
+        .get(matchId, cleanId, `fs_hist_${cleanId}`, `hist_${cleanId}`) as any;
+      return row ? mapHistoricalMatchRow(row) : null;
     } catch (err: any) {
-      console.error('[FootballDB] Error getting league historical matches:', err?.message);
+      console.error('[FootballDB] Error getting historical match by ID:', err?.message);
+      return null;
+    }
+  }
+
+  getDirectH2HHistoricalMatches(homeTeam: string, awayTeam: string, limit = 15): HistoricalMatch[] {
+    if (!homeTeam || !awayTeam) return [];
+    try {
+      // Gather candidate matches for homeTeam (handles exact and club-affix variations via getTeamHistoricalMatches)
+      const candidates = this.getTeamHistoricalMatches(homeTeam, 200);
+      return candidates
+        .filter((m) => resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam).matched)
+        .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)))
+        .slice(0, limit);
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting direct H2H historical matches:', err?.message);
       return [];
     }
   }
@@ -772,21 +797,7 @@ export class FootballDB {
         ORDER BY match_date DESC LIMIT ?
       `).all(limit) as any[];
 
-      return rows.map((r) => ({
-        id: String(r.id),
-        div: String(r.div),
-        season: String(r.season),
-        matchDate: String(r.match_date),
-        homeTeam: String(r.home_team),
-        awayTeam: String(r.away_team),
-        fthg: Number(r.fthg),
-        ftag: Number(r.ftag),
-        ftr: (r.ftr as 'H' | 'D' | 'A') || 'D',
-        hs: r.hs !== null ? Number(r.hs) : undefined,
-        asShots: r.as_shots !== null ? Number(r.as_shots) : undefined,
-        hst: r.hst !== null ? Number(r.hst) : undefined,
-        ast: r.ast !== null ? Number(r.ast) : undefined,
-      }));
+      return rows.map(mapHistoricalMatchRow);
     } catch (err: any) {
       console.error('[FootballDB] Error getting all historical matches:', err?.message);
       return [];
@@ -842,55 +853,6 @@ export class FootballDB {
     } catch (err: any) {
       console.error('[FootballDB] Error clearing historical data:', err?.message);
     }
-  }
-
-  saveTipsCache(
-    tipsJson: string,
-    headlineSummary: string,
-    rawMarkdown: string,
-    sourcesJson: string
-  ): void {
-    const now = new Date().toISOString();
-    try {
-      sqliteDb.prepare(`
-        INSERT OR REPLACE INTO football_tips_cache (
-          id, tips_json, headline_summary, raw_markdown, sources_json, updated_at
-        ) VALUES ('latest_tips', ?, ?, ?, ?, ?)
-      `).run(tipsJson, headlineSummary, rawMarkdown, sourcesJson, now);
-    } catch (err: any) {
-      console.error('[FootballDB] Error saving tips cache:', err?.message);
-      loggerService.addLog({
-        level: 'ERROR',
-        category: 'DATABASE',
-        source: 'FootballDB',
-        message: `Error saving tips cache: ${err?.message}`,
-        details: { stack: err?.stack },
-      });
-    }
-  }
-
-  getTipsCache(): {
-    tipsJson: string;
-    headlineSummary: string;
-    rawMarkdown: string;
-    sourcesJson: string;
-    updatedAt: string;
-  } | null {
-    try {
-      const tipsRow = sqliteDb.prepare("SELECT * FROM football_tips_cache WHERE id = 'latest_tips'").get() as any;
-      if (tipsRow) {
-        return {
-          tipsJson: String(tipsRow.tips_json),
-          headlineSummary: String(tipsRow.headline_summary),
-          rawMarkdown: String(tipsRow.raw_markdown),
-          sourcesJson: String(tipsRow.sources_json),
-          updatedAt: String(tipsRow.updated_at),
-        };
-      }
-    } catch (err: any) {
-      console.error('[FootballDB] Error getting tips cache:', err?.message);
-    }
-    return null;
   }
 
   saveFlashscoreScrapedMatches(matches: Array<any>): void {
@@ -970,6 +932,23 @@ export class FootballDB {
     }
   }
 
+  getFlashscoreScrapedMatchById(matchId: string, includeJsonBlobs = true): any | null {
+    if (!matchId) return null;
+    const cleanId = cleanFixtureId(matchId);
+    try {
+      const cols = includeJsonBlobs
+        ? '*'
+        : 'match_id, stage, status, match_date, country, league_name, home_name, home_image, away_name, away_image, home_score, away_score, regulation_time, penalties, scraped_at';
+      const row = sqliteDb
+        .prepare(`SELECT ${cols} FROM flashscore_scraped_matches WHERE match_id IN (?, ?) LIMIT 1`)
+        .get(matchId, cleanId) as any;
+      return row ? mapScrapedMatchRow(row, includeJsonBlobs) : null;
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting scraped match by ID:', err?.message);
+      return null;
+    }
+  }
+
   getFlashscoreScrapedMatches(limit = 1000, options?: { includeJsonBlobs?: boolean }): any[] {
     try {
       const includeJsonBlobs = options?.includeJsonBlobs ?? true;
@@ -977,25 +956,7 @@ export class FootballDB {
         ? '*'
         : 'match_id, stage, status, match_date, country, league_name, home_name, home_image, away_name, away_image, home_score, away_score, regulation_time, penalties, scraped_at';
       const rows = sqliteDb.prepare(`SELECT ${cols} FROM flashscore_scraped_matches ORDER BY scraped_at DESC LIMIT ?`).all(limit) as any[];
-      return rows.map(row => ({
-        matchId: row.match_id,
-        stage: row.stage,
-        status: row.status,
-        date: row.match_date,
-        country: row.country,
-        leagueName: row.league_name,
-        home: { name: row.home_name, image: row.home_image },
-        away: { name: row.away_name, image: row.away_image },
-        result: {
-          home: row.home_score,
-          away: row.away_score,
-          regulationTime: row.regulation_time,
-          penalties: row.penalties
-        },
-        information: includeJsonBlobs && row.information_json ? safeJsonParse(row.information_json, []) : [],
-        statistics: includeJsonBlobs && row.statistics_json ? safeJsonParse(row.statistics_json, []) : [],
-        scraped_at: row.scraped_at
-      }));
+      return rows.map((row) => mapScrapedMatchRow(row, includeJsonBlobs));
     } catch (err: any) {
       console.error('[FootballDB] Error getting scraped matches:', err?.message);
       return [];
@@ -1123,6 +1084,7 @@ export class FootballDB {
         SET market_odds_json = ?, updated_at = ?
         WHERE id = ? OR id = ?
       `).run(serialized, now, cleanId, `fs_${cleanId}`);
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[FootballDB] Error saving match odds cache:', err?.message);
       loggerService.addLog({
@@ -1165,6 +1127,7 @@ export class FootballDB {
       if (items.length >= 10) {
         checkpointSqliteWal('PASSIVE');
       }
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[FootballDB] Error batch saving match odds cache:', err?.message);
     }
@@ -1202,17 +1165,6 @@ export class FootballDB {
       console.error('[FootballDB] Error loading all match odds cache:', err?.message);
     }
     return oddsMap;
-  }
-
-  private computeFeedHash(text: string): string {
-    if (!text) return 'empty_0';
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-      const char = text.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash |= 0;
-    }
-    return `${text.length}_${hash}`;
   }
 
   saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): { hasChanged: boolean } {
@@ -1349,38 +1301,6 @@ export class FootballDB {
       console.error('[FootballDB] Error getting raw feeds count:', err?.message);
       return 0;
     }
-  }
-
-  saveMatchStatistics(matchId: string, statistics: any[]): void {
-    if (!matchId || !statistics || statistics.length === 0) return;
-    const cleanId = matchId.replace(/^fs_/, '').trim();
-    const statsJson = JSON.stringify(statistics);
-
-    try {
-      sqliteDb.prepare(`
-        UPDATE flashscore_scraped_matches SET statistics_json = ? WHERE match_id = ?
-      `).run(statsJson, cleanId);
-      sqliteDb.prepare(`
-        UPDATE upcoming_fixtures SET statistics_json = ? WHERE id IN (?, ?)
-      `).run(statsJson, cleanId, `fs_${cleanId}`);
-    } catch (err: any) {
-      console.error('[FootballDB] Error updating match statistics:', err?.message);
-    }
-  }
-
-  getMatchStatistics(matchId: string): any[] {
-    if (!matchId) return [];
-    const cleanId = matchId.replace(/^fs_/, '').trim();
-    
-    try {
-      const row = sqliteDb.prepare("SELECT statistics_json FROM flashscore_scraped_matches WHERE match_id = ?").get(cleanId) as any;
-      if (row && row.statistics_json) {
-        return JSON.parse(row.statistics_json);
-      }
-    } catch (err: any) {
-      console.error('[FootballDB] Error getting match statistics:', err?.message);
-    }
-    return [];
   }
 
   saveH2HRecord(fixtureId: string, h2hOrHomeTeam: any, _awayTeam?: string, h2hObj?: HeadToHeadMeasurement): void {

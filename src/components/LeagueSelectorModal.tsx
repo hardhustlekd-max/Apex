@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Globe, Check } from 'lucide-react';
-import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
-import { getLeaguePopularityScore } from '../core/leaguePriority.js';
+import { LeagueOptionDTO } from '../core/types.js';
+import { EngineService } from '../services/engineService.js';
 import { Input, Modal } from './ui/index.js';
 
 interface LeagueSelectorModalProps {
@@ -9,30 +9,45 @@ interface LeagueSelectorModalProps {
   onClose: () => void;
   selectedLeague: string;
   onSelectLeague: (code: string) => void;
+  leagues?: LeagueOptionDTO[];
 }
-
-const SORTED_LEAGUES = GLOBAL_LEAGUES_DATASET.slice().sort((a, b) => {
-  const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
-  const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
-  if (scoreA !== scoreB) return scoreB - scoreA;
-  return a.name.localeCompare(b.name);
-});
 
 export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
   isOpen,
   onClose,
   selectedLeague,
   onSelectLeague,
+  leagues: providedLeagues,
 }) => {
   const [search, setSearch] = useState('');
+  const [loadedLeagues, setLoadedLeagues] = useState<LeagueOptionDTO[]>([]);
+
+  useEffect(() => {
+    if (!isOpen && (!providedLeagues || providedLeagues.length === 0)) return;
+    if (providedLeagues && providedLeagues.length > 0) {
+      setLoadedLeagues(providedLeagues);
+      return;
+    }
+    let cancelled = false;
+    EngineService.getLeaguesCatalog().then((list) => {
+      if (!cancelled && Array.isArray(list)) {
+        setLoadedLeagues(list);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, providedLeagues]);
+
+  const effectiveLeagues = providedLeagues && providedLeagues.length > 0 ? providedLeagues : loadedLeagues;
 
   const filteredLeagues = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return SORTED_LEAGUES;
-    return SORTED_LEAGUES.filter(
+    if (!q) return effectiveLeagues;
+    return effectiveLeagues.filter(
       (l) => l.name.toLowerCase().includes(q) || (l.country && l.country.toLowerCase().includes(q))
     );
-  }, [search]);
+  }, [search, effectiveLeagues]);
 
   return (
     <Modal
@@ -83,7 +98,7 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
           const isSelected = selectedLeague.toUpperCase() === league.code.toUpperCase() || selectedLeague.toLowerCase() === league.name.toLowerCase();
           return (
             <button
-              key={`${league.reep_id}-${idx}`}
+              key={`${league.code}-${idx}`}
               type="button"
               onClick={() => {
                 onSelectLeague(league.code);

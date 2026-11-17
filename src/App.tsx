@@ -16,6 +16,8 @@ import { SyncLockOverlay } from './components/SyncLockOverlay.js';
 import { Button, Card, Toast } from './components/ui/index.js';
 import {
   Fixture,
+  LeagueGroupDTO,
+  LeagueOptionDTO,
   EngineSettings,
   ProviderStatus,
 } from './core/types.js';
@@ -23,8 +25,8 @@ import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
 import { TerminalLogEntry } from './services/loggerService.js';
 import type { SyncJobState } from './services/syncJobService.js';
-import { matchesDateFilter } from './core/dateUtils.js';
 import { applyColorTheme, getActiveColorThemeId, setThemeMode, getSavedThemeMode } from './core/themeEngine.js';
+import { ClientCache } from './core/clientCache.js';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -32,25 +34,31 @@ export default function App() {
     return saved === 'light' ? 'light' : 'dark';
   });
   const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY'>('FIXTURES');
+  const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [fixtureGroups, setFixtureGroups] = useState<LeagueGroupDTO[]>([]);
+  const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
+  const [leaguesCatalog, setLeaguesCatalog] = useState<LeagueOptionDTO[]>([]);
   const [isLoadingFixtures, setIsLoadingFixtures] = useState<boolean>(true);
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('TODAY');
   const [marketChoiceFilter, setMarketChoiceFilter] = useState<'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS'>('MOST_LIKELY');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'WIREFRAME' | 'CARDS'>('WIREFRAME');
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC'>('DEFAULT');
 
   const [settings, setSettings] = useState<EngineSettings | null>(null);
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  const [stats, setStats] = useState<{ totalMatches: number; totalTeams: number; leagues: any[] }>({
+  const [stats, setStats] = useState<{ totalMatches: number; totalTeams: number; leagues: any[]; upcomingCount?: number; predictionsCount?: number }>({
     totalMatches: 0,
     totalTeams: 0,
     leagues: [],
   });
   const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
-  const [livePredictions, setLivePredictions] = useState<Fixture[]>([]);
+  const [liveFixtures, setLiveFixtures] = useState<Fixture[]>([]);
+  const [liveGroups, setLiveGroups] = useState<LeagueGroupDTO[]>([]);
   const [isLoadingLivePredictions, setIsLoadingLivePredictions] = useState<boolean>(false);
 
   // Modals & Detail
@@ -67,7 +75,29 @@ export default function App() {
   const [isCalculatingPredictions, setIsCalculatingPredictions] = useState<boolean>(false);
   const [activeSyncJob, setActiveSyncJob] = useState<SyncJobState | null>(null);
   const [dataRefreshVersion, setDataRefreshVersion] = useState<number>(0);
+
   const hasInitializedDateFilterRef = useRef<boolean>(false);
+  const skipNextDateFilterFetchRef = useRef<boolean>(false);
+  const fixturesCountRef = useRef<number>(0);
+  fixturesCountRef.current = fixtures.length;
+  const liveFixturesCountRef = useRef<number>(0);
+  liveFixturesCountRef.current = liveFixtures.length;
+  const upcomingAbortRef = useRef<AbortController | null>(null);
+  const latestQueryParamsRef = useRef({
+    selectedLeague,
+    dateFilter,
+    debouncedSearchQuery,
+    sortBy,
+    marketChoiceFilter,
+  });
+  latestQueryParamsRef.current = {
+    selectedLeague,
+    dateFilter,
+    debouncedSearchQuery,
+    sortBy,
+    marketChoiceFilter,
+  };
+
   const syncAbortControllerRef = useRef<AbortController | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
@@ -125,19 +155,20 @@ export default function App() {
 
   // Pre-select first/best fixture and keep selectedDetailFixture in sync when SQLite predictions reload
   useEffect(() => {
-    if (fixtures.length === 0) return;
+    if (fixtures.length === 0 && liveFixtures.length === 0) return;
     setSelectedDetailFixture((prev) => {
-      if (!prev) {
+      if (!prev && fixtures.length > 0) {
         const highValue = fixtures.find((f) => f.prediction && f.prediction.homeWinProb >= 0.55);
         return highValue || fixtures.find((f) => Boolean(f.prediction)) || fixtures[0];
       }
+      if (!prev) return prev;
       const cleanPrevId = (prev.id || '').replace(/^fs_/, '');
       const updated =
         fixtures.find((f) => f.id === prev.id || (f.id || '').replace(/^fs_/, '') === cleanPrevId) ||
-        livePredictions.find((f) => f.id === prev.id || (f.id || '').replace(/^fs_/, '') === cleanPrevId);
+        liveFixtures.find((f) => f.id === prev.id || (f.id || '').replace(/^fs_/, '') === cleanPrevId);
       return updated || prev;
     });
-  }, [fixtures, livePredictions]);
+  }, [fixtures, liveFixtures]);
 
   const handleResetAndSyncData = async () => {
     if (isSyncingData || isCalculatingPredictions) return;
@@ -188,7 +219,7 @@ export default function App() {
             : prev
         );
         await Promise.all([
-          fetchFixtures(),
+          fetchFixtures({ forceRefresh: true }),
           fetchSettingsAndProviders(),
           fetchLiveScores(),
           fetchLivePredictions(),
@@ -264,7 +295,7 @@ export default function App() {
             : prev
         );
         await Promise.all([
-          fetchFixtures(),
+          fetchFixtures({ forceRefresh: true }),
           fetchSettingsAndProviders(),
           fetchLiveScores(),
           fetchLivePredictions(),
@@ -312,34 +343,86 @@ export default function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const fetchFixtures = useCallback(async () => {
+  // Debounce search input cleanly before triggering server-side queries
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchFixtures = useCallback(async (options?: { forceRefresh?: boolean }) => {
+    upcomingAbortRef.current?.abort();
+    const controller = new AbortController();
+    upcomingAbortRef.current = controller;
+
+    const params = latestQueryParamsRef.current;
+    const isInitialAuto = !hasInitializedDateFilterRef.current;
+    const queryDateFilter = isInitialAuto ? 'AUTO' : params.dateFilter;
+
     try {
-      if (fixtures.length === 0) {
+      const cacheKey = EngineService.buildQueryFixturesCacheKey({
+        league: params.selectedLeague,
+        dateFilter: queryDateFilter,
+        search: params.debouncedSearchQuery,
+        sortBy: params.sortBy,
+        marketFilter: params.marketChoiceFilter,
+      });
+
+      if (!options?.forceRefresh) {
+        const cached = await ClientCache.getCachedQueryResponse(cacheKey);
+        if (controller.signal.aborted) return;
+        if (cached?.data && Array.isArray(cached.data.fixtures)) {
+          setFixtures(cached.data.fixtures);
+          setFixtureGroups(cached.data.groups || []);
+          setTotalDatabaseCount(cached.data.totalDatabaseCount ?? cached.data.fixtures.length);
+          setIsLoadingFixtures(false);
+        } else if (fixturesCountRef.current === 0) {
+          setIsLoadingFixtures(true);
+        }
+      } else if (fixturesCountRef.current === 0) {
         setIsLoadingFixtures(true);
       }
-      const data = await EngineService.getFixtures('ALL');
-      setFixtures(data);
 
-      if (!hasInitializedDateFilterRef.current) {
-        const hasTodayMatches = data.some(f => f.status !== 'LIVE' && matchesDateFilter(f, 'TODAY'));
-        const hasTomorrowMatches = data.some(f => f.status !== 'LIVE' && matchesDateFilter(f, 'TOMORROW'));
-        if (hasTodayMatches) {
-          setDateFilter('TODAY');
-        } else if (hasTomorrowMatches) {
-          setDateFilter('TOMORROW');
-        } else if (data.length > 0) {
-          setDateFilter('ALL');
+      const res = await EngineService.queryFixtures(
+        {
+          league: params.selectedLeague,
+          dateFilter: queryDateFilter,
+          search: params.debouncedSearchQuery,
+          sortBy: params.sortBy,
+          marketFilter: params.marketChoiceFilter,
+        },
+        { forceRefresh: options?.forceRefresh, signal: controller.signal }
+      );
+
+      if (controller.signal.aborted) return;
+
+      if (res && Array.isArray(res.fixtures)) {
+        setFixtures(res.fixtures);
+        setFixtureGroups(res.groups || []);
+        setTotalDatabaseCount(res.totalDatabaseCount ?? res.fixtures.length);
+
+        if (isInitialAuto) {
+          hasInitializedDateFilterRef.current = true;
+          if (res.resolvedDateFilter && res.resolvedDateFilter !== params.dateFilter) {
+            skipNextDateFilterFetchRef.current = true;
+            setDateFilter(res.resolvedDateFilter);
+          }
         }
-        hasInitializedDateFilterRef.current = true;
       }
     } catch (e: any) {
-      console.error('Failed to fetch fixtures:', e);
-      showNotification('Server Error: ' + (e?.message || 'Failed to fetch fixtures from server'), 'info');
-      setFixtures([]);
+      if (e?.name !== 'AbortError') {
+        console.error('Failed to fetch fixtures:', e);
+        if (fixturesCountRef.current === 0) {
+          showNotification('Server Error: ' + (e?.message || 'Failed to fetch fixtures from server'), 'info');
+        }
+      }
     } finally {
-      setIsLoadingFixtures(false);
+      if (!controller.signal.aborted) {
+        setIsLoadingFixtures(false);
+      }
     }
-  }, [fixtures]);
+  }, []);
 
   const fetchSettingsAndProviders = useCallback(async () => {
     try {
@@ -368,28 +451,78 @@ export default function App() {
   }, []);
 
   const fetchLivePredictions = useCallback(async () => {
+    const params = latestQueryParamsRef.current;
     try {
-      setIsLoadingLivePredictions(true);
-      const data = await EngineService.getLivePredictions(selectedLeague, 100);
-      setLivePredictions(data || []);
+      if (liveFixturesCountRef.current === 0) {
+        setIsLoadingLivePredictions(true);
+      }
+      const res = await EngineService.queryLiveFixtures({
+        league: params.selectedLeague,
+        search: params.debouncedSearchQuery,
+        sortBy: params.sortBy,
+        marketFilter: params.marketChoiceFilter,
+        limit: 200,
+      });
+      setLiveFixtures(res.fixtures || []);
+      setLiveGroups(res.groups || []);
     } catch (err) {
-      console.error('Failed to load live predictions from db:', err);
+      console.error('Failed to load live fixtures from worker:', err);
     } finally {
       setIsLoadingLivePredictions(false);
     }
-  }, [selectedLeague]);
+  }, []);
 
+  // Execute server-side fixtures query on mount and when filter parameters change
   useEffect(() => {
-    applyColorTheme(settings?.colorTheme || getActiveColorThemeId());
-    fetchSettingsAndProviders();
-    fetchFixtures();
-    fetchLiveScores();
-    fetchLivePredictions();
-    checkForNewErrorLogs();
+    if (skipNextDateFilterFetchRef.current) {
+      skipNextDateFilterFetchRef.current = false;
+      return;
+    }
+    void fetchFixtures();
+  }, [
+    selectedLeague,
+    dateFilter,
+    debouncedSearchQuery,
+    sortBy,
+    marketChoiceFilter,
+    dataRefreshVersion,
+    fetchFixtures,
+  ]);
 
-    const liveInterval = setInterval(fetchLiveScores, 15000);
-    const predInterval = setInterval(fetchLivePredictions, 60000);
-    const errInterval = setInterval(checkForNewErrorLogs, 10000);
+  // Query live matches only when LIVE scope is active (and refresh every 15s with ETag 304 while active)
+  useEffect(() => {
+    if (activeScope !== 'LIVE') return;
+    void fetchLivePredictions();
+    const interval = setInterval(() => {
+      void fetchLivePredictions();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [
+    activeScope,
+    selectedLeague,
+    debouncedSearchQuery,
+    sortBy,
+    marketChoiceFilter,
+    dataRefreshVersion,
+    fetchLivePredictions,
+  ]);
+
+  // One-time mount initialization (settings, catalog, badge live-score polling, error logs, sync job resume)
+  useEffect(() => {
+    applyColorTheme(getActiveColorThemeId());
+    void fetchSettingsAndProviders();
+    void EngineService.getLeaguesCatalog().then((catalog) => {
+      if (Array.isArray(catalog)) setLeaguesCatalog(catalog);
+    });
+    void fetchLiveScores();
+    void checkForNewErrorLogs();
+
+    const liveInterval = setInterval(() => {
+      void fetchLiveScores();
+    }, 15000);
+    const errInterval = setInterval(() => {
+      void checkForNewErrorLogs();
+    }, 10000);
 
     const handleWindowError = (event: ErrorEvent) => {
       const details = {
@@ -456,10 +589,9 @@ export default function App() {
 
         if (pollRes.success && !resumeController.signal.aborted) {
           await Promise.all([
-            fetchFixtures(),
+            fetchFixtures({ forceRefresh: true }),
             fetchSettingsAndProviders(),
             fetchLiveScores(),
-            fetchLivePredictions(),
           ]);
           setDataRefreshVersion((v) => v + 1);
           showNotification(pollRes.job?.message || 'Background process completed!', 'success');
@@ -480,21 +612,21 @@ export default function App() {
     })();
 
     return () => {
+      upcomingAbortRef.current?.abort();
       resumeController.abort();
       clearInterval(liveInterval);
-      clearInterval(predInterval);
       clearInterval(errInterval);
       window.removeEventListener('error', handleWindowError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
-  }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores, fetchLivePredictions, checkForNewErrorLogs, isIgnoredHmrWebSocketError]);
+  }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores, checkForNewErrorLogs, isIgnoredHmrWebSocketError]);
 
   const handleSaveSettings = async (newSettings: Partial<EngineSettings>) => {
     try {
       const updated = await EngineService.updateSettings(newSettings);
       setSettings(updated);
-      fetchFixtures();
-      fetchSettingsAndProviders();
+      await fetchFixtures({ forceRefresh: true });
+      await fetchSettingsAndProviders();
     } catch (e) {
       console.error('Failed to update settings:', e);
     }
@@ -503,9 +635,9 @@ export default function App() {
   const handleRefresh = async () => {
     await Promise.all([
       fetchSettingsAndProviders(),
-      fetchFixtures(),
+      fetchFixtures({ forceRefresh: true }),
       fetchLiveScores(),
-      fetchLivePredictions()
+      activeScope === 'LIVE' ? fetchLivePredictions() : Promise.resolve(),
     ]);
   };
 
@@ -538,7 +670,7 @@ export default function App() {
           onOpenLeagueModal={() => setIsLeagueModalOpen(true)}
           theme={theme}
           onToggleTheme={toggleTheme}
-          totalMatchesCount={fixtures.length}
+          totalMatchesCount={totalDatabaseCount || stats?.upcomingCount || fixtures.length}
           liveMatchesCount={liveScores.length}
         />
 
@@ -600,8 +732,14 @@ export default function App() {
                   <div className="col-span-12 lg:col-span-7 xl:col-span-7 min-w-0">
                     <FixturesList
                       fixtures={fixtures}
+                      fixtureGroups={fixtureGroups}
+                      totalDatabaseCount={totalDatabaseCount}
                       liveScores={liveScores}
-                      livePredictions={livePredictions}
+                      liveFixtures={liveFixtures}
+                      liveGroups={liveGroups}
+                      leaguesCatalog={leaguesCatalog}
+                      activeScope={activeScope}
+                      onSelectScope={setActiveScope}
                       isLoading={isLoadingFixtures}
                       isLoadingLive={isLoadingLivePredictions}
                       onSelectDetail={handleSelectFixture}
@@ -639,9 +777,8 @@ export default function App() {
               {activeTab === 'ACCAS' && (
                 <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   <DailyFeaturedTip
-                    fixtures={fixtures}
-                    isLoading={isLoadingFixtures}
                     onSelectDetail={handleSelectFixture}
+                    refreshKey={dataRefreshVersion}
                   />
                 </div>
               )}

@@ -639,29 +639,6 @@ export function getFixtureSortableDateTime(f: Pick<Fixture, 'matchDate' | 'kickO
 }
 
 /**
- * Comparator sorting fixtures in descending order of league popularity
- * combined with match date and kickoff time descending.
- */
-export function compareFixturesByPopularityAndDateTimeDesc(a: Fixture, b: Fixture): number {
-  const popA = getLeaguePopularityScore(a.league, a.leagueName, a.stage);
-  const popB = getLeaguePopularityScore(b.league, b.leagueName, b.stage);
-  if (popA !== popB) return popB - popA;
-
-  const dtA = getFixtureSortableDateTime(a);
-  const dtB = getFixtureSortableDateTime(b);
-  if (dtA !== dtB) return dtB - dtA;
-
-  const nameA = (a.leagueName || a.league || '').toLowerCase();
-  const nameB = (b.leagueName || b.league || '').toLowerCase();
-  if (nameA !== nameB) return nameA < nameB ? -1 : 1;
-
-  const homeA = a.homeTeam || '';
-  const homeB = b.homeTeam || '';
-  if (homeA === homeB) return 0;
-  return homeA < homeB ? -1 : 1;
-}
-
-/**
  * Sorts fixtures in-place in O(N) key precomputation + O(N log N) numeric compares.
  */
 export function sortFixturesByPopularityInPlace(fixtures: Fixture[]): Fixture[] {
@@ -688,11 +665,4 @@ export function sortFixturesByPopularityInPlace(fixtures: Fixture[]): Fixture[] 
     fixtures[i] = keyed[i].f;
   }
   return fixtures;
-}
-
-/**
- * Sorts fixtures in descending order by league popularity combined with match date and time.
- */
-export function sortFixturesByMajorLeaguePriority(fixtures: Fixture[]): Fixture[] {
-  return sortFixturesByPopularityInPlace(fixtures.slice());
 }

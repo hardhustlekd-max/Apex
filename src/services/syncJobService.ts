@@ -3,8 +3,73 @@ import { predictionsDb } from '../core/predictionsDb.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { ServerEngine } from '../core/serverEngine.js';
 import { loggerService } from './loggerService.js';
-import { Fixture } from '../core/types.js';
-import { getRelativeDateStr } from '../core/dateUtils.js';
+import { cleanFixtureId, Fixture } from '../core/types.js';
+import { getRelativeDateStr, isMatchStarted } from '../core/dateUtils.js';
+import { LiveScore } from '../providers/types.js';
+
+export async function collectEngineStatsSummary() {
+  const baseStats = db.getStatsSummary();
+  const rawFeedsCount = db.getRawFeedsCount();
+  const upcomingDbCount = db.getUpcomingFixturesCount();
+  const totalPredCount = await predictionsDb.countAsync('all');
+  const upcomingPredCount = await predictionsDb.countAsync('upcoming');
+  const histPredCount = predictionsDb.countHistoricalPredictions();
+
+  return {
+    ...baseStats,
+    rawFeedsCount,
+    upcomingCount: upcomingDbCount > 0 ? upcomingDbCount : upcomingPredCount,
+    predictionsCount: totalPredCount,
+    upcomingPredictionsCount: upcomingPredCount,
+    historicalCount: histPredCount,
+    historicalPredictionsCount: histPredCount,
+    totalMatches: Math.max(baseStats.totalMatches, histPredCount),
+  };
+}
+
+function attachPredictionsToLiveScores(liveScores: LiveScore[]): Fixture[] {
+  if (!liveScores || liveScores.length === 0) return [];
+  const todayStr = getRelativeDateStr(0);
+  const predMap = predictionsDb.getPredictionsByIds(liveScores.map((s) => s.fixtureId));
+
+  return liveScores.map((s) => {
+    const lf: Fixture = {
+      id: s.fixtureId,
+      providerId: 'FLASHSCORE',
+      league: s.league || 'ALL',
+      leagueName: s.leagueName || 'Live In-Play',
+      matchDate: todayStr,
+      kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
+      homeTeam: s.homeTeam,
+      awayTeam: s.awayTeam,
+      status: 'LIVE' as const,
+      minute: s.minute,
+      score: { home: s.homeScore, away: s.awayScore },
+    };
+
+    const cleanId = cleanFixtureId(lf.id);
+    const stored = predMap.get(lf.id) || predMap.get(cleanId);
+    if (stored && stored.prediction) {
+      return { ...lf, prediction: stored.prediction };
+    }
+    return lf;
+  });
+}
+
+function getUnstartedUpcomingFixturesForPrediction(): Fixture[] {
+  let upcoming = db.getUpcomingFixturesForPrediction();
+  if (!upcoming || upcoming.length === 0) {
+    const allPreds = predictionsDb.getPredictions({ state: 'all', skipSort: true });
+    upcoming = allPreds.filter(
+      (f) =>
+        f.status === 'SCHEDULED' ||
+        f.status === 'TIMED' ||
+        (f.status as string) === 'UPCOMING' ||
+        (!f.status && f.status !== 'FINISHED' && f.status !== 'LIVE')
+    );
+  }
+  return upcoming.filter((f) => !isMatchStarted(f));
+}
 
 export interface SyncJobState {
   id: string;
@@ -496,44 +561,15 @@ export class SyncJobService {
       let liveEnrichedCount = 0;
 
       if (liveScores && liveScores.length > 0) {
-        const enrichedLive: Fixture[] = liveScores.map((s) => {
-          const lf: Fixture = {
-            id: s.fixtureId,
-            providerId: 'FLASHSCORE',
-            league: s.league || 'ALL',
-            leagueName: s.leagueName || 'Live In-Play',
-            matchDate: getRelativeDateStr(0),
-            kickOffTime: s.status === 'FINISHED' ? 'FT' : `${s.minute}'`,
-            homeTeam: s.homeTeam,
-            awayTeam: s.awayTeam,
-            status: 'LIVE' as const,
-            minute: s.minute,
-            score: { home: s.homeScore, away: s.awayScore },
-          };
-
-          // Attach pre-existing prediction if it exists in DB
-          const cleanId = (lf.id || '').replace(/^fs_/, '');
-          const stored = predictionsDb.getPredictionById(lf.id) || predictionsDb.getPredictionById(cleanId);
-          if (stored && stored.prediction) {
-            return { ...lf, prediction: stored.prediction };
-          }
-          return lf;
-        });
-
+        const enrichedLive = attachPredictionsToLiveScores(liveScores);
         await db.saveUpcomingFixtures(enrichedLive);
         liveEnrichedCount = enrichedLive.length;
       }
 
       if (this.isTerminated(jobId)) return;
 
-      const totalStoredPredictions = predictionsDb.count('all');
-      const updatedStats = {
-        ...db.getStatsSummary(),
-        rawFeedsCount: db.getRawFeedsCount(),
-        upcomingCount: db.getUpcomingFixturesCount(),
-        predictionsCount: totalStoredPredictions,
-        historicalCount: predictionsDb.countHistoricalPredictions(),
-      };
+      const updatedStats = await collectEngineStatsSummary();
+      const totalStoredPredictions = updatedStats.predictionsCount;
 
       const finalMessage = options.resetDatabase || options.resetRawFeeds
         ? `Full Data Sync complete (${syncRes.matchesCount} historical, ${upcoming.length} upcoming, ${liveEnrichedCount} live)`
@@ -615,18 +651,10 @@ export class SyncJobService {
         currentStep: 'Querying upcoming fixtures from database...',
       });
 
-      let upcoming = db.getUpcomingFixturesForPrediction();
-      if (!upcoming || upcoming.length === 0) {
-        const allPreds = predictionsDb.getPredictions({ state: 'all', skipSort: true });
-        upcoming = allPreds.filter((f) => f.status === 'SCHEDULED' || f.status === 'TIMED' || (f.status as string) === 'UPCOMING' || (!f.status && f.status !== 'FINISHED' && f.status !== 'LIVE'));
-      }
-
-      // STRICT FILTER: Only predict matches that have officially NOT YET STARTED according to UTC standard
-      const { isMatchStarted } = await import('../core/accumulator.js');
-      upcoming = upcoming.filter(f => !isMatchStarted(f));
+      const upcoming = getUnstartedUpcomingFixturesForPrediction();
       this.touchHeartbeat(jobId);
 
-      const totalCount = upcoming ? upcoming.length : 0;
+      const totalCount = upcoming.length;
 
       if (totalCount === 0) {
         this.updateProgress(jobId, {
@@ -695,16 +723,9 @@ export class SyncJobService {
 
       if (this.isTerminated(jobId)) return;
 
-      const totalPredictionsCount = await predictionsDb.countAsync('all');
+      const finalStats = await collectEngineStatsSummary();
+      const totalPredictionsCount = finalStats.predictionsCount;
       const finalMessage = `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <90% data completeness).`;
-
-      const finalStats = {
-        ...db.getStatsSummary(),
-        rawFeedsCount: db.getRawFeedsCount(),
-        upcomingCount: db.getUpcomingFixturesCount(),
-        predictionsCount: totalPredictionsCount,
-        historicalCount: predictionsDb.countHistoricalPredictions(),
-      };
 
       const now = Date.now();
       this.updateProgress(jobId, {

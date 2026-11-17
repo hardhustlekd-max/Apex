@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { predictionsDb } from './predictionsDb.js';
 import {
+  DEFAULT_ENGINE_SETTINGS,
   Fixture,
   EngineSettings,
   HistoricalMatch,
@@ -11,15 +12,15 @@ import { ApexEngine } from './poisson.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague } from './leagueMapper.js';
-import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr } from './dateUtils.js';
+import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr, parseDateMsNoon } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
 import { parseHeadToHeadFeedText, getTeamHistoricalMatches } from './feedParser.js';
 import { checkpointSqliteWal, sqliteDb } from './sqliteClient.js';
 
 export class ServerEngine {
-  public static getUnifiedHistoricalUniverse(): HistoricalMatch[] {
+  public static getUnifiedHistoricalUniverse(scrapedMatchesOverride?: any[]): HistoricalMatch[] {
     let rawHist = db.getAllHistoricalMatches(5000);
-    const scrapedMatches = db.getFlashscoreScrapedMatches(1000, { includeJsonBlobs: false });
+    const scrapedMatches = scrapedMatchesOverride ?? db.getFlashscoreScrapedMatches(1000, { includeJsonBlobs: false });
     const scrapedAsHistorical: HistoricalMatch[] = scrapedMatches
       .filter((sm) => {
         if (sm.status !== 'FINISHED') return false;
@@ -65,7 +66,7 @@ export class ServerEngine {
       const s = m.season;
       if (s && (s === currentSeason || s === prevSeason)) return true;
       if (m.matchDate) {
-        const d = new Date(m.matchDate.length === 10 ? `${m.matchDate}T12:00:00Z` : m.matchDate).getTime();
+        const d = parseDateMsNoon(m.matchDate);
         if (!isNaN(d) && d >= twoYearsAgoMs) return true;
       }
       return !s;
@@ -90,8 +91,7 @@ export class ServerEngine {
     recentFormMatches?: TeamFormMatch[]
   ): number {
     if (!fixtureDateStr || !teamName) return undefined as any;
-    const fixtureDate = new Date(fixtureDateStr.length === 10 ? `${fixtureDateStr}T12:00:00Z` : fixtureDateStr);
-    const fixtureTime = fixtureDate.getTime();
+    const fixtureTime = parseDateMsNoon(fixtureDateStr);
     if (isNaN(fixtureTime)) return undefined as any;
 
     // 1. Inspect recent matches from H2H scraped feed (find the actual latest prior match regardless of array order)
@@ -99,8 +99,7 @@ export class ServerEngine {
       let latestRecentPriorTime = 0;
       for (const rm of recentFormMatches) {
         if (rm.date) {
-          const matchDate = new Date(rm.date.length === 10 ? `${rm.date}T12:00:00Z` : rm.date);
-          const matchTime = matchDate.getTime();
+          const matchTime = parseDateMsNoon(rm.date);
           if (!isNaN(matchTime) && matchTime < fixtureTime && matchTime > latestRecentPriorTime) {
             latestRecentPriorTime = matchTime;
           }
@@ -120,8 +119,7 @@ export class ServerEngine {
 
     for (const m of teamHistory) {
       if (m.matchDate) {
-        const md = new Date(m.matchDate.length === 10 ? `${m.matchDate}T12:00:00Z` : m.matchDate);
-        const mt = md.getTime();
+        const mt = parseDateMsNoon(m.matchDate);
         if (!isNaN(mt) && mt < fixtureTime && mt > latestPriorTime) {
           latestPriorTime = mt;
         }
@@ -382,13 +380,7 @@ export class ServerEngine {
   ): Promise<{ predictedCount: number; skippedCount: number; fixtures: Fixture[] }> {
     const skipRemoteH2H = options?.skipRemoteH2H ?? false;
     const collectFixtures = options?.collectFixtures ?? true;
-    const settings: EngineSettings = db.getSettings() || {
-      rollingMatchWindow: 15,
-      safeWinThreshold: 0.72,
-      homeAdvantageFactor: 1.12,
-      formDecayRate: 0.85,
-      autoSyncDaily: true,
-    };
+    const settings: EngineSettings = db.getSettings() || { ...DEFAULT_ENGINE_SETTINGS };
 
     const seenIds = new Set<string>();
     const validFixtures: Fixture[] = [];
@@ -399,8 +391,8 @@ export class ServerEngine {
       validFixtures.push(f);
     }
 
-    const allMatches = this.getUnifiedHistoricalUniverse();
     const scrapedMatches = db.getFlashscoreScrapedMatches(1000);
+    const allMatches = this.getUnifiedHistoricalUniverse(scrapedMatches);
 
     console.log(`[ServerEngine] Recalculating ${validFixtures.length} upcoming fixtures with ${allMatches.length} historical matches in universe.`);
 

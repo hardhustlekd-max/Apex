@@ -19,7 +19,6 @@ import {
   MatchTacticalContextInput,
   ScrapedMarketOdds,
 } from './types.js';
-import { loggerService } from '../services/loggerService.js';
 import { getCurrentSeason, normalizeDateStr } from './dateUtils.js';
 import { resolveTeamSide, resolveFixtureAlignment, teamMatchScore, getTeamHistoricalMatches } from './feedParser.js';
 
@@ -148,6 +147,55 @@ export class ApexEngine {
     return 1.0;
   }
 
+  private static resolveSeasonRecentMatches(
+    teamName: string,
+    allMatches: HistoricalMatch[],
+    windowSize = 15,
+    scrapedRecent?: TeamFormMatch[]
+  ): TeamFormMatch[] {
+    const limit = Math.min(20, Math.max(8, windowSize));
+
+    if (scrapedRecent && scrapedRecent.length > 0) {
+      return [...scrapedRecent]
+        .sort((a, b) => this.getDateMs(b.date) - this.getDateMs(a.date))
+        .slice(0, limit);
+    }
+
+    const currentSeason = getCurrentSeason();
+    const now = new Date();
+    const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
+    const prevSeason = `${prevYear}/${prevYear + 1}`;
+    const clubMatches = this.getTeamSortedHistoricalMatches(teamName, allMatches)
+      .filter((m) => m.season === currentSeason || m.season === prevSeason)
+      .slice(0, limit);
+
+    const recentMatchesList: TeamFormMatch[] = [];
+    for (const m of clubMatches) {
+      const side = resolveTeamSide(teamName, m.homeTeam, m.awayTeam);
+      if (!side) continue;
+      const isHome = side === 'HOME';
+      const gf = isHome ? m.fthg : m.ftag;
+      const ga = isHome ? m.ftag : m.fthg;
+      const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
+
+      recentMatchesList.push({
+        date: m.matchDate,
+        opponent: isHome ? m.awayTeam : m.homeTeam,
+        isHome,
+        goalsFor: gf,
+        goalsAgainst: ga,
+        result: res,
+        competition: m.div,
+        shotsFor: isHome ? m.hs : m.asShots,
+        shotsAgainst: isHome ? m.asShots : m.hs,
+        shotsOnTargetFor: isHome ? m.hst : m.ast,
+        shotsOnTargetAgainst: isHome ? m.ast : m.hst,
+      });
+    }
+
+    return recentMatchesList;
+  }
+
   // =========================================================================
   // PILLAR 1: COMPOSITE TEAM STRENGTH & FORM MOMENTUM (CSF) INDEX
   // Replaces legacy Elo rating with empirical multi-factor model
@@ -168,7 +216,8 @@ export class ApexEngine {
     windowSize = 15,
     decayRate = 0.90,
     scrapedRecent?: TeamFormMatch[],
-    eloRatings?: Map<string, number>
+    eloRatings?: Map<string, number>,
+    preResolvedRecent?: TeamFormMatch[]
   ): {
     strengthRating: number;
     formDominance: number;
@@ -177,46 +226,9 @@ export class ApexEngine {
     venueModifier: number;
     recentMatches: TeamFormMatch[];
   } {
-    // 1. Compile recent matches (up to 20 so international/cup streaks are balanced by competitive qualifiers)
-    let recentMatchesList: TeamFormMatch[] = [];
-    const limit = Math.min(20, Math.max(8, windowSize));
-
-    if (scrapedRecent && scrapedRecent.length > 0) {
-      recentMatchesList = [...scrapedRecent]
-        .sort((a, b) => this.getDateMs(b.date) - this.getDateMs(a.date))
-        .slice(0, limit);
-    } else {
-      const currentSeason = getCurrentSeason();
-      const now = new Date();
-      const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
-      const prevSeason = `${prevYear}/${prevYear + 1}`;
-      const clubMatches = this.getTeamSortedHistoricalMatches(teamName, allMatches)
-        .filter((m) => m.season === currentSeason || m.season === prevSeason)
-        .slice(0, limit);
-
-      for (const m of clubMatches) {
-        const side = resolveTeamSide(teamName, m.homeTeam, m.awayTeam);
-        if (!side) continue;
-        const isHome = side === 'HOME';
-        const gf = isHome ? m.fthg : m.ftag;
-        const ga = isHome ? m.ftag : m.fthg;
-        const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
-
-        recentMatchesList.push({
-          date: m.matchDate,
-          opponent: isHome ? m.awayTeam : m.homeTeam,
-          isHome,
-          goalsFor: gf,
-          goalsAgainst: ga,
-          result: res,
-          competition: m.div,
-          shotsFor: isHome ? m.hs : m.asShots,
-          shotsAgainst: isHome ? m.asShots : m.hs,
-          shotsOnTargetFor: isHome ? m.hst : m.ast,
-          shotsOnTargetAgainst: isHome ? m.ast : m.hst,
-        });
-      }
-    }
+    const recentMatchesList =
+      preResolvedRecent ??
+      this.resolveSeasonRecentMatches(teamName, allMatches, windowSize, scrapedRecent);
 
     // 1. Decayed Opponent-Adjusted Form & Goal Dominance
     let weightedFormSum = 0;
@@ -483,25 +495,33 @@ export class ApexEngine {
     const now = Date.now();
     const passKs = [32, 24, 16];
 
+    // Precompute pass-invariant match metadata once outside the 3 Elo passes
+    const precomputed = sorted.map((m) => {
+      const gd = Math.abs(m.fthg - m.ftag);
+      const marginMult = gd >= 3 ? 1.5 : gd === 2 ? 1.25 : 1.0;
+      const dateMs = this.getDateMs(m.matchDate);
+      const ageDays = dateMs > 0 ? Math.max(0, (now - dateMs) / 86400000) : 180;
+      const recency = ageDays > 730 ? 0.35 : Math.exp(-ageDays / 450);
+      return {
+        hKey: m.homeTeam.toLowerCase().trim(),
+        aKey: m.awayTeam.toLowerCase().trim(),
+        actualHome: m.ftr === 'H' ? 1.0 : m.ftr === 'D' ? 0.5 : 0.0,
+        marginMult,
+        recency,
+      };
+    });
+
     for (const baseK of passKs) {
-      for (const m of sorted) {
-        const hKey = m.homeTeam.toLowerCase().trim();
-        const aKey = m.awayTeam.toLowerCase().trim();
-        const hElo = ratings.get(hKey) ?? 1500;
-        const aElo = ratings.get(aKey) ?? 1500;
+      for (let i = 0; i < precomputed.length; i++) {
+        const item = precomputed[i];
+        const hElo = ratings.get(item.hKey) ?? 1500;
+        const aElo = ratings.get(item.aKey) ?? 1500;
 
-        const homeAdv = 55;
-        const expHome = 1 / (1 + Math.pow(10, (aElo - (hElo + homeAdv)) / 400));
-        const actualHome = m.ftr === 'H' ? 1.0 : m.ftr === 'D' ? 0.5 : 0.0;
-        const gd = Math.abs(m.fthg - m.ftag);
-        const marginMult = gd >= 3 ? 1.5 : gd === 2 ? 1.25 : 1.0;
-        const dateMs = this.getDateMs(m.matchDate);
-        const ageDays = dateMs > 0 ? Math.max(0, (now - dateMs) / 86400000) : 180;
-        const recency = ageDays > 730 ? 0.35 : Math.exp(-ageDays / 450);
-        const delta = baseK * marginMult * recency * (actualHome - expHome);
+        const expHome = 1 / (1 + Math.pow(10, (aElo - (hElo + 55)) / 400));
+        const delta = baseK * item.marginMult * item.recency * (item.actualHome - expHome);
 
-        ratings.set(hKey, Math.round(hElo + delta));
-        ratings.set(aKey, Math.round(aElo - delta));
+        ratings.set(item.hKey, Math.round(hElo + delta));
+        ratings.set(item.aKey, Math.round(aElo - delta));
       }
     }
     return ratings;
@@ -578,7 +598,8 @@ export class ApexEngine {
     eloRatings: Map<string, number>,
     windowSize = 15,
     decayRate = 0.92,
-    scrapedRecent?: TeamFormMatch[]
+    scrapedRecent?: TeamFormMatch[],
+    preResolvedRecent?: TeamFormMatch[]
   ): {
     rawXG: number;
     rawXGA: number;
@@ -588,45 +609,9 @@ export class ApexEngine {
     rollingMatchesCount: number;
     formattedRecent: TeamFormMatch[];
   } {
-    let recentMatchesList: TeamFormMatch[] = [];
-    const limit = Math.min(20, Math.max(8, windowSize));
-
-    if (scrapedRecent && scrapedRecent.length > 0) {
-      recentMatchesList = [...scrapedRecent]
-        .sort((a, b) => this.getDateMs(b.date) - this.getDateMs(a.date))
-        .slice(0, limit);
-    } else {
-      const currentSeason = getCurrentSeason();
-      const now = new Date();
-      const prevYear = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 2 : 1);
-      const prevSeason = `${prevYear}/${prevYear + 1}`;
-      const clubMatches = this.getTeamSortedHistoricalMatches(teamName, allMatches)
-        .filter((m) => m.season === currentSeason || m.season === prevSeason)
-        .slice(0, limit);
-
-      for (const m of clubMatches) {
-        const side = resolveTeamSide(teamName, m.homeTeam, m.awayTeam);
-        if (!side) continue;
-        const isHome = side === 'HOME';
-        const gf = isHome ? m.fthg : m.ftag;
-        const ga = isHome ? m.ftag : m.fthg;
-        const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : ga > gf ? 'L' : 'D';
-
-        recentMatchesList.push({
-          date: m.matchDate,
-          opponent: isHome ? m.awayTeam : m.homeTeam,
-          isHome,
-          goalsFor: gf,
-          goalsAgainst: ga,
-          result: res,
-          competition: m.div,
-          shotsFor: isHome ? m.hs : m.asShots,
-          shotsAgainst: isHome ? m.asShots : m.hs,
-          shotsOnTargetFor: isHome ? m.hst : m.ast,
-          shotsOnTargetAgainst: isHome ? m.ast : m.hst,
-        });
-      }
-    }
+    const recentMatchesList =
+      preResolvedRecent ??
+      this.resolveSeasonRecentMatches(teamName, allMatches, windowSize, scrapedRecent);
 
     if (recentMatchesList.length === 0) {
       return {
@@ -836,26 +821,45 @@ export class ApexEngine {
     const homeAdvantageElo = 55;
     const eloExpectancy = this.getEloWinExpectancy(homeElo, awayElo, homeAdvantageElo);
 
+    const rollingWindow = settings?.rollingMatchWindow || 15;
+    const formDecay = settings?.formDecayRate || 0.90;
+    const csfUniverse = historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches;
+
+    const homeSeasonRecent = this.resolveSeasonRecentMatches(
+      homeTeam,
+      csfUniverse,
+      rollingWindow,
+      realScrapedH2H?.homeRecentMatches
+    );
+    const awaySeasonRecent = this.resolveSeasonRecentMatches(
+      awayTeam,
+      csfUniverse,
+      rollingWindow,
+      realScrapedH2H?.awayRecentMatches
+    );
+
     const homeCSF = this.computeTeamStrengthProfile(
       homeTeam,
-      historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches,
+      csfUniverse,
       standings,
       true,
-      settings?.rollingMatchWindow || 15,
-      settings?.formDecayRate || 0.90,
+      rollingWindow,
+      formDecay,
       realScrapedH2H?.homeRecentMatches,
-      eloRatingsMap
+      eloRatingsMap,
+      homeSeasonRecent
     );
 
     const awayCSF = this.computeTeamStrengthProfile(
       awayTeam,
-      historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches,
+      csfUniverse,
       standings,
       false,
-      settings?.rollingMatchWindow || 15,
-      settings?.formDecayRate || 0.90,
+      rollingWindow,
+      formDecay,
       realScrapedH2H?.awayRecentMatches,
-      eloRatingsMap
+      eloRatingsMap,
+      awaySeasonRecent
     );
 
     const csfExpectancy = this.getTeamStrengthExpectancy(
@@ -896,18 +900,20 @@ export class ApexEngine {
       homeTeam,
       historicalUniverse,
       eloRatingsMap,
-      settings?.rollingMatchWindow || 15,
+      rollingWindow,
       0.92,
-      realScrapedH2H?.homeRecentMatches
+      realScrapedH2H?.homeRecentMatches,
+      homeSeasonRecent
     );
 
     const awayXGProfile = this.computeOpponentAdjustedXG(
       awayTeam,
       historicalUniverse,
       eloRatingsMap,
-      settings?.rollingMatchWindow || 15,
+      rollingWindow,
       0.92,
-      realScrapedH2H?.awayRecentMatches
+      realScrapedH2H?.awayRecentMatches,
+      awaySeasonRecent
     );
 
     const xgBreakdown: XGBreakdown = {
@@ -1084,16 +1090,21 @@ export class ApexEngine {
 
     const scoresList: CorrectScoreProb[] = [];
 
+    const awayProbs: number[] = new Array(MAX_GOALS + 1);
+    for (let a = 0; a <= MAX_GOALS; a++) {
+      awayProbs[a] = this.poissonProb(a, awayMu);
+    }
+
     for (let h = 0; h <= MAX_GOALS; h++) {
-      matrix[h] = [];
+      const row: number[] = new Array(MAX_GOALS + 1);
+      matrix[h] = row;
       const pH = this.poissonProb(h, homeLambda);
 
       for (let a = 0; a <= MAX_GOALS; a++) {
-        const pA = this.poissonProb(a, awayMu);
         const tau = this.dixonColesTau(h, a, homeLambda, awayMu, RHO);
-        const pJoint = pH * pA * tau;
+        const pJoint = pH * awayProbs[a] * tau;
 
-        matrix[h][a] = pJoint;
+        row[a] = pJoint;
         sumTotalProb += pJoint;
       }
     }
@@ -1503,102 +1514,4 @@ export class ApexEngine {
       recentH2H,
     };
   }
-
-  public static computeTeamFormModel(
-    homeTeam: string,
-    awayTeam: string,
-    allMatches: HistoricalMatch[],
-    scrapedHomeRecent?: TeamFormMatch[],
-    scrapedAwayRecent?: TeamFormMatch[]
-  ): { homeWinProb: number; drawProb: number; awayWinProb: number; homeFormScore: number; awayFormScore: number } {
-    let homeFormPoints = 0;
-    let homeGoalDiff = 0;
-    let homeMatchesCount = 0;
-
-    if (scrapedHomeRecent && scrapedHomeRecent.length > 0) {
-      const list = [...scrapedHomeRecent]
-        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
-        .slice(0, 10);
-      homeMatchesCount = list.length;
-      for (const m of list) {
-        homeGoalDiff += (m.goalsFor - m.goalsAgainst);
-        if (m.result === 'W') homeFormPoints += 3;
-        else if (m.result === 'D') homeFormPoints += 1;
-      }
-    } else {
-      const homeTeamMatches = [...getTeamHistoricalMatches(homeTeam, allMatches)]
-        .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
-        .slice(0, 10);
-      homeMatchesCount = homeTeamMatches.length;
-      for (const m of homeTeamMatches) {
-        const side = resolveTeamSide(homeTeam, m.homeTeam, m.awayTeam);
-        if (!side) continue;
-        const isHome = side === 'HOME';
-        const gf = isHome ? m.fthg : m.ftag;
-        const ga = isHome ? m.ftag : m.fthg;
-        homeGoalDiff += (gf - ga);
-        if (gf > ga) homeFormPoints += 3;
-        else if (gf === ga) homeFormPoints += 1;
-      }
-      homeMatchesCount = homeTeamMatches.filter((m) => resolveTeamSide(homeTeam, m.homeTeam, m.awayTeam) !== null).length;
-    }
-
-    let awayFormPoints = 0;
-    let awayGoalDiff = 0;
-    let awayMatchesCount = 0;
-
-    if (scrapedAwayRecent && scrapedAwayRecent.length > 0) {
-      const list = [...scrapedAwayRecent]
-        .sort((a, b) => normalizeDateStr(b.date).localeCompare(normalizeDateStr(a.date)))
-        .slice(0, 10);
-      awayMatchesCount = list.length;
-      for (const m of list) {
-        awayGoalDiff += (m.goalsFor - m.goalsAgainst);
-        if (m.result === 'W') awayFormPoints += 3;
-        else if (m.result === 'D') awayFormPoints += 1;
-      }
-    } else {
-      const awayTeamMatches = [...getTeamHistoricalMatches(awayTeam, allMatches)]
-        .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
-        .slice(0, 10);
-      for (const m of awayTeamMatches) {
-        const side = resolveTeamSide(awayTeam, m.homeTeam, m.awayTeam);
-        if (!side) continue;
-        const isHome = side === 'HOME';
-        const gf = isHome ? m.fthg : m.ftag;
-        const ga = isHome ? m.ftag : m.fthg;
-        awayGoalDiff += (gf - ga);
-        if (gf > ga) awayFormPoints += 3;
-        else if (gf === ga) awayFormPoints += 1;
-      }
-      awayMatchesCount = awayTeamMatches.filter((m) => resolveTeamSide(awayTeam, m.homeTeam, m.awayTeam) !== null).length;
-    }
-
-    const homeMaxPts = Math.max(1, homeMatchesCount * 3);
-    const awayMaxPts = Math.max(1, awayMatchesCount * 3);
-    const homeFormRatio = homeFormPoints / homeMaxPts;
-    const awayFormRatio = awayFormPoints / awayMaxPts;
-
-    const formDiff = (homeFormRatio - awayFormRatio) + (homeGoalDiff - awayGoalDiff) * 0.04;
-    let formHomeWinProb = 0.38 + formDiff * 0.4;
-    let formAwayWinProb = 0.38 - formDiff * 0.4;
-    let formDrawProb = 0.24;
-
-    formHomeWinProb = Math.max(0.1, Math.min(0.75, formHomeWinProb));
-    formAwayWinProb = Math.max(0.1, Math.min(0.75, formAwayWinProb));
-    formDrawProb = Math.max(0.15, Math.min(0.4, formDrawProb));
-
-    const total = formHomeWinProb + formDrawProb + formAwayWinProb;
-    return {
-      homeWinProb: formHomeWinProb / total,
-      drawProb: formDrawProb / total,
-      awayWinProb: formAwayWinProb / total,
-      homeFormScore: Number((0.9 + homeFormRatio * 0.3).toFixed(2)),
-      awayFormScore: Number((0.9 + awayFormRatio * 0.3).toFixed(2)),
-    };
-  }
 }
-
-// Aliases for clear semantic naming
-export const EvidenceBasedPredictionEngine = ApexEngine;
-export const PredictionEngine = ApexEngine;

@@ -1,4 +1,4 @@
-import { HeadToHeadMatchRecord, HeadToHeadMeasurement, TeamFormMatch } from './types.js';
+import { HeadToHeadMatchRecord, HeadToHeadMeasurement, HistoricalMatch, TeamFormMatch } from './types.js';
 import { getStandardDateStr, normalizeDateStr } from './dateUtils.js';
 
 export const H2H_PARSER_VERSION = 3;
@@ -761,6 +761,111 @@ export function parseHeadToHeadFeedText(
     recentH2H: cappedH2H.map((x) => x.record),
     homeClub: homeClubName,
     awayClub: awayClubName,
+    homeRecentMatches,
+    awayRecentMatches,
+  };
+}
+
+function mapTeamRecentFromHistorical(teamName: string, matches: HistoricalMatch[]): TeamFormMatch[] {
+  if (!teamName || matches.length === 0) return [];
+  const sorted = matches
+    .slice()
+    .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)));
+
+  const out: TeamFormMatch[] = [];
+  for (const m of sorted) {
+    const side = resolveTeamSide(teamName, m.homeTeam, m.awayTeam);
+    if (!side) continue;
+    const isH = side === 'HOME';
+    const gf = isH ? m.fthg : m.ftag;
+    const ga = isH ? m.ftag : m.fthg;
+    const res: 'W' | 'D' | 'L' = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+    out.push({
+      date: normalizeDateStr(m.matchDate),
+      opponent: isH ? m.awayTeam : m.homeTeam,
+      isHome: isH,
+      goalsFor: gf,
+      goalsAgainst: ga,
+      result: res,
+      competition: m.div,
+    });
+  }
+  return out;
+}
+
+/**
+ * Shared builder that constructs a HeadToHeadMeasurement from local SQLite historical records,
+ * eliminating duplicate loops between OnDemandParser and FlashscoreScraperService.
+ */
+export function buildFallbackH2HFromHistoricalDb(
+  homeTeam: string,
+  awayTeam: string,
+  homeHist: HistoricalMatch[],
+  awayHist: HistoricalMatch[],
+  directH2H: HistoricalMatch[],
+  options?: { computeSwingMultipliers?: boolean }
+): HeadToHeadMeasurement {
+  const homeRecentMatches = mapTeamRecentFromHistorical(homeTeam, homeHist);
+  const awayRecentMatches = mapTeamRecentFromHistorical(awayTeam, awayHist);
+
+  const sortedH2H = directH2H
+    .filter((m) => resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam).matched)
+    .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)))
+    .slice(0, 15);
+
+  let homeWins = 0;
+  let draws = 0;
+  let awayWins = 0;
+  let homeGoalsTotal = 0;
+  let awayGoalsTotal = 0;
+
+  const recentH2H: HeadToHeadMatchRecord[] = sortedH2H.map((m) => {
+    const { isHomeFixture } = resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam);
+    const gHome = isHomeFixture ? m.fthg : m.ftag;
+    const gAway = isHomeFixture ? m.ftag : m.fthg;
+    homeGoalsTotal += gHome;
+    awayGoalsTotal += gAway;
+    if (gHome > gAway) homeWins++;
+    else if (gAway > gHome) awayWins++;
+    else draws++;
+
+    return {
+      date: normalizeDateStr(m.matchDate),
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      score: `${m.fthg}-${m.ftag}`,
+      winner: m.fthg > m.ftag ? 'HOME' : m.ftag > m.fthg ? 'AWAY' : 'DRAW',
+      competition: m.div,
+    };
+  });
+
+  const matchesCount = homeWins + draws + awayWins;
+  const homeGoalsAvg = matchesCount > 0 ? Number((homeGoalsTotal / matchesCount).toFixed(2)) : 0;
+  const awayGoalsAvg = matchesCount > 0 ? Number((awayGoalsTotal / matchesCount).toFixed(2)) : 0;
+
+  let h2hMultiplierHome = 1.0;
+  let h2hMultiplierAway = 1.0;
+  if (options?.computeSwingMultipliers) {
+    const netWinDiff = homeWins - awayWins;
+    const netGoalDiff = homeGoalsTotal - awayGoalsTotal;
+    const swing = matchesCount > 0 ? (netWinDiff * 0.02 + (netGoalDiff / matchesCount) * 0.015) : 0;
+    h2hMultiplierHome = Number(Math.max(0.90, Math.min(1.15, 1.0 + swing)).toFixed(3));
+    h2hMultiplierAway = Number(Math.max(0.90, Math.min(1.15, 1.0 - swing)).toFixed(3));
+  }
+
+  return {
+    parserVersion: H2H_PARSER_VERSION,
+    matchesCount,
+    homeWins,
+    draws,
+    awayWins,
+    homeGoalsAvg,
+    awayGoalsAvg,
+    h2hMultiplierHome,
+    h2hMultiplierAway,
+    recentH2H,
+    homeClub: homeTeam,
+    awayClub: awayTeam,
     homeRecentMatches,
     awayRecentMatches,
   };

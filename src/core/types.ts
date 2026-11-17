@@ -279,31 +279,86 @@ export interface Fixture {
   homeParticipantId?: string;
   awayParticipantId?: string;
   marketOdds?: ScrapedMarketOdds;
+  hasPrediction?: boolean;
+  authoritativePick?: {
+    key: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN';
+    type?: '1' | 'X' | '2';
+    label: string;
+    shortLabel?: string;
+    probability: number;
+    probabilityPercent: number;
+    probabilityFormatted: string;
+  };
+  highestPick?: {
+    type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N';
+    label: string;
+    shortLabel: string;
+    probability: number;
+    probabilityPercent: number;
+    probabilityFormatted: string;
+  };
+  probs?: {
+    home: number;
+    draw: number;
+    away: number;
+    over25: number;
+    under25: number;
+    bttsYes: number;
+    bttsNo: number;
+    tipProbMostLikely?: number;
+    tipProbOverUnder?: number;
+    tipProbBtts?: number;
+    tipProb1X2?: number;
+  };
+  popularityScore?: number;
 }
 
-export interface AccaLeg {
-  fixtureId: string;
-  fixtureDate: string;
-  league: string;
-  homeTeam: string;
-  awayTeam: string;
-  marketKey: MarketOption['key'];
-  marketName: string;
-  selection: string;
-  probability: number;
-  reasoning: string;
-  isBanker: boolean;
+export interface LeagueGroupDTO {
+  leagueKey: string;
+  leagueName: string;
+  subDivision?: string;
+  headerKey: string;
+  popularityScore: number;
+  latestDateTime: number;
+  fixtureIds: string[];
 }
 
-export interface AccumulatorSlip {
-  id: string;
+export interface FixturesQueryResponse {
+  success: boolean;
+  provider: string;
+  count: number;
+  totalDatabaseCount: number;
+  resolvedDateFilter: string;
+  fixtures: Fixture[];
+  groups: LeagueGroupDTO[];
+}
+
+export interface LiveFixturesResponse {
+  success: boolean;
+  provider: string;
+  count: number;
+  fixtures: Fixture[];
+  groups: LeagueGroupDTO[];
+}
+
+export interface FeaturedTipDTO {
+  fixture: Fixture;
+  market: MarketOption;
+  odds: number;
+  hasScrapedOdds: boolean;
+}
+
+export interface FeaturedTipsResponse {
+  success: boolean;
+  count: number;
+  totalOdds: number;
+  tips: FeaturedTipDTO[];
+}
+
+export interface LeagueOptionDTO {
+  code: string;
   name: string;
-  strategy: 'BANKER' | 'PROBABILITY_CHASE' | 'CUSTOM';
-  legs: AccaLeg[];
-  combinedProb: number;
-  riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
-  createdAt: string;
-  summaryText: string;
+  country?: string;
 }
 
 export interface EngineSettings {
@@ -315,36 +370,21 @@ export interface EngineSettings {
   colorTheme?: 'opta-emerald' | 'champions-crimson' | 'ballon-gold' | 'volt-lime';
 }
 
-export interface FlashscoreScrapedMatch {
-  matchId: string;
-  stage?: string;
-  date: string;
-  status: string;
-  country?: string;
-  leagueName?: string;
-  home: {
-    name: string;
-    image?: string;
-  };
-  away: {
-    name: string;
-    image?: string;
-  };
-  result?: {
-    home?: string;
-    away?: string;
-    regulationTime?: string;
-    penalties?: string;
-  };
-  information?: {
-    category: string;
-    value: string;
-  }[];
-  statistics?: {
-    category: string;
-    homeValue?: string;
-    awayValue?: string;
-  }[];
+export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
+  rollingMatchWindow: 15,
+  safeWinThreshold: 0.72,
+  homeAdvantageFactor: 1.12,
+  formDecayRate: 0.85,
+  autoSyncDaily: true,
+};
+
+export function cleanFixtureId(id?: string): string {
+  return String(id || '')
+    .replace(/^fs_hist_/, '')
+    .replace(/^fs_/, '')
+    .replace(/^hist_/, '')
+    .replace(/^scraped_/, '')
+    .trim();
 }
 
 export interface ProviderStatus {
@@ -355,35 +395,6 @@ export interface ProviderStatus {
   latencyMs: number;
   description: string;
   features: string[];
-}
-
-export interface GroundingSource {
-  title: string;
-  url: string;
-}
-
-export interface FootballTipItem {
-  id: string;
-  category: 'HEADLINE' | 'MATCH_PREVIEW' | 'BETTING_TIP' | 'INJURY_TEAM_NEWS';
-  title: string;
-  match?: string;
-  league?: string;
-  predictionOrTip?: string;
-  confidence?: string;
-  analysis: string;
-  keyPoints?: string[];
-  sourceTitle?: string;
-  sourceUrl?: string;
-}
-
-export interface TrendingTipsData {
-  lastUpdated: string;
-  headlineSummary: string;
-  rawAnalysisMarkdown: string;
-  tips: FootballTipItem[];
-  groundingSources: GroundingSource[];
-  isRealGrounding: boolean;
-  quotaNotice?: string;
 }
 
 export interface LeagueStandingEntry {

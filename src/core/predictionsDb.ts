@@ -1,8 +1,7 @@
-import { Fixture } from './types.js';
-import { compareFixturesByPopularityAndDateTimeDesc, sortFixturesByPopularityInPlace } from './leaguePriority.js';
-import { isMatchStarted } from './accumulator.js';
-import { getPossibleDateStrs, getRelativeDateStr, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
-import { sqliteDb, checkpointSqliteWal } from './sqliteClient.js';
+import { cleanFixtureId, Fixture } from './types.js';
+import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
+import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
+import { sqliteDb, notifyDbMutation } from './sqliteClient.js';
 import { loggerService } from '../services/loggerService.js';
 
 export interface PredictionEvaluationSummary {
@@ -109,10 +108,6 @@ export class PredictionsDB {
       (fixture as any).match_state = 'completed';
     }
     return fixture;
-  }
-
-  async savePredictions(fixtures: Fixture[], options?: { quiet?: boolean }): Promise<void> {
-    this.savePredictionsSync(fixtures, options);
   }
 
   savePredictionsSync(fixtures: Fixture[], options?: { quiet?: boolean }): void {
@@ -223,6 +218,7 @@ export class PredictionsDB {
       });
 
       insertMany(fixtures);
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[PredictionsDB] Error persisting predictions to SQLite:', err?.message);
       throw err;
@@ -327,6 +323,56 @@ export class PredictionsDB {
     return null;
   }
 
+  getPredictionsByIds(fixtureIds: string[]): Map<string, Fixture> {
+    const result = new Map<string, Fixture>();
+    if (!fixtureIds || fixtureIds.length === 0) return result;
+
+    try {
+      const candidateIds = new Set<string>();
+      for (const rawId of fixtureIds) {
+        if (!rawId) continue;
+        const cId = cleanFixtureId(rawId);
+        candidateIds.add(rawId);
+        if (cId) {
+          candidateIds.add(cId);
+          candidateIds.add(`fs_${cId}`);
+          candidateIds.add(`hist_${cId}`);
+          candidateIds.add(`fs_hist_${cId}`);
+        }
+      }
+
+      const idList = Array.from(candidateIds);
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < idList.length; i += CHUNK_SIZE) {
+        const chunk = idList.slice(i, i + CHUNK_SIZE);
+        const placeholders = chunk.map(() => '?').join(', ');
+        const rows = sqliteDb
+          .prepare(
+            `SELECT fixture_id, full_fixture_json, status, match_state, kick_off_time, home_score, away_score
+             FROM predictions
+             WHERE fixture_id IN (${placeholders})`
+          )
+          .all(...chunk) as any[];
+
+        for (const row of rows) {
+          if (!row?.full_fixture_json) continue;
+          const hydrated = this.hydrateFixtureFromRow(row);
+          const key = String(row.fixture_id);
+          const cKey = cleanFixtureId(key);
+          result.set(key, hydrated);
+          if (cKey) {
+            result.set(cKey, hydrated);
+            result.set(`fs_${cKey}`, hydrated);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[PredictionsDB] Error batch-loading predictions by IDs:', err?.message);
+    }
+
+    return result;
+  }
+
   count(state: 'upcoming' | 'completed' | 'all' = 'upcoming'): number {
     try {
       let query = 'SELECT COUNT(*) as count FROM predictions';
@@ -371,13 +417,10 @@ export class PredictionsDB {
       } else {
         sqliteDb.prepare('DELETE FROM predictions WHERE match_state = ?').run(effectiveState);
       }
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[PredictionsDB] Error clearing predictions:', err?.message);
     }
-  }
-
-  async removePredictions(fixtureIds: string[]): Promise<void> {
-    this.removePredictionsSync(fixtureIds);
   }
 
   removePredictionsSync(fixtureIds: string[]): void {
@@ -392,6 +435,7 @@ export class PredictionsDB {
         }
       });
       deleteMany(fixtureIds);
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[PredictionsDB] Error removing predictions:', err?.message);
     }
@@ -405,15 +449,6 @@ export class PredictionsDB {
       return this.clearPredictions('upcoming', 'update_predictions');
     }
     console.warn(`[PredictionsDB] Blocked unauthorized clearAll call (origin=${String(origin || 'none')}).`);
-  }
-
-  async saveLivePredictions(fixtures: Fixture[]): Promise<void> {
-    return this.savePredictions(fixtures);
-  }
-
-  async saveHistoricalPredictions(fixtures: Fixture[]): Promise<void> {
-    const enriched = fixtures.map((f) => ({ ...f, match_state: 'completed' as const }));
-    return this.savePredictions(enriched);
   }
 
   getHistoricalPredictions(filters?: { league?: string; limit?: number }): Fixture[] {

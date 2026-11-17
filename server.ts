@@ -3,6 +3,7 @@ import path from 'path';
 import { db } from './src/core/db.js';
 import { predictionsDb } from './src/core/predictionsDb.js';
 import { app } from './src/app.js';
+import { fixturesWorkerService } from './src/services/fixturesWorkerService.js';
 
 async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -15,6 +16,11 @@ async function startServer() {
   } catch (err) {
     console.warn('predictionsDb init notice:', err);
   }
+
+  // Warm the server-side fixtures projection worker index in the background
+  void fixturesWorkerService.ensureIndexReady(false).catch((err) => {
+    console.warn('fixturesWorkerService warmup notice:', err);
+  });
 
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {
@@ -36,7 +42,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`⚽ Football Prediction Engine server running on http://0.0.0.0:${PORT}`);
+    console.log(`Football Prediction Engine server running on http://0.0.0.0:${PORT}`);
   });
 }
 
