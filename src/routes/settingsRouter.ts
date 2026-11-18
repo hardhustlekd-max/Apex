@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { DEFAULT_ENGINE_SETTINGS, EngineSettings } from '../core/types.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
-import { getSqliteDbStats } from '../core/sqliteClient.js';
+import { DB_PATH, getSqliteDbStats } from '../core/sqliteClient.js';
 import { syncJobService } from '../services/syncJobService.js';
 
 export const settingsRouter = Router();
@@ -42,7 +42,7 @@ const getStorageStatusHandler = (_req: any, res: any) => {
     predictionsDb: {
       configured: true,
       status: 'CONNECTED',
-      url: `data/football_engine.db (${stats.tableCounts['predictions'] || 0} predictions)`,
+      url: `${DB_PATH} (${stats.tableCounts['predictions'] || 0} predictions)`,
       latencyMs: 1,
     },
   });

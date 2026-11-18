@@ -31,26 +31,28 @@ export function SegmentedTabs<T extends string = string>({
 }: SegmentedTabsProps<T>) {
   const containerBg =
     variant === 'card'
-      ? 'bg-theme-card shadow-theme-sm p-0.5 rounded-xl'
-      : variant === 'pill'
-      ? 'bg-theme-subtle p-1 rounded-full'
-      : 'bg-theme-subtle p-1 rounded-2xl';
+      ? 'bg-theme-card border border-theme shadow-theme-sm p-[3px] rounded-xl'
+      : 'bg-theme-subtle border border-theme-subdued p-[3px] rounded-xl';
+
+  const containerSize =
+    size === 'xs'
+      ? 'h-[36px] min-h-[36px]'
+      : size === 'md'
+      ? 'h-[44px] min-h-[44px]'
+      : 'h-[40px] min-h-[40px]';
 
   const btnHeight =
     size === 'xs'
-      ? 'min-h-[28px] px-2.5 py-1 text-[10.5px]'
+      ? 'h-full px-2.5 text-sm'
       : size === 'md'
-      ? 'min-h-[36px] px-3.5 py-1.5 text-xs'
-      : 'min-h-[32px] px-3 py-1 text-xs';
-
-  const btnRadius =
-    variant === 'pill' ? 'rounded-full' : variant === 'card' ? 'rounded-lg' : 'rounded-xl';
+      ? 'h-full px-2.5 sm:px-3.5 text-base'
+      : 'h-full px-3 text-base';
 
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`flex items-center gap-1 overflow-x-auto no-scrollbar flex-nowrap ${containerBg} ${
+      className={`flex items-center gap-0.5 overflow-x-auto no-scrollbar flex-nowrap font-sans ${containerSize} ${containerBg} ${
         fullWidth ? 'w-full' : 'shrink-0'
       } ${className}`}
     >
@@ -65,18 +67,18 @@ export function SegmentedTabs<T extends string = string>({
             aria-selected={isActive}
             onClick={() => onChange(item.id)}
             className={`${
-              fullWidth ? 'flex-1 min-w-[70px]' : 'shrink-0'
-            } ${btnHeight} ${btnRadius} font-bold transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+              fullWidth ? 'flex-1 min-w-0' : 'shrink-0'
+            } ${btnHeight} rounded-lg transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               isActive
-                ? 'bg-theme-primary text-theme-primary-text font-black shadow-theme-sm'
-                : 'text-theme-sub hover:text-theme-main'
+                ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                : 'text-theme-sub hover:text-theme-main font-medium'
             }`}
           >
             {item.icon}
             <span className="whitespace-nowrap">{item.label}</span>
             {item.count !== undefined && (
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono tabular-nums font-bold ${
+                className={`h-[20px] min-w-[20px] px-1.5 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold ${
                   isActive
                     ? 'bg-black/20 text-theme-primary-text'
                     : 'bg-theme-card text-theme-main'

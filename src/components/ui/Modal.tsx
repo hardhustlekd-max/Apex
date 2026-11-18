@@ -27,7 +27,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'max-w-2xl',
   mobileSheet = false,
-  bodyClassName = 'p-4 sm:p-5 overflow-y-auto overscroll-contain flex-1',
+  bodyClassName = 'p-3 sm:p-3.5 overflow-y-auto overscroll-contain flex-1',
   closeLabel = 'Close modal',
 }) => {
   useEffect(() => {
@@ -46,7 +46,7 @@ export const Modal: React.FC<ModalProps> = ({
       role="dialog"
       aria-modal="true"
       className={`fixed inset-0 z-50 flex justify-center bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans ${
-        mobileSheet ? 'items-end sm:items-center p-0 sm:p-3.5' : 'items-center p-2.5 sm:p-3.5'
+        mobileSheet ? 'items-end sm:items-center p-0 sm:p-3' : 'items-center p-2.5 sm:p-3.5'
       }`}
     >
       <div
@@ -55,38 +55,40 @@ export const Modal: React.FC<ModalProps> = ({
         aria-hidden="true"
       />
       <div
-        className={`relative z-10 bg-theme-card text-theme-main w-full ${maxWidth} overflow-hidden shadow-theme-md flex flex-col animate-in zoom-in-95 duration-150 ${
+        className={`relative z-10 bg-theme-card border border-theme text-theme-main w-full ${maxWidth} overflow-hidden shadow-theme-md flex flex-col animate-in zoom-in-95 duration-150 ${
           mobileSheet
-            ? 'rounded-t-3xl sm:rounded-2xl max-h-[92vh]'
-            : 'rounded-2xl sm:rounded-3xl max-h-[92vh]'
+            ? 'rounded-t-2xl sm:rounded-2xl max-h-[86vh]'
+            : 'rounded-2xl max-h-[86vh]'
         }`}
       >
         {mobileSheet && (
-          <div className="w-10 h-1 bg-theme-dim/40 rounded-full mx-auto mt-2 mb-0.5 sm:hidden shrink-0 opacity-70" />
+          <div className="w-9 h-1 bg-theme-dim/40 rounded-full mx-auto mt-2 mb-1 sm:hidden shrink-0 opacity-70" />
         )}
 
         {/* Header */}
-        <div className="px-4 sm:px-5 py-3 bg-theme-glass flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             {icon && (
-              <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text shrink-0 font-black shadow-theme-glow">
+              <span className="text-theme-primary shrink-0 flex items-center justify-center">
                 {icon}
-              </div>
+              </span>
             )}
             <div className="min-w-0">
-              <h3 className="font-extrabold text-sm sm:text-base text-theme-main truncate">{title}</h3>
-              {subtitle && <p className="text-xs text-theme-sub truncate">{subtitle}</p>}
+              <h3 className="font-semibold text-lg text-theme-main truncate tracking-[-0.015em]">
+                {title}
+              </h3>
+              {subtitle && <p className="text-xs font-normal text-theme-sub truncate">{subtitle}</p>}
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {headerActions}
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[36px] min-w-[36px] w-8 h-8 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-sub hover:text-theme-primary-text transition-all cursor-pointer flex items-center justify-center active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               aria-label={closeLabel}
             >
-              <X className="w-4 h-4 stroke-[2.5]" />
+              <X className="w-4 h-4 stroke-[2.25]" />
             </button>
           </div>
         </div>
@@ -96,7 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 sm:px-5 py-3 bg-theme-card-elevated shrink-0">
+          <div className="px-3.5 py-2.5 bg-theme-card-elevated border-t border-theme shrink-0">
             {footer}
           </div>
         )}

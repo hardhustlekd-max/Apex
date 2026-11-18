@@ -229,273 +229,252 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <Button
             id="settings-open-terminal-btn"
             variant="subtle"
-            size="xs"
-            pill
+            size="sm"
             onClick={onOpenTerminal}
             title="Terminal Logs"
           >
-            <Terminal className="w-3 h-3 text-theme-primary" />
+            <Terminal className="w-3.5 h-3.5 text-theme-primary" />
             <span className="hidden sm:inline">Terminal</span>
           </Button>
         ) : undefined
       }
       footer={
-        <div className="flex items-center justify-end gap-2.5">
-          <Button variant="subtle" size="md" pill onClick={onClose}>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="subtle" size="sm" onClick={onClose}>
             Close
           </Button>
-          <Button variant="primary" size="md" pill onClick={handleSave}>
+          <Button variant="primary" size="sm" onClick={handleSave}>
             Save Settings
           </Button>
         </div>
       }
     >
       {/* Modal Navigation Tabs */}
-      <div className="px-4 sm:px-5 pb-1.5 pt-1 shrink-0">
+      <div className="px-3.5 sm:px-4 pt-2.5 pb-1 shrink-0">
         <SegmentedTabs<SettingsTab>
           items={[
             {
               id: 'DATA',
               label: 'Data Management',
-              icon: <Database className="w-3 h-3 text-theme-primary" />,
+              icon: <Database className="w-3.5 h-3.5" />,
             },
             {
               id: 'PREDICTIONS',
               label: 'Predictions',
-              icon: <Sparkles className="w-3 h-3 text-theme-primary" />,
+              icon: <Sparkles className="w-3.5 h-3.5" />,
             },
             {
               id: 'UI',
-              label: 'UI Settings',
-              icon: <Sun className="w-3 h-3 text-theme-primary" />,
+              label: 'UI Themes',
+              icon: <Sun className="w-3.5 h-3.5" />,
             },
           ]}
           value={activeTab}
           onChange={(val) => setActiveTab(val)}
-          variant="pill"
-          size="sm"
+          variant="subtle"
+          size="xs"
           fullWidth
           ariaLabel="Settings categories"
         />
       </div>
 
       {/* Tab Body */}
-      <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+      <div className="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto flex-1">
         {activeTab === 'DATA' && (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {/* Live Database Metrics Overview */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-3">
-              <SectionHeader
-                title="Database Metrics"
-                size="sm"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    pill
-                    onClick={handleRefreshMetrics}
-                    disabled={isRefreshingMetrics}
-                    className="shadow-none"
-                    title="Refresh live metrics & feed stats"
-                  >
-                    <RefreshCw
-                      className={`w-3 h-3 ${isRefreshingMetrics ? 'animate-spin text-theme-primary' : ''}`}
-                    />
-                    <span>Refresh</span>
-                  </Button>
-                }
-              />
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center">
+                <SectionHeader
+                  title="Database Metrics"
+                  icon={<Database className="w-3.5 h-3.5" />}
+                  size="sm"
+                  className="w-full"
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={handleRefreshMetrics}
+                      disabled={isRefreshingMetrics}
+                      title="Refresh live metrics & feed stats"
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${isRefreshingMetrics ? 'animate-spin text-theme-primary' : ''}`}
+                      />
+                      <span>Refresh</span>
+                    </Button>
+                  }
+                />
+              </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-[var(--border-subdued)]">
                 <StatTile
-                  label="Upcoming Fixtures"
+                  label="Upcoming"
                   value={localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
                   tone="accent"
-                  surface="card"
+                  surface="flat"
                 />
                 <StatTile
-                  label="Stored Predictions"
+                  label="Predictions"
                   value={storedPredictionsCount}
                   tone="accent"
-                  surface="card"
+                  surface="flat"
                 />
                 <StatTile
-                  label="Stored Raw Feeds"
+                  label="Raw Feeds"
                   value={localStats?.rawFeedsCount ?? stats?.rawFeedsCount ?? '—'}
                   tone="accent"
-                  surface="card"
+                  surface="flat"
                 />
                 <StatTile
-                  label="Historical Matches"
+                  label="Historical"
                   value={localStats?.totalMatches ?? stats?.totalMatches ?? '—'}
                   tone="accent"
-                  surface="card"
+                  surface="flat"
                 />
               </div>
             </Card>
 
             {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-3">
-              <div className="flex items-center justify-between gap-2">
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
                 <SectionHeader
                   title="Scraper Health"
-                  icon={<Cpu className="w-4 h-4 text-theme-primary" />}
+                  icon={<Cpu className="w-3.5 h-3.5" />}
                   size="sm"
                 />
-                <span className="text-[11px] font-mono tabular-nums text-theme-sub">
+                <span className="text-xs font-normal tabular-nums text-theme-sub">
                   Circuit Failures:{' '}
-                  <strong className="text-theme-main">{scraperStatus?.circuit?.failureCount ?? 0}</strong>
+                  <strong className="text-theme-main font-semibold">{scraperStatus?.circuit?.failureCount ?? 0}</strong>
                 </span>
               </div>
 
               {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
-                <div className="pt-1 space-y-1.5">
-                  <span className="text-[10px] uppercase font-mono font-bold text-theme-sub block">
-                    Feed Mirrors
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px] font-mono">
-                    {scraperStatus.mirrors.map((m: any, idx: number) => (
-                      <div key={idx} className="p-2 rounded-xl bg-theme-card flex items-center justify-between gap-2">
-                        <span className="truncate text-theme-main font-medium">{m.name}</span>
-                        <Badge variant="accent" size="xs" pill>
-                          {m.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+                <div className="divide-y divide-[var(--border-subdued)] text-sm">
+                  {scraperStatus.mirrors.map((m: any, idx: number) => (
+                    <div key={idx} className="min-h-[38px] px-3.5 py-2 flex items-center justify-between gap-2">
+                      <span className="truncate text-theme-main font-medium">{m.name}</span>
+                      <span className="text-xs font-semibold text-theme-primary shrink-0">
+                        {m.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>
 
-            {/* Storage Status Section */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-3">
-              <SectionHeader
-                title="Storage Status"
-                icon={<Server className="w-4 h-4 text-theme-primary" />}
-                size="sm"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    pill
-                    onClick={fetchStorageStatus}
-                    disabled={isCheckingStorage}
-                    className="shadow-none"
-                  >
-                    <RefreshCw
-                      className={`w-3 h-3 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`}
-                    />
-                    <span>Test Storage</span>
-                  </Button>
-                }
-              />
+            {/* Storage Status Section (flattened - single card) */}
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center">
+                <SectionHeader
+                  title="Storage Status"
+                  icon={<Server className="w-3.5 h-3.5" />}
+                  size="sm"
+                  className="w-full"
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={fetchStorageStatus}
+                      disabled={isCheckingStorage}
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`}
+                      />
+                      <span>Test Storage</span>
+                    </Button>
+                  }
+                />
+              </div>
 
-              <Card surface="default" padding="md" radius="2xl" className="shadow-none space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-theme-main flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-theme-primary" />
-                    SQLite Storage Engine
-                  </span>
-                  <span className="text-[10px] font-mono text-theme-primary font-semibold">
-                    better-sqlite3 · 5 Pillars Active
+              <div className="px-3.5 py-2.5 space-y-1.5 text-sm tabular-nums">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-semibold text-theme-main">SQLite Storage Engine</span>
+                  <span className="text-xs font-medium text-theme-primary">
+                    better-sqlite3 · 5 Pillars
                   </span>
                 </div>
 
-                <div className="text-[11px] font-mono text-theme-sub space-y-0.5">
-                  <div className="truncate">
-                    Path:{' '}
-                    <span className="text-theme-main font-semibold">
-                      {storageStatus?.storageEngine?.dbPath || 'data/football_engine.db'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] pt-0.5">
-                    <span className="text-theme-sub">
-                      Disk Size:{' '}
-                      <strong className="text-theme-primary">{storageStatus?.storageEngine?.sizeMB ?? 0.1} MB</strong>
-                    </span>
-                    <span className="text-theme-primary font-semibold">WAL Mode</span>
-                  </div>
-                  {(storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error) && (
-                    <p className="text-[10px] text-rose-600 dark:text-rose-400 truncate">
-                      Err: {storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error}
-                    </p>
-                  )}
+                <div className="truncate text-theme-sub text-xs font-normal">
+                  Path:{' '}
+                  <span className="text-theme-main font-medium">
+                    {storageStatus?.storageEngine?.dbPath || 'data/football_engine.db'}
+                  </span>
                 </div>
-              </Card>
+                <div className="flex items-center justify-between text-xs font-normal">
+                  <span className="text-theme-sub">
+                    Disk Size:{' '}
+                    <strong className="text-theme-primary font-semibold">{storageStatus?.storageEngine?.sizeMB ?? 0.1} MB</strong>
+                  </span>
+                  <span className="text-theme-primary font-medium">WAL Mode</span>
+                </div>
+                {(storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error) && (
+                  <p className="text-xs text-rose-500 dark:text-rose-400 truncate font-medium">
+                    Err: {storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error}
+                  </p>
+                )}
+              </div>
             </Card>
 
-            {/* Full Data Sync Card */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-4">
+            {/* Full Data Sync Card (no nested card) */}
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
               <SectionHeader
                 title="Full Data Sync"
-                size="md"
-                icon={
-                  <div className="p-2 rounded-full bg-theme-primary-subtle text-theme-primary">
-                    <RefreshCw className="w-4 h-4" />
-                  </div>
-                }
+                size="sm"
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
               />
 
-              {!isConfirmingReset && (
+              {!isConfirmingReset ? (
                 <Button
                   id="full-data-sync-btn"
                   variant="primary"
-                  size="lg"
-                  pill
+                  size="md"
                   fullWidth
                   onClick={() => setIsConfirmingReset(true)}
                   disabled={isOperating}
-                  className="uppercase tracking-wide"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Full Data Sync</span>
                 </Button>
-              )}
+              ) : (
+                <div className="pt-1 space-y-2">
+                  <p className="text-sm font-semibold text-theme-main flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 text-theme-primary shrink-0" />
+                    <span>Confirm Full Data Sync?</span>
+                  </p>
 
-              {isConfirmingReset && (
-                <Card surface="subtle" padding="md" radius="2xl" className="bg-theme-primary-subtle space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <RefreshCw className="w-4 h-4 text-theme-primary shrink-0 mt-0.5" />
-                    <p className="text-xs font-bold text-theme-main">Confirm Full Data Sync?</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="primary"
-                      size="md"
-                      pill
+                      size="sm"
                       className="flex-1"
                       onClick={handleExecuteResetAndSync}
                       disabled={isOperating}
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Confirm &amp; Start Full Data Sync</span>
+                      <span>Confirm &amp; Start Sync</span>
                     </Button>
-                    <Button variant="secondary" size="md" pill onClick={() => setIsConfirmingReset(false)}>
+                    <Button variant="secondary" size="sm" onClick={() => setIsConfirmingReset(false)}>
                       Cancel
                     </Button>
                   </div>
-                </Card>
+                </div>
               )}
             </Card>
           </div>
         )}
 
         {activeTab === 'PREDICTIONS' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Action Card: Calculate Predictions */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-4">
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="Calculate Predictions"
-                  size="md"
-                  icon={
-                    <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-bold">
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                  }
+                  size="sm"
+                  icon={<TrendingUp className="w-3.5 h-3.5" />}
                 />
-                <span className="text-[11px] font-mono tabular-nums text-theme-sub">
+                <span className="text-xs font-normal tabular-nums text-theme-sub">
                   {storedPredictionsCount} stored · {localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'} upcoming
                 </span>
               </div>
@@ -503,12 +482,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Button
                 id="update-upcoming-predictions-btn"
                 variant="primary"
-                size="lg"
-                pill
+                size="md"
                 fullWidth
                 onClick={handleCalculatePredictions}
                 disabled={isOperating}
-                className="uppercase tracking-wide"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Calculate Predictions</span>
@@ -516,30 +493,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </Card>
 
             {/* Action Card: Export 1X2 Predictions to JSON */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none sm:p-5 space-y-3.5">
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
               <SectionHeader
                 title="Export Predictions"
-                size="md"
-                icon={
-                  <div className="p-2 rounded-full bg-theme-primary text-theme-primary-text font-bold">
-                    <Download className="w-4 h-4" />
-                  </div>
-                }
+                size="sm"
+                icon={<Download className="w-3.5 h-3.5" />}
               />
 
-              <p className="text-xs text-theme-sub leading-relaxed font-sans">
-                Export all 1X2 model predictions stored in the database to a standardized JSON file. The file can be archived or loaded into the Historical Evaluation page to backtest accuracy against verified match results.
+              <p className="text-sm font-normal text-theme-sub leading-relaxed font-sans">
+                Export all 1X2 model predictions to JSON for offline archiving or accuracy evaluation.
               </p>
 
               {exportToast && (
-                <div className="p-3 rounded-2xl bg-theme-primary-subtle text-theme-primary text-xs font-bold flex items-center gap-2 font-mono">
+                <div className="p-2.5 rounded-xl bg-theme-primary-subtle border border-theme-neon text-theme-primary text-sm font-medium flex items-center gap-2">
                   <Check className="w-4 h-4 text-theme-primary shrink-0" />
                   <span>{exportToast}</span>
                 </div>
               )}
 
-              <div className="space-y-1.5 pt-1">
-                <label className="text-[10px] font-mono font-bold text-theme-sub uppercase block">
+              <div className="space-y-1 pt-0.5">
+                <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">
                   Sort Order (Probability %)
                 </label>
                 <Select
@@ -547,7 +520,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={exportSort}
                   onChange={(e) => setExportSort(e.target.value as any)}
                   surface="subtle"
-                  selectSize="sm"
+                  selectSize="md"
                   options={[
                     { value: 'default', label: 'Default Date Order' },
                     { value: 'desc', label: 'Highest Probability First (Descending)' },
@@ -559,12 +532,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Button
                 id="export-predictions-json-btn"
                 variant="inverse"
-                size="lg"
-                pill
+                size="md"
                 fullWidth
                 onClick={handleExportPredictions}
                 disabled={isExporting || isOperating}
-                className="uppercase tracking-wide"
               >
                 <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
                 <span>{isExporting ? 'Exporting Predictions...' : 'Export 1X2 Predictions (JSON)'}</span>
@@ -572,25 +543,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </Card>
 
             {/* Calculated Market Categories Info */}
-            <Card surface="elevated" padding="md" radius="2xl" className="shadow-none space-y-2 text-xs">
-              <span className="font-bold text-theme-main uppercase tracking-wider text-[10px] block font-mono">
-                Market Categories
-              </span>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-theme-sub">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2">
+              <SectionHeader title="Market Categories" size="sm" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm font-normal text-theme-main">
+                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-amber-400 shrink-0" />
                   <span>1X2 Match Outcomes</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />
                   <span>Goals Over/Under (1.5, 2.5, 3.5)</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-indigo-400 shrink-0" />
                   <span>Both Teams to Score (BTTS)</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-sky-400 shrink-0" />
                   <span>Double Chance (1X, X2, 12)</span>
                 </div>
               </div>
@@ -599,68 +568,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         )}
 
         {activeTab === 'UI' && (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {/* Appearance / Theme Selector */}
-            <Card surface="subtle" padding="md" radius="2xl" className="sm:p-5 space-y-3">
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <SectionHeader title="Theme" size="md" />
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-theme-card text-theme-sub">
+                <SectionHeader title="Display Mode" size="sm" />
+                <span className="text-xs font-medium text-theme-sub">
                   App Controlled
                 </span>
               </div>
 
-              <p className="text-xs text-theme-sub leading-relaxed font-sans">
-                Display mode is strictly application-controlled and saved to your device. It operates independently of system or browser appearance preferences.
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => theme !== 'light' && onToggleTheme()}
-                  className={`p-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[40px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'light'
-                      ? 'bg-theme-card text-theme-main shadow-theme-sm ring-2 ring-theme-accent'
-                      : 'bg-theme-card/65 text-theme-sub hover:bg-theme-card hover:text-theme-main'
+                      ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
+                      : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-500">
-                      <Sun className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold block text-theme-main">Light Mode</span>
+                  <div className="flex items-center gap-2">
+                    <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="text-base text-theme-main">Light</span>
                   </div>
-                  {theme === 'light' && <Check className="w-4 h-4 text-theme-main" />}
+                  {theme === 'light' && <Check className="w-4 h-4 text-theme-primary stroke-[2.5]" />}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => theme !== 'dark' && onToggleTheme()}
-                  className={`p-3.5 rounded-2xl flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[40px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'dark'
-                      ? 'bg-theme-card text-theme-main shadow-theme-sm ring-2 ring-theme-accent'
-                      : 'bg-theme-card/65 text-theme-sub hover:bg-theme-card hover:text-theme-main'
+                      ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
+                      : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-full bg-theme-subtle text-amber-400">
-                      <Moon className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold block text-theme-main">Dark Mode</span>
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4 text-theme-primary shrink-0" />
+                    <span className="text-base text-theme-main">Dark</span>
                   </div>
-                  {theme === 'dark' && <Check className="w-4 h-4 text-theme-primary" />}
+                  {theme === 'dark' && <Check className="w-4 h-4 text-theme-primary stroke-[2.5]" />}
                 </button>
               </div>
             </Card>
 
             {/* Color System Theme Selector */}
-            <Card surface="subtle" padding="md" radius="2xl" className="sm:p-5 space-y-3">
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
               <SectionHeader
-                title="Color Palette"
-                icon={<Sparkles className="w-4 h-4 text-theme-primary" />}
-                size="md"
+                title="Neon Theme Palette"
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+                size="sm"
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {COLOR_THEMES.map((t) => {
                   const isSelected = activeThemeId === t.id;
                   return (
@@ -675,81 +636,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           handleSelectColorTheme(t.id);
                         }
                       }}
-                      className={`group relative p-3.5 rounded-2xl transition-all duration-150 cursor-pointer flex flex-col justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`group relative rounded-2xl border overflow-hidden transition-all duration-150 cursor-pointer flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         isSelected
-                          ? 'bg-theme-card shadow-theme-sm ring-2 ring-theme-accent'
-                          : 'bg-theme-card/75 hover:bg-theme-card hover:shadow-theme-sm'
+                          ? 'bg-theme-card border-theme-accent shadow-theme-glow'
+                          : 'bg-theme-card border-theme hover:border-theme-accent hover:shadow-theme-sm'
                       }`}
                     >
-                      <div className="space-y-1.5">
+                      {/* Theme Accent Gradient Strip Header */}
+                      <div
+                        className="h-1.5 w-full"
+                        style={{ background: t.previewColors.gradient }}
+                      />
+
+                      <div className="p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black text-theme-main truncate">{t.name}</span>
+                          <span className="text-base font-semibold text-theme-main truncate tracking-[-0.01em]">{t.name}</span>
                           {isSelected ? (
-                            <Badge variant="solid" size="xs" pill>
+                            <Badge variant="solid" size="xs">
                               <Check className="w-3 h-3 stroke-[3]" />
                               <span>Active</span>
                             </Badge>
                           ) : null}
                         </div>
 
-                        {t.colorways && t.colorways.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {t.colorways.map((cw, i) => (
-                              <span
-                                key={i}
-                                className="text-[9.5px] px-1.5 py-0.5 rounded bg-theme-subtle text-theme-sub font-mono font-medium"
-                              >
-                                {cw}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                        <p className="text-sm font-normal text-theme-sub truncate">{t.tagline}</p>
 
-                      <div className="pt-2 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className="w-4 h-4 rounded-full shrink-0"
-                            style={{ backgroundColor: t.previewColors.primary }}
-                            title={`Primary Accent: ${t.accentName}`}
-                          />
-                          <div
-                            className="w-4 h-4 rounded-full shrink-0"
-                            style={{ backgroundColor: t.previewColors.modelPick }}
-                            title={`Model Pick & Value: ${t.modelPickName}`}
-                          />
-                          <div
-                            className="w-4 h-4 rounded-full shrink-0"
-                            style={{ backgroundColor: t.previewColors.live }}
-                            title="Live Status Signal"
-                          />
-                          <div
-                            className="w-4 h-4 rounded-full shrink-0"
-                            style={{ backgroundColor: t.previewColors.surfaceDark }}
-                            title="Dark Surface Canvas"
-                          />
-                          <div
-                            className="w-4 h-4 rounded-full shrink-0"
-                            style={{ backgroundColor: t.previewColors.surfaceLight }}
-                            title="Light Surface Canvas"
-                          />
+                        {t.colorways && t.colorways.length > 0 && (
+                          <p className="text-xs font-normal text-theme-dim truncate">
+                            {t.colorways.join(' · ')}
+                          </p>
+                        )}
+
+                        <div className="pt-1.5 border-t border-theme-subdued flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="w-4 h-4 rounded-md shrink-0 shadow-sm"
+                              style={{ background: t.previewColors.gradient }}
+                              title={`Primary Accent: ${t.accentName}`}
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: t.previewColors.modelPick }}
+                              title={`Model Pick & Value: ${t.modelPickName}`}
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: t.previewColors.live }}
+                              title="Live Status Signal"
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: t.previewColors.surfaceDark }}
+                              title="Dark Surface Canvas"
+                            />
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: t.previewColors.surfaceLight }}
+                              title="Light Surface Canvas"
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-theme-sub truncate">
+                            {t.accentName}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-mono font-bold text-theme-sub truncate">
-                          {t.accentName}
-                        </span>
                       </div>
                     </div>
                   );
                 })}
               </div>
             </Card>
-
           </div>
         )}
 
         {/* Toast Notification */}
         {showSavedToast && (
-          <div className="p-3 rounded-full bg-theme-primary-subtle text-theme-primary text-xs font-black flex items-center gap-2 shadow-theme-sm font-mono">
+          <div className="p-2.5 rounded-xl bg-theme-primary-subtle border border-theme-neon text-theme-primary text-sm font-medium flex items-center gap-2 shadow-theme-glow">
             <Check className="w-4 h-4 text-theme-primary" />
             <span>Settings saved successfully</span>
           </div>

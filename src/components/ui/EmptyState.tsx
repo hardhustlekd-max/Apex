@@ -14,24 +14,24 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
   actions,
-  minHeight = 'min-h-[320px]',
+  minHeight = 'min-h-[180px]',
   className = '',
 }) => {
   return (
     <div
-      className={`bg-theme-card rounded-2xl sm:rounded-3xl p-8 sm:p-10 flex-1 ${minHeight} flex flex-col items-center justify-center text-center space-y-4 shadow-theme-sm font-sans ${className}`}
+      className={`bg-theme-card border border-theme rounded-2xl p-4 sm:p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center space-y-2.5 shadow-theme-sm font-sans ${className}`}
     >
       {icon && (
-        <div className="w-12 h-12 rounded-2xl bg-theme-primary-subtle flex items-center justify-center text-theme-primary shrink-0">
+        <div className="text-theme-primary shrink-0 flex items-center justify-center">
           {icon}
         </div>
       )}
       <div className="max-w-md space-y-1">
-        <h3 className="text-sm font-extrabold text-theme-main">{title}</h3>
-        {description && <p className="text-xs text-theme-sub">{description}</p>}
+        <h3 className="text-lg font-semibold text-theme-main tracking-[-0.015em]">{title}</h3>
+        {description && <p className="text-sm font-normal text-theme-sub">{description}</p>}
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
           {actions}
         </div>
       )}

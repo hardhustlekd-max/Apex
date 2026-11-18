@@ -19,28 +19,32 @@ export const Input: React.FC<InputProps> = ({
   value,
   ...props
 }) => {
-  const heightCls = inputSize === 'sm' ? 'h-8 py-1 text-[11px]' : 'h-10 py-2 text-xs';
-  const bgCls = surface === 'card' ? 'bg-theme-card' : 'bg-theme-subtle';
-  const padLeft = leftIcon ? 'pl-9' : 'pl-3.5';
-  const padRight = onClear && value ? 'pr-8' : 'pr-3.5';
+  const heightCls = inputSize === 'sm' ? 'h-[36px] min-h-[36px] text-sm' : 'h-[40px] min-h-[40px] text-base';
+  const bgCls = surface === 'card' ? 'bg-theme-card border border-theme' : 'bg-theme-subtle border border-theme-subdued';
+  const padLeft = leftIcon ? (inputSize === 'sm' ? 'pl-8' : 'pl-9') : 'pl-3';
+  const padRight = onClear && value ? 'pr-8' : 'pr-3';
 
   return (
-    <div className={`relative w-full ${containerClassName}`}>
+    <div className={`relative w-full font-sans ${containerClassName}`}>
       {leftIcon && (
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-sub pointer-events-none flex items-center justify-center shrink-0">
+        <span
+          className={`absolute top-1/2 -translate-y-1/2 text-theme-sub pointer-events-none flex items-center justify-center shrink-0 ${
+            inputSize === 'sm' ? 'left-2.5' : 'left-3'
+          }`}
+        >
           {leftIcon}
         </span>
       )}
       <input
         value={value}
-        className={`w-full ${heightCls} ${bgCls} rounded-full ${padLeft} ${padRight} text-theme-main placeholder:text-theme-sub font-semibold focus:outline-none focus:ring-2 focus:ring-theme-accent focus:bg-theme-card-elevated transition-colors ${className}`}
+        className={`w-full ${heightCls} ${bgCls} rounded-xl ${padLeft} ${padRight} text-theme-main placeholder:text-theme-dim font-normal focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-theme-accent focus:bg-theme-card-elevated transition-all ${className}`}
         {...props}
       />
       {onClear && value && (
         <button
           type="button"
           onClick={onClear}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-sub hover:text-theme-main p-1 rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-[24px] h-[24px] text-theme-sub hover:text-theme-main hover:bg-theme-card/70 rounded-lg cursor-pointer flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           aria-label="Clear input"
         >
           <X className="w-3.5 h-3.5" />

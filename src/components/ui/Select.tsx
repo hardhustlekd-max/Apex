@@ -8,7 +8,7 @@ export interface SelectOption {
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options?: SelectOption[];
-  selectSize?: 'sm' | 'md';
+  selectSize?: 'xs' | 'sm' | 'md';
   surface?: 'subtle' | 'card';
   containerClassName?: string;
 }
@@ -22,13 +22,21 @@ export const Select: React.FC<SelectProps> = ({
   children,
   ...props
 }) => {
-  const sizeCls = selectSize === 'sm' ? 'min-h-[32px] px-3 py-1 text-[11px] pr-7' : 'min-h-[36px] px-3.5 py-2 text-xs pr-8';
-  const bgCls = surface === 'card' ? 'bg-theme-card' : 'bg-theme-subtle';
+  const sizeCls =
+    selectSize === 'xs'
+      ? 'h-[30px] min-h-[30px] px-2.5 text-xs pr-7'
+      : selectSize === 'sm'
+      ? 'h-[36px] min-h-[36px] px-3 text-sm pr-8'
+      : 'h-[40px] min-h-[40px] px-3.5 text-base pr-8';
+  const bgCls =
+    surface === 'card'
+      ? 'bg-theme-card border border-theme'
+      : 'bg-theme-subtle border border-theme-subdued';
 
   return (
-    <div className={`relative inline-flex items-center ${containerClassName}`}>
+    <div className={`relative inline-flex items-center font-sans ${containerClassName}`}>
       <select
-        className={`w-full ${sizeCls} ${bgCls} rounded-full font-bold text-theme-main appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-theme-accent focus:bg-theme-card-elevated transition-colors ${className}`}
+        className={`w-full ${sizeCls} ${bgCls} rounded-xl font-medium text-theme-main appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-theme-accent focus:bg-theme-card-elevated transition-all ${className}`}
         {...props}
       >
         {options

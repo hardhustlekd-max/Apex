@@ -14,26 +14,26 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const SURFACE_CLASSES: Record<CardSurface, string> = {
-  default: 'bg-theme-card shadow-theme-sm',
-  elevated: 'bg-theme-card-elevated shadow-theme-sm',
-  subtle: 'bg-theme-subtle',
+  default: 'bg-theme-card border border-theme shadow-theme-sm',
+  elevated: 'bg-theme-card-elevated border border-theme shadow-theme-sm',
+  subtle: 'bg-theme-subtle border border-theme-subdued',
   interactive:
-    'bg-theme-card shadow-theme-sm hover:bg-theme-card-elevated hover:shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
+    'bg-theme-card border border-theme shadow-theme-sm hover:bg-theme-card-elevated hover:border-theme-accent hover:shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
   selected:
-    'bg-theme-card-elevated ring-2 ring-theme-accent shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
+    'bg-theme-card-elevated border border-theme-accent shadow-theme-glow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
 };
 
 const PADDING_CLASSES: Record<CardPadding, string> = {
   none: 'p-0',
-  sm: 'p-3',
-  md: 'p-3.5 sm:p-4',
-  lg: 'p-4 sm:p-5',
+  sm: 'p-2.5',
+  md: 'p-3 sm:p-3.5',
+  lg: 'p-3.5 sm:p-4',
 };
 
 const RADIUS_CLASSES: Record<CardRadius, string> = {
   xl: 'rounded-xl',
-  '2xl': 'rounded-xl sm:rounded-2xl',
-  '3xl': 'rounded-2xl sm:rounded-3xl',
+  '2xl': 'rounded-2xl',
+  '3xl': 'rounded-3xl',
 };
 
 export const Card: React.FC<CardProps> = ({

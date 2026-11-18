@@ -21,8 +21,8 @@ export function notifyDbMutation(): void {
   }
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
+export const DATA_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
+export const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
 
 let rawDbInstance: Database.Database | null = null;
 let isRecoveringDb = false;

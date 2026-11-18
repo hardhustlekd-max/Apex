@@ -8,10 +8,10 @@ export interface TeamAvatarProps {
 }
 
 const SIZE_MAP = {
-  xs: 'w-3.5 h-3.5 text-[7.5px]',
-  sm: 'w-4 h-4 text-[10px]',
-  md: 'w-5.5 h-5.5 text-xs',
-  lg: 'w-7 h-7 text-xs',
+  xs: 'w-[18px] h-[18px] text-2xs leading-none',
+  sm: 'w-[22px] h-[22px] text-2xs leading-none',
+  md: 'w-[28px] h-[28px] text-xs leading-none',
+  lg: 'w-[36px] h-[36px] text-sm leading-none',
 };
 
 export const TeamAvatar: React.FC<TeamAvatarProps> = ({
@@ -31,7 +31,7 @@ export const TeamAvatar: React.FC<TeamAvatarProps> = ({
   if (!src || hasError) {
     return (
       <div
-        className={`${SIZE_MAP[size]} rounded-full bg-theme-subtle font-bold text-theme-main flex items-center justify-center shrink-0 select-none ${className}`}
+        className={`${SIZE_MAP[size]} rounded-full bg-theme-subtle border border-theme-subdued font-semibold text-theme-main flex items-center justify-center shrink-0 select-none ${className}`}
         aria-hidden="true"
       >
         {initial}

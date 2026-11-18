@@ -114,26 +114,27 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
     }
     role={onClick ? 'button' : undefined}
     tabIndex={onClick ? 0 : undefined}
-    className={`px-4 py-2.5 odd:bg-theme-card even:bg-theme-card-elevated/45 hover:bg-theme-subtle/75 transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10.5px] ${
+    className={`min-h-[46px] px-3 py-1.5 hover:bg-theme-card-elevated transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm ${
       onClick ? 'cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent' : ''
     }`}
   >
     <div className="min-w-0 space-y-0.5">
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-extrabold text-theme-main text-[11px] sm:text-xs">
+        <span className="font-semibold text-theme-main text-base tracking-[-0.01em]">
           {homeTeam} <span className="text-theme-sub font-normal">vs</span> {awayTeam}
         </span>
-        <Badge variant="default" size="xs" pill>
-          {leagueLabel}
-        </Badge>
-        <span className="text-[9px] font-mono tabular-nums text-theme-sub">{matchDate}</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-xs text-theme-sub tabular-nums flex-wrap">
+        <span className="font-medium">{leagueLabel}</span>
+        <span aria-hidden="true">·</span>
+        <span className="font-normal">{matchDate}</span>
       </div>
 
-      <div className="text-[10px] text-theme-sub font-mono tabular-nums flex items-center gap-2 flex-wrap">
+      <div className="text-sm text-theme-sub font-normal tabular-nums flex items-center gap-1.5 flex-wrap">
         <span>{scoreLabel}</span>
         <span className="text-theme-sub" aria-hidden="true">•</span>
         <span>
-          Model Pick: <strong className="text-theme-main font-black">{pickLabel}</strong> ({pickProbPercent}%)
+          Model Pick: <strong className="text-theme-main font-semibold">{pickLabel}</strong> ({pickProbPercent}%)
         </span>
         {xGLabel && (
           <>
@@ -330,7 +331,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const correctCount = history.reduce((acc, f) => acc + (evaluatePrediction(f).isCorrect ? 1 : 0), 0);
   const accuracyPct = totalEvaluated > 0 ? ((correctCount / totalEvaluated) * 100).toFixed(1) : '0.0';
 
-  // Filter imported matches according to active filter tab and sort mode
   const filteredImportedMatches = importedEvaluation
     ? importedEvaluation.evaluated
         .filter((item) => {
@@ -349,12 +349,11 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     : [];
 
   if (isLoading && !importedEvaluation) {
-    return <LoadingState label="Loading..." minHeight="min-h-[240px]" />;
+    return <LoadingState label="Loading..." minHeight="min-h-[180px]" />;
   }
 
   return (
     <div className="space-y-3 font-sans">
-      {/* Hidden file input for importing predictions JSON */}
       <input
         type="file"
         ref={fileInputRef}
@@ -364,38 +363,36 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         aria-hidden="true"
       />
 
-      {/* Toast Notification */}
       {syncToast && (
         <div
           role="status"
-          className="p-3 rounded-2xl bg-theme-card text-theme-primary text-xs font-mono font-bold flex items-center justify-between gap-2 shadow-theme-md animate-in fade-in slide-in-from-top-2"
+          className="p-3 rounded-xl bg-theme-card border border-theme-neon text-theme-primary text-sm font-medium flex items-center justify-between gap-2 shadow-theme-md animate-in fade-in slide-in-from-top-2"
         >
           <div className="flex items-center gap-2">
             <Database className={`w-4 h-4 shrink-0 ${isSyncingHistory || isImporting ? 'animate-spin text-theme-primary' : 'text-theme-primary'}`} />
             <span>{syncToast}</span>
           </div>
           {importedEvaluation && (
-            <Badge variant="accent" size="xs" pill>
+            <Badge variant="accent" size="xs">
               Imported
             </Badge>
           )}
         </div>
       )}
 
-      {/* Import Error Message */}
       {importError && (
         <div
           role="alert"
-          className="p-3 rounded-2xl bg-rose-500/10 text-rose-700 dark:text-rose-400 text-xs font-bold flex items-center justify-between gap-2 font-mono shadow-theme-sm"
+          className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/35 text-rose-600 dark:text-rose-400 text-sm font-medium flex items-center justify-between gap-2 shadow-theme-sm"
         >
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
             <span>{importError}</span>
           </div>
           <button
             type="button"
             onClick={() => setImportError(null)}
-            className="p-1 text-rose-500 hover:text-rose-700 cursor-pointer"
+            className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             aria-label="Dismiss error"
           >
             <X className="w-3.5 h-3.5" />
@@ -407,7 +404,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <SectionHeader
           title={importedEvaluation ? 'Imported Evaluation' : 'Prediction History'}
-          icon={importedEvaluation ? <FileSpreadsheet className="w-4 h-4 text-theme-primary" /> : <BarChart3 className="w-4 h-4 text-theme-primary" />}
+          icon={importedEvaluation ? <FileSpreadsheet className="w-4 h-4" /> : <BarChart3 className="w-4 h-4" />}
           size="md"
         />
 
@@ -417,7 +414,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <Button
                 variant="inverse"
                 size="sm"
-                pill
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
                 title="Import another prediction JSON file"
@@ -429,7 +425,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <Button
                 variant="secondary"
                 size="sm"
-                pill
                 onClick={() => setImportedEvaluation(null)}
                 title="Exit imported evaluation and return to database history"
               >
@@ -442,12 +437,11 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <Button
                 variant="inverse"
                 size="sm"
-                pill
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting || isProcessingActive}
                 title="Import a predictions JSON file exported from the Prediction Engine to evaluate accuracy"
               >
-                <Upload className={`w-3.5 h-3.5 text-theme-primary ${isImporting ? 'animate-bounce' : ''}`} />
+                <Upload className={`w-3.5 h-3.5 ${isImporting ? 'animate-bounce' : ''}`} />
                 <span>{isImporting ? 'Evaluating File...' : 'Import & Evaluate'}</span>
               </Button>
 
@@ -481,7 +475,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <Button
                 variant="secondary"
                 size="sm"
-                pill
                 onClick={handleSyncHistoryScraper}
                 disabled={isSyncingHistory || isRefreshing || isProcessingActive}
                 title="Run historical archive scraper to populate database with multi-year results"
@@ -493,7 +486,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <Button
                 variant="primary"
                 size="sm"
-                pill
                 onClick={() => fetchHistory(limit, true)}
                 disabled={isRefreshing || isSyncingHistory || isProcessingActive}
               >
@@ -508,29 +500,24 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       {/* IMPORTED EVALUATION VIEW */}
       {importedEvaluation ? (
         <div className="space-y-3">
-          {/* Active File Banner with Filter Tabs */}
-          <Card surface="elevated" padding="md" radius="2xl" className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+            <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="p-2 rounded-xl bg-theme-primary/10 text-theme-primary shrink-0">
-                  <FileSpreadsheet className="w-4 h-4" />
-                </div>
+                <FileSpreadsheet className="w-4 h-4 text-theme-primary shrink-0" />
                 <div className="min-w-0">
-                  <span className="font-extrabold text-xs sm:text-sm text-theme-main truncate block">
+                  <span className="font-semibold text-base text-theme-main truncate block tracking-[-0.01em]">
                     {importedEvaluation.fileName}
                   </span>
-                  <span className="text-[10px] font-mono text-theme-sub">
-                    {importedEvaluation.summary.totalImported} predictions imported & evaluated against verified results
+                  <span className="text-xs font-normal tabular-nums text-theme-sub">
+                    {importedEvaluation.summary.totalImported} predictions evaluated
                   </span>
                 </div>
               </div>
 
-              {/* Status Filter Buttons */}
               <div className="flex items-center gap-1 shrink-0 flex-wrap">
                 <Button
                   variant={importedFilter === 'ALL' ? 'primary' : 'subtle'}
                   size="xs"
-                  pill
                   onClick={() => setImportedFilter('ALL')}
                 >
                   All ({importedEvaluation.summary.totalImported})
@@ -538,27 +525,21 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 <Button
                   variant={importedFilter === 'WON' ? 'primary' : 'subtle'}
                   size="xs"
-                  pill
                   onClick={() => setImportedFilter('WON')}
-                  className={importedFilter === 'WON' ? 'bg-emerald-600 dark:bg-emerald-500' : ''}
                 >
                   Won ({importedEvaluation.summary.wonCount})
                 </Button>
                 <Button
-                  variant={importedFilter === 'LOST' ? 'primary' : 'subtle'}
+                  variant={importedFilter === 'LOST' ? 'danger' : 'subtle'}
                   size="xs"
-                  pill
                   onClick={() => setImportedFilter('LOST')}
-                  className={importedFilter === 'LOST' ? 'bg-rose-600 dark:bg-rose-500' : ''}
                 >
                   Lost ({importedEvaluation.summary.lostCount})
                 </Button>
                 <Button
-                  variant={importedFilter === 'PENDING' ? 'primary' : 'subtle'}
+                  variant={importedFilter === 'PENDING' ? 'secondary' : 'subtle'}
                   size="xs"
-                  pill
                   onClick={() => setImportedFilter('PENDING')}
-                  className={importedFilter === 'PENDING' ? 'bg-amber-600 dark:bg-amber-500' : ''}
                 >
                   Pending ({importedEvaluation.summary.pendingCount})
                 </Button>
@@ -566,12 +547,11 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             </div>
           </Card>
 
-          {/* Imported Summary Stat Tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <StatTile
               label="Evaluated Matches"
               value={`${importedEvaluation.summary.evaluatedCount} / ${importedEvaluation.summary.totalImported}`}
-              icon={<Layers className="w-3.5 h-3.5 text-theme-primary" />}
+              icon={<Layers className="w-4 h-4" />}
               tone="default"
               surface="card"
             />
@@ -579,16 +559,17 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             <StatTile
               label="Model Accuracy"
               value={`${importedEvaluation.summary.accuracy}%`}
-              icon={<ShieldCheck className="w-3.5 h-3.5 text-theme-primary" />}
+              icon={<ShieldCheck className="w-4 h-4" />}
               tone="accent"
               surface="card"
+              progress={Number(importedEvaluation.summary.accuracy)}
             />
 
             <StatTile
               label="Won Picks"
               value={importedEvaluation.summary.wonCount}
               subValue={`Lost: ${importedEvaluation.summary.lostCount}`}
-              icon={<Target className="w-3.5 h-3.5 text-emerald-500" />}
+              icon={<Target className="w-4 h-4" />}
               tone="accent"
               surface="card"
             />
@@ -597,20 +578,19 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               label="Pending Matches"
               value={importedEvaluation.summary.pendingCount}
               subValue="Awaiting FT"
-              icon={<Clock className="w-3.5 h-3.5 text-amber-500" />}
+              icon={<Clock className="w-4 h-4" />}
               tone="warning"
               surface="card"
             />
           </div>
 
-          {/* Imported Predictions List */}
           {filteredImportedMatches.length === 0 ? (
             <EmptyState
               icon={<FileSpreadsheet className="w-6 h-6 text-theme-primary" />}
               title={`No ${importedFilter.toLowerCase()} predictions in imported file`}
             />
           ) : (
-            <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
+            <Card surface="default" padding="none" radius="2xl" className="overflow-hidden divide-y divide-[var(--border-subdued)]">
               {filteredImportedMatches.map((item, idx) => (
                 <HistoryMatchRow
                   key={`${item.fixtureId}_${idx}`}
@@ -621,10 +601,10 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                   scoreLabel={
                     item.homeScore !== null && item.awayScore !== null ? (
                       <>
-                        Final Score: <strong className="text-theme-main font-black">{item.homeScore} - {item.awayScore}</strong>
+                        Final Score: <strong className="text-theme-main font-semibold">{item.homeScore} - {item.awayScore}</strong>
                       </>
                     ) : (
-                      <span className="text-amber-500 font-bold">
+                      <span className="text-amber-500 font-medium">
                         Score: {item.status === 'LIVE' ? 'In Play' : 'Awaiting Final Result'}
                       </span>
                     )
@@ -634,18 +614,18 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                   xGLabel={item.homeXG !== null && item.homeXG !== undefined ? `${item.homeXG} - ${item.awayXG}` : null}
                   statusBadge={
                     item.evaluationState === 'WON' ? (
-                      <Badge variant="solid" size="sm" pill className="bg-emerald-600 text-white dark:bg-emerald-500">
-                        <CheckCircle2 className="w-3 h-3 text-white" />
+                      <Badge variant="success" size="sm">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Won</span>
                       </Badge>
                     ) : item.evaluationState === 'LOST' ? (
-                      <Badge variant="danger" size="sm" pill>
-                        <XCircle className="w-3 h-3 text-rose-500" />
+                      <Badge variant="danger" size="sm">
+                        <XCircle className="w-3.5 h-3.5" />
                         <span>Lost</span>
                       </Badge>
                     ) : (
-                      <Badge variant="warning" size="sm" pill>
-                        <Clock className="w-3 h-3 text-amber-500" />
+                      <Badge variant="warning" size="sm">
+                        <Clock className="w-3.5 h-3.5" />
                         <span>Pending</span>
                       </Badge>
                     )
@@ -658,13 +638,12 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       ) : (
         /* DATABASE HISTORICAL PREDICTIONS VIEW */
         <div className="space-y-3">
-          {/* Summary Stats Cards */}
           {totalEvaluated > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               <StatTile
                 label="Evaluated Matches"
                 value={totalEvaluated}
-                icon={<Layers className="w-3.5 h-3.5 text-theme-primary" />}
+                icon={<Layers className="w-4 h-4" />}
                 tone="default"
                 surface="card"
               />
@@ -672,16 +651,18 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               <StatTile
                 label="Model Accuracy"
                 value={`${accuracyPct}%`}
-                icon={<ShieldCheck className="w-3.5 h-3.5 text-theme-primary" />}
+                subValue={`n=${totalEvaluated}`}
+                icon={<ShieldCheck className="w-4 h-4" />}
                 tone="accent"
                 surface="card"
+                progress={Number(accuracyPct)}
               />
 
               <StatTile
                 label="Correct Hits"
                 value={correctCount}
                 subValue={`/ ${totalEvaluated}`}
-                icon={<Target className="w-3.5 h-3.5 text-theme-primary" />}
+                icon={<Target className="w-4 h-4" />}
                 tone="default"
                 surface="card"
                 className="col-span-2 sm:col-span-1"
@@ -689,7 +670,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
             </div>
           )}
 
-          {/* Fixtures List */}
           {history.length === 0 ? (
             (() => {
               const awaitingCount = summary?.completedAwaitingScore ?? 0;
@@ -725,30 +705,27 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     <div className="flex items-center gap-2 flex-wrap justify-center">
                       <Button
                         variant="inverse"
-                        size="md"
-                        pill
+                        size="sm"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Upload className="w-3.5 h-3.5 text-theme-primary" />
-                        <span>Import & Evaluate Predictions JSON</span>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Import &amp; Evaluate JSON</span>
                       </Button>
 
                       {showFullSyncCta && onTriggerFullSync ? (
                         <>
                           <Button
                             variant="primary"
-                            size="md"
-                            pill
+                            size="sm"
                             onClick={onTriggerFullSync}
                             disabled={isProcessingActive || isRefreshing}
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Start Full Sync & Update Data</span>
+                            <span>Start Full Sync</span>
                           </Button>
                           <Button
-                            variant="subtle"
-                            size="md"
-                            pill
+                            variant="secondary"
+                            size="sm"
                             onClick={() => fetchHistory(limit, true)}
                             disabled={isRefreshing || isProcessingActive}
                           >
@@ -759,13 +736,12 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                       ) : (
                         <Button
                           variant="primary"
-                          size="md"
-                          pill
+                          size="sm"
                           onClick={() => fetchHistory(limit, true)}
                           disabled={isRefreshing || isProcessingActive}
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                          <span>{isRefreshing ? 'Checking Flashscore Results...' : refreshCtaLabel}</span>
+                          <span>{isRefreshing ? 'Checking Results...' : refreshCtaLabel}</span>
                         </Button>
                       )}
                     </div>
@@ -774,7 +750,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               );
             })()
           ) : (
-            <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
+            <Card surface="default" padding="none" radius="2xl" className="overflow-hidden divide-y divide-[var(--border-subdued)]">
               {history.map((f) => {
                 const evalResult = evaluatePrediction(f);
 
@@ -788,21 +764,21 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     onClick={onSelectDetail ? () => onSelectDetail(f) : undefined}
                     scoreLabel={
                       <>
-                        Final Score: <strong className="text-theme-main font-black">{evalResult.hG} - {evalResult.aG}</strong>
+                        Final Score: <strong className="text-theme-main font-semibold">{evalResult.hG} - {evalResult.aG}</strong>
                       </>
                     }
                     pickLabel={evalResult.predictedLabel}
                     pickProbPercent={(evalResult.topProb * 100).toFixed(0)}
                     statusBadge={
-                      <Badge variant={evalResult.isCorrect ? 'solid' : 'danger'} size="sm" pill>
+                      <Badge variant={evalResult.isCorrect ? 'solid' : 'danger'} size="sm">
                         {evalResult.isCorrect ? (
                           <>
-                            <CheckCircle2 className="w-3 h-3 text-theme-primary-text" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-theme-primary-text" />
                             <span>Hit</span>
                           </>
                         ) : (
                           <>
-                            <XCircle className="w-3 h-3 text-rose-500" />
+                            <XCircle className="w-3.5 h-3.5 text-rose-500" />
                             <span>Missed</span>
                           </>
                         )}
@@ -818,4 +794,3 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     </div>
   );
 };
-

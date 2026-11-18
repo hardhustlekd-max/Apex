@@ -98,11 +98,11 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     <div className="space-y-2.5 font-sans">
       {!compact && (
         <div className="flex flex-col gap-2">
-          <SectionHeader title="Standings" size="md" />
+          <SectionHeader title="Standings" icon={<Trophy className="w-4 h-4" />} size="md" />
           <div
             role="tablist"
             aria-label="League standings selector"
-            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 p-1 bg-theme-card rounded-2xl shadow-theme-sm"
+            className="flex items-center gap-0.5 overflow-x-auto no-scrollbar h-[44px] min-h-[44px] p-[3px] bg-theme-card border border-theme rounded-xl shadow-theme-sm"
           >
             {POPULAR_LEAGUES.map((l) => (
               <button
@@ -111,10 +111,10 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                 role="tab"
                 aria-selected={currentLeague === l.code}
                 onClick={() => handleLeagueChange(l.code)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 whitespace-nowrap cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                className={`h-full px-3 rounded-lg text-base transition-all duration-150 whitespace-nowrap cursor-pointer shrink-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                   currentLeague === l.code
-                    ? 'bg-theme-primary text-theme-primary-text font-black shadow-theme-glow'
-                    : 'text-theme-sub hover:text-theme-main'
+                    ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                    : 'text-theme-sub font-medium hover:text-theme-main hover:bg-theme-subtle'
                 }`}
               >
                 {l.name}
@@ -125,14 +125,14 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       )}
 
       {compact && standingsData && (
-        <div className="flex items-center justify-between gap-1.5 px-1">
+        <div className="min-h-[36px] flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-theme-sub" />
-            <span className="text-xs font-extrabold text-theme-main">
+            <Trophy className="w-4 h-4 text-theme-primary shrink-0" />
+            <span className="text-base font-semibold text-theme-main tracking-[-0.01em]">
               {standingsData.leagueName} Table
             </span>
           </div>
-          <span className="text-xs font-mono tabular-nums text-theme-sub">
+          <span className="text-xs font-normal tabular-nums text-theme-sub">
             {standingsData.source === 'FLASHSCORE_SCRAPED' ? 'Flashscore Live Table' : 'Database Table'}
           </span>
         </div>
@@ -163,20 +163,20 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       {!isLoading && standingsData && standingsData.table.length > 0 && (
         <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
           <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-sm">
               <thead>
-                <tr className="bg-theme-card-elevated text-xs font-extrabold text-theme-main">
-                  <th className="py-2 pl-3 pr-1.5 text-center w-7 font-mono tabular-nums">#</th>
-                  <th className="py-2 px-2.5">Team</th>
-                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Played">MP</th>
-                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Won">W</th>
-                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Drawn">D</th>
-                  <th className="py-2 px-1.5 text-center w-7 font-mono tabular-nums" title="Lost">L</th>
-                  <th className="py-2 px-1.5 text-center hidden sm:table-cell w-10 font-mono tabular-nums" title="Goal Difference">GD</th>
-                  <th className="py-2 px-2.5 text-center font-black text-theme-main w-9 font-mono tabular-nums" title="Points">PTS</th>
+                <tr className="h-[36px] bg-theme-header-grad border-b border-theme text-2xs uppercase tracking-[0.06em] font-medium text-theme-sub">
+                  <th className="py-2 pl-2.5 pr-1 text-center w-8 tabular-nums">#</th>
+                  <th className="py-2 px-2">Team</th>
+                  <th className="py-2 px-1 text-center w-7 tabular-nums" title="Played">MP</th>
+                  <th className="py-2 px-1 text-center w-7 tabular-nums" title="Won">W</th>
+                  <th className="py-2 px-1 text-center w-7 tabular-nums" title="Drawn">D</th>
+                  <th className="py-2 px-1 text-center w-7 tabular-nums" title="Lost">L</th>
+                  <th className="py-2 px-1 text-center hidden sm:table-cell w-9 tabular-nums" title="Goal Difference">GD</th>
+                  <th className="py-2 px-2.5 text-center font-semibold text-theme-main w-10 tabular-nums" title="Points">PTS</th>
                 </tr>
               </thead>
-              <tbody className="font-semibold">
+              <tbody className="font-normal divide-y divide-[var(--border-subdued)]">
                 {standingsData.table.map((row) => {
                   const highlightRole = isTeamHighlighted(row.teamName);
                   const isTop4 = row.rank <= 4;
@@ -185,41 +185,41 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                   return (
                     <tr
                       key={`${row.rank}-${row.teamName}`}
-                      className={`transition-colors duration-150 hover:bg-theme-subtle ${
+                      className={`h-[32px] transition-colors duration-150 hover:bg-theme-subtle/75 ${
                         highlightRole === 'HOME' || highlightRole === 'AWAY'
-                          ? 'bg-theme-primary-subtle text-theme-main font-extrabold'
-                          : 'odd:bg-theme-card even:bg-theme-card-elevated/45'
+                          ? 'bg-theme-primary-subtle text-theme-main font-semibold'
+                          : ''
                       }`}
                     >
-                      <td className="py-2 pl-3 pr-1.5 text-center font-mono tabular-nums text-[10.5px]">
+                      <td className="py-2 pl-2.5 pr-1 text-center tabular-nums text-xs">
                         <span
-                          className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8.5px] font-black ${
+                          className={`inline-flex items-center justify-center w-[22px] h-[22px] rounded-md text-2xs font-bold ${
                             isTop4
-                              ? 'bg-theme-primary text-theme-primary-text'
+                              ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
                               : isRelegation
-                              ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
-                              : 'text-theme-sub'
+                              ? 'bg-rose-500/15 text-rose-500 dark:text-rose-400'
+                              : 'text-theme-sub font-medium'
                           }`}
                         >
                           {row.rank}
                         </span>
                       </td>
 
-                      <td className="py-2 px-2.5 min-w-[110px]">
+                      <td className="py-2 px-2 min-w-[110px]">
                         <div className="flex items-center gap-1.5">
                           <TeamAvatar src={row.badge} name={row.teamName} size="xs" />
-                          <span className="truncate text-theme-main font-extrabold text-[11px]">
+                          <span className="truncate text-theme-main font-medium text-sm">
                             {row.teamName}
                           </span>
                         </div>
                       </td>
 
-                      <td className="py-2 px-1.5 text-center font-mono tabular-nums text-theme-sub">{row.played}</td>
-                      <td className="py-2 px-1.5 text-center font-mono tabular-nums text-theme-sub">{row.won}</td>
-                      <td className="py-2 px-1.5 text-center font-mono tabular-nums text-theme-sub">{row.drawn}</td>
-                      <td className="py-2 px-1.5 text-center font-mono tabular-nums text-theme-sub">{row.lost}</td>
-                      <td className="py-2 px-1.5 text-center font-mono tabular-nums text-theme-sub hidden sm:table-cell">{row.goalDifference}</td>
-                      <td className="py-2 px-2.5 text-center font-mono tabular-nums font-black text-theme-main">{row.points}</td>
+                      <td className="py-2 px-1 text-center tabular-nums text-theme-sub">{row.played}</td>
+                      <td className="py-2 px-1 text-center tabular-nums text-theme-sub">{row.won}</td>
+                      <td className="py-2 px-1 text-center tabular-nums text-theme-sub">{row.drawn}</td>
+                      <td className="py-2 px-1 text-center tabular-nums text-theme-sub">{row.lost}</td>
+                      <td className="py-2 px-1 text-center tabular-nums text-theme-sub hidden sm:table-cell">{row.goalDifference}</td>
+                      <td className="py-2 px-2.5 text-center tabular-nums font-semibold text-theme-main text-sm">{row.points}</td>
                     </tr>
                   );
                 })}

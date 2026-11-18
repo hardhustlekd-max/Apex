@@ -7,10 +7,10 @@ interface BottomNavDockProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'FIXTURES' as const, label: 'Home / Fixtures', icon: Home },
-  { id: 'ACCAS' as const, label: 'Accumulators Schedule', icon: Layers },
-  { id: 'STANDINGS' as const, label: 'League Standings', icon: Trophy },
-  { id: 'HISTORY' as const, label: 'Prediction History', icon: History },
+  { id: 'FIXTURES' as const, label: 'Today', ariaLabel: 'Home and Fixtures', icon: Home },
+  { id: 'ACCAS' as const, label: 'Tips', ariaLabel: 'Featured Tips', icon: Layers },
+  { id: 'STANDINGS' as const, label: 'Table', ariaLabel: 'League Standings', icon: Trophy },
+  { id: 'HISTORY' as const, label: 'History', ariaLabel: 'Prediction History', icon: History },
 ];
 
 export const BottomNavDock: React.FC<BottomNavDockProps> = ({
@@ -20,10 +20,10 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
   return (
     <nav
       aria-label="Mobile navigation"
-      className="fixed bottom-0 left-0 right-0 w-full z-40 lg:hidden bg-theme-glass shadow-theme-md pt-1.5 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] px-3 transition-all"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+8px)] left-2.5 right-2.5 z-40 lg:hidden bg-theme-glass border border-theme rounded-xl shadow-theme-md p-[3px] transition-all font-sans"
     >
-      <div className="max-w-md mx-auto flex items-center justify-around w-full">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+      <div className="max-w-md mx-auto grid grid-cols-4 gap-0.5 w-full">
+        {NAV_ITEMS.map(({ id, label, ariaLabel, icon: Icon }) => {
           const isActive = activeTab === id;
           return (
             <button
@@ -31,17 +31,17 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
               type="button"
               onClick={() => onSelectTab(id)}
               aria-current={isActive ? 'page' : undefined}
-              aria-label={label}
-              className={`min-h-[46px] min-w-[50px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
+              aria-label={ariaLabel}
+              className={`h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 px-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
                 isActive
-                  ? 'text-theme-primary'
-                  : 'text-theme-sub hover:text-theme-main'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
+                  : 'text-theme-sub hover:text-theme-main font-medium'
               }`}
             >
-              <Icon className="w-5 h-5 stroke-[2]" />
-              {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-theme-primary absolute -bottom-0.5" />
-              )}
+              <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
+              <span className="text-xs leading-none tracking-[-0.005em] truncate max-w-full">
+                {label}
+              </span>
             </button>
           );
         })}

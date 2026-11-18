@@ -57,13 +57,13 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Error Log"
-      icon={<AlertCircle className="w-4 h-4 text-rose-500 stroke-[2.5]" />}
+      icon={<AlertCircle className="w-4 h-4 text-rose-500 stroke-[2.25]" />}
       maxWidth="max-w-2xl"
       closeLabel="Close error log"
-      bodyClassName="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 min-h-0"
+      bodyClassName="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto flex-1 min-h-0"
       headerActions={
         <>
-          <Badge variant="danger" size="xs" pill>
+          <Badge variant="danger" size="xs">
             {errors.length} {errors.length === 1 ? 'Error' : 'Errors'}
           </Badge>
           {onRefresh && (
@@ -71,21 +71,21 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
               type="button"
               onClick={onRefresh}
               disabled={isLoading}
-              className="w-8 h-8 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-all duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               title="Refresh error logs"
               aria-label="Refresh error logs"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-theme-primary' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-theme-primary' : ''}`} />
             </button>
           )}
           <button
             type="button"
             onClick={handleCopyLogs}
-            className="w-8 h-8 rounded-full bg-theme-subtle hover:bg-theme-primary hover:text-theme-primary-text text-theme-main transition-all duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Copy error log"
             aria-label="Copy error log"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
           </button>
         </>
       }
@@ -93,42 +93,42 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {onOpenTerminal && (
-              <Button variant="subtle" size="sm" pill onClick={onOpenTerminal}>
+              <Button variant="secondary" size="sm" onClick={onOpenTerminal}>
                 <Terminal className="w-3.5 h-3.5" />
                 <span>Full Terminal</span>
               </Button>
             )}
             {onClearErrors && errors.length > 0 && (
-              <Button variant="subtle" size="sm" pill onClick={onClearErrors}>
+              <Button variant="subtle" size="sm" onClick={onClearErrors}>
                 <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                 <span>Clear Logs</span>
               </Button>
             )}
           </div>
-          <Button variant="primary" size="sm" pill onClick={onClose}>
+          <Button variant="primary" size="sm" onClick={onClose}>
             Dismiss
           </Button>
         </div>
       }
     >
       {hasDatabaseError && (
-        <Card surface="subtle" padding="md" radius="2xl" className="bg-rose-500/10 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-extrabold text-rose-600 dark:text-rose-400">
-            <Database className="w-4 h-4 shrink-0" />
+        <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-rose-500 dark:text-rose-400">
+            <Database className="w-3.5 h-3.5 shrink-0" />
             <span>Database / SQLite Error Detected</span>
           </div>
-          <p className="text-[11px] text-theme-sub leading-relaxed">
-            A database read/write or integrity issue occurred. Automatic recovery runs if a malformed SQLite disk image is detected. Review the bound error entries below for exact details.
+          <p className="text-sm font-normal text-theme-sub leading-relaxed">
+            A database read/write issue occurred. Automatic recovery runs if a malformed disk image is detected.
           </p>
-        </Card>
+        </div>
       )}
 
       {errors.length === 0 ? (
-        <Card surface="subtle" padding="lg" radius="2xl" className="text-center text-xs text-theme-sub">
+        <div className="py-8 text-center text-sm text-theme-sub">
           No active error entries recorded.
-        </Card>
+        </div>
       ) : (
-        <div className="space-y-2.5 max-h-[52vh] overflow-y-auto pr-0.5 select-text">
+        <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden divide-y divide-[var(--border-subdued)] max-h-[52vh] overflow-y-auto select-text">
           {errors.map((err, idx) => {
             const time = err.timestamp ? err.timestamp.slice(11, 19) : '';
             const detailsText = err.details
@@ -138,45 +138,36 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
               : null;
 
             return (
-              <Card
-                key={err.id || idx}
-                surface="subtle"
-                padding="md"
-                radius="2xl"
-                className="space-y-2 border border-rose-500/20"
-              >
+              <div key={err.id || idx} className="p-3.5 space-y-1.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="danger" size="xs" pill>
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs tabular-nums">
+                    <Badge variant="danger" size="xs">
                       ERROR
                     </Badge>
-                    <Badge variant="default" size="xs" pill>
-                      {err.category}
-                    </Badge>
-                    <span className="text-[11px] font-mono font-bold text-theme-main">
-                      [{err.source}]
-                    </span>
+                    <span className="font-medium text-theme-sub">{err.category}</span>
+                    <span aria-hidden="true" className="text-theme-dim">·</span>
+                    <span className="font-semibold text-theme-main">{err.source}</span>
                   </div>
                   {time && (
-                    <span className="text-[10px] font-mono tabular-nums text-theme-sub">
+                    <span className="text-xs font-normal tabular-nums text-theme-dim">
                       {time}
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs font-mono font-semibold text-rose-600 dark:text-rose-400 break-words leading-relaxed">
+                <p className="text-sm font-medium text-rose-500 dark:text-rose-400 break-words leading-relaxed">
                   {err.message}
                 </p>
 
                 {detailsText && (
-                  <pre className="p-2.5 rounded-xl bg-theme-card text-[10px] font-mono text-theme-sub overflow-x-auto max-h-36 whitespace-pre-wrap break-words">
+                  <pre className="p-2.5 rounded-lg bg-theme-card border border-theme-subdued text-xs font-normal text-theme-sub overflow-x-auto max-h-32 whitespace-pre-wrap break-words tabular-nums">
                     {detailsText}
                   </pre>
                 )}
-              </Card>
+              </div>
             );
           })}
-        </div>
+        </Card>
       )}
     </Modal>
   );

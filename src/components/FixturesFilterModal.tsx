@@ -56,15 +56,15 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
       onClose={onClose}
       maxWidth="max-w-sm"
       title="Filters"
-      icon={<Filter className="w-3.5 h-3.5" />}
+      icon={<Filter className="w-4 h-4" />}
       closeLabel="Close filters"
-      bodyClassName="p-4 flex flex-col gap-3 overflow-y-auto overscroll-contain"
+      bodyClassName="p-3 sm:p-3.5 flex flex-col gap-2.5 overflow-y-auto overscroll-contain"
       headerActions={
         activeFilterCount > 0 && onResetFilters ? (
           <button
             type="button"
             onClick={onResetFilters}
-            className="text-xs font-bold text-rose-500 hover:text-rose-600 hover:underline cursor-pointer px-1.5 py-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="h-[34px] inline-flex items-center text-xs font-medium text-rose-500 hover:bg-rose-500/10 cursor-pointer px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Reset All
           </button>
@@ -78,8 +78,8 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
       }
     >
       <div className="w-full relative min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-[11px] font-bold text-theme-sub uppercase tracking-wider truncate">
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] truncate">
             League Filter
           </label>
           <button
@@ -88,7 +88,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
               setIsLeagueModalOpen(true);
               onClose();
             }}
-            className="text-xs font-bold text-theme-primary hover:underline cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="text-xs font-medium text-theme-primary hover:underline cursor-pointer rounded-lg px-1.5 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Browse All Leagues...
           </button>
@@ -106,9 +106,9 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         <div className="relative min-w-0">
-          <label className="text-[11px] font-bold text-theme-sub uppercase tracking-wider block mb-1">
+          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5">
             Date Range
           </label>
           <Select
@@ -130,7 +130,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </div>
 
         <div className="relative min-w-0">
-          <label className="text-[11px] font-bold text-theme-sub uppercase tracking-wider block mb-1">
+          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5">
             Market
           </label>
           <Select
@@ -148,15 +148,15 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
       </div>
 
       <div className="relative min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-[11px] font-bold text-theme-sub uppercase tracking-wider block">
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">
             Sort by Percentage
           </label>
           {sortBy && sortBy !== 'DEFAULT' && (
             <button
               type="button"
               onClick={() => onSelectSortBy?.('DEFAULT')}
-              className="text-xs font-bold text-rose-500 hover:underline cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="text-xs font-medium text-rose-500 hover:underline cursor-pointer rounded-lg px-1.5 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               Reset Sort
             </button>
@@ -176,15 +176,15 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </Select>
       </div>
 
-      <div className="space-y-1">
-        <label className="text-[11px] font-bold text-theme-sub uppercase tracking-wider block">Search Team</label>
+      <div className="space-y-1.5">
+        <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">Search Team</label>
         <Input
           type="text"
           placeholder="Find team (e.g., Arsenal, Real Madrid)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onClear={() => setSearchQuery('')}
-          leftIcon={<Search className="w-3.5 h-3.5" />}
+          leftIcon={<Search className="w-4 h-4" />}
         />
       </div>
     </Modal>

@@ -12,15 +12,15 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   label = 'Loading...',
   variant = 'spinner',
   rows = 6,
-  minHeight = 'min-h-[320px]',
+  minHeight = 'min-h-[180px]',
   className = '',
 }) => {
   if (variant === 'skeleton') {
     return (
-      <div className={`bg-theme-card rounded-2xl p-5 shadow-theme-sm space-y-2 animate-pulse ${className}`}>
-        <div className="h-3.5 bg-theme-subtle rounded-full w-1/3 mb-3" />
+      <div className={`bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm space-y-1.5 animate-pulse font-sans ${className}`}>
+        <div className="h-3 bg-theme-subtle rounded-lg w-1/3 mb-2" />
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="h-7 bg-theme-subtle rounded-xl" />
+          <div key={i} className="h-[28px] bg-theme-subtle rounded-lg" />
         ))}
       </div>
     );
@@ -28,12 +28,12 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 
   return (
     <div
-      className={`bg-theme-card rounded-2xl sm:rounded-3xl p-10 flex-1 ${minHeight} flex flex-col items-center justify-center text-center shadow-theme-sm font-sans ${className}`}
+      className={`bg-theme-card border border-theme rounded-2xl p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center shadow-theme-sm font-sans ${className}`}
       role="status"
       aria-live="polite"
     >
-      <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-default)] border-t-transparent animate-spin shrink-0 mx-auto" />
-      <span className="mt-3 text-xs text-theme-sub font-bold">{label}</span>
+      <div className="w-6 h-6 rounded-full border-2 border-[var(--accent-default)] border-t-transparent animate-spin shrink-0 mx-auto" />
+      <span className="mt-2.5 text-sm text-theme-sub font-medium">{label}</span>
     </div>
   );
 };

@@ -16,7 +16,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   className = '',
 }) => {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
-  const trackHeight = size === 'sm' ? 'h-2' : 'h-2.5';
+  const trackHeight = size === 'sm' ? 'h-1.5' : 'h-2';
   const trackBg = trackSurface === 'card' ? 'bg-theme-card' : 'bg-theme-subtle';
 
   return (
@@ -25,7 +25,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}
-      className={`w-full ${trackBg} rounded-full ${trackHeight} overflow-hidden ${className}`}
+      className={`w-full ${trackBg} border border-theme-subdued rounded-full ${trackHeight} overflow-hidden ${className}`}
     >
       <div
         className="bg-theme-primary h-full rounded-full transition-all duration-300 shadow-theme-glow"

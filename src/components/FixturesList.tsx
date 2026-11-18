@@ -348,9 +348,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       : 'No Historical Predictions';
 
   return (
-    <div className="space-y-2 font-sans flex-1 flex flex-col">
+    <div className="space-y-2.5 font-sans flex-1 flex flex-col">
       {/* 7-Day Selector Bar */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 items-center justify-items-center w-full py-1 px-0.5">
+      <div className="grid grid-cols-7 gap-1 items-center justify-items-center w-full">
         {calendarDays.map((cd) => {
           const isSelected =
             resolvedDateFilter.kind === 'SINGLE' && resolvedDateFilter.dayIndex === cd.index;
@@ -366,16 +366,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               onClick={() => handleSelectDateFilter(cd.filterKey)}
               aria-pressed={isSelected || isInRange}
               title={cd.fullLabel}
-              className={`w-full max-w-[44px] min-h-[46px] sm:min-h-[50px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl sm:rounded-2xl ${
+              className={`w-full max-w-[46px] h-[44px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl ${
                 isSelected
-                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow py-1.5 px-2 scale-[1.04]'
+                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
                   : isInRange
-                  ? 'bg-theme-primary-subtle text-theme-primary py-1.5 px-1'
-                  : 'bg-transparent text-theme-main hover:bg-theme-card hover:text-theme-primary py-1 px-1'
+                  ? 'bg-theme-primary-subtle text-theme-primary'
+                  : 'text-theme-main hover:bg-theme-card hover:text-theme-primary'
               }`}
             >
               <span
-                className={`text-sm sm:text-[15px] font-extrabold font-mono tabular-nums leading-none tracking-tight ${
+                className={`text-base font-semibold tabular-nums leading-none tracking-[-0.01em] ${
                   isSelected
                     ? 'text-theme-primary-text'
                     : isInRange
@@ -386,11 +386,11 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 {cd.dayNum}
               </span>
               <span
-                className={`text-[10px] font-semibold leading-none mt-1 ${
+                className={`text-2xs font-medium leading-none mt-1 ${
                   isSelected
-                    ? 'text-theme-primary-text font-bold'
+                    ? 'text-theme-primary-text'
                     : isInRange
-                    ? 'text-theme-primary font-bold'
+                    ? 'text-theme-primary'
                     : 'text-theme-sub'
                 }`}
               >
@@ -402,13 +402,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       </div>
 
       {/* Scope Sub-Tabs & Filters Bar */}
-      <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+      <div className="flex items-center justify-between gap-2 flex-nowrap">
         <SegmentedTabs
           items={scopeTabs}
           value={activeScope}
           onChange={(val) => setActiveScope(val as 'UPCOMING' | 'LIVE' | 'HISTORY')}
           variant="card"
-          size="xs"
+          size="md"
+          className="min-w-0"
           ariaLabel="Match scope"
         />
 
@@ -417,20 +418,20 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`min-h-[30px] flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`h-[44px] min-h-[44px] flex items-center justify-center gap-1.5 px-3 sm:px-3.5 rounded-xl text-base transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeFilterCount > 0
-                ? 'bg-theme-primary text-theme-primary-text font-extrabold shadow-theme-glow'
-                : 'bg-theme-card text-theme-main hover:bg-theme-subtle shadow-theme-sm'
+                ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                : 'bg-theme-card border border-theme text-theme-main font-medium hover:bg-theme-card-elevated hover:border-theme-accent shadow-theme-sm'
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="min-w-3.5 h-3.5 px-1 rounded-full bg-black/20 text-theme-primary-text text-[9.5px] font-black font-mono tabular-nums flex items-center justify-center">
+              <span className="min-w-[20px] h-[20px] px-1.5 rounded-md bg-black/20 text-theme-primary-text text-2xs leading-none font-semibold tabular-nums inline-flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
-            <ChevronDown className="w-3 h-3 opacity-70" />
+            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
         </div>
 
@@ -461,19 +462,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
       {/* Active Filter Chips Strip */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap py-2 px-3 bg-theme-card rounded-2xl text-xs shadow-theme-sm">
-          <span className="text-xs font-bold text-theme-sub shrink-0">
-            Active filters:
+        <div className="flex items-center gap-1.5 flex-wrap py-1.5 px-2.5 bg-theme-card border border-theme rounded-xl text-xs shadow-theme-sm">
+          <span className="text-2xs font-medium uppercase tracking-[0.05em] text-theme-sub shrink-0">
+            Filters:
           </span>
 
           {selectedLeague !== 'ALL' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
-              <span className="text-theme-sub">League:</span>
-              <span className="truncate max-w-[130px] font-semibold">{selectedLeagueLabel}</span>
+            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="truncate max-w-[130px] font-medium">{selectedLeagueLabel}</span>
               <button
                 type="button"
                 onClick={() => onSelectLeague('ALL')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Remove league filter"
                 aria-label="Remove league filter"
               >
@@ -483,13 +483,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {canonicalDateFilter !== 'TODAY' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
-              <span className="text-theme-sub">Date:</span>
-              <span className="font-semibold">{dateFilterLabel}</span>
+            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="font-medium">{dateFilterLabel}</span>
               <button
                 type="button"
                 onClick={() => handleSelectDateFilter('TODAY')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset date filter"
                 aria-label="Reset date filter"
               >
@@ -499,13 +498,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {marketChoiceFilter !== 'MOST_LIKELY' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
-              <span className="text-theme-sub">Market:</span>
-              <span className="font-semibold">{marketOptionObj?.label || marketChoiceFilter}</span>
+            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="font-medium">{marketOptionObj?.label || marketChoiceFilter}</span>
               <button
                 type="button"
                 onClick={() => setMarketChoiceFilter('MOST_LIKELY')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset to Most Likely"
                 aria-label="Reset market filter"
               >
@@ -515,13 +513,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {searchQuery.trim().length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
-              <span className="text-theme-sub">Search:</span>
-              <span className="truncate max-w-[110px] font-semibold">&quot;{searchQuery}&quot;</span>
+            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="truncate max-w-[110px] font-medium">&quot;{searchQuery}&quot;</span>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Clear search"
                 aria-label="Clear search"
               >
@@ -531,13 +528,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {sortBy && sortBy !== 'DEFAULT' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-theme-subtle text-theme-main font-medium text-xs">
-              <span className="text-theme-sub">Sort:</span>
-              <span className="font-semibold">{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
+            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="font-medium">{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
               <button
                 type="button"
                 onClick={() => onSelectSortBy?.('DEFAULT')}
-                className="text-theme-sub hover:text-theme-primary cursor-pointer p-0.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset sort"
                 aria-label="Reset sort"
               >
@@ -549,9 +545,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={handleResetAllFilters}
-            className="ml-auto text-xs font-bold text-theme-primary hover:underline px-1.5 py-0.5 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="ml-auto h-[24px] inline-flex items-center text-xs font-medium text-theme-primary hover:underline px-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
-            Clear all
+            Clear
           </button>
         </div>
       )}
@@ -561,24 +557,24 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         <LoadingState />
       ) : displayedFixtures.length === 0 ? (
         <EmptyState
-          icon={<RefreshCw className="w-6 h-6" />}
+          icon={<RefreshCw className="w-5 h-5" />}
           title={emptyTitle}
-          minHeight="min-h-[340px]"
+          minHeight="min-h-[180px]"
           actions={
             <>
               {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
-                <Button variant="primary" size="md" pill={false} onClick={onTriggerFullSync}>
-                  <RefreshCw className="w-4 h-4" />
+                <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
+                  <RefreshCw className="w-3.5 h-3.5" />
                   <span>Start Full Sync &amp; Update Data</span>
                 </Button>
               )}
               {activeFilterCount > 0 && (
-                <Button variant="subtle" size="md" pill={false} onClick={handleResetAllFilters}>
+                <Button variant="subtle" size="sm" onClick={handleResetAllFilters}>
                   Reset filters ({activeFilterCount})
                 </Button>
               )}
               {activeScope === 'UPCOMING' && canonicalDateFilter !== 'ALL' && (
-                <Button variant="subtle" size="md" pill={false} onClick={() => handleSelectDateFilter('ALL')}>
+                <Button variant="subtle" size="sm" onClick={() => handleSelectDateFilter('ALL')}>
                   Show all dates ({totalDatabaseCount ?? fixtures.length})
                 </Button>
               )}
@@ -586,7 +582,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           }
         />
       ) : viewMode === 'CARDS' ? (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {groupedByLeague.map((group) => {
             const isExpanded = !!expandedLeagues[group.headerKey];
             const isCollapsed = !isExpanded;
@@ -608,36 +604,43 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                   onClick={() => toggleLeagueExpand(group.headerKey)}
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
-                  className={`w-full min-h-[44px] flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
-                    isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-card-elevated hover:bg-theme-card'
+                  className={`w-full min-h-[44px] flex items-center justify-between gap-2.5 px-3 sm:px-3.5 py-2 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                    isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-header-grad border-b border-theme-subdued'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <ChevronDown
-                      className={`w-4 h-4 text-theme-sub shrink-0 transition-transform duration-150 ${
+                      className={`w-4 h-4 text-theme-primary shrink-0 transition-transform duration-150 ${
                         isCollapsed ? '-rotate-90' : 'rotate-0'
                       }`}
                     />
-                    <span className="font-extrabold text-sm sm:text-[15px] text-theme-main break-words">
+                    <span
+                      className={`font-semibold text-base leading-snug tracking-[-0.01em] text-theme-main ${
+                        isCollapsed ? 'truncate' : 'break-words'
+                      }`}
+                      title={group.leagueName}
+                    >
                       {group.leagueName}
                     </span>
                     {group.subDivision && group.subDivision !== group.leagueName && (
-                      <span className="text-xs text-theme-sub break-words">
+                      <span className="text-xs font-normal text-theme-sub truncate hidden sm:inline">
                         · {group.subDivision}
                       </span>
                     )}
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-theme-subtle text-theme-sub font-mono tabular-nums text-xs font-semibold shrink-0">
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="h-[22px] min-w-[24px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center">
                       {totalGroupMatches}
                     </span>
+                    <span className="text-xs font-normal text-theme-sub hidden sm:inline">
+                      {isCollapsed ? 'Expand' : 'Collapse'}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold text-theme-sub hidden sm:inline shrink-0">
-                    {isCollapsed ? 'Expand' : 'Collapse'}
-                  </span>
                 </button>
 
                 {!isCollapsed && (
-                  <div id={panelId} className="bg-theme-card border-t border-theme-subdued">
-                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div id={panelId} className="bg-theme-card">
+                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2.5">
                       {visibleGroupFixtures.map((fixture) => (
                         <FixtureCard
                           key={fixture.id}

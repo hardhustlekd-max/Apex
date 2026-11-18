@@ -45,39 +45,41 @@ export class ErrorBoundary extends React.Component<Props, State> {
   public override render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-theme-bg text-theme-main flex items-center justify-center p-4 font-sans">
-          <Card className="max-w-md w-full p-6 shadow-theme-md space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-theme-primary-subtle rounded-xl text-theme-primary shrink-0">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
+        <div className="min-h-screen bg-theme-bg text-theme-main flex items-center justify-center p-3.5 font-sans">
+          <Card radius="2xl" padding="none" className="max-w-md w-full shadow-theme-md overflow-hidden">
+            <div className="min-h-[44px] px-3.5 py-2.5 bg-theme-header-grad border-b border-theme flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-theme-primary shrink-0" />
               <div className="min-w-0">
-                <h2 className="text-lg font-extrabold text-theme-main">Application Encountered an Issue</h2>
-                <p className="text-xs text-theme-sub">Poisson Football Engine UI Recovery</p>
+                <h2 className="text-lg font-semibold text-theme-main tracking-[-0.015em]">
+                  Application Encountered an Issue
+                </h2>
+                <p className="text-xs font-normal text-theme-sub">Poisson Football Engine UI Recovery</p>
               </div>
             </div>
 
-            <div className="bg-theme-subtle rounded-xl p-3 text-xs font-mono text-theme-sub overflow-auto max-h-32">
-              <p className="text-rose-600 dark:text-rose-400 font-semibold mb-1">
-                {this.state.error?.name || 'Error'}: {this.state.error?.message || 'Unknown render error'}
-              </p>
-              {this.state.errorInfo?.componentStack && (
-                <pre className="text-[10px] text-theme-dim whitespace-pre-wrap">
-                  {this.state.errorInfo.componentStack.slice(0, 300)}
-                </pre>
-              )}
-            </div>
+            <div className="p-3.5 space-y-3">
+              <div className="bg-theme-subtle rounded-xl p-3 text-sm text-theme-sub overflow-auto max-h-32 tabular-nums">
+                <p className="text-rose-500 dark:text-rose-400 font-medium mb-1">
+                  {this.state.error?.name || 'Error'}: {this.state.error?.message || 'Unknown render error'}
+                </p>
+                {this.state.errorInfo?.componentStack && (
+                  <pre className="text-xs font-normal text-theme-dim whitespace-pre-wrap">
+                    {this.state.errorInfo.componentStack.slice(0, 300)}
+                  </pre>
+                )}
+              </div>
 
-            <div className="flex flex-col gap-2.5 pt-2">
-              <Button variant="primary" fullWidth onClick={this.handleReload}>
-                <RefreshCw className="w-4 h-4" />
-                <span>Reload Application</span>
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button variant="primary" size="md" fullWidth onClick={this.handleReload}>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Reload Application</span>
+                </Button>
 
-              <Button variant="subtle" fullWidth onClick={this.handleResetCache}>
-                <Trash2 className="w-4 h-4 text-theme-sub" />
-                <span>Clear Cache &amp; Reset Application State</span>
-              </Button>
+                <Button variant="secondary" size="md" fullWidth onClick={this.handleResetCache}>
+                  <Trash2 className="w-4 h-4 text-theme-sub" />
+                  <span>Clear Cache &amp; Reset Application State</span>
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

@@ -97,130 +97,131 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
   }, [fixture.awayTeam]);
 
   return (
-    <div className="space-y-4">
-      {/* Overview Banner with Framer Motion hover pulsing keywords */}
-      <motion.div
-        whileHover={{ scale: 1.01 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Card surface="elevated" padding="md" radius="2xl" className="space-y-3 cursor-pointer group">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-theme-primary-subtle text-theme-primary">
-              <Compass className="w-4 h-4" />
-            </div>
-            <div>
-              <SectionHeader title="Tactical Style & Matchup Analysis" size="sm" />
-              <p className="text-[11px] text-theme-sub font-mono">
-                AI-driven tactical blueprint derived from tactical structures, pressing metrics, and recent performances
-              </p>
-            </div>
-          </div>
-          <p className="text-xs text-theme-main font-sans leading-relaxed p-3 rounded-xl bg-theme-card border border-theme">
-            The tactical chess match between{' '}
-            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-bold underline decoration-dotted">
+    <div className="space-y-2.5 font-sans">
+      {/* Overview Banner */}
+      <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+        <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+          <SectionHeader
+            title="Tactical Matchup Analysis"
+            icon={<Compass className="w-3.5 h-3.5" />}
+            size="sm"
+          />
+          <span className="text-xs font-medium text-theme-sub hidden sm:inline">Pressing &amp; Transition</span>
+        </div>
+
+        <div className="p-3.5">
+          <p className="text-sm font-normal text-theme-main leading-relaxed">
+            The tactical match between{' '}
+            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">
               {fixture.homeTeam}
             </motion.span>{' '}
-            (<motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">{homeProfile.styleName}</motion.span>) and{' '}
-            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-bold underline decoration-dotted">
+            (<motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">{homeProfile.styleName}</motion.span>) and{' '}
+            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">
               {fixture.awayTeam}
             </motion.span>{' '}
-            (<motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">{awayProfile.styleName}</motion.span>) centers on{' '}
-            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">midfield territory control</motion.span>. Expect{' '}
+            (<motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">{awayProfile.styleName}</motion.span>) centers on{' '}
+            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">midfield territory control</motion.span>. Expect{' '}
             {fixture.homeTeam} to seek{' '}
-            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">territorial dominance</motion.span>, while {fixture.awayTeam} will look to exploit{' '}
-            <motion.span whileHover={{ scale: 1.08, color: 'var(--color-primary)' }} className="font-semibold underline decoration-dotted">transition channels</motion.span>.
+            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">territorial dominance</motion.span>, while {fixture.awayTeam} will look to exploit{' '}
+            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">transition channels</motion.span>.
           </p>
-        </Card>
-      </motion.div>
+        </div>
+      </Card>
 
       {/* Side-by-Side Team Tactical Profiles */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
         {[
           {
             key: 'HOME',
-            identityLabel: 'Home Tactical Identity',
+            identityLabel: 'Home',
             teamName: fixture.homeTeam,
             badge: fixture.homeBadge,
             profile: homeProfile,
           },
           {
             key: 'AWAY',
-            identityLabel: 'Away Tactical Identity',
+            identityLabel: 'Away',
             teamName: fixture.awayTeam,
             badge: fixture.awayBadge,
             profile: awayProfile,
           },
         ].map((side) => (
-          <Card key={side.key} surface="elevated" padding="md" radius="2xl" className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-theme">
-              <div className="flex items-center gap-2">
+          <Card key={side.key} surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+            <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <TeamAvatar src={side.badge} name={side.teamName} size="sm" />
-                <div>
-                  <span className="text-[10px] text-theme-sub font-mono uppercase font-bold block">{side.identityLabel}</span>
-                  <span className="text-sm font-extrabold text-theme-main">{side.teamName}</span>
+                <div className="min-w-0">
+                  <span className="text-base font-semibold text-theme-main truncate block tracking-[-0.01em]">
+                    {side.teamName}
+                  </span>
+                  <span className="text-2xs text-theme-sub uppercase font-medium tracking-[0.06em]">
+                    {side.identityLabel}
+                  </span>
                 </div>
               </div>
-              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-theme-primary-subtle text-theme-primary">
+              <span className="text-xs font-semibold text-theme-primary shrink-0 tabular-nums">
                 {side.profile.pressingIntensity}
               </span>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="p-3.5 space-y-2.5">
               <div>
-                <motion.span whileHover={{ scale: 1.03, color: 'var(--color-primary)' }} className="text-xs font-black text-theme-main block cursor-default">
+                <span className="text-base font-semibold text-theme-main block tracking-[-0.01em]">
                   {side.profile.styleName}
-                </motion.span>
-                <span className="text-[11px] text-theme-sub block leading-snug">{side.profile.tagline}</span>
+                </span>
+                <span className="text-sm font-normal text-theme-sub block leading-snug mt-0.5">{side.profile.tagline}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="p-2.5 rounded-xl bg-theme-card border border-theme">
-                  <span className="text-[10px] text-theme-sub block font-mono uppercase">Build-up</span>
-                  <span className="text-xs font-bold text-theme-main">{side.profile.buildUpStyle}</span>
+              <div className="grid grid-cols-2 divide-x divide-[var(--border-subdued)] border-y border-theme-subdued py-2">
+                <div className="pr-2.5">
+                  <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">Build-up</span>
+                  <span className="text-sm font-semibold text-theme-main mt-0.5 block">{side.profile.buildUpStyle}</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-theme-card border border-theme">
-                  <span className="text-[10px] text-theme-sub block font-mono uppercase">Defensive Shape</span>
-                  <span className="text-xs font-bold text-theme-main">{side.profile.defensiveShape}</span>
+                <div className="pl-2.5">
+                  <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">Shape</span>
+                  <span className="text-sm font-semibold text-theme-main mt-0.5 block">{side.profile.defensiveShape}</span>
                 </div>
               </div>
 
-              <div className="space-y-1.5 pt-1 text-xs">
-                <div className="flex items-start gap-2 p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-start gap-2 text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong className="text-theme-main">Strength:</strong> {side.profile.keyStrength}</span>
+                  <span className="text-theme-sub font-normal"><strong className="text-theme-main font-semibold">Strength:</strong> {side.profile.keyStrength}</span>
                 </div>
-                <div className="flex items-start gap-2 p-2 rounded-lg bg-rose-500/10 text-rose-400">
+                <div className="flex items-start gap-2 text-rose-500 dark:text-rose-400">
                   <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span><strong className="text-theme-main">Vulnerability:</strong> {side.profile.vulnerability}</span>
+                  <span className="text-theme-sub font-normal"><strong className="text-theme-main font-semibold">Vulnerability:</strong> {side.profile.vulnerability}</span>
                 </div>
               </div>
 
-              <motion.p whileHover={{ scale: 1.01 }} className="text-[11px] text-theme-sub font-mono leading-relaxed pt-1 cursor-default">
+              <p className="text-sm font-normal text-theme-sub leading-relaxed pt-1 border-t border-theme-subdued">
                 {side.profile.summary}
-              </motion.p>
+              </p>
             </div>
           </Card>
         ))}
       </div>
 
       {/* Key Matchup Battlegrounds */}
-      <Card surface="elevated" padding="md" radius="2xl" className="space-y-3">
-        <SectionHeader title="Critical Matchup Battlegrounds" size="sm" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-theme-card border border-theme space-y-1">
-            <span className="text-[10px] font-mono text-theme-sub uppercase font-bold block">Midfield Battle</span>
-            <span className="font-bold text-theme-main block">Territory & Second Balls</span>
-            <p className="text-[11px] text-theme-sub">Control of central second balls will dictate which team sustains attacking pressure.</p>
+      <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+        <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+          <SectionHeader title="Critical Matchup Battlegrounds" size="sm" className="w-full" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subdued)]">
+          <div className="p-3 space-y-1">
+            <span className="text-2xs text-theme-sub uppercase font-medium block tracking-[0.06em]">Midfield Battle</span>
+            <span className="font-semibold text-base text-theme-main block tracking-[-0.01em]">Territory &amp; Second Balls</span>
+            <p className="text-sm font-normal text-theme-sub leading-relaxed">Control of central second balls will dictate which team sustains attacking pressure.</p>
           </div>
-          <div className="p-3 rounded-xl bg-theme-card border border-theme space-y-1">
-            <span className="text-[10px] font-mono text-theme-sub uppercase font-bold block">Flank Duels</span>
-            <span className="font-bold text-theme-main block">Winger vs Fullback</span>
-            <p className="text-[11px] text-theme-sub">1v1 isolation duels on the wings will determine cross completion and box entries.</p>
+          <div className="p-3 space-y-1">
+            <span className="text-2xs text-theme-sub uppercase font-medium block tracking-[0.06em]">Flank Duels</span>
+            <span className="font-semibold text-base text-theme-main block tracking-[-0.01em]">Winger vs Fullback</span>
+            <p className="text-sm font-normal text-theme-sub leading-relaxed">1v1 isolation duels on the wings will determine cross completion and box entries.</p>
           </div>
-          <div className="p-3 rounded-xl bg-theme-card border border-theme space-y-1">
-            <span className="text-[10px] font-mono text-theme-sub uppercase font-bold block">Transition Phase</span>
-            <span className="font-bold text-theme-main block">Counter-Press Recovery</span>
-            <p className="text-[11px] text-theme-sub">Quick recovery runs during defensive transitions will prevent high-danger counter-attacks.</p>
+          <div className="p-3 space-y-1">
+            <span className="text-2xs text-theme-sub uppercase font-medium block tracking-[0.06em]">Transition Phase</span>
+            <span className="font-semibold text-base text-theme-main block tracking-[-0.01em]">Counter-Press Recovery</span>
+            <p className="text-sm font-normal text-theme-sub leading-relaxed">Quick recovery runs during defensive transitions will prevent high-danger counter-attacks.</p>
           </div>
         </div>
       </Card>

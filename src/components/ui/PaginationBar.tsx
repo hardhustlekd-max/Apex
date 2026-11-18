@@ -54,25 +54,24 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
     <div
       className={
         embedded
-          ? 'px-3 sm:px-3.5 py-2 bg-theme-card-elevated/60 border-t border-theme-subdued flex flex-wrap items-center justify-between gap-2 text-xs'
-          : 'px-3 py-2 bg-theme-card flex flex-wrap items-center justify-between gap-2 text-xs rounded-xl sm:rounded-full shadow-theme-sm'
+          ? 'px-3 py-2 bg-theme-card-elevated border-t border-theme-subdued flex flex-wrap items-center justify-between gap-2 text-xs font-sans'
+          : 'px-3 py-2 bg-theme-card border border-theme flex flex-wrap items-center justify-between gap-2 text-xs rounded-2xl shadow-theme-sm font-sans'
       }
     >
       <div className="flex items-center gap-2 flex-wrap min-w-0">
-        <span className="text-theme-sub font-mono tabular-nums text-xs whitespace-nowrap">
-          Showing{' '}
-          <span className="font-extrabold text-theme-primary">
+        <span className="text-theme-sub tabular-nums text-xs font-normal whitespace-nowrap">
+          <span className="font-semibold text-theme-primary">
             {startIndex}–{endIndex}
           </span>{' '}
           of{' '}
-          <span className="font-extrabold text-theme-main">{totalItems}</span>
+          <span className="font-semibold text-theme-main">{totalItems}</span>
         </span>
         <Select
           id="table-page-size-dropdown"
-          selectSize="sm"
+          selectSize="xs"
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="font-mono tabular-nums"
+          className="tabular-nums"
           aria-label="Rows per page"
         >
           {pageSizeOptions.map((opt) => (
@@ -83,12 +82,12 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
         </Select>
       </div>
 
-      <div className="flex items-center gap-1 ml-auto font-mono tabular-nums">
+      <div className="flex items-center gap-0.5 ml-auto tabular-nums">
         <button
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(1)}
-          className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-card-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+          className="h-[30px] w-[30px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
           title="First Page"
           aria-label="First Page"
         >
@@ -98,7 +97,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-card-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95 whitespace-nowrap"
+          className="h-[30px] flex items-center justify-center gap-0.5 px-2 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Previous Page"
           aria-label="Previous Page"
         >
@@ -111,7 +110,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
             typeof item === 'string' ? (
               <span
                 key={`ellipsis-${idx}`}
-                className="px-1 text-theme-sub font-bold text-xs select-none"
+                className="px-1 text-theme-sub font-medium text-xs select-none"
               >
                 ...
               </span>
@@ -120,10 +119,10 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
                 key={`page-${item}`}
                 type="button"
                 onClick={() => onPageChange(item)}
-                className={`min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-xs font-black transition-all cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                className={`w-[30px] h-[30px] flex items-center justify-center rounded-lg text-xs transition-all cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                   item === currentPage
-                    ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
-                    : 'bg-theme-subtle text-theme-main hover:bg-theme-card-elevated'
+                    ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                    : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
                 }`}
               >
                 {item}
@@ -136,7 +135,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          className="min-h-[32px] flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-card-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer active:scale-95 whitespace-nowrap"
+          className="h-[30px] flex items-center justify-center gap-0.5 px-2 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Next Page"
           aria-label="Next Page"
         >
@@ -147,7 +146,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(totalPages)}
-          className="min-h-[32px] min-w-[32px] p-1.5 rounded-full bg-theme-subtle text-theme-main hover:bg-theme-card-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+          className="h-[30px] w-[30px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
           title="Last Page"
           aria-label="Last Page"
         >

@@ -682,7 +682,7 @@ export default function App() {
             refreshingContent={
               <div className="flex items-center justify-center py-3">
                 <div
-                  className="w-9 h-9 rounded-full bg-theme-card shadow-theme-md flex items-center justify-center text-theme-primary"
+                  className="w-9 h-9 rounded-full bg-theme-card border border-theme shadow-theme-md flex items-center justify-center text-theme-primary"
                   role="status"
                   aria-label="Refreshing"
                 >
@@ -706,7 +706,7 @@ export default function App() {
               </div>
             }
           >
-            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 sm:py-3 space-y-3 pb-16 lg:pb-6">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-3 space-y-2.5 pb-20 lg:pb-6">
               {/* Blocking Job Overlay when Full Data Sync or Calculate Predictions is in progress */}
               {isProcessingActive && (
                 <SyncLockOverlay
@@ -727,7 +727,7 @@ export default function App() {
 
 
               {activeTab === 'FIXTURES' && (
-                <div className={`w-full grid grid-cols-12 gap-3 lg:gap-4 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
+                <div className={`w-full grid grid-cols-12 gap-3 lg:gap-3.5 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   {/* Master Feed Column */}
                   <div className="col-span-12 lg:col-span-7 xl:col-span-7 min-w-0">
                     <FixturesList
@@ -765,7 +765,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-14 h-[calc(100vh-4.25rem)] rounded-xl sm:rounded-2xl bg-theme-card shadow-theme-md overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[56px] h-[calc(100vh-68px)] rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}

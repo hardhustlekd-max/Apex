@@ -17,13 +17,17 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
 }) => {
   const titleCls =
     size === 'sm'
-      ? 'text-xs font-extrabold text-theme-main tracking-tight'
-      : 'text-sm sm:text-base font-extrabold text-theme-main tracking-tight';
+      ? 'text-base font-semibold text-theme-main tracking-[-0.01em]'
+      : 'text-lg font-bold text-theme-main tracking-[-0.015em]';
 
   return (
-    <div className={`flex items-center justify-between gap-2 min-w-0 ${className}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        {icon && <span className="shrink-0 text-theme-primary">{icon}</span>}
+    <div className={`flex items-center justify-between gap-2 min-w-0 font-sans ${className}`}>
+      <div className="flex items-center gap-1.5 min-w-0">
+        {icon && (
+          <span className="flex items-center justify-center shrink-0 text-theme-primary">
+            {icon}
+          </span>
+        )}
         <h2 className={`${titleCls} truncate`}>{title}</h2>
       </div>
       {action && <div className="shrink-0">{action}</div>}

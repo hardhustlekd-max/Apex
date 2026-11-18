@@ -55,12 +55,12 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
       onClose={onClose}
       maxWidth="max-w-xl"
       title="Leagues"
-      icon={<Globe className="w-4.5 h-4.5 stroke-[2.5]" />}
+      icon={<Globe className="w-4 h-4 stroke-[2.25]" />}
       closeLabel="Close league selector"
       bodyClassName="flex flex-col flex-1 min-h-0 overflow-hidden"
     >
       {/* Search Input Box */}
-      <div className="px-4 sm:px-6 pt-3 pb-2 shrink-0">
+      <div className="px-3 sm:px-3.5 pt-2.5 pb-2 shrink-0">
         <Input
           type="text"
           value={search}
@@ -68,59 +68,65 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
           onClear={() => setSearch('')}
           placeholder="Search by league name or country..."
           leftIcon={<Search className="w-4 h-4" />}
-          className="text-xs sm:text-sm font-extrabold"
+          inputSize="md"
           autoFocus
         />
       </div>
 
       {/* Leagues List */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 space-y-2 overscroll-contain">
-        <button
-          type="button"
-          onClick={() => {
-            onSelectLeague('ALL');
-            onClose();
-          }}
-          className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
-            selectedLeague === 'ALL'
-              ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-theme-sm'
-              : 'bg-theme-subtle hover:bg-theme-card-elevated text-theme-main'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-theme-primary shrink-0" />
-            <span className="text-xs sm:text-sm font-extrabold">All Leagues Worldwide</span>
-          </div>
-          {selectedLeague === 'ALL' && <Check className="w-4 h-4 text-theme-primary stroke-[3]" />}
-        </button>
+      <div className="flex-1 overflow-y-auto px-3 sm:px-3.5 pb-3 overscroll-contain">
+        <div className="rounded-xl border border-theme bg-theme-card divide-y overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectLeague('ALL');
+              onClose();
+            }}
+            className={`w-full min-h-[40px] text-left flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
+              selectedLeague === 'ALL'
+                ? 'bg-theme-primary-subtle font-semibold text-theme-primary'
+                : 'hover:bg-theme-subtle/70 font-medium text-theme-main'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-theme-primary shrink-0" />
+              <span className="text-base">All Leagues Worldwide</span>
+            </div>
+            {selectedLeague === 'ALL' && <Check className="w-3.5 h-3.5 text-theme-primary stroke-[3]" />}
+          </button>
 
-        {filteredLeagues.map((league, idx) => {
-          const isSelected = selectedLeague.toUpperCase() === league.code.toUpperCase() || selectedLeague.toLowerCase() === league.name.toLowerCase();
-          return (
-            <button
-              key={`${league.code}-${idx}`}
-              type="button"
-              onClick={() => {
-                onSelectLeague(league.code);
-                onClose();
-              }}
-              className={`w-full text-left flex items-center justify-between px-4 py-2.5 rounded-full cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
-                isSelected
-                  ? 'bg-theme-primary-subtle font-black text-theme-primary shadow-theme-sm'
-                  : 'bg-theme-subtle hover:bg-theme-card-elevated text-theme-main'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-theme-primary' : 'bg-theme-sub'}`} />
-                <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-bold truncate">{league.name}</div>
-                  <div className="text-xs font-mono text-theme-sub truncate">{league.country || 'International'}</div>
+          {filteredLeagues.map((league, idx) => {
+            const isSelected =
+              selectedLeague.toUpperCase() === league.code.toUpperCase() ||
+              selectedLeague.toLowerCase() === league.name.toLowerCase();
+            return (
+              <button
+                key={`${league.code}-${idx}`}
+                type="button"
+                onClick={() => {
+                  onSelectLeague(league.code);
+                  onClose();
+                }}
+                className={`w-full min-h-[40px] text-left flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
+                  isSelected
+                    ? 'bg-theme-primary-subtle font-semibold text-theme-primary'
+                    : 'hover:bg-theme-subtle/70 font-medium text-theme-main'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-theme-primary' : 'bg-theme-sub/60'}`} />
+                  <div className="min-w-0 flex items-baseline gap-1.5 truncate">
+                    <span className="text-base truncate">{league.name}</span>
+                    <span className="text-xs font-normal text-theme-sub truncate shrink-0">
+                      {league.country || 'International'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              {isSelected && <Check className="w-4 h-4 text-theme-primary shrink-0" />}
-            </button>
-          );
-        })}
+                {isSelected && <Check className="w-3.5 h-3.5 text-theme-primary shrink-0 stroke-[3]" />}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </Modal>
   );

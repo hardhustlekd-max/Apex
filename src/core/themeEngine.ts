@@ -16,6 +16,7 @@ export interface ColorTheme {
   previewColors: {
     primary: string;
     hover: string;
+    gradient: string;
     live: string;
     modelPick: string;
     surfaceDark: string;
@@ -29,96 +30,100 @@ export const COLOR_THEMES: ColorTheme[] = [
   {
     id: 'opta-emerald',
     name: 'Opta Kinetic Emerald',
-    tagline: 'Modern Precision Analytics',
-    description: 'Pitch-inspired kinetic emerald green with high-contrast obsidian dark mode & clean platinum light mode.',
-    accentHex: '#00E687',
-    accentHoverHex: '#00C272',
-    accentName: 'Pitch Emerald',
-    modelPickHex: '#00E687',
-    modelPickName: 'Kinetic Green',
-    liveHex: '#FF3B30',
+    tagline: 'Neon Pitch Gradient',
+    description: 'Kinetic neon emerald gradients on deep obsidian slate with crisp emerald-tinted borders and platinum daylight clarity.',
+    accentHex: '#00DC82',
+    accentHoverHex: '#2BFFAD',
+    accentName: 'Neon Emerald',
+    modelPickHex: '#2BFFAD',
+    modelPickName: 'Kinetic Mint',
+    liveHex: '#FF385C',
     badgeBg: 'bg-theme-primary-subtle text-theme-primary',
-    colorways: ['Obsidian Void', 'Platinum Canvas', 'Kinetic Emerald', 'Signal Red'],
+    colorways: ['Obsidian Pitch', 'Alabaster Light', 'Neon Emerald', 'Signal Crimson'],
     previewColors: {
-      primary: '#00E687',
-      hover: '#00C975',
-      live: '#FF3B4E',
-      modelPick: '#00E687',
-      surfaceDark: '#070B12',
-      surfaceLight: '#F5F7FB',
-      cardDark: '#0F1623',
+      primary: '#00DC82',
+      hover: '#2BFFAD',
+      gradient: 'linear-gradient(135deg, #2BFFAD 0%, #00DC82 55%, #059669 100%)',
+      live: '#FF385C',
+      modelPick: '#2BFFAD',
+      surfaceDark: '#060908',
+      surfaceLight: '#F2F6F4',
+      cardDark: '#0E1612',
       cardLight: '#FFFFFF',
     },
   },
   {
     id: 'champions-crimson',
     name: 'Champions Crimson & Mint',
-    tagline: 'European Matchday Intensity',
-    description: 'Signal matchday red for navigation & live score signaling, paired with cyber mint green for model predictions & value metrics.',
-    accentHex: '#E6002A',
-    accentHoverHex: '#FF1A43',
-    accentName: 'Signal Red & Mint',
+    tagline: 'Matchday Neon Contrast',
+    description: 'Luminous matchday crimson gradients paired with cyber mint model highlights and deep stadium midnight surfaces.',
+    accentHex: '#FF234B',
+    accentHoverHex: '#FF4D6D',
+    accentName: 'Neon Crimson',
     modelPickHex: '#00F5A0',
     modelPickName: 'Cyber Mint',
     liveHex: '#FF2E51',
     badgeBg: 'bg-theme-primary-subtle text-theme-primary',
-    colorways: ['Midnight Stadium', 'Cold Fog White', 'Matchday Crimson', 'Cyber Mint'],
+    colorways: ['Midnight Arena', 'Cold Stadium Mist', 'Matchday Crimson', 'Cyber Mint'],
     previewColors: {
       primary: '#FF234B',
-      hover: '#FF3D60',
+      hover: '#FF4D6D',
+      gradient: 'linear-gradient(135deg, #FF4D6D 0%, #FF1F4B 55%, #D90429 100%)',
       live: '#FF2E51',
       modelPick: '#00F5A0',
-      surfaceDark: '#090D18',
-      surfaceLight: '#F7F8FB',
-      cardDark: '#12192B',
+      surfaceDark: '#07080F',
+      surfaceLight: '#F3F4F9',
+      cardDark: '#121528',
       cardLight: '#FFFFFF',
     },
   },
   {
     id: 'ballon-gold',
-    name: "Ballon d'Or Gold",
-    tagline: 'Luxury Football Editorial',
-    description: 'Championship gold accents with velvet gala onyx surfaces, rich typography contrast, neon coral live highlights, and trophy jade indicators.',
-    accentHex: '#F59E0B',
-    accentHoverHex: '#FBBF24',
-    accentName: 'Championship Gold',
-    modelPickHex: '#10B981',
-    modelPickName: 'Trophy Jade',
+    name: "Ballon d'Or Gold & Jade",
+    tagline: 'Solar Gold & Neon Emerald',
+    description: 'Signature solar gold neon buttons and two-zone amber header washes paired with vibrant emerald win metrics on obsidian glass.',
+    accentHex: '#FACC15',
+    accentHoverHex: '#FDE047',
+    accentName: 'Solar Gold',
+    modelPickHex: '#10D982',
+    modelPickName: 'Neon Jade',
     liveHex: '#FF385C',
     badgeBg: 'bg-theme-primary-subtle text-theme-primary',
-    colorways: ['Velvet Gala Onyx', 'Gallery Alabaster', '24K Trophy Gold', 'Neon Coral Pink'],
+    colorways: ['Obsidian Onyx', 'Warm Ivory', 'Solar Gold', 'Neon Jade'],
     previewColors: {
-      primary: '#F59E0B',
-      hover: '#FBBF24',
+      primary: '#FACC15',
+      hover: '#FDE047',
+      gradient: 'linear-gradient(135deg, #FDE047 0%, #FACC15 50%, #F59E0B 100%)',
       live: '#FF385C',
-      modelPick: '#10B981',
-      surfaceDark: '#090A0F',
-      surfaceLight: '#FAF9F6',
-      cardDark: '#141724',
+      modelPick: '#10D982',
+      surfaceDark: '#060908',
+      surfaceLight: '#F6F4EE',
+      cardDark: '#101611',
       cardLight: '#FFFFFF',
     },
   },
   {
     id: 'volt-lime',
     name: 'Volt Lime Pro',
-    tagline: 'High-Energy Volt Cyber',
-    description: 'Electric neon volt lime with technical cyber graphite pitch surfaces, maximum visibility metrics, and laser live accents.',
+    tagline: 'Electric Volt Cyber',
+    description: 'High-voltage volt lime gradients over cyber carbon surfaces with razor-sharp neon hairline borders and cyan indicators.',
     accentHex: '#CCFF00',
-    accentHoverHex: '#D4FF33',
-    accentName: 'Electric Lime',
+    accentHoverHex: '#E5FF4F',
+    accentName: 'Electric Volt',
     modelPickHex: '#CCFF00',
     modelPickName: 'Hyper Volt',
     liveHex: '#FF334B',
     badgeBg: 'bg-theme-primary-subtle text-theme-primary',
-    colorways: ['Cyber Graphite', 'Technical Gray', 'Hyper Neon Volt', 'Laser Hazard Red'],
+    colorways: ['Cyber Carbon', 'Technical Silver', 'Electric Volt', 'Laser Crimson'],
     previewColors: {
       primary: '#CCFF00',
-      hover: '#D7FF38',
+      hover: '#E5FF4F',
+      gradient: 'linear-gradient(135deg, #E5FF4F 0%, #CCFF00 50%, #9AE600 100%)',
       live: '#FF334B',
       modelPick: '#CCFF00',
-      surfaceDark: '#0A0B0E',
-      surfaceLight: '#F6F7F9',
-      cardDark: '#15171E',
+      surfaceDark: '#070907',
+      surfaceLight: '#F1F4F0',
+      cardDark: '#121710',
       cardLight: '#FFFFFF',
     },
   },
@@ -148,10 +153,15 @@ export function getActiveColorThemeId(): string {
   return DEFAULT_COLOR_THEME_ID;
 }
 
+const META_BG_BY_THEME: Record<string, { dark: string; light: string }> = {
+  'opta-emerald': { dark: '#060908', light: '#f2f6f4' },
+  'champions-crimson': { dark: '#07080f', light: '#f3f4f9' },
+  'ballon-gold': { dark: '#060908', light: '#f6f4ee' },
+  'volt-lime': { dark: '#070907', light: '#f1f4f0' },
+};
+
 /**
- * Robust, Industry-Standard Unified Theme Application
- * Simultaneously updates both mode (light/dark) and color palette (data-color-theme)
- * across both <html> and <body> to prevent attribute desynchronization.
+ * Unified Theme Application across <html>, <body>, and theme-color meta tag.
  */
 export function applyTheme(options: { mode?: ThemeMode; colorTheme?: string }): { mode: ThemeMode; colorTheme: string } {
   if (typeof window === 'undefined') return { mode: 'dark', colorTheme: DEFAULT_COLOR_THEME_ID };
@@ -167,7 +177,6 @@ export function applyTheme(options: { mode?: ThemeMode; colorTheme?: string }): 
     localStorage.setItem('app_color_theme', colorTheme);
   } catch {}
 
-  // Apply to <html>
   const root = document.documentElement;
   root.setAttribute('data-theme', mode);
   root.setAttribute('data-color-theme', colorTheme);
@@ -178,7 +187,6 @@ export function applyTheme(options: { mode?: ThemeMode; colorTheme?: string }): 
     root.classList.remove('dark');
   }
 
-  // Apply to <body> if mounted
   if (document.body) {
     const body = document.body;
     body.setAttribute('data-theme', mode);
@@ -191,13 +199,12 @@ export function applyTheme(options: { mode?: ThemeMode; colorTheme?: string }): 
     }
   }
 
-  // Update meta theme color
   const metaTheme = document.getElementById('meta-theme-color');
   if (metaTheme) {
-    metaTheme.setAttribute('content', mode === 'dark' ? '#070b12' : '#f1f5f9');
+    const palette = META_BG_BY_THEME[colorTheme] || META_BG_BY_THEME['opta-emerald'];
+    metaTheme.setAttribute('content', mode === 'dark' ? palette.dark : palette.light);
   }
 
-  // Dispatch events
   window.dispatchEvent(new CustomEvent('app-theme-mode-changed', { detail: { mode, effectiveTheme: mode } }));
   window.dispatchEvent(new CustomEvent('app-color-theme-changed', { detail: colorTheme }));
 
