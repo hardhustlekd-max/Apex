@@ -215,7 +215,16 @@ fixturesRouter.get('/standings/catalog', async (req, res) => {
 fixturesRouter.get('/standings/:league', async (req, res) => {
   try {
     const league = req.params.league || 'england_premier_league';
-    const standings = await flashscoreScraperService.getLeagueStandings(league);
+    const leagueUrl = typeof req.query.leagueUrl === 'string' ? req.query.leagueUrl : undefined;
+    const leagueName = typeof req.query.leagueName === 'string' ? req.query.leagueName : undefined;
+    const homeTeam = typeof req.query.homeTeam === 'string' ? req.query.homeTeam : undefined;
+    const awayTeam = typeof req.query.awayTeam === 'string' ? req.query.awayTeam : undefined;
+    const standings = await flashscoreScraperService.getLeagueStandings(league, {
+      leagueUrl,
+      leagueName,
+      homeTeam,
+      awayTeam,
+    });
     res.json({
       success: true,
       league,

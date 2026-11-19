@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, History, Target } from 'lucide-react';
-import { Fixture, HeadToHeadMeasurement, MarketOption } from '../core/types.js';
+import { X, History, Target, Trophy } from 'lucide-react';
+import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
@@ -119,6 +119,8 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
   const [scrapedH2H, setScrapedH2H] = useState<HeadToHeadMeasurement | null>(hasInitialValidH2H ? initialH2H : null);
   const [isLoadingH2H, setIsLoadingH2H] = useState<boolean>(!hasInitialValidH2H);
+  const [standingsTable, setStandingsTable] = useState<LeagueStandingTable | null>(null);
+  const [isLoadingStandings, setIsLoadingStandings] = useState<boolean>(true);
 
   useEffect(() => {
     let isCancelled = false;
@@ -212,6 +214,47 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       isCancelled = true;
     };
   }, [fixture.id, fixture.homeTeam, fixture.awayTeam]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadFixtureStandings() {
+      const targetLeague = enrichedFixture.league || enrichedFixture.leagueName || 'ALL';
+      try {
+        setIsLoadingStandings(true);
+        const data = await EngineService.getLeagueStandings(targetLeague, {
+          leagueUrl: enrichedFixture.leagueUrl,
+          leagueName: enrichedFixture.leagueName,
+          homeTeam: enrichedFixture.homeTeam,
+          awayTeam: enrichedFixture.awayTeam,
+        });
+        if (!isCancelled) {
+          setStandingsTable(data && Array.isArray(data.table) && data.table.length > 0 ? data : null);
+        }
+      } catch {
+        if (!isCancelled) {
+          setStandingsTable(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingStandings(false);
+        }
+      }
+    }
+
+    void loadFixtureStandings();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    fixture.id,
+    enrichedFixture.league,
+    enrichedFixture.leagueUrl,
+    enrichedFixture.leagueName,
+    enrichedFixture.homeTeam,
+    enrichedFixture.awayTeam,
+  ]);
 
   const currentFixture = enrichedFixture;
   const pred = currentFixture.prediction || null;
@@ -331,6 +374,45 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   const homeWinPct = pred ? getProbValue(pred.homeWinProb, 1) : 0;
   const awayWinPct = pred ? getProbValue(pred.awayWinProb, 1) : 0;
 
+  const { homeStandingInfo, awayStandingInfo } = useMemo(() => {
+    const empty = {
+      homeStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
+      awayStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
+    };
+    if (!standingsTable) return empty;
+    const groups =
+      Array.isArray(standingsTable.groups) && standingsTable.groups.length > 0
+        ? standingsTable.groups
+        : Array.isArray(standingsTable.table) && standingsTable.table.length > 0
+        ? [{ name: 'Standings', table: standingsTable.table }]
+        : [];
+    if (groups.length === 0) return empty;
+
+    const findTeam = (teamName: string) => {
+      let bestScore = 0;
+      let bestRes: { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null = null;
+      for (const grp of groups) {
+        for (const e of grp.table) {
+          const s = teamMatchScore(teamName, e.teamName);
+          if (s > bestScore) {
+            bestScore = s;
+            bestRes = {
+              entry: e,
+              totalTeams: grp.table.length,
+              groupName: grp.name && grp.name !== 'Standings' ? grp.name : undefined,
+            };
+          }
+        }
+      }
+      return bestScore > 0 ? bestRes : null;
+    };
+
+    return {
+      homeStandingInfo: findTeam(fixture.homeTeam),
+      awayStandingInfo: findTeam(fixture.awayTeam),
+    };
+  }, [standingsTable, fixture.homeTeam, fixture.awayTeam]);
+
   const tabItems = [
     { id: 'OVERVIEW' as ModalTab, label: 'Overview' },
     { id: 'H2H' as ModalTab, label: 'H2H', count: h2h.matchesCount > 0 ? h2h.matchesCount : undefined },
@@ -342,6 +424,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
           ? homeRecentMatchesList.length + awayRecentMatchesList.length
           : undefined,
     },
+    { id: 'STANDINGS' as ModalTab, label: 'Table' },
     {
       id: 'PREDICTIONS' as ModalTab,
       label: 'Preds',
@@ -584,13 +667,107 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                   </Card>
                 )}
               </>
-            ) : (
+            ) : !homeStandingInfo && !awayStandingInfo ? (
               <EmptyState
                 icon={<Target className="w-5 h-5" />}
                 title="No projections"
                 minHeight="min-h-[140px]"
                 className="bg-theme-card-elevated"
               />
+            ) : null}
+
+            {(homeStandingInfo || awayStandingInfo) && standingsTable && (
+              <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+                <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+                  <SectionHeader
+                    title="League Standings"
+                    icon={<Trophy className="w-3.5 h-3.5" />}
+                    size="sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('STANDINGS')}
+                    className="text-xs font-semibold text-theme-primary hover:underline cursor-pointer shrink-0 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded"
+                  >
+                    Full Table
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subdued)]">
+                  {[
+                    {
+                      key: 'HOME',
+                      teamName: fixture.homeTeam,
+                      info: homeStandingInfo,
+                      accentClass: 'text-theme-primary',
+                      winBgClass: 'bg-theme-primary text-theme-primary-text',
+                    },
+                    {
+                      key: 'AWAY',
+                      teamName: fixture.awayTeam,
+                      info: awayStandingInfo,
+                      accentClass: 'text-sky-500 dark:text-sky-400',
+                      winBgClass: 'bg-sky-500 text-white',
+                    },
+                  ].map((side) => (
+                    <div key={side.key} className="p-2.5 space-y-1.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-theme-main truncate">{side.teamName}</span>
+                        {side.info ? (
+                          <span className={`text-sm font-bold tabular-nums shrink-0 ${side.accentClass}`}>
+                            #{side.info.entry.rank} / {side.info.totalTeams}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-theme-dim shrink-0">Not ranked</span>
+                        )}
+                      </div>
+
+                      {side.info && (
+                        <>
+                          <div className="flex items-center justify-between text-xs text-theme-sub tabular-nums">
+                            <span>
+                              {side.info.entry.played} MP · {side.info.entry.won}-{side.info.entry.drawn}-{side.info.entry.lost}
+                            </span>
+                            <span className="font-semibold text-theme-main">
+                              {side.info.entry.points} PTS ({side.info.entry.played > 0 ? (side.info.entry.points / side.info.entry.played).toFixed(2) : '0.00'})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
+                            <span className="text-theme-sub">
+                              GF {side.info.entry.goalsFor} · GA {side.info.entry.goalsAgainst} · GD{' '}
+                              <span className="font-medium text-theme-main">
+                                {side.info.entry.goalDifference > 0
+                                  ? `+${side.info.entry.goalDifference}`
+                                  : side.info.entry.goalDifference}
+                              </span>
+                            </span>
+
+                            {side.info.entry.form && side.info.entry.form.length > 0 && (
+                              <div className="inline-flex items-center gap-0.5 shrink-0">
+                                {side.info.entry.form.slice(0, 5).map((r, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`w-[16px] h-[16px] rounded-[4px] inline-flex items-center justify-center text-2xs leading-none font-bold ${
+                                      r === 'W'
+                                        ? side.winBgClass
+                                        : r === 'D'
+                                        ? 'bg-amber-500 text-white'
+                                        : 'bg-rose-500 text-white'
+                                    }`}
+                                  >
+                                    {r}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
             )}
           </div>
         )}
@@ -888,8 +1065,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {activeTab === 'STANDINGS' && (
           <div className="space-y-2.5">
             <LeagueStandings
-              initialLeague={fixture.league}
-              highlightTeams={{ homeTeam: fixture.homeTeam, awayTeam: fixture.awayTeam }}
+              initialLeague={currentFixture.league || currentFixture.leagueName}
+              leagueContext={{
+                leagueUrl: currentFixture.leagueUrl,
+                leagueName: currentFixture.leagueName,
+              }}
+              preloadedStandings={standingsTable}
+              isLoadingPreloaded={isLoadingStandings}
+              highlightTeams={{ homeTeam: currentFixture.homeTeam, awayTeam: currentFixture.awayTeam }}
               compact
             />
           </div>

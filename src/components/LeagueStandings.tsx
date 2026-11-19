@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Trophy, AlertCircle, RefreshCw, Search } from 'lucide-react';
 import { LeagueStandingGroup, LeagueStandingTable, StandingsCatalogItem } from '../core/types.js';
+import { teamMatchScore } from '../core/feedParser.js';
 import { EngineService } from '../services/engineService.js';
 import {
   Button,
@@ -18,6 +19,9 @@ interface LeagueStandingsProps {
   initialLeague?: string;
   selectedLeague?: string;
   onSelectLeague?: (league: string) => void;
+  leagueContext?: { leagueUrl?: string; leagueName?: string };
+  preloadedStandings?: LeagueStandingTable | null;
+  isLoadingPreloaded?: boolean;
   highlightTeams?: { homeTeam?: string; awayTeam?: string };
   compact?: boolean;
   onTriggerFullSync?: () => void;
@@ -32,6 +36,9 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   initialLeague = 'england_premier_league',
   selectedLeague: externalSelectedLeague,
   onSelectLeague: externalOnSelectLeague,
+  leagueContext,
+  preloadedStandings,
+  isLoadingPreloaded = false,
   highlightTeams,
   compact = false,
   onTriggerFullSync,
@@ -40,6 +47,12 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const [internalLeague, setInternalLeague] = useState<string>(
     initialLeague && initialLeague !== 'ALL' ? initialLeague : 'england_premier_league'
   );
+
+  useEffect(() => {
+    if (initialLeague && initialLeague !== 'ALL') {
+      setInternalLeague(initialLeague);
+    }
+  }, [initialLeague]);
 
   const currentLeague =
     externalSelectedLeague && externalSelectedLeague !== 'ALL' ? externalSelectedLeague : internalLeague;
@@ -60,9 +73,13 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('SYNCED');
 
   // Active table state
-  const [standingsData, setStandingsData] = useState<LeagueStandingTable | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchedStandingsData, setFetchedStandingsData] = useState<LeagueStandingTable | null>(null);
+  const [isFetchingStandings, setIsFetchingStandings] = useState<boolean>(preloadedStandings === undefined);
   const [error, setError] = useState<string | null>(null);
+
+  const usingPreloaded = preloadedStandings !== undefined;
+  const standingsData = usingPreloaded ? preloadedStandings : fetchedStandingsData;
+  const isLoading = usingPreloaded ? isLoadingPreloaded : isFetchingStandings;
 
   const fetchCatalog = useCallback(async () => {
     if (compact) return;
@@ -83,33 +100,50 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
 
   const fetchStandings = useCallback(async (leagueCode: string) => {
     try {
-      setIsLoading(true);
+      setIsFetchingStandings(true);
       setError(null);
       const cleanCode = (leagueCode || 'england_premier_league').trim();
-      const data = await EngineService.getLeagueStandings(cleanCode);
+      const data = await EngineService.getLeagueStandings(cleanCode, {
+        leagueUrl: leagueContext?.leagueUrl,
+        leagueName: leagueContext?.leagueName,
+        homeTeam: highlightTeams?.homeTeam,
+        awayTeam: highlightTeams?.awayTeam,
+      });
       if (data && Array.isArray(data.table) && data.table.length > 0) {
-        setStandingsData(data);
+        setFetchedStandingsData(data);
         return;
       }
 
       setError('No standings table synced for this league yet');
-      setStandingsData(data);
+      setFetchedStandingsData(data);
     } catch (err: any) {
       setError(err?.message || 'Error loading standings');
-      setStandingsData(null);
+      setFetchedStandingsData(null);
     } finally {
-      setIsLoading(false);
+      setIsFetchingStandings(false);
     }
-  }, []);
+  }, [leagueContext?.leagueUrl, leagueContext?.leagueName, highlightTeams?.homeTeam, highlightTeams?.awayTeam]);
 
   useEffect(() => {
     void fetchCatalog();
   }, [fetchCatalog, refreshKey]);
 
   useEffect(() => {
+    if (usingPreloaded) {
+      if (!isLoadingPreloaded) {
+        if (preloadedStandings && Array.isArray(preloadedStandings.table) && preloadedStandings.table.length > 0) {
+          setError(null);
+        } else {
+          setError('No standings table synced for this league yet');
+        }
+      } else {
+        setError(null);
+      }
+      return;
+    }
     const code = currentLeague && currentLeague !== 'ALL' ? currentLeague : 'england_premier_league';
     void fetchStandings(code);
-  }, [currentLeague, fetchStandings, refreshKey]);
+  }, [usingPreloaded, isLoadingPreloaded, preloadedStandings, currentLeague, fetchStandings, refreshKey]);
 
   const countryOptions = useMemo(() => {
     const countries = new Set<string>();
@@ -133,26 +167,39 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
     });
   }, [catalog, availabilityFilter, selectedCountry, searchQuery]);
 
+  const homeTarget = highlightTeams?.homeTeam?.trim() || '';
+  const awayTarget = highlightTeams?.awayTeam?.trim() || '';
+
+  const isTeamHighlighted = useCallback(
+    (teamName: string): 'HOME' | 'AWAY' | null => {
+      if (!teamName) return null;
+      const homeScore = homeTarget ? teamMatchScore(homeTarget, teamName) : 0;
+      const awayScore = awayTarget ? teamMatchScore(awayTarget, teamName) : 0;
+      if (homeScore > 0 && homeScore >= awayScore) return 'HOME';
+      if (awayScore > 0) return 'AWAY';
+      return null;
+    },
+    [homeTarget, awayTarget]
+  );
+
   const displayGroups = useMemo<LeagueStandingGroup[]>(() => {
     if (!standingsData) return EMPTY_GROUPS;
-    if (Array.isArray(standingsData.groups) && standingsData.groups.length > 0) {
-      return standingsData.groups;
-    }
-    if (Array.isArray(standingsData.table) && standingsData.table.length > 0) {
-      return [{ name: 'Standings', table: standingsData.table }];
-    }
-    return EMPTY_GROUPS;
-  }, [standingsData]);
+    const rawGroups =
+      Array.isArray(standingsData.groups) && standingsData.groups.length > 0
+        ? standingsData.groups
+        : Array.isArray(standingsData.table) && standingsData.table.length > 0
+        ? [{ name: 'Standings', table: standingsData.table }]
+        : EMPTY_GROUPS;
 
-  const homeTarget = highlightTeams?.homeTeam?.toLowerCase().trim();
-  const awayTarget = highlightTeams?.awayTeam?.toLowerCase().trim();
-
-  const isTeamHighlighted = (teamName: string): 'HOME' | 'AWAY' | null => {
-    const t = teamName.toLowerCase().trim();
-    if (homeTarget && t === homeTarget) return 'HOME';
-    if (awayTarget && t === awayTarget) return 'AWAY';
-    return null;
-  };
+    if (compact && rawGroups.length > 1 && (homeTarget || awayTarget)) {
+      return [...rawGroups].sort((a, b) => {
+        const aHas = a.table.some((r) => isTeamHighlighted(r.teamName) !== null) ? 1 : 0;
+        const bHas = b.table.some((r) => isTeamHighlighted(r.teamName) !== null) ? 1 : 0;
+        return bHas - aHas;
+      });
+    }
+    return rawGroups;
+  }, [standingsData, compact, homeTarget, awayTarget, isTeamHighlighted]);
 
   const formatGD = (gd: number): string => {
     if (!Number.isFinite(gd)) return '0';
@@ -213,8 +260,10 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                 <tr
                   key={`${group.name}-${row.rank}-${row.teamName}`}
                   className={`h-[29px] transition-colors duration-150 hover:bg-theme-subtle/75 ${
-                    highlightRole === 'HOME' || highlightRole === 'AWAY'
+                    highlightRole === 'HOME'
                       ? 'bg-theme-primary-subtle text-theme-main font-semibold'
+                      : highlightRole === 'AWAY'
+                      ? 'bg-sky-500/10 text-theme-main font-semibold'
                       : ''
                   }`}
                 >
@@ -233,6 +282,17 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                       <span className="truncate text-theme-main font-medium text-sm">
                         {row.teamName}
                       </span>
+                      {highlightRole && (
+                        <span
+                          className={`text-2xs font-bold shrink-0 ${
+                            highlightRole === 'HOME'
+                              ? 'text-theme-primary'
+                              : 'text-sky-500 dark:text-sky-400'
+                          }`}
+                        >
+                          {highlightRole === 'HOME' ? 'H' : 'A'}
+                        </span>
+                      )}
                     </div>
                   </td>
 

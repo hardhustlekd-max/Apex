@@ -320,9 +320,24 @@ export class EngineService {
     return { syncedCount: 0, leagues: [] };
   }
 
-  public static async getLeagueStandings(leagueCode: string): Promise<LeagueStandingTable | null> {
+  public static async getLeagueStandings(
+    leagueCode: string,
+    context?: {
+      leagueUrl?: string;
+      leagueName?: string;
+      homeTeam?: string;
+      awayTeam?: string;
+    }
+  ): Promise<LeagueStandingTable | null> {
     const cleanCode = (leagueCode || 'england_premier_league').trim();
-    const serverData = await this.safeJsonFetch(`/api/fixtures/standings/${encodeURIComponent(cleanCode)}`);
+    const params = new URLSearchParams();
+    if (context?.leagueUrl) params.set('leagueUrl', context.leagueUrl);
+    if (context?.leagueName) params.set('leagueName', context.leagueName);
+    if (context?.homeTeam) params.set('homeTeam', context.homeTeam);
+    if (context?.awayTeam) params.set('awayTeam', context.awayTeam);
+    const qs = params.toString();
+    const url = `/api/fixtures/standings/${encodeURIComponent(cleanCode)}${qs ? `?${qs}` : ''}`;
+    const serverData = await this.safeJsonFetch(url);
     if (serverData && serverData.success && serverData.standings) {
       return serverData.standings as LeagueStandingTable;
     }

@@ -2174,41 +2174,100 @@ export class FlashscoreScraperService {
   /**
    * Retrieves league standings table strictly 100% from SQLite database saved data
    */
-  async getLeagueStandings(leagueCode: string, _tournamentSlug?: string): Promise<LeagueStandingTable> {
-    const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  async getLeagueStandings(
+    leagueCode: string,
+    slugOrContext?:
+      | string
+      | {
+          leagueUrl?: string;
+          leagueName?: string;
+          homeTeam?: string;
+          awayTeam?: string;
+        }
+  ): Promise<LeagueStandingTable> {
+    const cleanCode = (leagueCode || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const ctx = typeof slugOrContext === 'object' && slugOrContext !== null ? slugOrContext : undefined;
+    const homeTarget = ctx?.homeTeam?.trim() || '';
+    const awayTarget = ctx?.awayTeam?.trim() || '';
 
-    const dbStandings = db.getLeagueStandings(cleanCode);
-    if (dbStandings) {
-      const tableData = Array.isArray(dbStandings.table)
-        ? dbStandings.table
-        : Array.isArray(dbStandings.standings)
-        ? dbStandings.standings
-        : [];
-      const groupsData = Array.isArray(dbStandings.groups) && dbStandings.groups.length > 0
-        ? dbStandings.groups
-        : tableData.length > 0
-        ? [{ name: 'Standings', table: tableData }]
-        : [];
+    const hasTeamInTable = (rows: any[], team: string): boolean => {
+      if (!team || !Array.isArray(rows)) return false;
+      return rows.some((r) => r?.teamName && teamMatchScore(team, r.teamName) > 0);
+    };
 
-      if (tableData.length > 0) {
-        const formatted: LeagueStandingTable = {
-          leagueCode: dbStandings.leagueCode || cleanCode,
-          leagueName: dbStandings.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
-          country: dbStandings.country || 'LEAGUE',
-          leagueUrl: dbStandings.leagueUrl,
-          season: dbStandings.season || getCurrentSeason(),
-          updatedAt: dbStandings.updatedAt || new Date().toISOString(),
-          source: 'FLASHSCORE_SCRAPED',
-          table: tableData,
-          groups: groupsData,
-        };
-        return formatted;
+    const formatFound = (raw: any): LeagueStandingTable => {
+      const tableData = Array.isArray(raw.table)
+        ? raw.table
+        : Array.isArray(raw.standings)
+        ? raw.standings
+        : [];
+      const groupsData =
+        Array.isArray(raw.groups) && raw.groups.length > 0
+          ? raw.groups
+          : tableData.length > 0
+          ? [{ name: 'Standings', table: tableData }]
+          : [];
+      return {
+        leagueCode: raw.leagueCode || cleanCode,
+        leagueName: raw.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
+        country: raw.country || 'LEAGUE',
+        leagueUrl: raw.leagueUrl,
+        season: raw.season || getCurrentSeason(),
+        updatedAt: raw.updatedAt || new Date().toISOString(),
+        source: 'FLASHSCORE_SCRAPED',
+        table: tableData,
+        groups: groupsData,
+      };
+    };
+
+    const dbStandings = db.getLeagueStandings(cleanCode, ctx?.leagueUrl, ctx?.leagueName);
+    if (dbStandings && Array.isArray(dbStandings.table) && dbStandings.table.length > 0) {
+      if (!homeTarget && !awayTarget) {
+        return formatFound(dbStandings);
       }
+      if (hasTeamInTable(dbStandings.table, homeTarget) || hasTeamInTable(dbStandings.table, awayTarget)) {
+        return formatFound(dbStandings);
+      }
+    }
+
+    // Secondary lookup across all persisted league standings using URL / name / team overlap
+    if (ctx?.leagueUrl || ctx?.leagueName || homeTarget || awayTarget) {
+      const allTables = db.getAllLeagueStandingsTables();
+      const normCtxUrl = ctx?.leagueUrl ? ctx.leagueUrl.trim().replace(/\/+$/, '').toLowerCase() : '';
+      const normCtxName = ctx?.leagueName ? ctx.leagueName.trim().toLowerCase() : '';
+
+      if (normCtxUrl) {
+        const byUrl = allTables.find(
+          (t) => t.leagueUrl && t.leagueUrl.trim().replace(/\/+$/, '').toLowerCase() === normCtxUrl
+        );
+        if (byUrl) return formatFound(byUrl);
+      }
+
+      if (homeTarget && awayTarget) {
+        // Prefer table matching leagueName/code where both teams appear
+        const matchingBoth = allTables.filter(
+          (t) => hasTeamInTable(t.table, homeTarget) && hasTeamInTable(t.table, awayTarget)
+        );
+        if (matchingBoth.length === 1) {
+          return formatFound(matchingBoth[0]);
+        }
+        if (matchingBoth.length > 1) {
+          const nameMatched = matchingBoth.find((t) => {
+            const ln = (t.leagueName || '').toLowerCase();
+            return (normCtxName && (ln.includes(normCtxName) || normCtxName.includes(ln))) || t.leagueCode.toLowerCase() === cleanCode;
+          });
+          return formatFound(nameMatched || matchingBoth[0]);
+        }
+      }
+    }
+
+    if (dbStandings && Array.isArray(dbStandings.table) && dbStandings.table.length > 0) {
+      return formatFound(dbStandings);
     }
 
     return {
       leagueCode: cleanCode,
-      leagueName: cleanCode.replace(/_/g, ' ').toUpperCase(),
+      leagueName: ctx?.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
       country: cleanCode.split('_')[0]?.toUpperCase() || 'LEAGUE',
       season: getCurrentSeason(),
       updatedAt: new Date().toISOString(),
