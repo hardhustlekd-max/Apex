@@ -686,8 +686,8 @@ export class EngineService {
     // 0. Purge local browser storage & IndexedDB
     await this.clearClientStorage().catch(() => {});
 
-    // 1. Initiate async background sync job
-    const startRes = await this.startSyncJob({ resetDatabase: true, resetRawFeeds: true }, signal);
+    // 1. Initiate async background sync job with merge & retain mode (resetDatabase: false, resetRawFeeds: false)
+    const startRes = await this.startSyncJob({ resetDatabase: false, resetRawFeeds: false }, signal);
 
     if (!startRes.success || !startRes.jobId) {
       return {

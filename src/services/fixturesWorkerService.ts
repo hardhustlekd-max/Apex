@@ -848,32 +848,23 @@ class FixturesWorkerService {
     for (const rec of this.records) {
       const f = rec.slimFixture;
       if (!f.hasPrediction || !rec.fullMarkets || rec.fullMarkets.length === 0) continue;
-      if (seenIds.has(f.id)) continue;
 
       if (!matchesResolvedDateFilter(f, todayResolved)) continue;
       if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') continue;
 
-      let bestMarket: MarketOption | null = null;
-      let maxProb = 0;
       for (const market of rec.fullMarkets) {
-        if (market.probability >= 0.85 && market.probability > maxProb) {
-          maxProb = market.probability;
-          bestMarket = market;
+        if (market.probability >= 0.75) {
+          const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
+          const hasScrapedOdds = fsOdd !== null;
+          const odds = fsOdd ?? (market.probability > 0 ? Number((1 / market.probability).toFixed(2)) : 1.5);
+
+          tips.push({
+            fixture: f,
+            market,
+            odds,
+            hasScrapedOdds,
+          });
         }
-      }
-
-      if (bestMarket && maxProb >= 0.85) {
-        const fsOdd = extractFlashscoreOddsServer(bestMarket.key, rec.marketOdds);
-        const hasScrapedOdds = fsOdd !== null;
-        const odds = fsOdd ?? (maxProb > 0 ? Number((1 / maxProb).toFixed(2)) : 1.5);
-
-        tips.push({
-          fixture: f,
-          market: bestMarket,
-          odds,
-          hasScrapedOdds,
-        });
-        seenIds.add(f.id);
       }
     }
 
