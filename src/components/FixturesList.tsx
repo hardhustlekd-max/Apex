@@ -604,18 +604,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                   onClick={() => toggleLeagueExpand(group.headerKey)}
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
-                  className={`w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-1.5 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`w-full min-h-[34px] flex items-center justify-between gap-2 px-3 py-1.5 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-header-grad border-b border-theme-subdued'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <ChevronDown
-                      className={`w-4 h-4 text-theme-primary shrink-0 transition-transform duration-150 ${
+                      className={`w-3.5 h-3.5 text-theme-primary shrink-0 transition-transform duration-150 ${
                         isCollapsed ? '-rotate-90' : 'rotate-0'
                       }`}
                     />
                     <span
-                      className={`font-semibold text-base leading-snug tracking-[-0.01em] text-theme-main ${
+                      className={`font-semibold text-xs leading-snug tracking-[-0.01em] text-theme-main ${
                         isCollapsed ? 'truncate' : 'break-words'
                       }`}
                       title={group.leagueName}
@@ -623,7 +623,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                       {group.leagueName}
                     </span>
                     {group.subDivision && group.subDivision !== group.leagueName && (
-                      <span className="text-xs font-normal text-theme-sub truncate hidden sm:inline">
+                      <span className="text-2xs font-normal text-theme-sub truncate hidden sm:inline">
                         · {group.subDivision}
                       </span>
                     )}
@@ -632,7 +632,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                     <span className="h-[20px] min-w-[22px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center">
                       {totalGroupMatches}
                     </span>
-                    <span className="text-xs font-normal text-theme-sub hidden sm:inline">
+                    <span className="text-2xs font-normal text-theme-sub hidden sm:inline">
                       {isCollapsed ? 'Expand' : 'Collapse'}
                     </span>
                   </div>

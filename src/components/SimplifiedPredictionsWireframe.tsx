@@ -511,12 +511,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     onClick={() => toggleLeagueExpand(group.headerKey)}
                     aria-expanded={isExpanded}
                     aria-controls={panelId}
-                    className="w-full min-h-[38px] flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 bg-theme-card hover:bg-theme-card-elevated transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                    className="w-full min-h-[34px] flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 bg-theme-card hover:bg-theme-card-elevated transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <ChevronDown className="w-4 h-4 text-theme-primary shrink-0 -rotate-90 transition-transform duration-150" />
+                      <ChevronDown className="w-3.5 h-3.5 text-theme-primary shrink-0 -rotate-90 transition-transform duration-150" />
                       <span
-                        className="font-semibold text-theme-main text-base leading-snug tracking-[-0.01em] truncate"
+                        className="font-semibold text-theme-main text-xs leading-snug tracking-[-0.01em] truncate"
                         title={group.subDivision || group.leagueName}
                       >
                         {group.subDivision || group.leagueName}
@@ -527,7 +527,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     </span>
                   </button>
                 ) : (
-                  <div className="grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none transition-colors min-h-[38px] bg-theme-header-grad border-b border-theme-subdued">
+                  <div className="grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none transition-colors min-h-[34px] bg-theme-header-grad border-b border-theme-subdued">
                     <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1">
                       <button
                         type="button"
@@ -536,11 +536,11 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                         aria-controls={panelId}
                         className="w-full min-h-[24px] flex items-center gap-2 text-left cursor-pointer rounded-lg hover:text-theme-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent min-w-0"
                       >
-                        <ChevronDown className="w-4 h-4 text-theme-primary shrink-0 rotate-0 transition-transform duration-150" />
-                        <span className="font-semibold text-theme-main text-base leading-snug tracking-[-0.01em] break-words">
+                        <ChevronDown className="w-3.5 h-3.5 text-theme-primary shrink-0 rotate-0 transition-transform duration-150" />
+                        <span className="font-semibold text-theme-main text-xs leading-snug tracking-[-0.01em] break-words">
                           {group.subDivision || group.leagueName}
                         </span>
-                        <span className="text-theme-dim tabular-nums text-xs font-medium shrink-0">
+                        <span className="text-theme-dim tabular-nums text-2xs font-medium shrink-0">
                           · {totalGroupMatches}
                         </span>
                       </button>

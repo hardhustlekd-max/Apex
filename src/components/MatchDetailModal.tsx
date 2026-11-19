@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, History, Target, Trophy } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { X, History, Target, Trophy, Copy, Check } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -121,6 +121,53 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
   const [isLoadingH2H, setIsLoadingH2H] = useState<boolean>(!hasInitialValidH2H);
   const [standingsTable, setStandingsTable] = useState<LeagueStandingTable | null>(null);
   const [isLoadingStandings, setIsLoadingStandings] = useState<boolean>(true);
+  const [copiedKey, setCopiedKey] = useState<'HOME' | 'AWAY' | 'MATCHUP' | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setCopiedKey(null);
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, [fixture.id]);
+
+  const handleCopyText = useCallback(async (text: string, key: 'HOME' | 'AWAY' | 'MATCHUP') => {
+    const value = text.trim();
+    if (!value) return;
+    let copied = false;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(value);
+        copied = true;
+      }
+    } catch {
+      copied = false;
+    }
+
+    if (!copied && typeof document !== 'undefined') {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch {}
+    }
+
+    if (copied) {
+      setCopiedKey(key);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedKey((prev) => (prev === key ? null : prev));
+      }, 1500);
+    }
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -457,25 +504,55 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}
             </span>
           </div>
-          {onClose && (
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-              aria-label="Close match details"
+              onClick={() => void handleCopyText(`${fixture.homeTeam} vs ${fixture.awayTeam}`, 'MATCHUP')}
+              title={`Copy "${fixture.homeTeam} vs ${fixture.awayTeam}"`}
+              aria-label="Copy both team names"
+              className="w-[28px] h-[28px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
-              <X className="w-4 h-4 stroke-[2.25]" />
+              {copiedKey === 'MATCHUP' ? (
+                <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[2.25]" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
             </button>
-          )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                aria-label="Close match details"
+              >
+                <X className="w-4 h-4 stroke-[2.25]" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Hero Scoreboard (unboxed directly inside header band) */}
         <div className="mt-1.5 py-1 flex items-center justify-between gap-2.5">
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
             <TeamAvatar src={fixture.homeBadge} name={fixture.homeTeam} size="md" />
-            <span className="text-base font-semibold text-theme-main truncate block max-w-full tracking-[-0.01em]">
-              {fixture.homeTeam}
-            </span>
+            <div className="inline-flex items-center justify-center gap-1 max-w-full min-w-0">
+              <span className="text-base font-semibold text-theme-main truncate tracking-[-0.01em]">
+                {fixture.homeTeam}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleCopyText(fixture.homeTeam, 'HOME')}
+                title={`Copy ${fixture.homeTeam}`}
+                aria-label={`Copy ${fixture.homeTeam}`}
+                className="w-[20px] h-[20px] rounded-md text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              >
+                {copiedKey === 'HOME' ? (
+                  <Check className="w-3 h-3 text-emerald-500 stroke-[2.25]" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </button>
+            </div>
             {pred && (
               <span className="text-xs font-semibold tabular-nums text-theme-primary">
                 {homeWinPct}%
@@ -494,9 +571,24 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
             <TeamAvatar src={fixture.awayBadge} name={fixture.awayTeam} size="md" />
-            <span className="text-base font-semibold text-theme-main truncate block max-w-full tracking-[-0.01em]">
-              {fixture.awayTeam}
-            </span>
+            <div className="inline-flex items-center justify-center gap-1 max-w-full min-w-0">
+              <span className="text-base font-semibold text-theme-main truncate tracking-[-0.01em]">
+                {fixture.awayTeam}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleCopyText(fixture.awayTeam, 'AWAY')}
+                title={`Copy ${fixture.awayTeam}`}
+                aria-label={`Copy ${fixture.awayTeam}`}
+                className="w-[20px] h-[20px] rounded-md text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              >
+                {copiedKey === 'AWAY' ? (
+                  <Check className="w-3 h-3 text-emerald-500 stroke-[2.25]" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </button>
+            </div>
             {pred && (
               <span className="text-xs font-semibold tabular-nums text-sky-500 dark:text-sky-400">
                 {awayWinPct}%
@@ -1081,7 +1173,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {/* TAB 7: TACTICS */}
         {activeTab === 'TACTICS' && (
           <div className="space-y-2.5">
-            <TacticalAnalysis fixture={enrichedFixture} />
+            <TacticalAnalysis
+              fixture={enrichedFixture}
+              standingsTable={standingsTable}
+              homeStanding={homeStandingInfo}
+              awayStanding={awayStandingInfo}
+              isLoadingStandings={isLoadingStandings}
+            />
           </div>
         )}
       </div>
