@@ -578,6 +578,21 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       fetched_at TEXT NOT NULL
     );
 
+    -- BET SLIPS & BET BUILDER TABLE
+    CREATE TABLE IF NOT EXISTS bets (
+      id TEXT PRIMARY KEY,
+      stake REAL NOT NULL,
+      total_odds REAL NOT NULL,
+      potential_win REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'Birr',
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      selections_json TEXT NOT NULL,
+      placed_at TEXT NOT NULL,
+      evaluated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_bets_status ON bets(status);
+    CREATE INDEX IF NOT EXISTS idx_bets_placed ON bets(placed_at DESC);
+
     -- ARCHIVAL: Single-Instance Compressed Raw Feeds (strictly 1 row per daily feed)
     CREATE TABLE IF NOT EXISTS raw_feed_data (
       feed_path TEXT PRIMARY KEY,

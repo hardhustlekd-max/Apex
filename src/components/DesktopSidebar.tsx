@@ -1,9 +1,9 @@
 import React from 'react';
-import { Target, Layers, Trophy, History, Terminal, Sun, Moon, Globe, ChevronRight } from 'lucide-react';
+import { Target, Layers, Trophy, History, Ticket, Terminal, Sun, Moon, Globe, ChevronRight } from 'lucide-react';
 
 interface DesktopSidebarProps {
-  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY';
-  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY') => void;
+  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS';
+  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS') => void;
   selectedLeague: string;
   onSelectLeague: (league: string) => void;
   onOpenTerminal: () => void;
@@ -117,6 +117,21 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <div className="flex items-center gap-2 min-w-0">
               <History className="w-4 h-4 shrink-0" />
               <span className="truncate whitespace-nowrap">Prediction History</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTab('BETS')}
+            className={`w-full h-[32px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+              activeTab === 'BETS'
+                ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
+                : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Ticket className="w-4 h-4 shrink-0" />
+              <span className="truncate whitespace-nowrap">My Bets</span>
             </div>
           </button>
         </nav>

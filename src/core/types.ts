@@ -488,3 +488,26 @@ export interface LeagueStandingTable {
   table: LeagueStandingEntry[];
   groups?: LeagueStandingGroup[];
 }
+
+export interface BetSelection {
+  fixtureId: string;
+  homeTeam: string;
+  awayTeam: string;
+  leagueName: string;
+  marketKey: string;
+  marketName: string;
+  odds: number;
+  matchDate?: string;
+}
+
+export interface SlipBet {
+  id: string;
+  stake: number;
+  totalOdds: number;
+  potentialWin: number;
+  currency: 'Birr';
+  status: 'PENDING' | 'WON' | 'LOST';
+  selections: BetSelection[];
+  placedAt: string;
+  evaluatedAt?: string;
+}

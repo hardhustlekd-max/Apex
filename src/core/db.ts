@@ -1,4 +1,4 @@
-import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, LeagueStandingTable, DEFAULT_ENGINE_SETTINGS, cleanFixtureId } from './types.js';
+import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, LeagueStandingTable, DEFAULT_ENGINE_SETTINGS, cleanFixtureId, SlipBet, BetSelection } from './types.js';
 import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
@@ -85,6 +85,9 @@ export class FootballDB {
 
       // Remove any stale Russian/Cyrillic rows previously ingested from /46/ mirrors
       this.purgeCyrillicFixtures();
+
+      // Evaluate pending bets against latest SQLite match results on startup
+      this.evaluateBets();
 
       console.log('[FootballDB] Initialized persistent SQLite database (data/football_engine.db) in WAL mode.');
     } catch (err: any) {
@@ -1584,6 +1587,158 @@ export class FootballDB {
     }
 
     return collected;
+  }
+
+  saveBet(bet: SlipBet): void {
+    try {
+      const stmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO bets (
+          id, stake, total_odds, potential_win, currency, status, selections_json, placed_at, evaluated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        bet.id,
+        bet.stake,
+        bet.totalOdds,
+        bet.potentialWin,
+        bet.currency || 'Birr',
+        bet.status || 'PENDING',
+        JSON.stringify(bet.selections || []),
+        bet.placedAt || new Date().toISOString(),
+        bet.evaluatedAt || null
+      );
+    } catch (err: any) {
+      console.error('[FootballDB] Error saving bet slip:', err?.message);
+    }
+  }
+
+  getAllBets(): SlipBet[] {
+    try {
+      const rows = sqliteDb.prepare("SELECT * FROM bets ORDER BY placed_at DESC").all() as any[];
+      return rows.map((r) => ({
+        id: String(r.id),
+        stake: Number(r.stake),
+        totalOdds: Number(r.total_odds),
+        potentialWin: Number(r.potential_win),
+        currency: (r.currency || 'Birr') as 'Birr',
+        status: (r.status || 'PENDING') as 'PENDING' | 'WON' | 'LOST',
+        selections: safeJsonParse<BetSelection[]>(r.selections_json, []),
+        placedAt: String(r.placed_at),
+        evaluatedAt: r.evaluated_at ? String(r.evaluated_at) : undefined,
+      }));
+    } catch (err: any) {
+      console.error('[FootballDB] Error fetching bets:', err?.message);
+      return [];
+    }
+  }
+
+  deleteBet(id: string): void {
+    try {
+      sqliteDb.prepare("DELETE FROM bets WHERE id = ?").run(id);
+    } catch (err: any) {
+      console.error('[FootballDB] Error deleting bet:', err?.message);
+    }
+  }
+
+  evaluateBets(): void {
+    try {
+      const pendingBets = this.getAllBets().filter((b) => b.status === 'PENDING');
+      if (pendingBets.length === 0) return;
+
+      // Gather score cache from predictions, scraped matches, and upcoming fixtures
+      const scoreMap = new Map<string, { home: number; away: number; isFinished: boolean }>();
+
+      const predRows = sqliteDb.prepare("SELECT fixture_id, home_score, away_score, status FROM predictions WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
+      for (const r of predRows) {
+        const id = cleanFixtureId(r.fixture_id);
+        scoreMap.set(id, {
+          home: Number(r.home_score),
+          away: Number(r.away_score),
+          isFinished: String(r.status || '').toUpperCase() === 'FINISHED',
+        });
+        scoreMap.set(String(r.fixture_id), scoreMap.get(id)!);
+      }
+
+      const scrapedRows = sqliteDb.prepare("SELECT match_id, home_score, away_score, status FROM flashscore_scraped_matches WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
+      for (const r of scrapedRows) {
+        const id = cleanFixtureId(r.match_id);
+        scoreMap.set(id, {
+          home: Number(r.home_score),
+          away: Number(r.away_score),
+          isFinished: String(r.status || '').toUpperCase() === 'FINISHED' || Number(r.status) === 3 || Number(r.status) === 4,
+        });
+        scoreMap.set(String(r.match_id), scoreMap.get(id)!);
+      }
+
+      const updateStmt = sqliteDb.prepare("UPDATE bets SET status = ?, evaluated_at = ? WHERE id = ?");
+
+      const evaluateSelection = (sel: BetSelection, hs: number, as: number): boolean | null => {
+        if (isNaN(hs) || isNaN(as)) return null;
+        const key = (sel.marketKey || '').toUpperCase();
+        const tot = hs + as;
+        switch (key) {
+          case 'HOME_WIN': return hs > as;
+          case 'AWAY_WIN': return as > hs;
+          case 'DRAW': return hs === as;
+          case 'OVER_25': return tot >= 3;
+          case 'UNDER_25': return tot <= 2;
+          case 'BTTS_YES': return hs > 0 && as > 0;
+          case 'BTTS_NO': return hs === 0 || as === 0;
+          case 'DOUBLE_CHANCE_1X': return hs >= as;
+          case 'DOUBLE_CHANCE_X2': return as >= hs;
+          case 'OVER_15': return tot >= 2;
+          case 'UNDER_15': return tot <= 1;
+          case 'OVER_35': return tot >= 4;
+          case 'UNDER_35': return tot <= 3;
+          default:
+            if (key.includes('HOME') || key.includes('1')) return hs > as;
+            if (key.includes('AWAY') || key.includes('2')) return as > hs;
+            if (key.includes('DRAW') || key.includes('X')) return hs === as;
+            return null;
+        }
+      };
+
+      const evalTx = sqliteDb.transaction((betsToEval: SlipBet[]) => {
+        const now = new Date().toISOString();
+        for (const bet of betsToEval) {
+          let allWon = true;
+          let anyLost = false;
+          let allEvaluated = true;
+
+          for (const sel of bet.selections) {
+            const cleanId = cleanFixtureId(sel.fixtureId);
+            const scoreInfo = scoreMap.get(cleanId) || scoreMap.get(String(sel.fixtureId));
+
+            if (!scoreInfo) {
+              allEvaluated = false;
+              allWon = false;
+              break;
+            }
+
+            const res = evaluateSelection(sel, scoreInfo.home, scoreInfo.away);
+            if (res === null) {
+              allEvaluated = false;
+              allWon = false;
+              break;
+            }
+            if (res === false) {
+              anyLost = true;
+              break;
+            }
+          }
+
+          if (anyLost) {
+            updateStmt.run('LOST', now, bet.id);
+          } else if (allEvaluated && allWon) {
+            updateStmt.run('WON', now, bet.id);
+          }
+        }
+      });
+
+      evalTx(pendingBets);
+    } catch (err: any) {
+      console.warn('[FootballDB] Error evaluating bets:', err?.message);
+    }
   }
 }
 

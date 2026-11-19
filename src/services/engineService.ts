@@ -10,6 +10,7 @@ import {
   HeadToHeadMeasurement,
   StandingsCatalogItem,
   LeagueStandingTable,
+  SlipBet,
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
@@ -1078,5 +1079,32 @@ export class EngineService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry),
     });
+  }
+
+  public static async getBets(): Promise<SlipBet[]> {
+    const serverData = await this.safeJsonFetch('/api/bets');
+    if (serverData && serverData.success && Array.isArray(serverData.bets)) {
+      return serverData.bets;
+    }
+    return [];
+  }
+
+  public static async saveBet(bet: SlipBet): Promise<{ success: boolean; error?: string }> {
+    const serverData = await this.safeJsonFetch('/api/bets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bet),
+    });
+    if (serverData && serverData.success) {
+      return { success: true };
+    }
+    return { success: false, error: serverData?.error || 'Failed to save bet slip' };
+  }
+
+  public static async deleteBet(id: string): Promise<boolean> {
+    const res = await this.safeJsonFetch(`/api/bets/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return Boolean(res && res.success);
   }
 }

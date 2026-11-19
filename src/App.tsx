@@ -13,6 +13,8 @@ import { TerminalModal } from './components/TerminalModal.js';
 import { ErrorLogModal } from './components/ErrorLogModal.js';
 import { BottomNavDock } from './components/BottomNavDock.js';
 import { SyncLockOverlay } from './components/SyncLockOverlay.js';
+import { BetsView } from './components/BetsView.js';
+import { BetSlipDrawer } from './components/BetSlipDrawer.js';
 import { Button, Card, Toast } from './components/ui/index.js';
 import {
   Fixture,
@@ -20,6 +22,7 @@ import {
   LeagueOptionDTO,
   EngineSettings,
   ProviderStatus,
+  BetSelection,
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
@@ -33,7 +36,28 @@ export default function App() {
     const saved = getSavedThemeMode();
     return saved === 'light' ? 'light' : 'dark';
   });
-  const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY'>('FIXTURES');
+  const [activeTab, setActiveTab] = useState<'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS'>('FIXTURES');
+  const [betSelections, setBetSelections] = useState<BetSelection[]>([]);
+
+  const handleToggleSelection = (selection: BetSelection) => {
+    setBetSelections((prev) => {
+      const exists = prev.some((s) => s.fixtureId === selection.fixtureId && s.marketKey === selection.marketKey);
+      if (exists) {
+        return prev.filter((s) => !(s.fixtureId === selection.fixtureId && s.marketKey === selection.marketKey));
+      } else {
+        const filtered = prev.filter((s) => s.fixtureId !== selection.fixtureId);
+        return [...filtered, selection];
+      }
+    });
+  };
+
+  const handleRemoveSelection = (fixtureId: string) => {
+    setBetSelections((prev) => prev.filter((s) => s.fixtureId !== fixtureId));
+  };
+
+  const handleClearSelections = () => {
+    setBetSelections([]);
+  };
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [fixtureGroups, setFixtureGroups] = useState<LeagueGroupDTO[]>([]);
@@ -769,6 +793,8 @@ export default function App() {
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
+                      onAddSelection={handleToggleSelection}
+                      selectedSelections={betSelections}
                     />
                   </div>
                 </div>
@@ -778,6 +804,8 @@ export default function App() {
                 <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   <DailyFeaturedTip
                     onSelectDetail={handleSelectFixture}
+                    onAddSelection={handleToggleSelection}
+                    selectedSelections={betSelections}
                     refreshKey={dataRefreshVersion}
                   />
                 </div>
@@ -804,6 +832,12 @@ export default function App() {
                   />
                 </div>
               )}
+
+              {activeTab === 'BETS' && (
+                <div className={`max-w-4xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
+                  <BetsView refreshKey={dataRefreshVersion} />
+                </div>
+              )}
             </main>
           </PullToRefresh>
         </div>
@@ -815,8 +849,24 @@ export default function App() {
           <MatchDetailModal
             fixture={selectedDetailFixture}
             onClose={() => setIsMobileDetailOpen(false)}
+            onAddSelection={handleToggleSelection}
+            selectedSelections={betSelections}
           />
         </div>
+      )}
+
+      {/* Floating Bet Slip Builder Tray */}
+      {betSelections.length > 0 && (
+        <BetSlipDrawer
+          selections={betSelections}
+          onRemoveSelection={handleRemoveSelection}
+          onClearSelections={handleClearSelections}
+          onBetPlaced={() => {
+            void fetchFixtures({ forceRefresh: true });
+            setDataRefreshVersion((v) => v + 1);
+          }}
+          showToast={showNotification}
+        />
       )}
 
       {/* Terminal Logs Modal */}

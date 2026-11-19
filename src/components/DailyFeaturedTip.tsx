@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Award, ChevronRight } from 'lucide-react';
-import { FeaturedTipDTO, Fixture, MarketOption } from '../core/types.js';
+import { Award, ChevronRight, Ticket, Check } from 'lucide-react';
+import { FeaturedTipDTO, Fixture, MarketOption, BetSelection } from '../core/types.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
 import { EngineService } from '../services/engineService.js';
 import { Card, LoadingState, SectionHeader, SegmentedTabs, SegmentedTabItem } from './ui/index.js';
 
 interface DailyFeaturedTipProps {
   onSelectDetail?: (fixture: Fixture) => void;
+  onAddSelection?: (selection: BetSelection) => void;
+  selectedSelections?: BetSelection[];
   refreshKey?: number;
 }
 
@@ -28,6 +30,8 @@ function getMarketCategory(key: MarketOption['key']): Exclude<FeaturedMarketCate
 
 export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
   onSelectDetail,
+  onAddSelection,
+  selectedSelections = [],
   refreshKey = 0,
 }) => {
   const [tips, setTips] = useState<FeaturedTipDTO[]>([]);
@@ -199,6 +203,43 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {onAddSelection && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddSelection({
+                          fixtureId: fixture.id,
+                          homeTeam: fixture.homeTeam,
+                          awayTeam: fixture.awayTeam,
+                          leagueName: fixture.leagueName,
+                          marketKey: market.key,
+                          marketName: market.name,
+                          odds: Number(odds.toFixed(2)),
+                          matchDate: fixture.matchDate,
+                        });
+                      }}
+                      className={`h-[28px] px-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                        selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === market.key)
+                          ? 'bg-theme-primary text-theme-primary-text'
+                          : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'
+                      }`}
+                      title="Add to Bet Slip"
+                      aria-label="Add to Bet Slip"
+                    >
+                      {selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === market.key) ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Added</span>
+                        </>
+                      ) : (
+                        <>
+                          <Ticket className="w-3.5 h-3.5" />
+                          <span>+ Slip</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                   <div className="text-right">
                     <div className="text-lg font-bold text-theme-main tabular-nums leading-none tracking-[-0.015em]">
                       {probPercent}%

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Home, Layers, Trophy, History } from 'lucide-react';
+import { Home, Layers, Trophy, History, Ticket } from 'lucide-react';
 
 interface BottomNavDockProps {
-  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY';
-  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY') => void;
+  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS';
+  onSelectTab: (tab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS') => void;
 }
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: 'ACCAS' as const, label: 'Tips', ariaLabel: 'Featured Tips', icon: Layers },
   { id: 'STANDINGS' as const, label: 'Table', ariaLabel: 'League Standings', icon: Trophy },
   { id: 'HISTORY' as const, label: 'History', ariaLabel: 'Prediction History', icon: History },
+  { id: 'BETS' as const, label: 'Bets', ariaLabel: 'My Bets & Slips', icon: Ticket },
 ];
 
 export const BottomNavDock: React.FC<BottomNavDockProps> = ({
@@ -22,7 +23,7 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
       aria-label="Mobile navigation"
       className="fixed bottom-[calc(env(safe-area-inset-bottom)+8px)] left-2.5 right-2.5 z-40 lg:hidden bg-theme-glass border border-theme rounded-xl shadow-theme-md p-[3px] transition-all font-sans"
     >
-      <div className="max-w-md mx-auto grid grid-cols-4 gap-0.5 w-full">
+      <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 w-full">
         {NAV_ITEMS.map(({ id, label, ariaLabel, icon: Icon }) => {
           const isActive = activeTab === id;
           return (

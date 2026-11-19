@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { X, History, Target, Trophy, Copy, Check } from 'lucide-react';
-import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption } from '../core/types.js';
+import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
 import { EngineService } from '../services/engineService.js';
@@ -14,6 +14,8 @@ export interface MatchDetailViewProps {
   fixture: Fixture | null;
   onClose?: () => void;
   isPanel?: boolean;
+  onAddSelection?: (selection: BetSelection) => void;
+  selectedSelections?: BetSelection[];
 }
 
 type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
@@ -22,6 +24,8 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   fixture,
   onClose,
   isPanel = false,
+  onAddSelection,
+  selectedSelections = [],
 }) => {
   const safeFixture = useMemo(() => {
     if (!fixture) return null;
@@ -40,12 +44,27 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
     return null;
   }
 
-  return <MatchDetailModalContent fixture={safeFixture} onClose={onClose} isPanel={isPanel} />;
+  return (
+    <MatchDetailModalContent
+      fixture={safeFixture}
+      onClose={onClose}
+      isPanel={isPanel}
+      onAddSelection={onAddSelection}
+      selectedSelections={selectedSelections}
+    />
+  );
 };
 
-export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () => void }> = ({
+export const MatchDetailModal: React.FC<{
+  fixture: Fixture | null;
+  onClose: () => void;
+  onAddSelection?: (selection: BetSelection) => void;
+  selectedSelections?: BetSelection[];
+}> = ({
   fixture,
   onClose,
+  onAddSelection,
+  selectedSelections = [],
 }) => {
   const lastFixtureRef = React.useRef(fixture);
   useEffect(() => {
@@ -77,17 +96,46 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
         aria-hidden="true"
       />
       <div className="relative w-full max-w-2xl h-[86vh] sm:h-[80vh] max-h-[680px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-theme-md animate-in slide-in-from-bottom-4 duration-300">
-        <MatchDetailView fixture={displayFixture} onClose={onClose} isPanel={false} />
+        <MatchDetailView
+          fixture={displayFixture}
+          onClose={onClose}
+          isPanel={false}
+          onAddSelection={onAddSelection}
+          selectedSelections={selectedSelections}
+        />
       </div>
     </div>
   );
 };
 
-const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void; isPanel?: boolean }> = ({
+const MatchDetailModalContent: React.FC<{
+  fixture: Fixture;
+  onClose?: () => void;
+  isPanel?: boolean;
+  onAddSelection?: (selection: BetSelection) => void;
+  selectedSelections?: BetSelection[];
+}> = ({
   fixture,
   onClose,
   isPanel = false,
+  onAddSelection,
+  selectedSelections = [],
 }) => {
+  const handleAddBet = (marketKey: string, marketName: string, odds?: number) => {
+    if (!odds || odds <= 1.0) return;
+    onAddSelection?.({
+      fixtureId: fixture.id,
+      homeTeam: fixture.homeTeam,
+      awayTeam: fixture.awayTeam,
+      leagueName: fixture.leagueName,
+      marketKey,
+      marketName,
+      odds,
+    });
+  };
+
+  const isSel = (marketKey: string) =>
+    selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === marketKey);
   const [activeTab, setActiveTab] = useState<ModalTab>('OVERVIEW');
   const [statFilterGroup] = useState<StatCategoryGroup>('ALL');
 
@@ -702,7 +750,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       />
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
-                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
+                          isSel('HOME_WIN') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        }`}
+                      >
                         <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
                         <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
@@ -713,7 +768,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                             : '-'}
                         </span>
                       </div>
-                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
+                          isSel('DRAW') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        }`}
+                      >
                         <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
                         <span className="text-lg font-bold text-amber-500 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
@@ -724,7 +786,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                             : '-'}
                         </span>
                       </div>
-                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
+                          isSel('AWAY_WIN') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        }`}
+                      >
                         <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
                         <span className="text-lg font-bold text-sky-500 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
@@ -739,7 +808,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     {(enrichedFixture.marketOdds.over25Odds || enrichedFixture.marketOdds.bttsYesOdds) && (
                       <div className="border-t border-theme-subdued grid grid-cols-2 divide-x divide-[var(--border-subdued)] text-sm tabular-nums">
                         {enrichedFixture.marketOdds.over25Odds && (
-                          <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleAddBet('OVER_25', 'Over 2.5 Goals', enrichedFixture.marketOdds?.over25Odds)}
+                            className={`min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                              isSel('OVER_25') ? 'bg-theme-primary/15' : 'hover:bg-theme-card-elevated'
+                            }`}
+                          >
                             <span className="text-theme-sub font-normal">O/U 2.5</span>
                             <span className="font-semibold text-theme-main">
                               {enrichedFixture.marketOdds.over25Odds.toFixed(2)} / {enrichedFixture.marketOdds.under25Odds?.toFixed(2) ?? '-'}
@@ -747,7 +823,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                           </div>
                         )}
                         {enrichedFixture.marketOdds.bttsYesOdds && (
-                          <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleAddBet('BTTS_YES', 'BTTS - Yes', enrichedFixture.marketOdds?.bttsYesOdds)}
+                            className={`min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                              isSel('BTTS_YES') ? 'bg-theme-primary/15' : 'hover:bg-theme-card-elevated'
+                            }`}
+                          >
                             <span className="text-theme-sub font-normal">BTTS Y/N</span>
                             <span className="font-semibold text-theme-main">
                               {enrichedFixture.marketOdds.bttsYesOdds.toFixed(2)} / {enrichedFixture.marketOdds.bttsNoOdds?.toFixed(2) ?? '-'}

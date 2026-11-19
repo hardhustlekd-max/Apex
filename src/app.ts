@@ -5,6 +5,7 @@ import { settingsRouter } from './routes/settingsRouter.js';
 import { providersRouter } from './routes/providersRouter.js';
 import { statsRouter } from './routes/statsRouter.js';
 import { logsRouter } from './routes/logsRouter.js';
+import { betsRouter } from './routes/betsRouter.js';
 
 export function createApp(): Express {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp(): Express {
   app.use('/api/providers', providersRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/logs', logsRouter);
+  app.use('/api/bets', betsRouter);
 
   // Also mount without /api prefix in case serverless gateway strips /api
   app.use('/fixtures', fixturesRouter);
@@ -38,6 +40,7 @@ export function createApp(): Express {
   app.use('/providers', providersRouter);
   app.use('/stats', statsRouter);
   app.use('/logs', logsRouter);
+  app.use('/bets', betsRouter);
 
   return app;
 }

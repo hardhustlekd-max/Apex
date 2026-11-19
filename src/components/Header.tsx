@@ -2,7 +2,7 @@ import React from 'react';
 import { Settings } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY';
+  activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS';
   onOpenSettings: () => void;
 }
 
@@ -11,6 +11,7 @@ const TAB_TITLES: Record<HeaderProps['activeTab'], string> = {
   ACCAS: 'Featured Tips',
   STANDINGS: 'Standings Table',
   HISTORY: 'Prediction History',
+  BETS: 'My Bet Slips',
 };
 
 export const Header: React.FC<HeaderProps> = ({
