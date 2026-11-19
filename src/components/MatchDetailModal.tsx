@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { X, History, Target, Trophy, Copy, Check } from 'lucide-react';
+import { X, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -138,9 +138,42 @@ const MatchDetailModalContent: React.FC<{
     selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === marketKey);
   const [activeTab, setActiveTab] = useState<ModalTab>('OVERVIEW');
   const [statFilterGroup] = useState<StatCategoryGroup>('ALL');
+  const [predictionViewFilter, setPredictionViewFilter] = useState<'BEST' | 'ALL'>('BEST');
 
   const [enrichedFixture, setEnrichedFixture] = useState<Fixture>(fixture);
   const [, setIsParsing] = useState<boolean>(false);
+
+  const getOddsForMarket = useCallback(
+    (marketKey: string, probability: number): { odds: number; isFlashscore: boolean } => {
+      const mOdds = enrichedFixture.marketOdds;
+      if (mOdds) {
+        if (marketKey === 'HOME_WIN' && mOdds.homeOdds && mOdds.homeOdds > 1.0) return { odds: mOdds.homeOdds, isFlashscore: true };
+        if (marketKey === 'DRAW' && mOdds.drawOdds && mOdds.drawOdds > 1.0) return { odds: mOdds.drawOdds, isFlashscore: true };
+        if (marketKey === 'AWAY_WIN' && mOdds.awayOdds && mOdds.awayOdds > 1.0) return { odds: mOdds.awayOdds, isFlashscore: true };
+        if (marketKey === 'OVER_25' && mOdds.over25Odds && mOdds.over25Odds > 1.0) return { odds: mOdds.over25Odds, isFlashscore: true };
+        if (marketKey === 'UNDER_25' && mOdds.under25Odds && mOdds.under25Odds > 1.0) return { odds: mOdds.under25Odds, isFlashscore: true };
+        if (marketKey === 'BTTS_YES' && mOdds.bttsYesOdds && mOdds.bttsYesOdds > 1.0) return { odds: mOdds.bttsYesOdds, isFlashscore: true };
+        if (marketKey === 'BTTS_NO' && mOdds.bttsNoOdds && mOdds.bttsNoOdds > 1.0) return { odds: mOdds.bttsNoOdds, isFlashscore: true };
+        if (marketKey === 'DOUBLE_CHANCE_1X' && mOdds.dc1XOdds && mOdds.dc1XOdds > 1.0) return { odds: mOdds.dc1XOdds, isFlashscore: true };
+        if (marketKey === 'DOUBLE_CHANCE_X2' && mOdds.dcX2Odds && mOdds.dcX2Odds > 1.0) return { odds: mOdds.dcX2Odds, isFlashscore: true };
+      }
+      const fair = probability > 0 ? Number((1 / probability).toFixed(2)) : 1.5;
+      return { odds: fair, isFlashscore: false };
+    },
+    [enrichedFixture.marketOdds]
+  );
+
+  const allMarketsList = useMemo(() => {
+    if (!enrichedFixture.markets || enrichedFixture.markets.length === 0) return [];
+    return enrichedFixture.markets.map((market) => {
+      let groupName = 'Market';
+      if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) groupName = '1X2';
+      else if (['OVER_25', 'UNDER_25'].includes(market.key)) groupName = 'Goals';
+      else if (['BTTS_YES', 'BTTS_NO'].includes(market.key)) groupName = 'BTTS';
+      else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2'].includes(market.key)) groupName = 'Double Chance';
+      return { groupName, ...market };
+    });
+  }, [enrichedFixture.markets]);
 
   const hasTeamFormData = (h?: HeadToHeadMeasurement | null): boolean =>
     !!(
@@ -1185,53 +1218,171 @@ const MatchDetailModalContent: React.FC<{
         {/* TAB 5: PREDICTIONS */}
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-2.5">
-            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
-                <SectionHeader title="Best Predictions" size="sm" className="w-full" />
-              </div>
-              {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
-                <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
-                  {bestMarketsPerGroup.map((market, idx) => {
-                    const mOdds = enrichedFixture.marketOdds;
-                    let fsOdds: number | undefined;
-                    let fsProb: number | undefined;
-                    if (mOdds) {
-                      if (market.key === 'HOME_WIN') { fsOdds = mOdds.homeOdds; fsProb = mOdds.homeImpliedProb; }
-                      else if (market.key === 'DRAW') { fsOdds = mOdds.drawOdds; fsProb = mOdds.drawImpliedProb; }
-                      else if (market.key === 'AWAY_WIN') { fsOdds = mOdds.awayOdds; fsProb = mOdds.awayImpliedProb; }
-                      else if (market.key === 'OVER_25') { fsOdds = mOdds.over25Odds; fsProb = mOdds.over25ImpliedProb; }
-                      else if (market.key === 'UNDER_25') { fsOdds = mOdds.under25Odds; fsProb = mOdds.under25ImpliedProb; }
-                      else if (market.key === 'BTTS_YES') { fsOdds = mOdds.bttsYesOdds; fsProb = mOdds.bttsYesImpliedProb; }
-                      else if (market.key === 'BTTS_NO') { fsOdds = mOdds.bttsNoOdds; fsProb = mOdds.bttsNoImpliedProb; }
-                      else if (market.key === 'DOUBLE_CHANCE_1X') { fsOdds = mOdds.dc1XOdds; fsProb = mOdds.dc1XImpliedProb; }
-                      else if (market.key === 'DOUBLE_CHANCE_X2') { fsOdds = mOdds.dcX2Odds; fsProb = mOdds.dcX2ImpliedProb; }
-                    }
-                    return (
-                      <div key={idx} className="min-h-[46px] px-3 py-2 flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">
-                            {market.groupName} Market
-                          </span>
-                          <span className="font-semibold text-theme-main text-base tracking-[-0.01em]">{market.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-bold text-theme-primary block text-lg tracking-[-0.015em]">
-                            {(market.probability * 100).toFixed(1)}%
-                          </span>
-                          <span className="text-xs font-normal text-theme-dim block">
-                            Model Fair {(1 / market.probability).toFixed(2)}
-                            {fsOdds !== undefined && fsProb !== undefined
-                              ? ` · FS ${fsOdds.toFixed(2)} (${(fsProb * 100).toFixed(1)}%)`
-                              : ''}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+            {/* Top Model Recommendation Banner with direct Add to Bet Slip */}
+            {currentFixture.authoritativePick && (
+              <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden border border-theme-primary/30">
+                <div className="min-h-[34px] px-3.5 py-1.5 bg-theme-primary-subtle border-b border-theme-subdued flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-theme-primary animate-pulse" />
+                    <span className="text-2xs font-bold text-theme-primary uppercase tracking-[0.06em]">
+                      Model Recommendation
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-theme-primary tabular-nums">
+                    {currentFixture.authoritativePick.probabilityFormatted}
+                  </span>
                 </div>
-              ) : (
-                <div className="py-5 text-center text-sm text-theme-sub">No predictions computed</div>
-              )}
+                <div className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-bold text-theme-main tracking-[-0.01em] truncate">
+                      {currentFixture.authoritativePick.label}
+                    </div>
+                    <div className="text-xs text-theme-sub truncate mt-0.5">
+                      {currentFixture.homeTeam} vs {currentFixture.awayTeam} · {currentFixture.leagueName}
+                    </div>
+                  </div>
+                  {onAddSelection && (() => {
+                    const authKey = currentFixture.authoritativePick.key;
+                    const { odds: authOdds } = getOddsForMarket(authKey, currentFixture.authoritativePick.probability);
+                    const isAuthSelected = isSel(authKey);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAddBet(
+                            authKey,
+                            `${currentFixture.authoritativePick!.label} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
+                            authOdds
+                          )
+                        }
+                        className={`h-[32px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent shrink-0 active:scale-95 ${
+                          isAuthSelected
+                            ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
+                            : 'bg-theme-primary text-theme-primary-text hover:opacity-90 shadow-theme-sm'
+                        }`}
+                        title={isAuthSelected ? 'Remove from Bet Slip' : 'Add to Bet Slip'}
+                        aria-label={`${isAuthSelected ? 'Remove' : 'Add'} ${currentFixture.authoritativePick.label} to Bet Slip`}
+                      >
+                        {isAuthSelected ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.2]" />
+                            <span>Added to Slip</span>
+                          </>
+                        ) : (
+                          <>
+                            <Ticket className="w-3.5 h-3.5" />
+                            <span>Add to Slip ({authOdds.toFixed(2)})</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
+                </div>
+              </Card>
+            )}
+
+            {/* Market Predictions List */}
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+                <SectionHeader title="Market Predictions" size="sm" />
+                {allMarketsList.length > 0 && (
+                  <div className="flex items-center gap-1 p-0.5 bg-theme-subtle rounded-lg border border-theme-subdued text-xs font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setPredictionViewFilter('BEST')}
+                      className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                        predictionViewFilter === 'BEST'
+                          ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
+                          : 'text-theme-sub hover:text-theme-main'
+                      }`}
+                    >
+                      Best Picks
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPredictionViewFilter('ALL')}
+                      className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                        predictionViewFilter === 'ALL'
+                          ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
+                          : 'text-theme-sub hover:text-theme-main'
+                      }`}
+                    >
+                      All Markets ({allMarketsList.length})
+                    </button>
+                  </div>
+                )}
+              </div>
+              {(() => {
+                const listToRender = predictionViewFilter === 'ALL' && allMarketsList.length > 0
+                  ? allMarketsList
+                  : bestMarketsPerGroup;
+
+                if (!listToRender || listToRender.length === 0) {
+                  return <div className="py-5 text-center text-sm text-theme-sub">No predictions computed</div>;
+                }
+
+                return (
+                  <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
+                    {listToRender.map((market, idx) => {
+                      const { odds: betOdds, isFlashscore } = getOddsForMarket(market.key, market.probability);
+                      const isSelected = isSel(market.key);
+                      return (
+                        <div key={idx} className="min-h-[50px] px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-theme-card-elevated transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">
+                              {market.groupName} Market
+                            </span>
+                            <span className="font-semibold text-theme-main text-base tracking-[-0.01em] truncate block mt-0.5">
+                              {market.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="font-bold text-theme-primary block text-lg leading-none tracking-[-0.015em]">
+                                {(market.probability * 100).toFixed(1)}%
+                              </span>
+                              <span className="text-xs font-normal text-theme-dim block mt-0.5">
+                                {isFlashscore ? `FS ${betOdds.toFixed(2)}` : `Model ${betOdds.toFixed(2)}`}
+                              </span>
+                            </div>
+                            {onAddSelection && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleAddBet(
+                                    market.key,
+                                    `${market.name} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
+                                    betOdds
+                                  )
+                                }
+                                className={`h-[30px] px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 shrink-0 ${
+                                  isSelected
+                                    ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                                    : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'
+                                }`}
+                                title={isSelected ? 'Remove from Bet Slip' : 'Add to Bet Slip'}
+                                aria-label={`${isSelected ? 'Remove' : 'Add'} ${market.name} to Bet Slip`}
+                              >
+                                {isSelected ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 stroke-[2.2]" />
+                                    <span>Added</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ticket className="w-3.5 h-3.5" />
+                                    <span>+ Slip</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </Card>
           </div>
         )}
