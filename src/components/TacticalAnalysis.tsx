@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Fixture } from '../core/types.js';
 import { Card, SectionHeader, TeamAvatar } from './ui/index.js';
-import { Compass, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Compass, ShieldAlert, CheckCircle2, Trophy } from 'lucide-react';
 
 export interface TacticalAnalysisProps {
   fixture: Fixture;
@@ -96,8 +96,133 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
     return styles[hash % styles.length];
   }, [fixture.awayTeam]);
 
+  const standingsCtx = fixture.prediction?.standingsContext;
+  const tacticalNotes = fixture.prediction?.tacticalContext?.tacticalNotes || [];
+
+  const formatDelta = (delta?: number) => {
+    if (delta === undefined || !Number.isFinite(delta)) return '0.0%';
+    return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`;
+  };
+
   return (
     <div className="space-y-2.5 font-sans">
+      {standingsCtx && (standingsCtx.home || standingsCtx.away) && (
+        <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+          <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+            <SectionHeader
+              title="League Standings Influence"
+              icon={<Trophy className="w-3.5 h-3.5" />}
+              size="sm"
+            />
+            <span className="text-xs font-normal text-theme-sub tabular-nums truncate">
+              {standingsCtx.groupName ? `${standingsCtx.groupName} · ` : ''}
+              Avg {standingsCtx.tableAvgGoalsPerGame.toFixed(2)} G/M
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--border-subdued)]">
+            {[
+              {
+                key: 'HOME',
+                teamName: fixture.homeTeam,
+                snap: standingsCtx.home,
+                attackAnchor: standingsCtx.attackAnchorHome,
+                defenseAnchor: standingsCtx.defenseAnchorHome,
+                motivation: standingsCtx.motivationMultiplierHome,
+                xgDelta: standingsCtx.xgDeltaPercentHome,
+                accentClass: 'text-theme-primary',
+              },
+              {
+                key: 'AWAY',
+                teamName: fixture.awayTeam,
+                snap: standingsCtx.away,
+                attackAnchor: standingsCtx.attackAnchorAway,
+                defenseAnchor: standingsCtx.defenseAnchorAway,
+                motivation: standingsCtx.motivationMultiplierAway,
+                xgDelta: standingsCtx.xgDeltaPercentAway,
+                accentClass: 'text-sky-500 dark:text-sky-400',
+              },
+            ].map((side) => (
+              <div key={side.key} className="p-3 space-y-2 min-w-0">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold text-theme-main truncate">{side.teamName}</span>
+                  {side.snap ? (
+                    <span className={`text-sm font-bold tabular-nums shrink-0 ${side.accentClass}`}>
+                      #{side.snap.rank} / {side.snap.totalTeams}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-theme-dim shrink-0">Unranked</span>
+                  )}
+                </div>
+
+                {side.snap && (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-theme-sub tabular-nums">
+                      <span>
+                        {side.snap.played} MP · {side.snap.points} PTS
+                      </span>
+                      <span className="font-semibold text-theme-main">
+                        {side.snap.ppg.toFixed(2)} PPG
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 divide-x divide-[var(--border-subdued)] border-y border-theme-subdued py-1.5 text-center tabular-nums">
+                      <div>
+                        <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GF/M</span>
+                        <span className="text-xs font-semibold text-theme-main">{side.snap.gfPerGame.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GA/M</span>
+                        <span className="text-xs font-semibold text-theme-main">{side.snap.gaPerGame.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GD/M</span>
+                        <span className="text-xs font-semibold text-theme-main">
+                          {side.snap.gdPerGame > 0 ? `+${side.snap.gdPerGame.toFixed(2)}` : side.snap.gdPerGame.toFixed(2)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">xG Shift</span>
+                        <span
+                          className={`text-xs font-semibold ${
+                            (side.xgDelta ?? 0) > 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : (side.xgDelta ?? 0) < 0
+                              ? 'text-rose-500 dark:text-rose-400'
+                              : 'text-theme-main'
+                          }`}
+                        >
+                          {formatDelta(side.xgDelta)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {(side.snap.zoneLabel || side.motivation !== 1) && (
+                      <div className="flex items-center justify-between gap-2 text-xs text-theme-sub tabular-nums">
+                        <span className="truncate">{side.snap.zoneLabel || 'Zone stakes active'}</span>
+                        <span className="font-semibold text-theme-main shrink-0">
+                          Stakes x{side.motivation.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {tacticalNotes.length > 0 && (
+            <div className="px-3 py-2 border-t border-theme-subdued space-y-1">
+              {tacticalNotes.map((note, idx) => (
+                <div key={idx} className="text-xs text-theme-sub leading-snug">
+                  · {note}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Overview Banner */}
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
         <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">

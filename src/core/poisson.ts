@@ -12,6 +12,10 @@ import {
   EloRatingBreakdown,
   TeamStrengthBreakdown,
   LeagueStandingTable,
+  LeagueStandingEntry,
+  LeagueStandingGroup,
+  TeamStandingsSnapshot,
+  StandingsPredictionContext,
   XGBreakdown,
   TacticalContextBreakdown,
   MostLikelyOutcome,
@@ -196,6 +200,178 @@ export class ApexEngine {
     return recentMatchesList;
   }
 
+  private static getStandingsGroups(standings?: LeagueStandingTable | null): LeagueStandingGroup[] {
+    if (!standings) return [];
+    if (Array.isArray(standings.groups) && standings.groups.length > 0) {
+      return standings.groups.filter((g) => Array.isArray(g.table) && g.table.length > 0);
+    }
+    if (Array.isArray(standings.table) && standings.table.length > 0) {
+      return [{ name: 'Standings', table: standings.table }];
+    }
+    return [];
+  }
+
+  private static findTeamStandingsEntry(
+    teamName: string,
+    groups: LeagueStandingGroup[]
+  ): { entry: LeagueStandingEntry; group: LeagueStandingGroup } | null {
+    if (!teamName || groups.length === 0) return null;
+    let bestScore = 0;
+    let bestEntry: LeagueStandingEntry | null = null;
+    let bestGroup: LeagueStandingGroup | null = null;
+
+    for (const group of groups) {
+      for (const e of group.table) {
+        const s = teamMatchScore(teamName, e.teamName);
+        if (s > bestScore) {
+          bestScore = s;
+          bestEntry = e;
+          bestGroup = group;
+        }
+      }
+    }
+
+    if (!bestEntry || !bestGroup || bestScore <= 0 || bestEntry.played <= 0) {
+      return null;
+    }
+
+    return { entry: bestEntry, group: bestGroup };
+  }
+
+  private static computeGroupAvgGoalsPerGame(rows: LeagueStandingEntry[]): number {
+    let totalGF = 0;
+    let totalPlayed = 0;
+    for (const r of rows) {
+      if (r.played > 0 && Number.isFinite(r.goalsFor)) {
+        totalGF += r.goalsFor;
+        totalPlayed += r.played;
+      }
+    }
+    if (totalPlayed <= 0 || totalGF <= 0) return 0;
+    return Math.max(0.65, Math.min(2.50, totalGF / totalPlayed));
+  }
+
+  private static buildTeamStandingsSnapshot(
+    entry: LeagueStandingEntry,
+    group: LeagueStandingGroup
+  ): TeamStandingsSnapshot {
+    const played = Math.max(1, entry.played);
+    const totalTeams = Math.max(entry.rank || 1, group.table.length);
+    const reliabilityWeight = Number((played / (played + 6)).toFixed(3));
+    return {
+      rank: entry.rank,
+      totalTeams,
+      played,
+      won: entry.won,
+      drawn: entry.drawn,
+      lost: entry.lost,
+      goalsFor: entry.goalsFor,
+      goalsAgainst: entry.goalsAgainst,
+      goalDifference: entry.goalDifference,
+      points: entry.points,
+      ppg: Number((entry.points / played).toFixed(2)),
+      gfPerGame: Number((entry.goalsFor / played).toFixed(2)),
+      gaPerGame: Number((entry.goalsAgainst / played).toFixed(2)),
+      gdPerGame: Number((entry.goalDifference / played).toFixed(2)),
+      form: entry.form && entry.form.length > 0 ? entry.form.slice(0, 5) : undefined,
+      zoneCode: entry.zoneCode,
+      zoneLabel: entry.zoneLabel,
+      groupName: group.name && group.name !== 'Standings' ? group.name : undefined,
+      reliabilityWeight,
+    };
+  }
+
+  private static computeTableFormScore(form?: ('W' | 'D' | 'L')[]): number | null {
+    if (!form || form.length === 0) return null;
+    let weightedPts = 0;
+    let maxWeightedPts = 0;
+    for (let i = 0; i < form.length; i++) {
+      const w = Math.pow(0.85, i);
+      const pts = form[i] === 'W' ? 3 : form[i] === 'D' ? 1 : 0;
+      weightedPts += pts * w;
+      maxWeightedPts += 3 * w;
+    }
+    if (maxWeightedPts <= 0) return null;
+    return Math.max(0, Math.min(100, (weightedPts / maxWeightedPts) * 100));
+  }
+
+  private static classifyZoneStakes(
+    snap?: TeamStandingsSnapshot
+  ): 'TITLE_OR_QUALIFICATION' | 'PLAYOFF' | 'RELEGATION' | 'NONE' {
+    if (!snap || snap.played < 15) return 'NONE';
+    const z = (snap.zoneCode || '').toLowerCase();
+    const lbl = (snap.zoneLabel || '').toLowerCase();
+
+    if (z.startsWith('r') || lbl.includes('relegat')) {
+      return 'RELEGATION';
+    }
+    if (
+      z.startsWith('q') ||
+      lbl.includes('champion') ||
+      lbl.includes('promot') ||
+      lbl.includes('title') ||
+      lbl.includes('europa') ||
+      lbl.includes('conference')
+    ) {
+      return 'TITLE_OR_QUALIFICATION';
+    }
+    if (z.startsWith('p') || lbl.includes('playoff') || lbl.includes('play-off')) {
+      return 'PLAYOFF';
+    }
+
+    if (snap.totalTeams >= 12 && snap.played >= 20) {
+      if (snap.rank <= 3) return 'TITLE_OR_QUALIFICATION';
+      if (snap.rank >= snap.totalTeams - 2) return 'RELEGATION';
+    }
+
+    return 'NONE';
+  }
+
+  private static computeZoneStakesMotivation(
+    homeTeam: string,
+    awayTeam: string,
+    homeSnap?: TeamStandingsSnapshot,
+    awaySnap?: TeamStandingsSnapshot
+  ): {
+    homeMult: number;
+    awayMult: number;
+    notes: string[];
+  } {
+    const homeStakes = this.classifyZoneStakes(homeSnap);
+    const awayStakes = this.classifyZoneStakes(awaySnap);
+    const notes: string[] = [];
+
+    const formatZoneName = (stakes: ReturnType<typeof ApexEngine.classifyZoneStakes>, snap?: TeamStandingsSnapshot) => {
+      if (snap?.zoneLabel) return snap.zoneLabel;
+      if (stakes === 'RELEGATION') return 'relegation battle';
+      if (stakes === 'PLAYOFF') return 'playoff race';
+      return 'top qualification race';
+    };
+
+    let homeMult = 1.0;
+    let awayMult = 1.0;
+
+    if (homeStakes !== 'NONE' && awayStakes === 'NONE' && homeSnap) {
+      homeMult = 1.03;
+      awayMult = 0.985;
+      notes.push(`${homeTeam} (#${homeSnap.rank}/${homeSnap.totalTeams}) motivated for ${formatZoneName(homeStakes, homeSnap)}`);
+    } else if (awayStakes !== 'NONE' && homeStakes === 'NONE' && awaySnap) {
+      awayMult = 1.03;
+      homeMult = 0.985;
+      notes.push(`${awayTeam} (#${awaySnap.rank}/${awaySnap.totalTeams}) motivated for ${formatZoneName(awayStakes, awaySnap)}`);
+    } else if (homeStakes !== 'NONE' && awayStakes !== 'NONE' && homeSnap && awaySnap) {
+      homeMult = 1.015;
+      awayMult = 1.015;
+      notes.push(`High-stakes clash: #${homeSnap.rank} ${homeTeam} vs #${awaySnap.rank} ${awayTeam}`);
+    }
+
+    return {
+      homeMult: Math.max(0.96, Math.min(1.04, Number(homeMult.toFixed(3)))),
+      awayMult: Math.max(0.96, Math.min(1.04, Number(awayMult.toFixed(3)))),
+      notes,
+    };
+  }
+
   // =========================================================================
   // PILLAR 1: COMPOSITE TEAM STRENGTH & FORM MOMENTUM (CSF) INDEX
   // Replaces legacy Elo rating with empirical multi-factor model
@@ -266,32 +442,35 @@ export class ApexEngine {
     const rawFormDominance = formWeightTotal > 0 ? (weightedFormSum / formWeightTotal) : 50.0;
     const formDominance = Number((50.0 + (rawFormDominance - 50.0) * sampleShrink).toFixed(1));
 
-    // 2. League Standings & Table Momentum (only weighted distinctly when actual standings exist)
+    // 2. League Standings & Table Momentum (group-scoped & sample-size weighted)
     let hasStandingsEntry = false;
+    let standingsReliability = 0;
     let tableMomentum = formDominance;
-    if (standings && Array.isArray(standings.table) && standings.table.length > 0) {
-      let entry = standings.table[0];
-      let bestScore = 0;
-      for (const e of standings.table) {
-        const s = teamMatchScore(teamName, e.teamName);
-        if (s > bestScore) {
-          bestScore = s;
-          entry = e;
-        }
-      }
-      if (bestScore === 0) entry = undefined as any;
+    const groups = this.getStandingsGroups(standings);
+    const matched = this.findTeamStandingsEntry(teamName, groups);
 
-      if (entry) {
-        hasStandingsEntry = true;
-        const totalTeams = Math.max(10, standings.table.length);
-        const rankScore = Math.max(0, Math.min(100, ((totalTeams - entry.rank + 1) / totalTeams) * 100));
-        const ppg = entry.played > 0 ? entry.points / entry.played : 1.35;
-        const ppgScore = Math.max(0, Math.min(100, (ppg / 3.0) * 100));
-        const gdPerGame = entry.played > 0 ? entry.goalDifference / entry.played : 0;
-        const gdScore = Math.max(0, Math.min(100, 50 + (gdPerGame * 20)));
+    if (matched) {
+      const snap = this.buildTeamStandingsSnapshot(matched.entry, matched.group);
+      hasStandingsEntry = true;
+      standingsReliability = snap.reliabilityWeight;
 
-        tableMomentum = Number(((0.40 * ppgScore) + (0.35 * rankScore) + (0.25 * gdScore)).toFixed(1));
-      }
+      const rankScore =
+        snap.totalTeams > 1
+          ? Math.max(0, Math.min(100, ((snap.totalTeams - snap.rank) / (snap.totalTeams - 1)) * 100))
+          : 50.0;
+      const ppgScore = Math.max(0, Math.min(100, (snap.ppg / 3.0) * 100));
+      const gdScore = Math.max(0, Math.min(100, 50 + snap.gdPerGame * 20));
+      const tableFormScore = this.computeTableFormScore(snap.form);
+
+      const rawMomentum =
+        tableFormScore !== null
+          ? (0.35 * ppgScore) + (0.30 * rankScore) + (0.20 * gdScore) + (0.15 * tableFormScore)
+          : (0.42 * ppgScore) + (0.33 * rankScore) + (0.25 * gdScore);
+
+      // Smoothly shrink early-season table momentum toward actual match form dominance
+      tableMomentum = Number(
+        (formDominance + (rawMomentum - formDominance) * standingsReliability).toFixed(1)
+      );
     }
 
     // 3. Attacking & Defensive Shot Efficiency (shrunk toward 50 when sample is small)
@@ -339,9 +518,9 @@ export class ApexEngine {
     }
 
     // 5. Composite Team Strength Rating (TSR)
-    const rawStrength = hasStandingsEntry
-      ? (0.55 * formDominance) + (0.20 * tableMomentum) + (0.25 * shotEfficiency)
-      : (0.75 * formDominance) + (0.25 * shotEfficiency);
+    const tableWeight = hasStandingsEntry ? 0.25 * standingsReliability : 0;
+    const formWeight = 0.75 - tableWeight;
+    const rawStrength = (formWeight * formDominance) + (tableWeight * tableMomentum) + (0.25 * shotEfficiency);
     const strengthRating = Number(Math.max(15.0, Math.min(90.0, rawStrength)).toFixed(1));
 
     return {
@@ -927,8 +1106,31 @@ export class ApexEngine {
       awayRollingMatchesEvaluated: awayXGProfile.rollingMatchesCount,
     };
 
-    // 3. Team News & Tactical Context
-    const tacticalContext = this.computeTacticalAdjustments(homeTeam, awayTeam, tacticalInput);
+    // 3. Team News & Tactical Context + Group-Scoped League Standings Context
+    const baseTacticalContext = this.computeTacticalAdjustments(homeTeam, awayTeam, tacticalInput);
+    const standingsGroups = this.getStandingsGroups(standings);
+    const homeStandingsMatch = this.findTeamStandingsEntry(homeTeam, standingsGroups);
+    const awayStandingsMatch = this.findTeamStandingsEntry(awayTeam, standingsGroups);
+    const homeSnap = homeStandingsMatch
+      ? this.buildTeamStandingsSnapshot(homeStandingsMatch.entry, homeStandingsMatch.group)
+      : undefined;
+    const awaySnap = awayStandingsMatch
+      ? this.buildTeamStandingsSnapshot(awayStandingsMatch.entry, awayStandingsMatch.group)
+      : undefined;
+
+    const motivation = this.computeZoneStakesMotivation(homeTeam, awayTeam, homeSnap, awaySnap);
+    const tacticalContext: TacticalContextBreakdown = {
+      ...baseTacticalContext,
+      fatigueAdjustmentHome: Math.max(
+        0.88,
+        Math.min(1.12, Number((baseTacticalContext.fatigueAdjustmentHome * motivation.homeMult).toFixed(3)))
+      ),
+      fatigueAdjustmentAway: Math.max(
+        0.88,
+        Math.min(1.12, Number((baseTacticalContext.fatigueAdjustmentAway * motivation.awayMult).toFixed(3)))
+      ),
+      tacticalNotes: [...baseTacticalContext.tacticalNotes, ...motivation.notes],
+    };
 
     // 4. Head to Head record directly from scraper feed or historical records (recency-weighted)
     const hasRealScrapedH2H = Boolean(
@@ -997,16 +1199,16 @@ export class ApexEngine {
     const hShrink = homeXGProfile.rollingMatchesCount / (homeXGProfile.rollingMatchesCount + 10);
     const aShrink = awayXGProfile.rollingMatchesCount / (awayXGProfile.rollingMatchesCount + 10);
 
-    const homeAttackPower = homeXGProfile.rollingMatchesCount > 0
+    let homeAttackPower = homeXGProfile.rollingMatchesCount > 0
       ? 1.0 + ((homeXGProfile.adjustedXG / leagueHomeAvg) - 1.0) * hShrink
       : 1.0;
-    const awayDefensePower = awayXGProfile.rollingMatchesCount > 0
+    let awayDefensePower = awayXGProfile.rollingMatchesCount > 0
       ? 1.0 + ((awayXGProfile.adjustedXGA / leagueHomeAvg) - 1.0) * aShrink
       : 1.0;
-    const awayAttackPower = awayXGProfile.rollingMatchesCount > 0
+    let awayAttackPower = awayXGProfile.rollingMatchesCount > 0
       ? 1.0 + ((awayXGProfile.adjustedXG / leagueAwayAvg) - 1.0) * aShrink
       : 1.0;
-    const homeDefensePower = homeXGProfile.rollingMatchesCount > 0
+    let homeDefensePower = homeXGProfile.rollingMatchesCount > 0
       ? 1.0 + ((homeXGProfile.adjustedXGA / leagueAwayAvg) - 1.0) * hShrink
       : 1.0;
 
@@ -1020,6 +1222,46 @@ export class ApexEngine {
     const venueRatio = Math.sqrt((homeCSF.venueModifier || 1.0) / Math.max(0.85, awayCSF.venueModifier || 1.0));
     const effectiveHomeAdvantage = Number(Math.max(1.03, Math.min(1.22, baseHomeAdvantage * venueRatio)).toFixed(3));
     const effectiveAwayBaseline = 0.96;
+
+    const preStandingsHomeLambda =
+      leagueHomeAvg *
+      Math.pow(Math.max(0.25, homeAttackPower * awayDefensePower), 0.55) *
+      effectiveHomeAdvantage *
+      eloMultiplierHome *
+      baseTacticalContext.fatigueAdjustmentHome *
+      h2hMultiplierHome;
+
+    const preStandingsAwayMu =
+      leagueAwayAvg *
+      Math.pow(Math.max(0.25, awayAttackPower * homeDefensePower), 0.55) *
+      effectiveAwayBaseline *
+      eloMultiplierAway *
+      baseTacticalContext.fatigueAdjustmentAway *
+      h2hMultiplierAway;
+
+    // Standings Attack & Defense Anchoring (season GF/MP and GA/MP relative to table/group average)
+    const homeGroupAvg = homeStandingsMatch ? this.computeGroupAvgGoalsPerGame(homeStandingsMatch.group.table) : 0;
+    const awayGroupAvg = awayStandingsMatch ? this.computeGroupAvgGoalsPerGame(awayStandingsMatch.group.table) : 0;
+    let attackAnchorHome = 1.0;
+    let defenseAnchorHome = 1.0;
+    let attackAnchorAway = 1.0;
+    let defenseAnchorAway = 1.0;
+
+    if (homeSnap && homeGroupAvg > 0) {
+      attackAnchorHome = Number(Math.max(0.55, Math.min(1.85, homeSnap.gfPerGame / homeGroupAvg)).toFixed(3));
+      defenseAnchorHome = Number(Math.max(0.55, Math.min(1.85, homeSnap.gaPerGame / homeGroupAvg)).toFixed(3));
+      const hTableBlend = 0.32 * homeSnap.reliabilityWeight;
+      homeAttackPower = (1 - hTableBlend) * homeAttackPower + hTableBlend * attackAnchorHome;
+      homeDefensePower = (1 - hTableBlend) * homeDefensePower + hTableBlend * defenseAnchorHome;
+    }
+
+    if (awaySnap && awayGroupAvg > 0) {
+      attackAnchorAway = Number(Math.max(0.55, Math.min(1.85, awaySnap.gfPerGame / awayGroupAvg)).toFixed(3));
+      defenseAnchorAway = Number(Math.max(0.55, Math.min(1.85, awaySnap.gaPerGame / awayGroupAvg)).toFixed(3));
+      const aTableBlend = 0.32 * awaySnap.reliabilityWeight;
+      awayAttackPower = (1 - aTableBlend) * awayAttackPower + aTableBlend * attackAnchorAway;
+      awayDefensePower = (1 - aTableBlend) * awayDefensePower + aTableBlend * defenseAnchorAway;
+    }
 
     const homeCombinedPower = Math.pow(Math.max(0.25, homeAttackPower * awayDefensePower), 0.55);
     const awayCombinedPower = Math.pow(Math.max(0.25, awayAttackPower * homeDefensePower), 0.55);
@@ -1039,6 +1281,38 @@ export class ApexEngine {
       eloMultiplierAway *
       tacticalContext.fatigueAdjustmentAway *
       h2hMultiplierAway;
+
+    const standingsContext: StandingsPredictionContext | undefined =
+      standings && (homeSnap || awaySnap)
+        ? {
+            leagueCode: standings.leagueCode,
+            leagueName: standings.leagueName,
+            season: standings.season,
+            groupName:
+              homeSnap?.groupName && awaySnap?.groupName && homeSnap.groupName === awaySnap.groupName
+                ? homeSnap.groupName
+                : homeSnap?.groupName || awaySnap?.groupName,
+            home: homeSnap,
+            away: awaySnap,
+            tableAvgGoalsPerGame: Number(
+              ((homeGroupAvg || awayGroupAvg || (leagueHomeAvg + leagueAwayAvg) / 2)).toFixed(2)
+            ),
+            attackAnchorHome,
+            defenseAnchorHome,
+            attackAnchorAway,
+            defenseAnchorAway,
+            motivationMultiplierHome: motivation.homeMult,
+            motivationMultiplierAway: motivation.awayMult,
+            xgDeltaPercentHome:
+              preStandingsHomeLambda > 0
+                ? Number((((homeLambda - preStandingsHomeLambda) / preStandingsHomeLambda) * 100).toFixed(1))
+                : undefined,
+            xgDeltaPercentAway:
+              preStandingsAwayMu > 0
+                ? Number((((awayMu - preStandingsAwayMu) / preStandingsAwayMu) * 100).toFixed(1))
+                : undefined,
+          }
+        : undefined;
 
     // Coherent Market Odds Calibration: anchor goal rates λ & μ and probabilities when valid bookmaker odds exist
     let marketOddsWeight = 0;
@@ -1138,10 +1412,15 @@ export class ApexEngine {
     scoresList.sort((a, b) => b.probability - a.probability);
     const topCorrectScores = scoresList.slice(0, 5);
 
-    // Coherent blend: primarily Dixon-Coles (82%) + Elo (12%) + CSF (6%)
-    let finalHomeWin = (0.82 * homeWinProbRaw) + (0.12 * eloExpectancy.homeWinProb) + (0.06 * csfExpectancy.homeWinExpectancy);
-    let finalDraw = (0.82 * drawProbRaw) + (0.12 * eloExpectancy.drawProb) + (0.06 * csfExpectancy.drawExpectancy);
-    let finalAwayWin = (0.82 * awayWinProbRaw) + (0.12 * eloExpectancy.awayWinProb) + (0.06 * csfExpectancy.awayWinExpectancy);
+    // Coherent blend: Dixon-Coles primary + Elo + CSF (raises CSF/Standings share when both teams have reliable table samples)
+    const avgStandingsRel =
+      homeSnap && awaySnap ? (homeSnap.reliabilityWeight + awaySnap.reliabilityWeight) / 2 : 0;
+    const csfWeight = avgStandingsRel >= 0.4 ? 0.10 : 0.06;
+    const dcWeight = 1.0 - 0.12 - csfWeight;
+
+    let finalHomeWin = (dcWeight * homeWinProbRaw) + (0.12 * eloExpectancy.homeWinProb) + (csfWeight * csfExpectancy.homeWinExpectancy);
+    let finalDraw = (dcWeight * drawProbRaw) + (0.12 * eloExpectancy.drawProb) + (csfWeight * csfExpectancy.drawExpectancy);
+    let finalAwayWin = (dcWeight * awayWinProbRaw) + (0.12 * eloExpectancy.awayWinProb) + (csfWeight * csfExpectancy.awayWinExpectancy);
 
     if (marketOddsWeight > 0) {
       const probBlend = marketOddsWeight * 0.5;
@@ -1213,6 +1492,7 @@ export class ApexEngine {
       eloRatings: eloBreakdown,
       xgBreakdown,
       tacticalContext,
+      standingsContext,
       dixonColesParams,
     };
 

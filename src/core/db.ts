@@ -1,4 +1,4 @@
-import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, DEFAULT_ENGINE_SETTINGS, cleanFixtureId } from './types.js';
+import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, LeagueStandingTable, DEFAULT_ENGINE_SETTINGS, cleanFixtureId } from './types.js';
 import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
@@ -507,6 +507,7 @@ export class FootballDB {
           providerId: (row.provider_id as any) || 'FLASHSCORE',
           league: String(row.league || ''),
           leagueName: String(row.league_name || row.league || ''),
+          leagueUrl: row.league_url ? String(row.league_url) : undefined,
           matchDate: String(row.match_date || ''),
           kickOffTime: String(row.kick_off_time || ''),
           homeTeam: String(row.home_team || ''),
@@ -1373,7 +1374,31 @@ export class FootballDB {
     }
   }
 
-  getLeagueStandings(leagueCode: string): any {
+  private mapLeagueStandingsRow(row: any): LeagueStandingTable & { standings?: any[] } {
+    const parsedTable = safeJsonParse<any[]>(row.standings_json, []);
+    const parsedGroups = row.groups_json ? safeJsonParse<any[]>(row.groups_json, []) : [];
+    const groups =
+      Array.isArray(parsedGroups) && parsedGroups.length > 0
+        ? parsedGroups
+        : Array.isArray(parsedTable) && parsedTable.length > 0
+        ? [{ name: 'Standings', table: parsedTable }]
+        : [];
+
+    return {
+      leagueCode: String(row.league_code),
+      leagueName: String(row.league_name || row.league_code),
+      country: row.country ? String(row.country) : undefined,
+      leagueUrl: row.league_url ? String(row.league_url) : undefined,
+      season: row.season ? String(row.season) : undefined,
+      table: parsedTable,
+      standings: parsedTable,
+      groups,
+      source: (row.source as any) || 'FLASHSCORE_SCRAPED',
+      updatedAt: String(row.updated_at || ''),
+    };
+  }
+
+  getLeagueStandings(leagueCode: string, leagueUrl?: string, leagueName?: string): any {
     const aliasMap: Record<string, string[]> = {
       'e0': ['england_premier_league'],
       'england_premier_league': ['e0'],
@@ -1412,10 +1437,35 @@ export class FootballDB {
     };
 
     try {
+      if (leagueUrl && leagueUrl.trim()) {
+        const cleanUrl = leagueUrl.trim().replace(/\/+$/, '').toLowerCase();
+        const urlRows = sqliteDb
+          .prepare("SELECT * FROM league_standings WHERE league_url IS NOT NULL")
+          .all() as any[];
+        for (const row of urlRows) {
+          const rowUrl = String(row.league_url || '').trim().replace(/\/+$/, '').toLowerCase();
+          if (rowUrl && rowUrl === cleanUrl && row.standings_json) {
+            return this.mapLeagueStandingsRow(row);
+          }
+        }
+      }
+
       const clean = String(leagueCode || '').toLowerCase().trim();
-      const dynamicAliases = getLeagueAliases(leagueCode).map((a) => a.toLowerCase());
+      const dynamicAliases = [
+        ...getLeagueAliases(leagueCode),
+        ...(leagueName ? getLeagueAliases(leagueName) : []),
+      ].map((a) => a.toLowerCase());
+
       const candidates = Array.from(
-        new Set([leagueCode, clean, ...(aliasMap[clean] || []), ...dynamicAliases].filter(Boolean))
+        new Set(
+          [
+            leagueCode,
+            clean,
+            ...(aliasMap[clean] || []),
+            leagueName ? leagueName.toLowerCase().trim() : '',
+            ...dynamicAliases,
+          ].filter(Boolean)
+        )
       );
 
       for (const code of candidates) {
@@ -1423,27 +1473,7 @@ export class FootballDB {
           .prepare("SELECT * FROM league_standings WHERE LOWER(league_code) = LOWER(?) LIMIT 1")
           .get(code) as any;
         if (row && row.standings_json) {
-          const parsedTable = safeJsonParse(row.standings_json, []);
-          const parsedGroups = row.groups_json ? safeJsonParse(row.groups_json, []) : [];
-          const groups =
-            Array.isArray(parsedGroups) && parsedGroups.length > 0
-              ? parsedGroups
-              : Array.isArray(parsedTable) && parsedTable.length > 0
-              ? [{ name: 'Standings', table: parsedTable }]
-              : [];
-
-          return {
-            leagueCode: row.league_code,
-            leagueName: row.league_name,
-            country: row.country,
-            leagueUrl: row.league_url || undefined,
-            season: row.season || undefined,
-            table: parsedTable,
-            standings: parsedTable,
-            groups,
-            source: row.source,
-            updatedAt: row.updated_at,
-          };
+          return this.mapLeagueStandingsRow(row);
         }
       }
     } catch (err: any) {
@@ -1451,6 +1481,20 @@ export class FootballDB {
     }
 
     return null;
+  }
+
+  getAllLeagueStandingsTables(): LeagueStandingTable[] {
+    try {
+      const rows = sqliteDb
+        .prepare("SELECT * FROM league_standings WHERE standings_json IS NOT NULL")
+        .all() as any[];
+      return rows
+        .map((row) => this.mapLeagueStandingsRow(row))
+        .filter((t) => Array.isArray(t.table) && t.table.length > 0);
+    } catch (err: any) {
+      console.error('[FootballDB] Error bulk loading league standings:', err?.message);
+      return [];
+    }
   }
 
   getAllLeagueStandingsSummaries(): Array<{

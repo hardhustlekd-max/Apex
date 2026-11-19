@@ -209,6 +209,46 @@ export interface MatchTacticalContextInput {
   venue?: string;
 }
 
+export interface TeamStandingsSnapshot {
+  rank: number;
+  totalTeams: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+  ppg: number;
+  gfPerGame: number;
+  gaPerGame: number;
+  gdPerGame: number;
+  form?: ('W' | 'D' | 'L')[];
+  zoneCode?: string;
+  zoneLabel?: string;
+  groupName?: string;
+  reliabilityWeight: number;
+}
+
+export interface StandingsPredictionContext {
+  leagueCode: string;
+  leagueName: string;
+  season?: string;
+  groupName?: string;
+  home?: TeamStandingsSnapshot;
+  away?: TeamStandingsSnapshot;
+  tableAvgGoalsPerGame: number;
+  attackAnchorHome: number;
+  defenseAnchorHome: number;
+  attackAnchorAway: number;
+  defenseAnchorAway: number;
+  motivationMultiplierHome: number;
+  motivationMultiplierAway: number;
+  xgDeltaPercentHome?: number;
+  xgDeltaPercentAway?: number;
+}
+
 export interface PoissonPrediction {
   homeXG: number;
   awayXG: number;
@@ -233,6 +273,7 @@ export interface PoissonPrediction {
   eloRatings?: EloRatingBreakdown;
   xgBreakdown?: XGBreakdown;
   tacticalContext?: TacticalContextBreakdown;
+  standingsContext?: StandingsPredictionContext;
   dixonColesParams?: DixonColesParams;
   mostLikelyOutcome?: MostLikelyOutcome;
   marketOdds?: ScrapedMarketOdds;

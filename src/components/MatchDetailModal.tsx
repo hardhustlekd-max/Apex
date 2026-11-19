@@ -476,6 +476,27 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       </div>
                     ) : null}
 
+                    {pred?.standingsContext && (pred.standingsContext.home || pred.standingsContext.away) && (
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                        <span className="text-theme-sub font-normal truncate">
+                          League Rank{pred.standingsContext.groupName ? ` · ${pred.standingsContext.groupName}` : ''}
+                        </span>
+                        <div className="font-semibold text-theme-main shrink-0">
+                          <span className="text-theme-primary">
+                            {pred.standingsContext.home
+                              ? `#${pred.standingsContext.home.rank}/${pred.standingsContext.home.totalTeams} (${pred.standingsContext.home.ppg.toFixed(2)})`
+                              : '-'}
+                          </span>
+                          <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
+                          <span className="text-sky-500 dark:text-sky-400">
+                            {pred.standingsContext.away
+                              ? `#${pred.standingsContext.away.rank}/${pred.standingsContext.away.totalTeams} (${pred.standingsContext.away.ppg.toFixed(2)})`
+                              : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {pred?.tacticalContext && (
                       <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Rest Days</span>

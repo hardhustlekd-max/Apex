@@ -7,15 +7,21 @@ import {
   HistoricalMatch,
   HeadToHeadMeasurement,
   TeamFormMatch,
+  LeagueStandingTable,
 } from './types.js';
 import { ApexEngine } from './poisson.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
-import { matchesLeague } from './leagueMapper.js';
+import { matchesLeague, getLeagueAliases, cleanStr } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr, parseDateMsNoon } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
-import { parseHeadToHeadFeedText, getTeamHistoricalMatches } from './feedParser.js';
+import { parseHeadToHeadFeedText, getTeamHistoricalMatches, teamMatchScore } from './feedParser.js';
 import { checkpointSqliteWal, sqliteDb } from './sqliteClient.js';
+
+interface StandingsLookupIndex {
+  byUrl: Map<string, LeagueStandingTable>;
+  byKey: Map<string, LeagueStandingTable[]>;
+}
 
 export class ServerEngine {
   public static getUnifiedHistoricalUniverse(scrapedMatchesOverride?: any[]): HistoricalMatch[] {
@@ -136,6 +142,124 @@ export class ServerEngine {
     return undefined as any;
   }
 
+  private static normalizeStandingsUrl(url?: string): string {
+    if (!url) return '';
+    return url
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\/[^/]+/, '')
+      .replace(/\/+$/, '');
+  }
+
+  private static tableContainsFixtureTeam(table: LeagueStandingTable, homeTeam: string, awayTeam: string): boolean {
+    if (!table || !Array.isArray(table.table) || table.table.length === 0) return false;
+    for (const row of table.table) {
+      if (
+        (homeTeam && teamMatchScore(homeTeam, row.teamName) > 0) ||
+        (awayTeam && teamMatchScore(awayTeam, row.teamName) > 0)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static buildStandingsLookup(tables: LeagueStandingTable[]): StandingsLookupIndex {
+    const byUrl = new Map<string, LeagueStandingTable>();
+    const byKey = new Map<string, LeagueStandingTable[]>();
+
+    const addKey = (rawKey: string | undefined, table: LeagueStandingTable) => {
+      if (!rawKey) return;
+      const k = rawKey.trim().toLowerCase();
+      if (!k) return;
+      const list = byKey.get(k);
+      if (!list) {
+        byKey.set(k, [table]);
+      } else if (!list.includes(table)) {
+        list.push(table);
+      }
+    };
+
+    for (const table of tables) {
+      if (!table || !Array.isArray(table.table) || table.table.length === 0) continue;
+
+      const normUrl = this.normalizeStandingsUrl(table.leagueUrl);
+      if (normUrl && !byUrl.has(normUrl)) {
+        byUrl.set(normUrl, table);
+      }
+
+      addKey(table.leagueCode, table);
+      addKey(cleanStr(table.leagueCode), table);
+
+      if (table.leagueName) {
+        addKey(table.leagueName, table);
+        addKey(cleanStr(table.leagueName), table);
+      }
+      if (table.country && table.leagueName) {
+        addKey(`${table.country}_${table.leagueName}`, table);
+        addKey(cleanStr(`${table.country}_${table.leagueName}`), table);
+      }
+
+      for (const alias of getLeagueAliases(table.leagueCode)) {
+        addKey(alias, table);
+        addKey(cleanStr(alias), table);
+      }
+      if (table.leagueName) {
+        for (const alias of getLeagueAliases(table.leagueName)) {
+          addKey(alias, table);
+          addKey(cleanStr(alias), table);
+        }
+      }
+    }
+
+    return { byUrl, byKey };
+  }
+
+  public static resolveStandingsForFixture(
+    fixture: Pick<Fixture, 'league' | 'leagueName' | 'leagueUrl' | 'homeTeam' | 'awayTeam'>,
+    lookup: StandingsLookupIndex
+  ): LeagueStandingTable | null {
+    // 1. Exact tournament URL path match
+    const normUrl = this.normalizeStandingsUrl(fixture.leagueUrl);
+    if (normUrl) {
+      const urlHit = lookup.byUrl.get(normUrl);
+      if (urlHit) return urlHit;
+    }
+
+    // 2. Canonical code, cleaned slug, and alias lookup with team verification
+    const probeKeys = new Set<string>();
+    const pushKey = (val?: string) => {
+      if (!val || val === 'ALL') return;
+      const trimmed = val.trim().toLowerCase();
+      if (trimmed) probeKeys.add(trimmed);
+      const cleaned = cleanStr(val);
+      if (cleaned) probeKeys.add(cleaned);
+    };
+
+    pushKey(fixture.league);
+    pushKey(fixture.leagueName);
+    if (fixture.league) {
+      for (const a of getLeagueAliases(fixture.league)) pushKey(a);
+    }
+    if (fixture.leagueName) {
+      for (const a of getLeagueAliases(fixture.leagueName)) pushKey(a);
+    }
+
+    let firstCandidate: LeagueStandingTable | null = null;
+    for (const key of probeKeys) {
+      const candidates = lookup.byKey.get(key);
+      if (!candidates) continue;
+      for (const cand of candidates) {
+        if (!firstCandidate) firstCandidate = cand;
+        if (this.tableContainsFixtureTeam(cand, fixture.homeTeam, fixture.awayTeam)) {
+          return cand;
+        }
+      }
+    }
+
+    return firstCandidate;
+  }
+
   public static predictFixtureUnified(
     fixture: Fixture,
     allMatches: HistoricalMatch[],
@@ -144,7 +268,8 @@ export class ServerEngine {
     tacticalInput?: any,
     scrapedMap?: Map<string, any>,
     historicalContextOverride?: HistoricalMatch[],
-    eloRatingsMap?: Map<string, number>
+    eloRatingsMap?: Map<string, number>,
+    standingsOverride?: LeagueStandingTable | null
   ): Fixture {
     // Standardize date/time for the incoming fixture
     const f = {
@@ -185,6 +310,11 @@ export class ServerEngine {
       stage: tacticalInput?.stage || f.stage,
     };
 
+    const resolvedStandings =
+      standingsOverride !== undefined
+        ? standingsOverride
+        : ((db.getLeagueStandings(f.league, f.leagueUrl, f.leagueName) as LeagueStandingTable | null) || null);
+
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       f.homeTeam,
       f.awayTeam,
@@ -193,7 +323,7 @@ export class ServerEngine {
       cachedH2H,
       allMatches,
       mergedTacticalInput,
-      undefined,
+      resolvedStandings,
       eloRatingsMap,
       f.marketOdds
     );
@@ -259,6 +389,7 @@ export class ServerEngine {
     scrapedMap?: Map<string, any>,
     precomputed?: {
       leagueCountCache?: Map<string, number>;
+      standingsTable?: LeagueStandingTable | null;
       quiet?: boolean;
     }
   ): { score: number; isEligible: boolean; missingFields: string[] } {
@@ -333,7 +464,13 @@ export class ServerEngine {
       precomputed?.leagueCountCache?.set(leagueCacheKey, leagueMatchesCount);
     }
 
-    if (leagueMatchesCount >= 1) {
+    const hasStandingsBaseline = Boolean(
+      precomputed?.standingsTable &&
+      Array.isArray(precomputed.standingsTable.table) &&
+      precomputed.standingsTable.table.some((r) => r.played > 0)
+    );
+
+    if (leagueMatchesCount >= 1 || hasStandingsBaseline) {
       score += 0.15;
     } else {
       missingFields.push('league_scoring_baselines');
@@ -410,6 +547,8 @@ export class ServerEngine {
     const cachedH2HMap = db.getAllPredictionMeasurements();
     const cachedOddsMap = db.getAllMatchOddsCache();
     const rawFeedPaths = db.getRawFeedPathsSet();
+    const allStandingsTables = db.getAllLeagueStandingsTables();
+    const standingsLookup = this.buildStandingsLookup(allStandingsTables);
 
     // Build augmented match graph (base historical universe + cached H2H form feeds) so international & cup teams get real Elo ratings
     const eloUniverse = ApexEngine.augmentHistoricalMatchesWithH2H(allMatches, cachedH2HMap.values());
@@ -515,8 +654,10 @@ export class ServerEngine {
           const fWithOdds = cachedOdds && !f.marketOdds ? { ...f, marketOdds: cachedOdds } : f;
 
           const leagueHistoricalContext = getLeagueContext(f.league, f.leagueName);
+          const fixtureStandings = this.resolveStandingsForFixture(fWithOdds, standingsLookup);
           const availability = this.calculateDataAvailability(fWithOdds, allMatches, cachedH2H, scrapedMap, {
             leagueCountCache,
+            standingsTable: fixtureStandings,
             quiet: true,
           });
 
@@ -529,7 +670,8 @@ export class ServerEngine {
               tacticalInput,
               scrapedMap,
               leagueHistoricalContext,
-              eloRatingsMap
+              eloRatingsMap,
+              fixtureStandings
             );
             if (cachedOdds) {
               enriched.marketOdds = cachedOdds;
