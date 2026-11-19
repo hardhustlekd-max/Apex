@@ -2,7 +2,8 @@ import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, Scrape
 import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
-import { resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
+import { extractTournamentMetadataFromFeed, FlashscoreTournamentMeta, resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
+import { getLeagueAliases } from './leagueMapper.js';
 import {
   sqliteDb,
   initSqliteSchema,
@@ -230,7 +231,7 @@ export class FootballDB {
           prediction_json, markets_json, best_value_market_json,
           home_stats_json, away_stats_json, measurements_json, h2h_matches_json,
           information_json, statistics_json, market_odds_json,
-          feed_path, updated_at
+          feed_path, league_url, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
@@ -239,7 +240,7 @@ export class FootballDB {
           ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?, ?,
-          ?, ?
+          ?, ?, ?
         )
         ON CONFLICT(id) DO UPDATE SET
           provider_id = excluded.provider_id,
@@ -276,6 +277,7 @@ export class FootballDB {
           END,
           market_odds_json = COALESCE(excluded.market_odds_json, upcoming_fixtures.market_odds_json),
           feed_path = COALESCE(excluded.feed_path, upcoming_fixtures.feed_path),
+          league_url = COALESCE(NULLIF(excluded.league_url, ''), upcoming_fixtures.league_url),
           updated_at = excluded.updated_at
       `);
 
@@ -310,6 +312,7 @@ export class FootballDB {
             f.statistics ? JSON.stringify(f.statistics) : null,
             f.marketOdds ? JSON.stringify(f.marketOdds) : null,
             (f as any).feed_path || null,
+            f.leagueUrl || (f as any).league_url || null,
             now
           );
         }
@@ -613,7 +616,7 @@ export class FootballDB {
       }
 
       const selectCols = skipPredictionBlobs
-        ? `id, provider_id, league, league_name, match_date, kick_off_time, timestamp,
+        ? `id, provider_id, league, league_name, league_url, match_date, kick_off_time, timestamp,
            home_team, away_team, home_badge, away_badge, stage,
            rest_days_home, rest_days_away, status, score_json,
            (prediction_json IS NOT NULL) AS has_prediction,
@@ -657,6 +660,7 @@ export class FootballDB {
           providerId: (row.provider_id as any) || 'FLASHSCORE',
           league: String(row.league || ''),
           leagueName: String(row.league_name || row.league || ''),
+          leagueUrl: row.league_url ? String(row.league_url) : undefined,
           matchDate: String(row.match_date || ''),
           kickOffTime: String(row.kick_off_time || ''),
           timestamp: row.timestamp
@@ -1314,13 +1318,24 @@ export class FootballDB {
     let leagueCode = '';
     let name = '';
     let ctry: string | undefined;
+    let leagueUrl: string | undefined;
+    let season: string | undefined;
     let tableData: any[] = [];
+    let groupsData: any[] | undefined;
 
     if (typeof tableObjOrLeagueCode === 'object' && tableObjOrLeagueCode !== null) {
       leagueCode = tableObjOrLeagueCode.leagueCode || tableObjOrLeagueCode.league_code;
       name = tableObjOrLeagueCode.leagueName || tableObjOrLeagueCode.league_name;
       ctry = tableObjOrLeagueCode.country;
+      leagueUrl = tableObjOrLeagueCode.leagueUrl || tableObjOrLeagueCode.league_url;
+      season = tableObjOrLeagueCode.season;
       tableData = tableObjOrLeagueCode.table || tableObjOrLeagueCode.standings || [];
+      groupsData = Array.isArray(tableObjOrLeagueCode.groups) && tableObjOrLeagueCode.groups.length > 0
+        ? tableObjOrLeagueCode.groups
+        : undefined;
+      if (tableData.length === 0 && groupsData) {
+        tableData = groupsData.flatMap((g: any) => (Array.isArray(g.table) ? g.table : []));
+      }
     } else {
       leagueCode = String(tableObjOrLeagueCode);
       name = leagueName || leagueCode;
@@ -1328,11 +1343,25 @@ export class FootballDB {
       tableData = standings || [];
     }
 
+    if (!leagueCode) return;
+
     try {
       sqliteDb.prepare(`
-        INSERT OR REPLACE INTO league_standings (league_code, league_name, country, standings_json, source, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(leagueCode, name, ctry || null, JSON.stringify(tableData), source, new Date().toISOString());
+        INSERT OR REPLACE INTO league_standings (
+          league_code, league_name, country, league_url, season, standings_json, groups_json, source, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        leagueCode,
+        name || leagueCode,
+        ctry || null,
+        leagueUrl || null,
+        season || null,
+        JSON.stringify(tableData),
+        groupsData ? JSON.stringify(groupsData) : null,
+        source,
+        new Date().toISOString()
+      );
+      notifyDbMutation();
     } catch (err: any) {
       console.error('[FootballDB] Error saving league standings:', err?.message);
       loggerService.addLog({
@@ -1354,35 +1383,64 @@ export class FootballDB {
       'spain_la_liga': ['sp1'],
       'd1': ['germany_bundesliga'],
       'germany_bundesliga': ['d1'],
+      'd2': ['germany_2_bundesliga'],
+      'germany_2_bundesliga': ['d2'],
       'i1': ['italy_serie_a'],
       'italy_serie_a': ['i1'],
       'f1': ['france_ligue_1'],
       'france_ligue_1': ['f1'],
       'n1': ['netherlands_eredivisie'],
-      'netherlands_eredivisie': ['n1'],
+      'nl1': ['netherlands_eredivisie'],
+      'netherlands_eredivisie': ['n1', 'nl1'],
       'p1': ['portugal_primeira_liga'],
-      'portugal_primeira_liga': ['p1'],
+      'po1': ['portugal_primeira_liga'],
+      'portugal_primeira_liga': ['p1', 'po1'],
+      'bra': ['brazil_serie_a'],
+      'brazil_serie_a': ['bra'],
+      'mls': ['usa_major_league_soccer', 'mls1'],
+      'mls1': ['usa_major_league_soccer', 'mls'],
+      'usa_major_league_soccer': ['mls', 'mls1'],
+      'sa1': ['saudi_arabia_saudi_professional_league', 'saudi_arabia_saudi_pro_league'],
       'ucl': ['europe_champions_league_league_phase', 'europe_champions_league', 'europe_uefa_champions_league'],
       'europe_champions_league': ['europe_champions_league_league_phase', 'ucl'],
       'europe_champions_league_league_phase': ['europe_champions_league', 'ucl'],
       'uel': ['europe_europa_league_league_phase', 'europe_europa_league', 'europe_uefa_europa_league'],
       'europe_europa_league': ['europe_europa_league_league_phase', 'uel'],
       'europe_europa_league_league_phase': ['europe_europa_league', 'uel'],
+      'ucol': ['europe_conference_league_league_phase', 'europe_uefa_conference_league', 'uecl'],
+      'uecl': ['europe_conference_league_league_phase', 'europe_uefa_conference_league', 'ucol'],
     };
 
     try {
       const clean = String(leagueCode || '').toLowerCase().trim();
-      const candidates = [leagueCode, clean, ...(aliasMap[clean] || [])];
+      const dynamicAliases = getLeagueAliases(leagueCode).map((a) => a.toLowerCase());
+      const candidates = Array.from(
+        new Set([leagueCode, clean, ...(aliasMap[clean] || []), ...dynamicAliases].filter(Boolean))
+      );
+
       for (const code of candidates) {
-        const row = sqliteDb.prepare("SELECT * FROM league_standings WHERE LOWER(league_code) = LOWER(?)").get(code) as any;
+        const row = sqliteDb
+          .prepare("SELECT * FROM league_standings WHERE LOWER(league_code) = LOWER(?) LIMIT 1")
+          .get(code) as any;
         if (row && row.standings_json) {
           const parsedTable = safeJsonParse(row.standings_json, []);
+          const parsedGroups = row.groups_json ? safeJsonParse(row.groups_json, []) : [];
+          const groups =
+            Array.isArray(parsedGroups) && parsedGroups.length > 0
+              ? parsedGroups
+              : Array.isArray(parsedTable) && parsedTable.length > 0
+              ? [{ name: 'Standings', table: parsedTable }]
+              : [];
+
           return {
             leagueCode: row.league_code,
             leagueName: row.league_name,
             country: row.country,
+            leagueUrl: row.league_url || undefined,
+            season: row.season || undefined,
             table: parsedTable,
             standings: parsedTable,
+            groups,
             source: row.source,
             updatedAt: row.updated_at,
           };
@@ -1393,6 +1451,95 @@ export class FootballDB {
     }
 
     return null;
+  }
+
+  getAllLeagueStandingsSummaries(): Array<{
+    leagueCode: string;
+    leagueName: string;
+    country: string;
+    leagueUrl?: string;
+    season?: string;
+    teamCount: number;
+    groupCount: number;
+    updatedAt: string;
+  }> {
+    try {
+      const rows = sqliteDb
+        .prepare("SELECT league_code, league_name, country, league_url, season, standings_json, groups_json, updated_at FROM league_standings")
+        .all() as any[];
+
+      return rows.map((row) => {
+        const parsedTable = safeJsonParse<any[]>(row.standings_json, []);
+        const parsedGroups = row.groups_json ? safeJsonParse<any[]>(row.groups_json, []) : [];
+        return {
+          leagueCode: String(row.league_code),
+          leagueName: String(row.league_name || row.league_code),
+          country: String(row.country || 'International'),
+          leagueUrl: row.league_url ? String(row.league_url) : undefined,
+          season: row.season ? String(row.season) : undefined,
+          teamCount: Array.isArray(parsedTable) ? parsedTable.length : 0,
+          groupCount: Array.isArray(parsedGroups) && parsedGroups.length > 0 ? parsedGroups.length : (Array.isArray(parsedTable) && parsedTable.length > 0 ? 1 : 0),
+          updatedAt: String(row.updated_at || ''),
+        };
+      });
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting standings summaries:', err?.message);
+      return [];
+    }
+  }
+
+  getDiscoveredTournamentsFromDb(): Array<FlashscoreTournamentMeta & { leagueCode?: string }> {
+    const collected: Array<FlashscoreTournamentMeta & { leagueCode?: string }> = [];
+    const seenKeys = new Set<string>();
+
+    try {
+      // 1. From stored compressed f_1_* daily feeds (carries ZE tournamentId, ZC stageId, ZL leagueUrl)
+      const dailyRows = sqliteDb
+        .prepare("SELECT compressed_data FROM raw_feed_data WHERE feed_path LIKE 'f_1_%'")
+        .all() as Array<{ compressed_data: Buffer }>;
+
+      for (const r of dailyRows) {
+        if (!r.compressed_data) continue;
+        const text = decompressBuffer(r.compressed_data);
+        const metas = extractTournamentMetadataFromFeed(text);
+        for (const m of metas) {
+          const key = `${m.leagueUrl || ''}::${m.country}::${m.tournament}`.toLowerCase();
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          collected.push(m);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[FootballDB] Notice scanning raw feeds for tournaments:', err?.message);
+    }
+
+    try {
+      // 2. Also inspect distinct leagues persisted in upcoming_fixtures
+      const fixRows = sqliteDb
+        .prepare("SELECT DISTINCT league, league_name, league_url FROM upcoming_fixtures WHERE league IS NOT NULL")
+        .all() as Array<{ league: string; league_name: string; league_url?: string }>;
+
+      for (const r of fixRows) {
+        const leagueUrl = r.league_url ? String(r.league_url) : undefined;
+        const rawName = String(r.league_name || r.league || '').trim();
+        const colonIdx = rawName.indexOf(':');
+        const country = colonIdx > 0 ? rawName.slice(0, colonIdx).trim() : 'International';
+        const tournament = colonIdx > 0 ? rawName.slice(colonIdx + 1).trim() : rawName;
+        const key = `${leagueUrl || ''}::${country}::${tournament}`.toLowerCase();
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        collected.push({
+          leagueCode: String(r.league),
+          tournament: rawName,
+          country,
+          leagueUrl,
+        });
+      }
+    } catch (err: any) {
+      console.warn('[FootballDB] Notice scanning upcoming_fixtures for tournaments:', err?.message);
+    }
+
+    return collected;
   }
 }
 

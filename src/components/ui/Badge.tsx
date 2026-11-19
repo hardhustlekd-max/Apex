@@ -30,8 +30,8 @@ const VARIANT_STYLES: Record<BadgeVariant, string> = {
 };
 
 const SIZE_STYLES: Record<'xs' | 'sm', string> = {
-  xs: 'h-[20px] px-1.5 text-2xs leading-none',
-  sm: 'h-[24px] px-2 text-xs leading-none',
+  xs: 'h-[18px] px-1.5 text-2xs leading-none',
+  sm: 'h-[21px] px-2 text-xs leading-none',
 };
 
 export const Badge: React.FC<BadgeProps> = ({

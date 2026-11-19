@@ -64,7 +64,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onResetFilters}
-            className="h-[34px] inline-flex items-center text-xs font-medium text-rose-500 hover:bg-rose-500/10 cursor-pointer px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="h-[30px] inline-flex items-center text-xs font-medium text-rose-500 hover:bg-rose-500/10 cursor-pointer px-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Reset All
           </button>

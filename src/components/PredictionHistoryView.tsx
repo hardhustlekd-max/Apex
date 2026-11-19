@@ -114,7 +114,7 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
     }
     role={onClick ? 'button' : undefined}
     tabIndex={onClick ? 0 : undefined}
-    className={`min-h-[46px] px-3 py-1.5 hover:bg-theme-card-elevated transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm ${
+    className={`min-h-[42px] px-3 py-1.5 hover:bg-theme-card-elevated transition-colors duration-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm ${
       onClick ? 'cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent' : ''
     }`}
   >
@@ -349,7 +349,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     : [];
 
   if (isLoading && !importedEvaluation) {
-    return <LoadingState label="Loading..." minHeight="min-h-[180px]" />;
+    return <LoadingState label="Loading..." minHeight="min-h-[156px]" />;
   }
 
   return (
@@ -392,7 +392,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           <button
             type="button"
             onClick={() => setImportError(null)}
-            className="w-[28px] h-[28px] inline-flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             aria-label="Dismiss error"
           >
             <X className="w-3.5 h-3.5" />
@@ -501,7 +501,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       {importedEvaluation ? (
         <div className="space-y-3">
           <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-            <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <FileSpreadsheet className="w-4 h-4 text-theme-primary shrink-0" />
                 <div className="min-w-0">

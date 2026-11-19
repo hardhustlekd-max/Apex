@@ -100,7 +100,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
     <div className="space-y-2.5 font-sans">
       {/* Overview Banner */}
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+        <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
           <SectionHeader
             title="Tactical Matchup Analysis"
             icon={<Compass className="w-3.5 h-3.5" />}
@@ -147,7 +147,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
           },
         ].map((side) => (
           <Card key={side.key} surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-            <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+            <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <TeamAvatar src={side.badge} name={side.teamName} size="sm" />
                 <div className="min-w-0">
@@ -204,7 +204,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({ fixture }) =
 
       {/* Key Matchup Battlegrounds */}
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+        <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
           <SectionHeader title="Critical Matchup Battlegrounds" size="sm" className="w-full" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subdued)]">

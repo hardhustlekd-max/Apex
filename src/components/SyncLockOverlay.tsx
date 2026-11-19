@@ -29,7 +29,7 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
       className="relative w-full overflow-hidden shadow-theme-md backdrop-blur-xl animate-in fade-in duration-200 z-30 my-1"
     >
       <div className="p-4 sm:p-5 flex flex-col items-center text-center max-w-lg mx-auto space-y-3">
-        <div className="w-10 h-10 rounded-xl bg-theme-primary text-theme-primary-text flex items-center justify-center shadow-theme-glow">
+        <div className="w-9 h-9 rounded-xl bg-theme-primary text-theme-primary-text flex items-center justify-center shadow-theme-glow">
           {isPredictionJob ? (
             <Sparkles className="w-5 h-5 animate-pulse text-theme-primary-text" />
           ) : (

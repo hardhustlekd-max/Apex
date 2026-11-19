@@ -19,17 +19,17 @@ export const Input: React.FC<InputProps> = ({
   value,
   ...props
 }) => {
-  const heightCls = inputSize === 'sm' ? 'h-[36px] min-h-[36px] text-sm' : 'h-[40px] min-h-[40px] text-base';
+  const heightCls = inputSize === 'sm' ? 'h-[30px] min-h-[30px] text-sm' : 'h-[34px] min-h-[34px] text-base';
   const bgCls = surface === 'card' ? 'bg-theme-card border border-theme' : 'bg-theme-subtle border border-theme-subdued';
-  const padLeft = leftIcon ? (inputSize === 'sm' ? 'pl-8' : 'pl-9') : 'pl-3';
-  const padRight = onClear && value ? 'pr-8' : 'pr-3';
+  const padLeft = leftIcon ? (inputSize === 'sm' ? 'pl-7' : 'pl-8') : 'pl-2.5';
+  const padRight = onClear && value ? 'pr-7' : 'pr-2.5';
 
   return (
     <div className={`relative w-full font-sans ${containerClassName}`}>
       {leftIcon && (
         <span
           className={`absolute top-1/2 -translate-y-1/2 text-theme-sub pointer-events-none flex items-center justify-center shrink-0 ${
-            inputSize === 'sm' ? 'left-2.5' : 'left-3'
+            inputSize === 'sm' ? 'left-2' : 'left-2.5'
           }`}
         >
           {leftIcon}
@@ -44,7 +44,7 @@ export const Input: React.FC<InputProps> = ({
         <button
           type="button"
           onClick={onClear}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-[24px] h-[24px] text-theme-sub hover:text-theme-main hover:bg-theme-card/70 rounded-lg cursor-pointer flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-[20px] h-[20px] text-theme-sub hover:text-theme-main hover:bg-theme-card/70 rounded-lg cursor-pointer flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           aria-label="Clear input"
         >
           <X className="w-3.5 h-3.5" />

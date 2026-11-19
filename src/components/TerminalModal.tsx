@@ -133,7 +133,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             type="button"
             onClick={fetchLogs}
             disabled={isLoading}
-            className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle hover:text-theme-primary text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle hover:text-theme-primary text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Refresh"
             aria-label="Refresh logs"
           >
@@ -142,7 +142,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
           <button
             type="button"
             onClick={handleClear}
-            className="w-[34px] h-[34px] rounded-full hover:bg-rose-500/15 hover:text-rose-500 text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[30px] h-[30px] rounded-full hover:bg-rose-500/15 hover:text-rose-500 text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Clear Terminal"
             aria-label="Clear terminal logs"
           >
@@ -160,12 +160,12 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       }
     >
       {/* Filter bar */}
-      <div className="px-3.5 py-2 bg-theme-subtle border-b border-theme flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div className="px-3 py-1.5 bg-theme-subtle border-b border-theme flex flex-wrap items-center justify-between gap-2 shrink-0">
         {/* Category Tabs */}
         <div
           role="tablist"
           aria-label="Log category filter"
-          className="flex items-center gap-0.5 h-[36px] min-h-[36px] p-[3px] rounded-xl bg-theme-card border border-theme overflow-x-auto no-scrollbar max-w-full"
+          className="flex items-center gap-0.5 h-[30px] min-h-[30px] p-[3px] rounded-xl bg-theme-card border border-theme overflow-x-auto no-scrollbar max-w-full"
         >
           {['ALL', 'DATABASE', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
             <button
@@ -228,7 +228,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       </div>
 
       {/* Quick summary stats banner */}
-      <div className="min-h-[34px] px-3.5 py-1.5 bg-theme-header-grad border-b border-theme-subdued text-xs flex items-center justify-between text-theme-sub shrink-0">
+      <div className="min-h-[30px] px-3 py-1 bg-theme-header-grad border-b border-theme-subdued text-xs flex items-center justify-between text-theme-sub shrink-0">
         <div className="flex items-center gap-2.5 tabular-nums flex-wrap font-normal">
           <span>
             Total <strong className="text-theme-main font-semibold">{stats.total}</strong>
@@ -243,12 +243,12 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             Errors <strong className={`font-semibold ${stats.errors > 0 ? 'text-rose-500' : 'text-theme-sub'}`}>{stats.errors}</strong>
           </span>
         </div>
-        <label className="h-[28px] inline-flex items-center gap-1.5 cursor-pointer text-theme-sub hover:text-theme-main select-none font-medium">
+        <label className="h-[24px] inline-flex items-center gap-1.5 cursor-pointer text-theme-sub hover:text-theme-main select-none font-medium">
           <input
             type="checkbox"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="rounded bg-theme-subtle accent-[var(--accent-default)] focus-visible:ring-2 focus-visible:ring-theme-accent w-4 h-4 cursor-pointer"
+            className="rounded bg-theme-subtle accent-[var(--accent-default)] focus-visible:ring-2 focus-visible:ring-theme-accent w-3.5 h-3.5 cursor-pointer"
           />
           <span>Auto scroll</span>
         </label>
@@ -257,7 +257,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       {/* Terminal Console Output */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto divide-y divide-white/[0.06] bg-[#060a10] select-text min-h-[220px] max-h-[48vh]"
+        className="flex-1 overflow-y-auto divide-y divide-white/[0.06] bg-[#060a10] select-text min-h-[195px] max-h-[46vh]"
       >
         {filteredLogs.length === 0 ? (
           <div className="py-10 text-center text-zinc-500 text-sm">

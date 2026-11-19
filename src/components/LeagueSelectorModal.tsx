@@ -82,13 +82,13 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
               onSelectLeague('ALL');
               onClose();
             }}
-            className={`w-full min-h-[40px] text-left flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
+            className={`w-full min-h-[34px] text-left flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
               selectedLeague === 'ALL'
                 ? 'bg-theme-primary-subtle font-semibold text-theme-primary'
                 : 'hover:bg-theme-subtle/70 font-medium text-theme-main'
             }`}
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-theme-primary shrink-0" />
               <span className="text-base">All Leagues Worldwide</span>
             </div>
@@ -107,7 +107,7 @@ export const LeagueSelectorModal: React.FC<LeagueSelectorModalProps> = ({
                   onSelectLeague(league.code);
                   onClose();
                 }}
-                className={`w-full min-h-[40px] text-left flex items-center justify-between px-3.5 py-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
+                className={`w-full min-h-[34px] text-left flex items-center justify-between px-3 py-1.5 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-theme-subtle ${
                   isSelected
                     ? 'bg-theme-primary-subtle font-semibold text-theme-primary'
                     : 'hover:bg-theme-subtle/70 font-medium text-theme-main'

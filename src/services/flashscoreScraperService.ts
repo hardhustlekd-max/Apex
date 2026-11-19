@@ -1,4 +1,4 @@
-import { cleanFixtureId, Fixture, HistoricalMatch, LeagueCode, HeadToHeadMeasurement, LeagueStandingTable, LeagueStandingEntry, ProviderStatus, ScrapedMarketOdds } from '../core/types.js';
+import { cleanFixtureId, Fixture, HistoricalMatch, LeagueCode, HeadToHeadMeasurement, LeagueStandingTable, ProviderStatus, ScrapedMarketOdds } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
@@ -63,6 +63,7 @@ const STATIC_IMAGE_BASE = 'https://static.flashscore.com/res/image/data/';
 import {
   parseFeedText,
   parseHeadToHeadFeedText,
+  parseFlashscoreStandingsFeed,
   buildFallbackH2HFromHistoricalDb,
   teamMatchScore,
   H2H_PARSER_VERSION,
@@ -292,6 +293,7 @@ export class FlashscoreScraperService {
                 providerId: 'FLASHSCORE',
                 league: code,
                 leagueName: name,
+                leagueUrl: m.leagueUrl,
                 matchDate: dateStr,
                 kickOffTime,
                 timestamp: m.timestamp,
@@ -493,6 +495,7 @@ export class FlashscoreScraperService {
             providerId: 'FLASHSCORE',
             league: code,
             leagueName: name,
+            leagueUrl: m.leagueUrl,
             matchDate: dateStr,
             kickOffTime,
             timestamp: m.timestamp,
@@ -1019,7 +1022,7 @@ export class FlashscoreScraperService {
   async syncHistoricalData(
     daysBack = 7,
     _shouldClear = false,
-    options?: { skipUpcomingRefresh?: boolean }
+    options?: { skipUpcomingRefresh?: boolean; skipStandings?: boolean }
   ): Promise<{ success: boolean; matchesCount: number; message: string }> {
     loggerService.addLog({
       level: 'INFO',
@@ -1153,18 +1156,15 @@ export class FlashscoreScraperService {
       ? []
       : await this.getUpcomingFixtures(undefined, true);
 
-    // Scrape and save standings into SQLite database table during fullsync process
-    const popularLeagues = tournamentPages.map((t) => t.code);
-    const standingsBatchSize = 4;
-    for (let i = 0; i < popularLeagues.length; i += standingsBatchSize) {
-      const batch = popularLeagues.slice(i, i + standingsBatchSize);
-      await Promise.allSettled(batch.map((code) => this.fetchAndSaveLeagueStandings(code)));
+    // Scrape and save standings for discovered & catalog leagues unless deferred to dedicated Full Sync step
+    if (!options?.skipStandings) {
+      await this.syncAllCatalogStandings();
     }
 
     return {
       success: true,
       matchesCount: historicalMatches.length + upcoming.length,
-      message: `FlashscoreScraping synchronized ${historicalMatches.length} real historical multi-year results, ${upcoming.length} upcoming fixtures, and league standings into database.`,
+      message: `FlashscoreScraping synchronized ${historicalMatches.length} historical results and ${upcoming.length} upcoming fixtures into database.`,
     };
   }
 
@@ -1699,152 +1699,155 @@ export class FlashscoreScraperService {
     return fetchedCount;
   }
 
-  /**
-   * Parse Flashscore delimiter format into LeagueStandingEntry array
-   */
-  private parseStandingsFeed(feedText: string): LeagueStandingEntry[] {
-    const entries: LeagueStandingEntry[] = [];
-    const sections = feedText.split('~');
+  private normalizeLeagueBasePath(rawPath?: string): string | undefined {
+    if (!rawPath) return undefined;
+    let clean = rawPath.trim();
+    if (!clean) return undefined;
+    clean = clean.replace(/^https?:\/\/[^/]+/i, '');
+    if (!clean.startsWith('/')) clean = `/${clean}`;
+    clean = clean.replace(/\/(?:standings|results|fixtures|archive)\/?$/i, '/');
+    if (!clean.endsWith('/')) clean = `${clean}/`;
+    return clean.startsWith('/football/') ? clean : undefined;
+  }
 
-    for (const section of sections) {
-      if (!section) continue;
-      // Standings row indicator in Flashscore feed
-      if (section.startsWith('TR÷') || section.includes('¬TR÷') || section.includes('¬TN÷')) {
-        const parts = section.split('¬');
-        const data: Record<string, string> = {};
-        for (const p of parts) {
-          const [k, v] = p.split('÷');
-          if (k && v !== undefined) {
-            data[k] = v;
-          }
-        }
-
-        const teamName = data['TN'] || data['TI'] || data['AE'];
-        const rank = parseInt(data['TR'] || data['RK'] || '0', 10);
-        const played = parseInt(data['TP'] || data['MP'] || data['GP'] || '0', 10);
-        const won = parseInt(data['TW'] || data['W'] || '0', 10);
-        const drawn = parseInt(data['TD'] || data['D'] || '0', 10);
-        const lost = parseInt(data['TL'] || data['L'] || '0', 10);
-
-        // Goals parsing e.g. TG÷45:20 or separate GF/GA
-        let goalsFor = 0;
-        let goalsAgainst = 0;
-        if (data['TG'] && data['TG'].includes(':')) {
-          const [gf, ga] = data['TG'].split(':');
-          goalsFor = parseInt(gf, 10) || 0;
-          goalsAgainst = parseInt(ga, 10) || 0;
-        } else {
-          goalsFor = parseInt(data['GF'] || data['TG'] || '0', 10);
-          goalsAgainst = parseInt(data['GA'] || data['TC'] || '0', 10);
-        }
-
-        const points = parseInt(data['PTS'] || data['PT'] || '0', 10);
-        const badge = data['TB'] ? `${STATIC_IMAGE_BASE}${data['TB']}` : undefined;
-
-        // Form string e.g. "W,D,W,L,W" or "WDWLW"
-        let form: ('W' | 'D' | 'L')[] = [];
-        const rawForm = data['FM'] || data['FR'] || '';
-        if (rawForm) {
-          form = rawForm
-            .toUpperCase()
-            .replace(/[^WDL]/g, '')
-            .split('')
-            .slice(-5) as ('W' | 'D' | 'L')[];
-        }
-
-        if (teamName && (played > 0 || points > 0 || rank > 0)) {
-          entries.push({
-            rank: rank || (entries.length + 1),
-            teamId: data['TI'],
-            teamName: teamName.trim(),
-            badge,
-            played,
-            won,
-            drawn,
-            lost,
-            goalsFor,
-            goalsAgainst,
-            goalDifference: goalsFor - goalsAgainst,
-            points,
-            form: form.length > 0 ? form : undefined,
-          });
-        }
-      }
-    }
-
-    if (entries.length > 0) {
-      entries.sort((a, b) => a.rank - b.rank);
-      entries.forEach((e, i) => { e.rank = i + 1; });
-    }
-
-    return entries;
+  private getKnownStandingsUrlMap(): Record<string, { path: string; name: string; country: string }> {
+    return {
+      'europe_champions_league': { path: '/football/europe/champions-league/', name: 'UEFA Champions League', country: 'Europe' },
+      'europe_champions_league_league_phase': { path: '/football/europe/champions-league/', name: 'UEFA Champions League', country: 'Europe' },
+      'europe_uefa_champions_league': { path: '/football/europe/champions-league/', name: 'UEFA Champions League', country: 'Europe' },
+      'ucl': { path: '/football/europe/champions-league/', name: 'UEFA Champions League', country: 'Europe' },
+      'europe_europa_league': { path: '/football/europe/europa-league/', name: 'UEFA Europa League', country: 'Europe' },
+      'europe_uefa_europa_league': { path: '/football/europe/europa-league/', name: 'UEFA Europa League', country: 'Europe' },
+      'europe_europa_league_league_phase': { path: '/football/europe/europa-league/', name: 'UEFA Europa League', country: 'Europe' },
+      'uel': { path: '/football/europe/europa-league/', name: 'UEFA Europa League', country: 'Europe' },
+      'europe_uefa_conference_league': { path: '/football/europe/conference-league/', name: 'UEFA Conference League', country: 'Europe' },
+      'europe_conference_league_league_phase': { path: '/football/europe/conference-league/', name: 'UEFA Conference League', country: 'Europe' },
+      'ucol': { path: '/football/europe/conference-league/', name: 'UEFA Conference League', country: 'Europe' },
+      'uecl': { path: '/football/europe/conference-league/', name: 'UEFA Conference League', country: 'Europe' },
+      'england_premier_league': { path: '/football/england/premier-league/', name: 'Premier League', country: 'England' },
+      'e0': { path: '/football/england/premier-league/', name: 'Premier League', country: 'England' },
+      'england_championship': { path: '/football/england/championship/', name: 'EFL Championship', country: 'England' },
+      'e1': { path: '/football/england/championship/', name: 'EFL Championship', country: 'England' },
+      'spain_la_liga': { path: '/football/spain/laliga/', name: 'La Liga', country: 'Spain' },
+      'spain_laliga': { path: '/football/spain/laliga/', name: 'La Liga', country: 'Spain' },
+      'sp1': { path: '/football/spain/laliga/', name: 'La Liga', country: 'Spain' },
+      'spain_la_liga_2': { path: '/football/spain/laliga2/', name: 'LaLiga2', country: 'Spain' },
+      'spain_laliga2': { path: '/football/spain/laliga2/', name: 'LaLiga2', country: 'Spain' },
+      'germany_bundesliga': { path: '/football/germany/bundesliga/', name: 'Bundesliga', country: 'Germany' },
+      'd1': { path: '/football/germany/bundesliga/', name: 'Bundesliga', country: 'Germany' },
+      'germany_2_bundesliga': { path: '/football/germany/2-bundesliga/', name: '2. Bundesliga', country: 'Germany' },
+      'd2': { path: '/football/germany/2-bundesliga/', name: '2. Bundesliga', country: 'Germany' },
+      'italy_serie_a': { path: '/football/italy/serie-a/', name: 'Serie A', country: 'Italy' },
+      'i1': { path: '/football/italy/serie-a/', name: 'Serie A', country: 'Italy' },
+      'italy_serie_b': { path: '/football/italy/serie-b/', name: 'Serie B', country: 'Italy' },
+      'france_ligue_1': { path: '/football/france/ligue-1/', name: 'Ligue 1', country: 'France' },
+      'f1': { path: '/football/france/ligue-1/', name: 'Ligue 1', country: 'France' },
+      'france_ligue_2': { path: '/football/france/ligue-2/', name: 'Ligue 2', country: 'France' },
+      'netherlands_eredivisie': { path: '/football/netherlands/eredivisie/', name: 'Eredivisie', country: 'Netherlands' },
+      'n1': { path: '/football/netherlands/eredivisie/', name: 'Eredivisie', country: 'Netherlands' },
+      'nl1': { path: '/football/netherlands/eredivisie/', name: 'Eredivisie', country: 'Netherlands' },
+      'portugal_primeira_liga': { path: '/football/portugal/liga-portugal/', name: 'Liga Portugal', country: 'Portugal' },
+      'portugal_liga_portugal': { path: '/football/portugal/liga-portugal/', name: 'Liga Portugal', country: 'Portugal' },
+      'p1': { path: '/football/portugal/liga-portugal/', name: 'Liga Portugal', country: 'Portugal' },
+      'po1': { path: '/football/portugal/liga-portugal/', name: 'Liga Portugal', country: 'Portugal' },
+      'brazil_serie_a': { path: '/football/brazil/serie-a/', name: 'Série A', country: 'Brazil' },
+      'bra': { path: '/football/brazil/serie-a/', name: 'Série A', country: 'Brazil' },
+      'usa_major_league_soccer': { path: '/football/usa/mls/', name: 'MLS', country: 'USA' },
+      'mls': { path: '/football/usa/mls/', name: 'MLS', country: 'USA' },
+      'mls1': { path: '/football/usa/mls/', name: 'MLS', country: 'USA' },
+      'turkey_super_lig': { path: '/football/turkey/super-lig/', name: 'Süper Lig', country: 'Turkey' },
+      'belgium_jupiler_pro_league': { path: '/football/belgium/jupiler-pro-league/', name: 'Jupiler Pro League', country: 'Belgium' },
+      'scotland_premiership': { path: '/football/scotland/premiership/', name: 'Premiership', country: 'Scotland' },
+      'austria_bundesliga': { path: '/football/austria/bundesliga/', name: 'Bundesliga', country: 'Austria' },
+      'switzerland_super_league': { path: '/football/switzerland/super-league/', name: 'Super League', country: 'Switzerland' },
+      'denmark_superliga': { path: '/football/denmark/superliga/', name: 'Superliga', country: 'Denmark' },
+      'norway_eliteserien': { path: '/football/norway/eliteserien/', name: 'Eliteserien', country: 'Norway' },
+      'sweden_allsvenskan': { path: '/football/sweden/allsvenskan/', name: 'Allsvenskan', country: 'Sweden' },
+      'greece_super_league': { path: '/football/greece/super-league/', name: 'Super League', country: 'Greece' },
+      'poland_ekstraklasa': { path: '/football/poland/ekstraklasa/', name: 'Ekstraklasa', country: 'Poland' },
+      'mexico_liga_mx': { path: '/football/mexico/liga-mx/', name: 'Liga MX', country: 'Mexico' },
+      'argentina_liga_profesional': { path: '/football/argentina/torneo-betano/', name: 'Torneo Betano', country: 'Argentina' },
+      'japan_j1_league': { path: '/football/japan/j1-league/', name: 'J1 League', country: 'Japan' },
+      'south_korea_k_league_1': { path: '/football/south-korea/k-league-1/', name: 'K League 1', country: 'South Korea' },
+      'saudi_arabia_saudi_professional_league': { path: '/football/saudi-arabia/saudi-professional-league/', name: 'Saudi Pro League', country: 'Saudi Arabia' },
+      'sa1': { path: '/football/saudi-arabia/saudi-professional-league/', name: 'Saudi Pro League', country: 'Saudi Arabia' },
+    };
   }
 
   /**
-   * Scrapes standings from Flashscore during fullsync process and saves to SQLite database table
+   * Queries Flashscore's official standings feed (`to_<tournamentId>_<tournamentStageId>_1`) directly.
+   * Bypasses the global circuit breaker so individual empty/404 cup stages never stall batch sync.
    */
-  async fetchAndSaveLeagueStandings(leagueCode: string): Promise<LeagueStandingTable | null> {
-    const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  private async fetchDirectStandingsFeed(
+    tournamentId: string,
+    tournamentStageId: string
+  ): Promise<string | null> {
+    if (!tournamentId || !tournamentStageId) return null;
+    const path = `to_${tournamentId.trim()}_${tournamentStageId.trim()}_1`;
+    const urls = [
+      `${FLASHSCORE_NINJA_BASE}/${path}`,
+      `https://global.flashscore.ninja/2/x/feed/${path}`,
+      `${FLASHSCORE_FEED_BASE}/${path}`,
+    ];
 
-    const urlMap: Record<string, { path: string; name: string; country: string }> = {
-      'europe_champions_league': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
-      'europe_champions_league_league_phase': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
-      'europe_uefa_champions_league': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
-      'ucl': { path: '/football/europe/champions-league/standings/', name: 'UEFA Champions League', country: 'Europe' },
-      'europe_europa_league': { path: '/football/europe/europa-league/standings/', name: 'UEFA Europa League', country: 'Europe' },
-      'europe_uefa_europa_league': { path: '/football/europe/europa-league/standings/', name: 'UEFA Europa League', country: 'Europe' },
-      'europe_europa_league_league_phase': { path: '/football/europe/europa-league/standings/', name: 'UEFA Europa League', country: 'Europe' },
-      'uel': { path: '/football/europe/europa-league/standings/', name: 'UEFA Europa League', country: 'Europe' },
-      'europe_uefa_conference_league': { path: '/football/europe/conference-league/standings/', name: 'UEFA Conference League', country: 'Europe' },
-      'europe_conference_league_league_phase': { path: '/football/europe/conference-league/standings/', name: 'UEFA Conference League', country: 'Europe' },
-      'uecl': { path: '/football/europe/conference-league/standings/', name: 'UEFA Conference League', country: 'Europe' },
-      'england_premier_league': { path: '/football/england/premier-league/standings/', name: 'English Premier League', country: 'England' },
-      'e0': { path: '/football/england/premier-league/standings/', name: 'English Premier League', country: 'England' },
-      'england_championship': { path: '/football/england/championship/standings/', name: 'English Championship', country: 'England' },
-      'e1': { path: '/football/england/championship/standings/', name: 'English Championship', country: 'England' },
-      'spain_la_liga': { path: '/football/spain/laliga/standings/', name: 'Spanish La Liga', country: 'Spain' },
-      'sp1': { path: '/football/spain/laliga/standings/', name: 'Spanish La Liga', country: 'Spain' },
-      'germany_bundesliga': { path: '/football/germany/bundesliga/standings/', name: 'German Bundesliga', country: 'Germany' },
-      'd1': { path: '/football/germany/bundesliga/standings/', name: 'German Bundesliga', country: 'Germany' },
-      'italy_serie_a': { path: '/football/italy/serie-a/standings/', name: 'Italian Serie A', country: 'Italy' },
-      'i1': { path: '/football/italy/serie-a/standings/', name: 'Italian Serie A', country: 'Italy' },
-      'france_ligue_1': { path: '/football/france/ligue-1/standings/', name: 'French Ligue 1', country: 'France' },
-      'f1': { path: '/football/france/ligue-1/standings/', name: 'French Ligue 1', country: 'France' },
-      'netherlands_eredivisie': { path: '/football/netherlands/eredivisie/standings/', name: 'Dutch Eredivisie', country: 'Netherlands' },
-      'n1': { path: '/football/netherlands/eredivisie/standings/', name: 'Dutch Eredivisie', country: 'Netherlands' },
-      'portugal_primeira_liga': { path: '/football/portugal/liga-portugal/standings/', name: 'Portuguese Primeira Liga', country: 'Portugal' },
-      'p1': { path: '/football/portugal/liga-portugal/standings/', name: 'Portuguese Primeira Liga', country: 'Portugal' },
-      'brazil_serie_a': { path: '/football/brazil/serie-a/standings/', name: 'Brazilian Série A', country: 'Brazil' },
-      'bra': { path: '/football/brazil/serie-a/standings/', name: 'Brazilian Série A', country: 'Brazil' },
-      'usa_major_league_soccer': { path: '/football/usa/mls/standings/', name: 'Major League Soccer', country: 'USA' },
-      'mls': { path: '/football/usa/mls/standings/', name: 'Major League Soccer', country: 'USA' },
-    };
+    for (const url of urls) {
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      try {
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(url, {
+          headers: {
+            'x-fsign': FSIGN_HEADER,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://www.flashscore.com/',
+            'Origin': 'https://www.flashscore.com',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          signal: controller.signal,
+        });
 
-    let target = urlMap[cleanCode];
-    if (!target) {
-      const parts = cleanCode.split('_');
-      if (parts.length >= 2) {
-        const country = parts[0];
-        const leagueName = parts.slice(1).join('-');
-        target = {
-          path: `/football/${country}/${leagueName}/standings/`,
-          name: leagueCode.replace(/_/g, ' '),
-          country: country.charAt(0).toUpperCase() + country.slice(1),
-        };
-      } else {
-        target = {
-          path: `/football/${cleanCode.replace(/_/g, '-')}/standings/`,
-          name: cleanCode.replace(/_/g, ' ').toUpperCase(),
-          country: 'International',
-        };
+        if (res.status === 404) return null;
+        if (!res.ok) continue;
+
+        const text = await res.text();
+        if (!text || CYRILLIC_REGEX.test(text)) continue;
+        if (text.includes('TR÷') || text.includes('¬TR÷')) {
+          return text;
+        }
+        // Valid 200 with no TR÷ means knockout cup / no standings table available on this stage
+        return null;
+      } catch {
+        // Try next mirror
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
       }
     }
 
-    let standingsTimeout: NodeJS.Timeout | null = null;
+    return null;
+  }
+
+  /**
+   * Fetches Flashscore standings HTML page to extract window.leaguePageHeaderData IDs (or inline initialFeeds)
+   * when tournamentId/tournamentStageId were not already present in daily feeds.
+   */
+  private async resolveStandingsIdsFromHtml(standingsPath: string): Promise<{
+    tournamentId?: string;
+    tournamentStageId?: string;
+    initialFeed?: string;
+  } | null> {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
-      const pageUrl = `https://www.flashscore.com${target.path}`;
+      const cleanPath = standingsPath.endsWith('/standings/')
+        ? standingsPath
+        : `${standingsPath.replace(/\/$/, '')}/standings/`;
+      const pageUrl = `https://www.flashscore.com${cleanPath}`;
       const controller = new AbortController();
-      standingsTimeout = setTimeout(() => controller.abort(), 8000);
+      timeout = setTimeout(() => controller.abort(), 6500);
 
       const res = await fetch(pageUrl, {
         headers: {
@@ -1855,183 +1858,317 @@ export class FlashscoreScraperService {
         signal: controller.signal,
       });
 
-      if (res.ok) {
-        const html = await res.text();
-        
-        // 1. Try to extract direct 'standings' feed if available (Optimized On-Demand Method)
-        const standingsMatch = html.match(/cjs\.initialFeeds\['standings'\]\s*=\s*\{\s*data:\s*[\`\"']([\s\S]*?)[\`\"']\s*\}/);
-        if (standingsMatch && standingsMatch[1]) {
-          const feedText = standingsMatch[1];
-          const entries = this.parseStandingsFeed(feedText);
-          if (entries.length > 0) {
-            const table: LeagueStandingTable = {
-              leagueCode: cleanCode,
-              leagueName: target.name,
-              country: target.country,
-              season: getCurrentSeason(),
-              updatedAt: new Date().toISOString(),
-              source: 'FLASHSCORE_SCRAPED',
-              table: entries,
-            };
-            db.saveLeagueStandings(table);
-            return table;
-          }
-        }
+      if (!res.ok) return null;
+      const html = await res.text();
 
-        // 2. Fallback: Extract 'results' feed and calculate standings manually (Local Engine Method)
-        const resultsMatch = html.match(/cjs\.initialFeeds\['results'\]\s*=\s*\{\s*data:\s*[\`\"']([\s\S]*?)[\`\"']\s*\}/);
+      const standingsMatch = html.match(/cjs\.initialFeeds\['standings'\]\s*=\s*\{\s*data:\s*[`"']([\s\S]*?)[`"']\s*\}/);
+      const initialFeed = standingsMatch?.[1] && !CYRILLIC_REGEX.test(standingsMatch[1]) ? standingsMatch[1] : undefined;
 
-        if (resultsMatch && resultsMatch[1]) {
-          const feedText = resultsMatch[1];
-          const sections = feedText.split('~');
-          const parsedResults: Array<{
-            ts: number;
-            homeTeam: string;
-            awayTeam: string;
-            homeScore: number;
-            awayScore: number;
-            homeBadge?: string;
-            awayBadge?: string;
-          }> = [];
-          const seenResultIds = new Set<string>();
+      const tidMatch = html.match(/(?:["']?tournamentId["']?)\s*:\s*["']([A-Za-z0-9]+)["']/);
+      const sidMatch = html.match(/(?:["']?tournamentStageId["']?)\s*:\s*["']([A-Za-z0-9]+)["']/);
 
-          for (const s of sections) {
-            if (!s.startsWith('AA÷')) continue;
-            const parts = s.split('¬');
-            const data: Record<string, string> = {};
-            for (const p of parts) {
-              const sepIdx = p.indexOf('÷');
-              if (sepIdx > 0) data[p.slice(0, sepIdx)] = p.slice(sepIdx + 1);
-            }
-
-            if (data['AB'] !== '3' || data['AG'] === undefined || data['AH'] === undefined) continue;
-            const resId = data['AA'];
-            if (resId && seenResultIds.has(resId)) continue;
-            if (resId) seenResultIds.add(resId);
-
-            const homeTeam = (data['AE'] || '').trim();
-            const awayTeam = (data['AF'] || '').trim();
-            const homeScore = parseInt(data['AG'], 10);
-            const awayScore = parseInt(data['AH'], 10);
-            if (!homeTeam || !awayTeam || isNaN(homeScore) || isNaN(awayScore)) continue;
-
-            const ts = parseInt(data['AD'] || '0', 10) || 0;
-            const rawHomeBadge = data['OA'] || data['OAJ'];
-            const rawAwayBadge = data['OB'];
-
-            parsedResults.push({
-              ts,
-              homeTeam,
-              awayTeam,
-              homeScore,
-              awayScore,
-              homeBadge: rawHomeBadge ? `${STATIC_IMAGE_BASE}${rawHomeBadge}` : undefined,
-              awayBadge: rawAwayBadge ? `${STATIC_IMAGE_BASE}${rawAwayBadge}` : undefined,
-            });
-          }
-
-          // Sort strictly newest-first by timestamp so form[0..4] holds the 5 most recent matches
-          parsedResults.sort((a, b) => b.ts - a.ts);
-
-          const teamStats = new Map<string, {
-            played: number;
-            won: number;
-            drawn: number;
-            lost: number;
-            goalsFor: number;
-            goalsAgainst: number;
-            points: number;
-            form: ('W' | 'D' | 'L')[];
-            badge?: string;
-          }>();
-
-          for (const r of parsedResults) {
-            if (!teamStats.has(r.homeTeam)) {
-              teamStats.set(r.homeTeam, {
-                played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: [],
-                badge: r.homeBadge,
-              });
-            }
-            if (!teamStats.has(r.awayTeam)) {
-              teamStats.set(r.awayTeam, {
-                played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: [],
-                badge: r.awayBadge,
-              });
-            }
-
-            const h = teamStats.get(r.homeTeam)!;
-            const a = teamStats.get(r.awayTeam)!;
-            if (!h.badge && r.homeBadge) h.badge = r.homeBadge;
-            if (!a.badge && r.awayBadge) a.badge = r.awayBadge;
-
-            h.played++; a.played++;
-            h.goalsFor += r.homeScore; h.goalsAgainst += r.awayScore;
-            a.goalsFor += r.awayScore; a.goalsAgainst += r.homeScore;
-
-            if (r.homeScore > r.awayScore) {
-              h.won++; h.points += 3; h.form.push('W');
-              a.lost++; a.form.push('L');
-            } else if (r.homeScore < r.awayScore) {
-              a.won++; a.points += 3; a.form.push('W');
-              h.lost++; h.form.push('L');
-            } else {
-              h.drawn++; h.points += 1; h.form.push('D');
-              a.drawn++; a.points += 1; a.form.push('D');
-            }
-          }
-
-          if (teamStats.size > 0) {
-            const entries: LeagueStandingEntry[] = Array.from(teamStats.entries()).map(([teamName, s]) => ({
-              rank: 1,
-              teamName,
-              badge: s.badge,
-              played: s.played,
-              won: s.won,
-              drawn: s.drawn,
-              lost: s.lost,
-              goalsFor: s.goalsFor,
-              goalsAgainst: s.goalsAgainst,
-              goalDifference: s.goalsFor - s.goalsAgainst,
-              points: s.points,
-              form: (s.form.slice(0, 5) as ('W' | 'D' | 'L')[]) || undefined,
-            }));
-
-            entries.sort((a, b) => {
-              if (b.points !== a.points) return b.points - a.points;
-              if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-              if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-              return a.teamName.localeCompare(b.teamName);
-            });
-
-            entries.forEach((e, idx) => {
-              e.rank = idx + 1;
-            });
-
-            const liveTable: LeagueStandingTable = {
-              leagueCode: cleanCode,
-              leagueName: target.name,
-              country: target.country,
-              season: getCurrentSeason(),
-              updatedAt: new Date().toISOString(),
-              source: 'FLASHSCORE_SCRAPED',
-              table: entries,
-            };
-
-            db.saveLeagueStandings(liveTable);
-            return liveTable;
-          }
-        }
+      if (!initialFeed && (!tidMatch?.[1] || !sidMatch?.[1])) {
+        return null;
       }
-    } catch (err) {
-      // Catch cleanly
+
+      return {
+        tournamentId: tidMatch?.[1],
+        tournamentStageId: sidMatch?.[1],
+        initialFeed,
+      };
+    } catch {
+      return null;
     } finally {
-      if (standingsTimeout) {
-        clearTimeout(standingsTimeout);
-        standingsTimeout = null;
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+    }
+  }
+
+  /**
+   * Scrapes official Flashscore standings via `to_<ZE>_<ZC>_1` or HTML `leaguePageHeaderData`
+   * and persists multi-group tables in SQLite. Zero fabricated/manual calculations.
+   */
+  async fetchAndSaveLeagueStandings(
+    targetInput:
+      | string
+      | {
+          leagueCode: string;
+          leagueName?: string;
+          country?: string;
+          leagueUrl?: string;
+          tournamentId?: string;
+          tournamentStageId?: string;
+        }
+  ): Promise<LeagueStandingTable | null> {
+    const rawCode = typeof targetInput === 'string' ? targetInput : targetInput.leagueCode;
+    const cleanCode = String(rawCode || '')
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (!cleanCode) return null;
+
+    const urlMap = this.getKnownStandingsUrlMap();
+    const mappedUrlInfo = urlMap[cleanCode];
+
+    let resolvedName =
+      (typeof targetInput === 'object' ? targetInput.leagueName : undefined) ||
+      mappedUrlInfo?.name ||
+      rawCode.replace(/_/g, ' ');
+    let resolvedCountry =
+      (typeof targetInput === 'object' ? targetInput.country : undefined) ||
+      mappedUrlInfo?.country ||
+      'International';
+
+    if (resolvedName.includes(':')) {
+      const colonIdx = resolvedName.indexOf(':');
+      const prefixCountry = resolvedName.slice(0, colonIdx).trim();
+      const suffixLeague = resolvedName.slice(colonIdx + 1).trim();
+      if (suffixLeague) {
+        if (resolvedCountry === 'International' && prefixCountry) {
+          resolvedCountry = prefixCountry;
+        }
+        resolvedName = suffixLeague;
       }
     }
 
-    return null;
+    let baseLeagueUrl =
+      this.normalizeLeagueBasePath(typeof targetInput === 'object' ? targetInput.leagueUrl : undefined) ||
+      mappedUrlInfo?.path;
+
+    if (!baseLeagueUrl) {
+      const countrySlug = resolvedCountry
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      const parts = cleanCode.split('_');
+      if (countrySlug && countrySlug !== 'international') {
+        const prefixCheck = `${countrySlug.replace(/-/g, '_')}_`;
+        const slugRemainder = cleanCode.startsWith(prefixCheck)
+          ? cleanCode.slice(prefixCheck.length).replace(/_/g, '-')
+          : resolvedName
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '');
+        if (slugRemainder) {
+          baseLeagueUrl = `/football/${countrySlug}/${slugRemainder}/`;
+        }
+      } else if (parts.length >= 2) {
+        baseLeagueUrl = `/football/${parts[0]}/${parts.slice(1).join('-')}/`;
+      }
+    }
+
+    let resolvedTid = typeof targetInput === 'object' ? targetInput.tournamentId : undefined;
+    let resolvedSid = typeof targetInput === 'object' ? targetInput.tournamentStageId : undefined;
+    let feedText: string | null = null;
+
+    // 1. Direct fast path using ZE + ZC IDs from daily Flashscore feeds
+    if (resolvedTid && resolvedSid) {
+      feedText = await this.fetchDirectStandingsFeed(resolvedTid, resolvedSid);
+    }
+
+    // 2. HTML header resolution path (leaguePageHeaderData -> to_<tid>_<sid>_1)
+    if (!feedText && baseLeagueUrl) {
+      const htmlInfo = await this.resolveStandingsIdsFromHtml(`${baseLeagueUrl}standings/`);
+      if (htmlInfo) {
+        if (htmlInfo.initialFeed) {
+          feedText = htmlInfo.initialFeed;
+        } else if (htmlInfo.tournamentId && htmlInfo.tournamentStageId) {
+          resolvedTid = htmlInfo.tournamentId;
+          resolvedSid = htmlInfo.tournamentStageId;
+          feedText = await this.fetchDirectStandingsFeed(resolvedTid, resolvedSid);
+        }
+      }
+    }
+
+    if (!feedText) return null;
+
+    const parsed = parseFlashscoreStandingsFeed(feedText);
+    if (!parsed.table || parsed.table.length === 0) {
+      return null;
+    }
+
+    const table: LeagueStandingTable = {
+      leagueCode: cleanCode,
+      leagueName: resolvedName,
+      country: resolvedCountry,
+      leagueUrl: baseLeagueUrl,
+      season: getCurrentSeason(),
+      tournamentId: resolvedTid,
+      updatedAt: new Date().toISOString(),
+      source: 'FLASHSCORE_SCRAPED',
+      table: parsed.table,
+      groups: parsed.groups,
+    };
+
+    db.saveLeagueStandings(table);
+    return table;
+  }
+
+  /**
+   * Discovers and pre-scrapes standings for every league discovered in stored Flashscore feeds,
+   * upcoming fixtures, and the global catalog during Full Sync.
+   */
+  async syncAllCatalogStandings(
+    onProgress?: (processed: number, total: number, saved: number) => void
+  ): Promise<{ totalAttempted: number; savedCount: number }> {
+    type CatalogTarget = {
+      leagueCode: string;
+      leagueName: string;
+      country: string;
+      leagueUrl?: string;
+      tournamentId?: string;
+      tournamentStageId?: string;
+    };
+
+    const dedupMap = new Map<string, CatalogTarget>();
+    const urlMap = this.getKnownStandingsUrlMap();
+
+    const mergeTarget = (candidate: CatalogTarget) => {
+      const normUrl = this.normalizeLeagueBasePath(candidate.leagueUrl);
+      const normCode = candidate.leagueCode.toLowerCase().trim();
+      const tidKey =
+        candidate.tournamentId && candidate.tournamentStageId
+          ? `tid:${candidate.tournamentId}_${candidate.tournamentStageId}`
+          : undefined;
+      const key = normUrl ? `url:${normUrl}` : tidKey || `code:${normCode}`;
+
+      const existing = dedupMap.get(key);
+      if (existing) {
+        if (!existing.tournamentId && candidate.tournamentId) existing.tournamentId = candidate.tournamentId;
+        if (!existing.tournamentStageId && candidate.tournamentStageId) existing.tournamentStageId = candidate.tournamentStageId;
+        if (!existing.leagueUrl && normUrl) existing.leagueUrl = normUrl;
+        if (candidate.leagueName && candidate.leagueName.length > 0 && existing.leagueName === existing.leagueCode) {
+          existing.leagueName = candidate.leagueName;
+        }
+        return;
+      }
+
+      dedupMap.set(key, {
+        ...candidate,
+        leagueCode: normCode,
+        leagueUrl: normUrl,
+      });
+    };
+
+    // 1. Seed popular top leagues (ensures marquee competitions are always included even off-season)
+    const marqueeLeagues: Array<{ code: string; name: string; country: string; url: string }> = [
+      { code: 'england_premier_league', name: 'Premier League', country: 'England', url: '/football/england/premier-league/' },
+      { code: 'spain_la_liga', name: 'La Liga', country: 'Spain', url: '/football/spain/laliga/' },
+      { code: 'germany_bundesliga', name: 'Bundesliga', country: 'Germany', url: '/football/germany/bundesliga/' },
+      { code: 'italy_serie_a', name: 'Serie A', country: 'Italy', url: '/football/italy/serie-a/' },
+      { code: 'france_ligue_1', name: 'Ligue 1', country: 'France', url: '/football/france/ligue-1/' },
+      { code: 'europe_champions_league_league_phase', name: 'UEFA Champions League', country: 'Europe', url: '/football/europe/champions-league/' },
+      { code: 'europe_europa_league_league_phase', name: 'UEFA Europa League', country: 'Europe', url: '/football/europe/europa-league/' },
+      { code: 'europe_uefa_conference_league', name: 'UEFA Conference League', country: 'Europe', url: '/football/europe/conference-league/' },
+      { code: 'england_championship', name: 'EFL Championship', country: 'England', url: '/football/england/championship/' },
+      { code: 'netherlands_eredivisie', name: 'Eredivisie', country: 'Netherlands', url: '/football/netherlands/eredivisie/' },
+      { code: 'portugal_primeira_liga', name: 'Liga Portugal', country: 'Portugal', url: '/football/portugal/liga-portugal/' },
+      { code: 'brazil_serie_a', name: 'Série A', country: 'Brazil', url: '/football/brazil/serie-a/' },
+      { code: 'usa_major_league_soccer', name: 'MLS', country: 'USA', url: '/football/usa/mls/' },
+      { code: 'germany_2_bundesliga', name: '2. Bundesliga', country: 'Germany', url: '/football/germany/2-bundesliga/' },
+      { code: 'france_ligue_2', name: 'Ligue 2', country: 'France', url: '/football/france/ligue-2/' },
+      { code: 'italy_serie_b', name: 'Serie B', country: 'Italy', url: '/football/italy/serie-b/' },
+      { code: 'spain_la_liga_2', name: 'LaLiga2', country: 'Spain', url: '/football/spain/laliga2/' },
+      { code: 'turkey_super_lig', name: 'Süper Lig', country: 'Turkey', url: '/football/turkey/super-lig/' },
+      { code: 'belgium_jupiler_pro_league', name: 'Jupiler Pro League', country: 'Belgium', url: '/football/belgium/jupiler-pro-league/' },
+      { code: 'scotland_premiership', name: 'Premiership', country: 'Scotland', url: '/football/scotland/premiership/' },
+      { code: 'austria_bundesliga', name: 'Bundesliga', country: 'Austria', url: '/football/austria/bundesliga/' },
+      { code: 'switzerland_super_league', name: 'Super League', country: 'Switzerland', url: '/football/switzerland/super-league/' },
+      { code: 'denmark_superliga', name: 'Superliga', country: 'Denmark', url: '/football/denmark/superliga/' },
+      { code: 'norway_eliteserien', name: 'Eliteserien', country: 'Norway', url: '/football/norway/eliteserien/' },
+      { code: 'sweden_allsvenskan', name: 'Allsvenskan', country: 'Sweden', url: '/football/sweden/allsvenskan/' },
+      { code: 'greece_super_league', name: 'Super League', country: 'Greece', url: '/football/greece/super-league/' },
+      { code: 'poland_ekstraklasa', name: 'Ekstraklasa', country: 'Poland', url: '/football/poland/ekstraklasa/' },
+      { code: 'mexico_liga_mx', name: 'Liga MX', country: 'Mexico', url: '/football/mexico/liga-mx/' },
+      { code: 'argentina_liga_profesional', name: 'Torneo Betano', country: 'Argentina', url: '/football/argentina/torneo-betano/' },
+      { code: 'japan_j1_league', name: 'J1 League', country: 'Japan', url: '/football/japan/j1-league/' },
+      { code: 'south_korea_k_league_1', name: 'K League 1', country: 'South Korea', url: '/football/south-korea/k-league-1/' },
+      { code: 'saudi_arabia_saudi_professional_league', name: 'Saudi Pro League', country: 'Saudi Arabia', url: '/football/saudi-arabia/saudi-professional-league/' },
+    ];
+
+    for (const m of marqueeLeagues) {
+      mergeTarget({
+        leagueCode: m.code,
+        leagueName: m.name,
+        country: m.country,
+        leagueUrl: m.url,
+      });
+    }
+
+    for (const g of GLOBAL_LEAGUES_DATASET) {
+      const codeLower = g.code.toLowerCase();
+      const mapped = urlMap[codeLower];
+      mergeTarget({
+        leagueCode: mapped ? codeLower : codeLower,
+        leagueName: g.name,
+        country: g.country || 'International',
+        leagueUrl: mapped?.path,
+      });
+    }
+
+    // 2. Discover every league present in stored Flashscore raw feeds & upcoming fixtures
+    const discovered = db.getDiscoveredTournamentsFromDb();
+    for (const item of discovered) {
+      const mapped = this.mapToLeagueCode(item.tournament, item.country);
+      const rawCleanName = item.tournament.includes(':')
+        ? item.tournament.slice(item.tournament.indexOf(':') + 1).trim()
+        : item.tournament.trim();
+
+      mergeTarget({
+        leagueCode: (item.leagueCode || mapped.code).toLowerCase(),
+        leagueName: rawCleanName || mapped.name,
+        country: item.country || 'International',
+        leagueUrl: item.leagueUrl,
+        tournamentId: item.tournamentId,
+        tournamentStageId: item.tournamentStageId,
+      });
+    }
+
+    const targets = Array.from(dedupMap.values());
+    // Direct ZE+ZC feed targets execute in <200ms each; HTML-only fallback targets run afterwards
+    const directTargets = targets.filter((t) => Boolean(t.tournamentId && t.tournamentStageId));
+    const htmlTargets = targets.filter((t) => !(t.tournamentId && t.tournamentStageId));
+
+    const totalAttempted = targets.length;
+    let processed = 0;
+    let savedCount = 0;
+
+    const runBatches = async (list: CatalogTarget[], concurrency: number) => {
+      for (let i = 0; i < list.length; i += concurrency) {
+        const batch = list.slice(i, i + concurrency);
+        const results = await Promise.allSettled(
+          batch.map((t) => this.fetchAndSaveLeagueStandings(t))
+        );
+        for (const r of results) {
+          processed++;
+          if (r.status === 'fulfilled' && r.value && r.value.table.length > 0) {
+            savedCount++;
+          }
+        }
+        onProgress?.(processed, totalAttempted, savedCount);
+      }
+    };
+
+    await runBatches(directTargets, 8);
+    await runBatches(htmlTargets, 5);
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'SCRAPER',
+      source: 'FlashscoreScraper',
+      message: `Synchronized league standings tables for ${savedCount}/${totalAttempted} discovered & catalog competitions`,
+      details: { savedCount, totalAttempted, directTargets: directTargets.length, htmlTargets: htmlTargets.length },
+    });
+
+    return { totalAttempted, savedCount };
   }
 
   /**
@@ -2040,7 +2177,6 @@ export class FlashscoreScraperService {
   async getLeagueStandings(leagueCode: string, _tournamentSlug?: string): Promise<LeagueStandingTable> {
     const cleanCode = leagueCode.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // 2. Query 100% strictly from SQLite database table
     const dbStandings = db.getLeagueStandings(cleanCode);
     if (dbStandings) {
       const tableData = Array.isArray(dbStandings.table)
@@ -2048,23 +2184,29 @@ export class FlashscoreScraperService {
         : Array.isArray(dbStandings.standings)
         ? dbStandings.standings
         : [];
+      const groupsData = Array.isArray(dbStandings.groups) && dbStandings.groups.length > 0
+        ? dbStandings.groups
+        : tableData.length > 0
+        ? [{ name: 'Standings', table: tableData }]
+        : [];
 
       if (tableData.length > 0) {
         const formatted: LeagueStandingTable = {
-          leagueCode: cleanCode,
+          leagueCode: dbStandings.leagueCode || cleanCode,
           leagueName: dbStandings.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
           country: dbStandings.country || 'LEAGUE',
+          leagueUrl: dbStandings.leagueUrl,
           season: dbStandings.season || getCurrentSeason(),
           updatedAt: dbStandings.updatedAt || new Date().toISOString(),
           source: 'FLASHSCORE_SCRAPED',
           table: tableData,
+          groups: groupsData,
         };
         return formatted;
       }
     }
 
-    // 3. Fallback: Empty table structure if not yet populated into SQLite table via fullsync
-    const emptyTable: LeagueStandingTable = {
+    return {
       leagueCode: cleanCode,
       leagueName: cleanCode.replace(/_/g, ' ').toUpperCase(),
       country: cleanCode.split('_')[0]?.toUpperCase() || 'LEAGUE',
@@ -2072,8 +2214,8 @@ export class FlashscoreScraperService {
       updatedAt: new Date().toISOString(),
       source: 'FLASHSCORE_SCRAPED',
       table: [],
+      groups: [],
     };
-    return emptyTable;
   }
   public getProviderStatus(): ProviderStatus {
     return {

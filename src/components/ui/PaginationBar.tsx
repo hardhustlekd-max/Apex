@@ -87,7 +87,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(1)}
-          className="h-[30px] w-[30px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
+          className="h-[26px] w-[26px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
           title="First Page"
           aria-label="First Page"
         >
@@ -97,7 +97,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          className="h-[30px] flex items-center justify-center gap-0.5 px-2 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
+          className="h-[26px] flex items-center justify-center gap-0.5 px-1.5 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Previous Page"
           aria-label="Previous Page"
         >
@@ -119,7 +119,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
                 key={`page-${item}`}
                 type="button"
                 onClick={() => onPageChange(item)}
-                className={`w-[30px] h-[30px] flex items-center justify-center rounded-lg text-xs transition-all cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                className={`w-[26px] h-[26px] flex items-center justify-center rounded-lg text-xs transition-all cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                   item === currentPage
                     ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
                     : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
@@ -135,7 +135,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          className="h-[30px] flex items-center justify-center gap-0.5 px-2 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
+          className="h-[26px] flex items-center justify-center gap-0.5 px-1.5 rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Next Page"
           aria-label="Next Page"
         >
@@ -146,7 +146,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(totalPages)}
-          className="h-[30px] w-[30px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
+          className="h-[26px] w-[26px] rounded-lg text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
           title="Last Page"
           aria-label="Last Page"
         >

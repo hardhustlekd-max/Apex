@@ -8,10 +8,10 @@ export interface TeamAvatarProps {
 }
 
 const SIZE_MAP = {
-  xs: 'w-[18px] h-[18px] text-2xs leading-none',
-  sm: 'w-[22px] h-[22px] text-2xs leading-none',
-  md: 'w-[28px] h-[28px] text-xs leading-none',
-  lg: 'w-[36px] h-[36px] text-sm leading-none',
+  xs: 'w-[16px] h-[16px] text-2xs leading-none',
+  sm: 'w-[20px] h-[20px] text-2xs leading-none',
+  md: 'w-[24px] h-[24px] text-xs leading-none',
+  lg: 'w-[32px] h-[32px] text-sm leading-none',
 };
 
 export const TeamAvatar: React.FC<TeamAvatarProps> = ({

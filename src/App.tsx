@@ -185,7 +185,7 @@ export default function App() {
         progress: 5,
         currentStep: 'Initializing Full Data Sync worker...',
         stepIndex: 1,
-        totalSteps: 7,
+        totalSteps: 8,
         matchesCount: 0,
         upcomingCount: 0,
         predictionsCount: 0,
@@ -706,7 +706,7 @@ export default function App() {
               </div>
             }
           >
-            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-3 space-y-2.5 pb-20 lg:pb-6">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 space-y-2.5 pb-16 lg:pb-5">
               {/* Blocking Job Overlay when Full Data Sync or Calculate Predictions is in progress */}
               {isProcessingActive && (
                 <SyncLockOverlay
@@ -765,7 +765,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[56px] h-[calc(100vh-68px)] rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[47px] h-[calc(100vh-58px)] rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
@@ -784,11 +784,12 @@ export default function App() {
               )}
 
               {activeTab === 'STANDINGS' && (
-                <div className={`max-w-5xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
+                <div className={`max-w-6xl mx-auto w-full ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
                   <LeagueStandings
                     selectedLeague={selectedLeague}
                     onSelectLeague={setSelectedLeague}
                     onTriggerFullSync={handleResetAndSyncData}
+                    refreshKey={dataRefreshVersion}
                   />
                 </div>
               )}

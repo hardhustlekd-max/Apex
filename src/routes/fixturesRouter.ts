@@ -194,6 +194,24 @@ fixturesRouter.post('/predictions/evaluate-imported', async (req, res) => {
   }
 });
 
+fixturesRouter.get('/standings/catalog', async (req, res) => {
+  try {
+    const catalog = await fixturesWorkerService.getStandingsCatalog();
+    res.setHeader('ETag', catalog.etag);
+    res.setHeader('Cache-Control', 'private, no-cache');
+
+    if (isEtagMatch(req.headers['if-none-match'], catalog.etag)) {
+      return res.status(304).end();
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).send(catalog.jsonPayload);
+  } catch (err: any) {
+    console.error('Error loading standings catalog:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Failed to fetch standings catalog' });
+  }
+});
+
 fixturesRouter.get('/standings/:league', async (req, res) => {
   try {
     const league = req.params.league || 'england_premier_league';

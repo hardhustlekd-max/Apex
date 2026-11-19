@@ -47,13 +47,13 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
   }, [refreshKey]);
 
   if (isLoading) {
-    return <LoadingState variant="spinner" minHeight="min-h-[140px]" label="Loading today's high confidence tips..." />;
+    return <LoadingState variant="spinner" minHeight="min-h-[124px]" label="Loading today's high confidence tips..." />;
   }
 
   if (tips.length === 0) {
     return (
       <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center">
+        <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center">
           <SectionHeader
             title="Today's Featured Tips (>85%)"
             icon={<Award className="w-4 h-4" />}
@@ -70,7 +70,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
 
   return (
     <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
-      <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+      <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
         <SectionHeader
           title="Today's Featured Tips (>85%)"
           icon={<Award className="w-4 h-4" />}
@@ -86,7 +86,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
         </div>
       </div>
 
-      <div className="divide-y divide-[var(--border-subdued)] max-h-[480px] overflow-y-auto">
+      <div className="divide-y divide-[var(--border-subdued)] max-h-[440px] overflow-y-auto">
         {tips.map(({ fixture, market, odds, hasScrapedOdds }) => {
           const { timeStr } = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp);
           const probPercent = (market.probability * 100).toFixed(0);
@@ -103,7 +103,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                   onSelectDetail(fixture);
                 }
               }}
-              className="min-h-[46px] flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-card-elevated transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="min-h-[42px] flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-theme-card-elevated transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 text-xs text-theme-sub">

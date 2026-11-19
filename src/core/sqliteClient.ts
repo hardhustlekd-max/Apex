@@ -519,6 +519,7 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       statistics_json TEXT,
       market_odds_json TEXT,
       feed_path TEXT,
+      league_url TEXT,
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_upcoming_date ON upcoming_fixtures(match_date);
@@ -613,7 +614,10 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       league_code TEXT PRIMARY KEY,
       league_name TEXT NOT NULL,
       country TEXT,
+      league_url TEXT,
+      season TEXT,
       standings_json TEXT NOT NULL,
+      groups_json TEXT,
       source TEXT NOT NULL DEFAULT 'FLASHSCORE_SCRAPED',
       updated_at TEXT NOT NULL
     );
@@ -659,8 +663,28 @@ export function initSqliteSchema(): void {
         db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN timestamp INTEGER;");
         db.exec("UPDATE upcoming_fixtures SET timestamp = CAST(strftime('%s', match_date || ' ' || kick_off_time || ':00') AS INTEGER) WHERE timestamp IS NULL AND kick_off_time LIKE '%:%';");
       }
+      if (!columnNames.includes('league_url')) {
+        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN league_url TEXT;");
+      }
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
+    }
+
+    // Schema Migration: Ensure league_standings supports groups_json, league_url, season
+    try {
+      const stCols = db.prepare("PRAGMA table_info(league_standings)").all() as any[];
+      const stColNames = stCols.map((c) => c.name);
+      if (!stColNames.includes('league_url')) {
+        db.exec("ALTER TABLE league_standings ADD COLUMN league_url TEXT;");
+      }
+      if (!stColNames.includes('season')) {
+        db.exec("ALTER TABLE league_standings ADD COLUMN season TEXT;");
+      }
+      if (!stColNames.includes('groups_json')) {
+        db.exec("ALTER TABLE league_standings ADD COLUMN groups_json TEXT;");
+      }
+    } catch (migErr: any) {
+      console.warn('[SQLite] Migration note for league_standings:', migErr?.message);
     }
 
     // Schema Migration: Handle transition to unified predictions table

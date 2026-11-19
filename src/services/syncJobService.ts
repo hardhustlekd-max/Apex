@@ -236,7 +236,7 @@ export class SyncJobService {
       progress: 5,
       currentStep: 'Initializing Full Data Sync worker...',
       stepIndex: 1,
-      totalSteps: 7,
+      totalSteps: 8,
       matchesCount: 0,
       upcomingCount: 0,
       predictionsCount: 0,
@@ -412,7 +412,7 @@ export class SyncJobService {
         this.updateProgress(jobId, {
           progress: 5,
           stepIndex: 1,
-          totalSteps: 7,
+          totalSteps: 8,
           currentStep: 'Purging database tables, raw feeds, and clearing all cached data to zero...',
         });
         await this.runStepWithTimeout(jobId, 'Database purge', 25_000, async () => {
@@ -426,9 +426,9 @@ export class SyncJobService {
 
       // Step 2: Reconcile stale matches and verify databases
       this.updateProgress(jobId, {
-        progress: 15,
+        progress: 12,
         stepIndex: 2,
-        totalSteps: 7,
+        totalSteps: 8,
         currentStep: 'Verifying clean database state and reconciling match records...',
       });
       await this.runStepWithTimeout(jobId, 'Stale match reconciliation', 25_000, () =>
@@ -439,9 +439,9 @@ export class SyncJobService {
 
       // Step 3: Scrape historical matches from feeds and tournament pages (non-fatal on partial timeouts)
       this.updateProgress(jobId, {
-        progress: 30,
+        progress: 24,
         stepIndex: 3,
-        totalSteps: 7,
+        totalSteps: 8,
         currentStep: 'Scraping historical match results and multi-year tournament feeds...',
       });
 
@@ -451,7 +451,7 @@ export class SyncJobService {
           jobId,
           'Historical archive sync',
           150_000,
-          () => flashscoreScraperService.syncHistoricalData(7, false, { skipUpcomingRefresh: true })
+          () => flashscoreScraperService.syncHistoricalData(7, false, { skipUpcomingRefresh: true, skipStandings: true })
         );
       } catch (histErr: any) {
         if (this.isTerminated(jobId)) return;
@@ -473,9 +473,9 @@ export class SyncJobService {
 
       // Step 4: Scrape upcoming fixtures
       this.updateProgress(jobId, {
-        progress: 50,
+        progress: 40,
         stepIndex: 4,
-        totalSteps: 7,
+        totalSteps: 8,
         matchesCount: syncRes.matchesCount,
         currentStep: 'Scraping upcoming fixtures raw feeds and saving to database...',
       });
@@ -488,11 +488,47 @@ export class SyncJobService {
 
       if (this.isTerminated(jobId)) return;
 
-      // Step 5: Scrape and store Head-to-Head (H2H) raw feeds for upcoming games
+      // Step 5: Scrape standings for all discovered & catalog leagues via official Flashscore endpoints
       this.updateProgress(jobId, {
-        progress: 68,
+        progress: 52,
         stepIndex: 5,
-        totalSteps: 7,
+        totalSteps: 8,
+        upcomingCount: upcoming.length,
+        currentStep: 'Discovering and scraping standings tables for all catalog leagues...',
+      });
+      await this.runStepWithTimeout(
+        jobId,
+        'All-catalog standings sync',
+        180_000,
+        () =>
+          flashscoreScraperService.syncAllCatalogStandings((processed, total, saved) => {
+            if (this.isTerminated(jobId)) return;
+            const pct = total > 0 ? Math.min(68, Math.round(52 + (processed / total) * 16)) : 60;
+            this.updateProgress(jobId, {
+              progress: pct,
+              stepIndex: 5,
+              totalSteps: 8,
+              currentStep: `Scraping league standings (${processed}/${total} checked, ${saved} tables saved)...`,
+            });
+          })
+      ).catch((standErr: any) => {
+        if (this.isTerminated(jobId)) return { totalAttempted: 0, savedCount: 0 };
+        loggerService.addLog({
+          level: 'WARN',
+          category: 'SCRAPER',
+          source: 'SyncJobService',
+          message: `Full data sync standings notice: ${standErr?.message || standErr}`,
+        });
+        return { totalAttempted: 0, savedCount: 0 };
+      });
+
+      if (this.isTerminated(jobId)) return;
+
+      // Step 6: Scrape and store Head-to-Head (H2H) raw feeds for upcoming games
+      this.updateProgress(jobId, {
+        progress: 70,
+        stepIndex: 6,
+        totalSteps: 8,
         upcomingCount: upcoming.length,
         currentStep: 'Scraping Head-to-Head (H2H) raw feeds, team recent form, and encounter statistics...',
       });
@@ -514,11 +550,11 @@ export class SyncJobService {
 
       if (this.isTerminated(jobId)) return;
 
-      // Step 6: Scrape and persist Flashscore pre-match market odds & implied probabilities
+      // Step 7: Scrape and persist Flashscore pre-match market odds & implied probabilities
       this.updateProgress(jobId, {
         progress: 82,
-        stepIndex: 6,
-        totalSteps: 7,
+        stepIndex: 7,
+        totalSteps: 8,
         currentStep: 'Scraping Flashscore bookmaker odds & market-implied probabilities into SQLite...',
       });
       await this.runStepWithTimeout(
@@ -541,11 +577,11 @@ export class SyncJobService {
 
       const histPredCount = predictionsDb.countHistoricalPredictions();
 
-      // Step 7: Scrape active live scores (pure data scraping, no prediction calculation)
+      // Step 8: Scrape active live scores (pure data scraping, no prediction calculation)
       this.updateProgress(jobId, {
         progress: 92,
-        stepIndex: 7,
-        totalSteps: 7,
+        stepIndex: 8,
+        totalSteps: 8,
         currentStep: 'Scraping active live scores and updating database...',
       });
 

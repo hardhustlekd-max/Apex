@@ -366,7 +366,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               onClick={() => handleSelectDateFilter(cd.filterKey)}
               aria-pressed={isSelected || isInRange}
               title={cd.fullLabel}
-              className={`w-full max-w-[46px] h-[44px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl ${
+              className={`w-full max-w-[40px] h-[38px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl ${
                 isSelected
                   ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
                   : isInRange
@@ -418,7 +418,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`h-[44px] min-h-[44px] flex items-center justify-center gap-1.5 px-3 sm:px-3.5 rounded-xl text-base transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`h-[38px] min-h-[38px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-xl text-base transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeFilterCount > 0
                 ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
                 : 'bg-theme-card border border-theme text-theme-main font-medium hover:bg-theme-card-elevated hover:border-theme-accent shadow-theme-sm'
@@ -427,7 +427,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="min-w-[20px] h-[20px] px-1.5 rounded-md bg-black/20 text-theme-primary-text text-2xs leading-none font-semibold tabular-nums inline-flex items-center justify-center">
+              <span className="min-w-[18px] h-[18px] px-1 rounded-md bg-black/20 text-theme-primary-text text-2xs leading-none font-semibold tabular-nums inline-flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -468,12 +468,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           </span>
 
           {selectedLeague !== 'ALL' && (
-            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
-              <span className="truncate max-w-[130px] font-medium">{selectedLeagueLabel}</span>
+            <span className="h-[22px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="truncate max-w-[115px] font-medium">{selectedLeagueLabel}</span>
               <button
                 type="button"
                 onClick={() => onSelectLeague('ALL')}
-                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[16px] h-[16px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Remove league filter"
                 aria-label="Remove league filter"
               >
@@ -483,12 +483,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {canonicalDateFilter !== 'TODAY' && (
-            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+            <span className="h-[22px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
               <span className="font-medium">{dateFilterLabel}</span>
               <button
                 type="button"
                 onClick={() => handleSelectDateFilter('TODAY')}
-                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[16px] h-[16px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset date filter"
                 aria-label="Reset date filter"
               >
@@ -498,12 +498,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {marketChoiceFilter !== 'MOST_LIKELY' && (
-            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+            <span className="h-[22px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
               <span className="font-medium">{marketOptionObj?.label || marketChoiceFilter}</span>
               <button
                 type="button"
                 onClick={() => setMarketChoiceFilter('MOST_LIKELY')}
-                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[16px] h-[16px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset to Most Likely"
                 aria-label="Reset market filter"
               >
@@ -513,12 +513,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {searchQuery.trim().length > 0 && (
-            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
-              <span className="truncate max-w-[110px] font-medium">&quot;{searchQuery}&quot;</span>
+            <span className="h-[22px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+              <span className="truncate max-w-[100px] font-medium">&quot;{searchQuery}&quot;</span>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[16px] h-[16px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Clear search"
                 aria-label="Clear search"
               >
@@ -528,12 +528,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           )}
 
           {sortBy && sortBy !== 'DEFAULT' && (
-            <span className="h-[24px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
+            <span className="h-[22px] inline-flex items-center gap-1 pl-2 pr-1 rounded-lg bg-theme-subtle text-theme-main text-xs">
               <span className="font-medium">{sortOptionObj?.label?.split('(')[0] || sortBy}</span>
               <button
                 type="button"
                 onClick={() => onSelectSortBy?.('DEFAULT')}
-                className="w-[18px] h-[18px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[16px] h-[16px] inline-flex items-center justify-center text-theme-sub hover:text-theme-primary hover:bg-theme-card/80 cursor-pointer rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 title="Reset sort"
                 aria-label="Reset sort"
               >
@@ -545,7 +545,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={handleResetAllFilters}
-            className="ml-auto h-[24px] inline-flex items-center text-xs font-medium text-theme-primary hover:underline px-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="ml-auto h-[22px] inline-flex items-center text-xs font-medium text-theme-primary hover:underline px-2 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Clear
           </button>
@@ -559,7 +559,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         <EmptyState
           icon={<RefreshCw className="w-5 h-5" />}
           title={emptyTitle}
-          minHeight="min-h-[180px]"
+          minHeight="min-h-[156px]"
           actions={
             <>
               {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
@@ -604,7 +604,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                   onClick={() => toggleLeagueExpand(group.headerKey)}
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
-                  className={`w-full min-h-[44px] flex items-center justify-between gap-2.5 px-3 sm:px-3.5 py-2 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-1.5 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-header-grad border-b border-theme-subdued'
                   }`}
                 >
@@ -629,7 +629,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="h-[22px] min-w-[24px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center">
+                    <span className="h-[20px] min-w-[22px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center">
                       {totalGroupMatches}
                     </span>
                     <span className="text-xs font-normal text-theme-sub hidden sm:inline">

@@ -10,9 +10,10 @@ import {
   LeagueOptionDTO,
   MarketOption,
   ScrapedMarketOdds,
+  StandingsCatalogItem,
 } from '../core/types.js';
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
-import { matchesLeague } from '../core/leagueMapper.js';
+import { cleanStr, getLeagueAliases, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import {
   getFixtureSortableDateTime,
@@ -343,6 +344,7 @@ class FixturesWorkerService {
   private queryCache = new Map<string, CachedSerializedResponse>();
   private featuredTipsCache: CachedSerializedResponse | null = null;
   private leaguesCatalogCache: CachedSerializedResponse | null = null;
+  private standingsCatalogCache: CachedSerializedResponse | null = null;
   private liveQueryCache = new Map<string, CachedSerializedResponse>();
 
   private liveScoresCache: { scores: LiveScore[]; fetchedAt: number; signature: string } | null = null;
@@ -360,6 +362,7 @@ class FixturesWorkerService {
     this.indexVersion++;
     this.queryCache.clear();
     this.featuredTipsCache = null;
+    this.standingsCatalogCache = null;
     this.liveQueryCache.clear();
   }
 
@@ -983,6 +986,171 @@ class FixturesWorkerService {
     const etag = makeEtag(jsonPayload);
 
     this.leaguesCatalogCache = {
+      jsonPayload,
+      etag,
+      timestamp: Date.now(),
+    };
+
+    return { jsonPayload, etag };
+  }
+
+  /**
+   * Returns merged catalog of all synced and discovered leagues for the Standings page,
+   * prioritized by table availability and league popularity, with ETag caching.
+   */
+  public async getStandingsCatalog(): Promise<{ jsonPayload: string; etag: string }> {
+    if (this.standingsCatalogCache) {
+      return {
+        jsonPayload: this.standingsCatalogCache.jsonPayload,
+        etag: this.standingsCatalogCache.etag,
+      };
+    }
+
+    await db.init();
+    const summaries = db.getAllLeagueStandingsSummaries();
+    const discovered = db.getDiscoveredTournamentsFromDb();
+
+    const items: StandingsCatalogItem[] = [];
+    const byUrl = new Map<string, StandingsCatalogItem>();
+    const byAlias = new Map<string, StandingsCatalogItem>();
+
+    const cleanDisplayName = (rawName: string, country: string): string => {
+      const trimmed = (rawName || '').trim();
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx > 0) {
+        const prefix = trimmed.slice(0, colonIdx).trim();
+        const suffix = trimmed.slice(colonIdx + 1).trim();
+        if (suffix && (!country || country === 'International' || prefix.toLowerCase() === country.toLowerCase())) {
+          return suffix;
+        }
+      }
+      return trimmed || rawName;
+    };
+
+    const findExisting = (code: string, name: string, country: string, leagueUrl?: string): StandingsCatalogItem | undefined => {
+      if (leagueUrl && byUrl.has(leagueUrl)) return byUrl.get(leagueUrl);
+      const codeKey = cleanStr(code);
+      if (codeKey && byAlias.has(codeKey)) return byAlias.get(codeKey);
+
+      for (const alias of getLeagueAliases(code)) {
+        const a = cleanStr(alias);
+        if (a && byAlias.has(a)) return byAlias.get(a);
+      }
+
+      const fullSlug = cleanStr(`${country}_${name}`);
+      if (fullSlug && byAlias.has(fullSlug)) return byAlias.get(fullSlug);
+
+      return undefined;
+    };
+
+    const registerItem = (item: StandingsCatalogItem) => {
+      items.push(item);
+      if (item.leagueUrl) byUrl.set(item.leagueUrl, item);
+      const codeKey = cleanStr(item.code);
+      if (codeKey) byAlias.set(codeKey, item);
+      const fullSlug = cleanStr(`${item.country}_${item.name}`);
+      if (fullSlug) byAlias.set(fullSlug, item);
+      for (const alias of getLeagueAliases(item.code)) {
+        const a = cleanStr(alias);
+        if (a && !byAlias.has(a)) byAlias.set(a, item);
+      }
+    };
+
+    // 1. Register all synced leagues already stored in league_standings
+    for (const s of summaries) {
+      const country = (s.country || 'International').trim();
+      const name = cleanDisplayName(s.leagueName, country);
+      const existing = findExisting(s.leagueCode, name, country, s.leagueUrl);
+      if (existing) {
+        if (!existing.hasStandings && s.teamCount > 0) {
+          existing.hasStandings = true;
+          existing.teamCount = s.teamCount;
+          existing.groupCount = s.groupCount;
+          existing.updatedAt = s.updatedAt;
+        }
+        if (!existing.leagueUrl && s.leagueUrl) {
+          existing.leagueUrl = s.leagueUrl;
+          byUrl.set(s.leagueUrl, existing);
+        }
+        continue;
+      }
+
+      const item: StandingsCatalogItem = {
+        code: s.leagueCode,
+        name,
+        country,
+        leagueUrl: s.leagueUrl,
+        hasStandings: s.teamCount > 0,
+        teamCount: s.teamCount,
+        groupCount: s.groupCount,
+        updatedAt: s.updatedAt || undefined,
+        popularityScore: getLeaguePopularityScore(s.leagueCode, name, `${country}: ${name}`),
+      };
+      registerItem(item);
+    }
+
+    // 2. Merge discovered competitions from Flashscore raw daily feeds & upcoming_fixtures
+    for (const d of discovered) {
+      const country = (d.country || 'International').trim();
+      const name = cleanDisplayName(d.tournament, country);
+      const fallbackCode = cleanStr(`${country}_${name}`) || cleanStr(name);
+      const code = (d.leagueCode || fallbackCode).toLowerCase();
+      const existing = findExisting(code, name, country, d.leagueUrl);
+      if (existing) {
+        if (!existing.leagueUrl && d.leagueUrl) {
+          existing.leagueUrl = d.leagueUrl;
+          byUrl.set(d.leagueUrl, existing);
+        }
+        continue;
+      }
+
+      registerItem({
+        code,
+        name,
+        country,
+        leagueUrl: d.leagueUrl,
+        hasStandings: false,
+        teamCount: 0,
+        groupCount: 0,
+        popularityScore: getLeaguePopularityScore(code, name, `${country}: ${name}`),
+      });
+    }
+
+    // 3. Merge Global Leagues Dataset entries if not already present
+    for (const g of GLOBAL_LEAGUES_DATASET) {
+      const country = (g.country || 'International').trim();
+      const existing = findExisting(g.code, g.name, country);
+      if (existing) continue;
+
+      registerItem({
+        code: g.code.toLowerCase(),
+        name: g.name,
+        country,
+        hasStandings: false,
+        teamCount: 0,
+        groupCount: 0,
+        popularityScore: getLeaguePopularityScore(g.code, g.name, `${country}: ${g.name}`),
+      });
+    }
+
+    items.sort((a, b) => {
+      if (a.hasStandings !== b.hasStandings) return a.hasStandings ? -1 : 1;
+      if (a.popularityScore !== b.popularityScore) return b.popularityScore - a.popularityScore;
+      const cCmp = a.country.localeCompare(b.country);
+      if (cCmp !== 0) return cCmp;
+      return a.name.localeCompare(b.name);
+    });
+
+    const syncedCount = items.filter((i) => i.hasStandings).length;
+    const jsonPayload = JSON.stringify({
+      success: true,
+      count: items.length,
+      syncedCount,
+      leagues: items,
+    });
+    const etag = makeEtag(jsonPayload);
+
+    this.standingsCatalogCache = {
       jsonPayload,
       etag,
       timestamp: Date.now(),

@@ -37,7 +37,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   liveMatchesCount = 0,
 }) => {
   return (
-    <aside className="w-[224px] shrink-0 hidden lg:flex flex-col h-[calc(100vh-40px)] sticky top-[40px] bg-theme-card border-r border-theme shadow-theme-sm z-20 select-none overflow-y-auto no-scrollbar justify-between font-sans">
+    <aside className="w-[196px] shrink-0 hidden lg:flex flex-col h-[calc(100vh-36px)] sticky top-[36px] bg-theme-card border-r border-theme shadow-theme-sm z-20 select-none overflow-y-auto no-scrollbar justify-between font-sans">
       <div className="p-2.5 space-y-4">
         {/* Primary Navigation Sections */}
         <nav aria-label="Workspace navigation" className="space-y-0.5">
@@ -48,7 +48,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('FIXTURES')}
-            className={`w-full h-[36px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`w-full h-[32px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeTab === 'FIXTURES'
                 ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
@@ -59,7 +59,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
               <span className="truncate whitespace-nowrap">Predictions &amp; Live</span>
             </div>
             {liveMatchesCount > 0 ? (
-              <span className={`h-[20px] min-w-[22px] px-1.5 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold shrink-0 ${
+              <span className={`h-[18px] min-w-[20px] px-1 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold shrink-0 ${
                 activeTab === 'FIXTURES'
                   ? 'bg-black/20 text-theme-primary-text'
                   : 'bg-theme-primary text-theme-primary-text'
@@ -78,7 +78,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('ACCAS')}
-            className={`w-full h-[36px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`w-full h-[32px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeTab === 'ACCAS'
                 ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
@@ -93,7 +93,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('STANDINGS')}
-            className={`w-full h-[36px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`w-full h-[32px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeTab === 'STANDINGS'
                 ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
@@ -108,7 +108,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('HISTORY')}
-            className={`w-full h-[36px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`w-full h-[32px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeTab === 'HISTORY'
                 ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                 : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
@@ -130,7 +130,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <button
               type="button"
               onClick={onOpenLeagueModal}
-              className="h-[24px] px-1.5 text-xs text-theme-primary hover:underline cursor-pointer font-medium inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-md"
+              className="h-[22px] px-1.5 text-xs text-theme-primary hover:underline cursor-pointer font-medium inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-md"
             >
               <span>All</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -148,7 +148,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
                     onSelectLeague(league.code);
                     if (activeTab !== 'FIXTURES') onSelectTab('FIXTURES');
                   }}
-                  className={`w-full h-[34px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`w-full h-[30px] flex items-center justify-between px-2.5 rounded-xl text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     isSelected
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-normal'
@@ -174,7 +174,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={onToggleTheme}
-            className="flex-1 h-[36px] flex items-center justify-center gap-1.5 rounded-xl bg-theme-subtle text-theme-main hover:bg-theme-card hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all text-sm font-medium cursor-pointer whitespace-nowrap"
+            className="flex-1 h-[32px] flex items-center justify-center gap-1.5 rounded-xl bg-theme-subtle text-theme-main hover:bg-theme-card hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all text-sm font-medium cursor-pointer whitespace-nowrap"
             title="Toggle Light / Dark mode"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-theme-primary" /> : <Moon className="w-4 h-4 text-theme-main" />}
@@ -184,7 +184,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           <button
             type="button"
             onClick={onOpenTerminal}
-            className="h-[36px] w-[36px] rounded-xl bg-theme-subtle text-theme-main hover:bg-theme-card hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all cursor-pointer flex items-center justify-center shrink-0"
+            className="h-[32px] w-[32px] rounded-xl bg-theme-subtle text-theme-main hover:bg-theme-card hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all cursor-pointer flex items-center justify-center shrink-0"
             title="System Terminal & Logs"
             aria-label="Open Terminal Logs"
           >

@@ -18,11 +18,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
 }) => {
   return (
-    <header className="sticky top-0 z-30 h-[40px] bg-theme-glass border-b border-theme transition-colors shadow-theme-sm font-sans">
+    <header className="sticky top-0 z-30 h-[36px] bg-theme-glass border-b border-theme transition-colors shadow-theme-sm font-sans">
       <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-4 flex items-center justify-between gap-2.5">
         {/* Zone 1: Brand Title */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-[26px] h-[26px] rounded-lg bg-theme-primary text-theme-primary-text flex items-center justify-center font-bold text-sm shrink-0 shadow-theme-glow">
+          <div className="w-[22px] h-[22px] rounded-lg bg-theme-primary text-theme-primary-text flex items-center justify-center font-bold text-sm shrink-0 shadow-theme-glow">
             A
           </div>
           <span className="font-bold text-lg tracking-[-0.015em] text-theme-main whitespace-nowrap truncate">
@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
             id="open-settings-modal-btn"
             type="button"
             onClick={onOpenSettings}
-            className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle flex items-center justify-center text-theme-sub hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-colors cursor-pointer active:scale-95"
+            className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle flex items-center justify-center text-theme-sub hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-colors cursor-pointer active:scale-95"
             title="Settings"
             aria-label="Settings"
           >

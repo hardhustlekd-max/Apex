@@ -36,17 +36,17 @@ export function SegmentedTabs<T extends string = string>({
 
   const containerSize =
     size === 'xs'
-      ? 'h-[36px] min-h-[36px]'
+      ? 'h-[30px] min-h-[30px]'
       : size === 'md'
-      ? 'h-[44px] min-h-[44px]'
-      : 'h-[40px] min-h-[40px]';
+      ? 'h-[38px] min-h-[38px]'
+      : 'h-[34px] min-h-[34px]';
 
   const btnHeight =
     size === 'xs'
-      ? 'h-full px-2.5 text-sm'
+      ? 'h-full px-2 text-sm'
       : size === 'md'
-      ? 'h-full px-2.5 sm:px-3.5 text-base'
-      : 'h-full px-3 text-base';
+      ? 'h-full px-2.5 sm:px-3 text-base'
+      : 'h-full px-2.5 text-base';
 
   return (
     <div
@@ -78,7 +78,7 @@ export function SegmentedTabs<T extends string = string>({
             <span className="whitespace-nowrap">{item.label}</span>
             {item.count !== undefined && (
               <span
-                className={`h-[20px] min-w-[20px] px-1.5 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold ${
+                className={`h-[18px] min-w-[18px] px-1 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold ${
                   isActive
                     ? 'bg-black/20 text-theme-primary-text'
                     : 'bg-theme-card text-theme-main'

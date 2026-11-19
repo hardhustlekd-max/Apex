@@ -1,4 +1,11 @@
-import { HeadToHeadMatchRecord, HeadToHeadMeasurement, HistoricalMatch, TeamFormMatch } from './types.js';
+import {
+  HeadToHeadMatchRecord,
+  HeadToHeadMeasurement,
+  HistoricalMatch,
+  LeagueStandingEntry,
+  LeagueStandingGroup,
+  TeamFormMatch,
+} from './types.js';
 import { getStandardDateStr, normalizeDateStr } from './dateUtils.js';
 
 export const H2H_PARSER_VERSION = 3;
@@ -9,6 +16,9 @@ export interface ScrapedRawMatch {
   tournament: string;
   country: string;
   leagueUrl?: string;
+  tournamentId?: string;
+  tournamentStageId?: string;
+  tournamentTemplateId?: string;
   homeTeam: string;
   awayTeam: string;
   homeParticipantId?: string;
@@ -23,6 +33,15 @@ export interface ScrapedRawMatch {
   awayHtScore?: number;
   statistics?: any[];
   minute?: number;
+}
+
+export interface FlashscoreTournamentMeta {
+  tournament: string;
+  country: string;
+  leagueUrl?: string;
+  tournamentId?: string;
+  tournamentStageId?: string;
+  tournamentTemplateId?: string;
 }
 
 const TEAM_AFFIX_REGEX = /\b(fc|cf|sc|ac|fk|sk|sv|vfb)\b/gi;
@@ -300,12 +319,18 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
   let currentTournament = 'Football Competition';
   let currentCountry = 'International';
   let currentLeagueUrl = '';
+  let currentTournamentId = '';
+  let currentTournamentStageId = '';
+  let currentTournamentTemplateId = '';
 
   for (const section of sections) {
     if (!section) continue;
 
     if (section.startsWith('ZA÷')) {
       // Tournament header section
+      currentTournamentId = '';
+      currentTournamentStageId = '';
+      currentTournamentTemplateId = '';
       const parts = section.split('¬');
       for (const p of parts) {
         const sepIdx = p.indexOf('÷');
@@ -315,6 +340,9 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
         if (key === 'ZA' && val) currentTournament = val.trim();
         if (key === 'ZY' && val) currentCountry = val.trim();
         if (key === 'ZL' && val) currentLeagueUrl = val.trim();
+        if (key === 'ZE' && val) currentTournamentId = val.trim();
+        if (key === 'ZC' && val) currentTournamentStageId = val.trim();
+        if (key === 'ZEE' && val) currentTournamentTemplateId = val.trim();
       }
     } else if (section.startsWith('AA÷')) {
       // Match item
@@ -322,7 +350,10 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
       const matchData: any = {
         tournament: currentTournament,
         country: currentCountry,
-        leagueUrl: currentLeagueUrl,
+        leagueUrl: currentLeagueUrl || undefined,
+        tournamentId: currentTournamentId || undefined,
+        tournamentStageId: currentTournamentStageId || undefined,
+        tournamentTemplateId: currentTournamentTemplateId || undefined,
         statistics: [],
       };
 
@@ -869,4 +900,276 @@ export function buildFallbackH2HFromHistoricalDb(
     homeRecentMatches,
     awayRecentMatches,
   };
+}
+
+/**
+ * Extracts unique Flashscore tournament metadata (ZA, ZY, ZL, ZE, ZC, ZEE) from a raw f_1_* feed string.
+ */
+export function extractTournamentMetadataFromFeed(feedText: string): FlashscoreTournamentMeta[] {
+  if (!feedText) return [];
+  const results: FlashscoreTournamentMeta[] = [];
+  const seen = new Set<string>();
+  const sections = feedText.split('~');
+
+  for (const section of sections) {
+    if (!section || !section.startsWith('ZA÷')) continue;
+    const parts = section.split('¬');
+    let tournament = '';
+    let country = 'International';
+    let leagueUrl: string | undefined;
+    let tournamentId: string | undefined;
+    let tournamentStageId: string | undefined;
+    let tournamentTemplateId: string | undefined;
+
+    for (const p of parts) {
+      const sepIdx = p.indexOf('÷');
+      if (sepIdx <= 0) continue;
+      const key = p.slice(0, sepIdx);
+      const val = p.slice(sepIdx + 1).trim();
+      if (!val) continue;
+      if (key === 'ZA') tournament = val;
+      else if (key === 'ZY') country = val;
+      else if (key === 'ZL') leagueUrl = val;
+      else if (key === 'ZE') tournamentId = val;
+      else if (key === 'ZC') tournamentStageId = val;
+      else if (key === 'ZEE') tournamentTemplateId = val;
+    }
+
+    if (!tournament) continue;
+    const key = `${leagueUrl || ''}::${tournamentId || ''}::${tournamentStageId || ''}::${country}::${tournament}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({
+      tournament,
+      country,
+      leagueUrl,
+      tournamentId,
+      tournamentStageId,
+      tournamentTemplateId,
+    });
+  }
+
+  return results;
+}
+
+const FLASHSCORE_STATIC_IMG_BASE = 'https://static.flashscore.com/res/image/data/';
+
+/**
+ * Parses Flashscore standings feed (`to_<tournamentId>_<stageId>_1` or `initialFeeds['standings']`)
+ * into structured multi-group tables with team crests, GF, GA, zone indicators, and 5-match Form badges.
+ */
+export function parseFlashscoreStandingsFeed(feedText: string): {
+  groups: LeagueStandingGroup[];
+  table: LeagueStandingEntry[];
+} {
+  if (!feedText || (!feedText.includes('TR÷') && !feedText.includes('¬TR÷'))) {
+    return { groups: [], table: [] };
+  }
+
+  const sections = feedText.split('~');
+  const badgeMap = new Map<string, string>();
+  const zoneLegendMap = new Map<string, { label: string; color: string }>();
+
+  // First pass: collect IPI->IPU crest mappings and TV zone legends
+  for (const section of sections) {
+    if (!section) continue;
+    if (section.includes('IPI÷') && section.includes('IPU÷')) {
+      const parts = section.split('¬');
+      let currentIpi = '';
+      for (const p of parts) {
+        const sepIdx = p.indexOf('÷');
+        if (sepIdx <= 0) continue;
+        const k = p.slice(0, sepIdx);
+        const v = p.slice(sepIdx + 1).trim();
+        if (k === 'IPI') {
+          currentIpi = v;
+        } else if (k === 'IPU' && currentIpi && v) {
+          badgeMap.set(currentIpi, v.startsWith('http') ? v : `${FLASHSCORE_STATIC_IMG_BASE}${v}`);
+          currentIpi = '';
+        }
+      }
+    } else if (section.startsWith('TV÷') || section.includes('¬TV÷')) {
+      const parts = section.split('¬');
+      for (const p of parts) {
+        if (!p.startsWith('TV÷')) continue;
+        const val = p.slice(3).trim();
+        const [zCode, zLabel, zColor] = val.split('|');
+        if (zCode) {
+          zoneLegendMap.set(zCode.trim(), {
+            label: (zLabel || '').trim(),
+            color: zColor ? `#${zColor.trim().replace(/^#/, '')}` : '',
+          });
+        }
+      }
+    }
+  }
+
+  const groups: LeagueStandingGroup[] = [];
+  let currentGroupName = 'Standings';
+  let currentGroupEntries: LeagueStandingEntry[] = [];
+  let currentTeamEntry: LeagueStandingEntry | null = null;
+
+  const flushGroup = () => {
+    if (currentGroupEntries.length > 0) {
+      currentGroupEntries.sort((a, b) => a.rank - b.rank);
+      currentGroupEntries.forEach((e, i) => {
+        e.rank = i + 1;
+      });
+      groups.push({
+        name: currentGroupName || 'Standings',
+        table: currentGroupEntries,
+      });
+      currentGroupEntries = [];
+    }
+  };
+
+  for (const section of sections) {
+    if (!section) continue;
+
+    // Group / Conference boundary
+    if (section.startsWith('TB÷') || section.startsWith('TZS÷') || (section.includes('¬TB÷') && !section.startsWith('TR÷'))) {
+      const parts = section.split('¬');
+      let tcVal = '';
+      let tzsVal = '';
+      for (const p of parts) {
+        const sepIdx = p.indexOf('÷');
+        if (sepIdx <= 0) continue;
+        const k = p.slice(0, sepIdx);
+        const v = p.slice(sepIdx + 1).trim();
+        if (k === 'TC' && v) tcVal = v;
+        else if (k === 'TZS' && v) tzsVal = v;
+      }
+      if (tcVal) {
+        flushGroup();
+        currentGroupName = tcVal;
+        currentTeamEntry = null;
+      } else if (tzsVal && currentGroupEntries.length === 0 && currentGroupName === 'Standings') {
+        // Keep 'Standings' unless multiple explicit sub-tables exist
+      }
+      continue;
+    }
+
+    // Recent match form record following a team row (LMS÷...¬LMU÷w|d|l|upcoming)
+    if (section.startsWith('LMS÷')) {
+      if (!currentTeamEntry) continue;
+      const parts = section.split('¬');
+      let lmu = '';
+      let isUpcoming = false;
+      for (const p of parts) {
+        const sepIdx = p.indexOf('÷');
+        if (sepIdx <= 0) continue;
+        const k = p.slice(0, sepIdx);
+        const v = p.slice(sepIdx + 1).trim();
+        if (k === 'LMS' && v === '?') isUpcoming = true;
+        else if (k === 'LMU') lmu = v.toLowerCase();
+      }
+      if (isUpcoming || lmu === 'upcoming' || lmu === '?') continue;
+      const mapped = lmu === 'w' ? 'W' : lmu === 'd' ? 'D' : lmu === 'l' ? 'L' : null;
+      if (mapped) {
+        if (!currentTeamEntry.form) currentTeamEntry.form = [];
+        if (currentTeamEntry.form.length < 5) {
+          currentTeamEntry.form.push(mapped);
+        }
+      }
+      continue;
+    }
+
+    // Standings team row
+    if (section.startsWith('TR÷') || section.includes('¬TR÷')) {
+      const parts = section.split('¬');
+      const data: Record<string, string> = {};
+      for (const p of parts) {
+        const sepIdx = p.indexOf('÷');
+        if (sepIdx <= 0) continue;
+        const k = p.slice(0, sepIdx);
+        const v = p.slice(sepIdx + 1);
+        if (k && v !== undefined) {
+          data[k] = v;
+        }
+      }
+
+      const teamName = (data['TN'] || data['AE'] || data['TI'] || '').trim();
+      if (!teamName) continue;
+
+      const rank = parseInt(data['TR'] || data['RK'] || '0', 10);
+      const hasTm = data['TM'] !== undefined || data['MP'] !== undefined || data['GP'] !== undefined;
+      const played = parseInt(data['TM'] || data['MP'] || data['GP'] || (data['PTS'] || data['PT'] ? data['TP'] : '0') || '0', 10) || 0;
+      const won = parseInt(data['TW'] || data['W'] || '0', 10) || 0;
+      const drawn = parseInt(data['TDR'] || data['TD'] || data['D'] || '0', 10) || 0;
+      const lost = parseInt(data['TL'] || data['L'] || '0', 10) || 0;
+
+      let goalsFor = 0;
+      let goalsAgainst = 0;
+      if (data['TG'] && data['TG'].includes(':')) {
+        const [gf, ga] = data['TG'].split(':');
+        goalsFor = parseInt(gf, 10) || 0;
+        goalsAgainst = parseInt(ga, 10) || 0;
+      } else {
+        goalsFor = parseInt(data['GF'] || data['TG'] || '0', 10) || 0;
+        goalsAgainst = parseInt(data['GA'] || data['TC'] || '0', 10) || 0;
+      }
+
+      const goalDifference =
+        data['TPF'] !== undefined && data['TPF'] !== '' && !isNaN(parseInt(data['TPF'], 10))
+          ? parseInt(data['TPF'], 10)
+          : goalsFor - goalsAgainst;
+
+      const pointsRaw = hasTm
+        ? data['TP'] ?? data['PTS'] ?? data['PT'] ?? '0'
+        : data['PTS'] ?? data['PT'] ?? data['TP'] ?? '0';
+      const points = parseInt(pointsRaw, 10) || 0;
+
+      const teamId = data['TI']?.trim();
+      const badge =
+        (teamId && badgeMap.get(teamId)) ||
+        (data['TB'] ? (data['TB'].startsWith('http') ? data['TB'] : `${FLASHSCORE_STATIC_IMG_BASE}${data['TB']}`) : undefined);
+
+      let form: ('W' | 'D' | 'L')[] | undefined;
+      const rawForm = data['FM'] || data['FR'] || '';
+      if (rawForm) {
+        const parsedForm = rawForm
+          .toUpperCase()
+          .replace(/[^WDL]/g, '')
+          .split('')
+          .slice(0, 5) as ('W' | 'D' | 'L')[];
+        if (parsedForm.length > 0) form = parsedForm;
+      }
+
+      const zoneCode = data['TU']?.trim() || undefined;
+      const legend = zoneCode ? zoneLegendMap.get(zoneCode) : undefined;
+      const zoneColor = data['TUC']?.trim()
+        ? `#${data['TUC'].trim().replace(/^#/, '')}`
+        : legend?.color || undefined;
+      const zoneLabel = legend?.label || undefined;
+
+      if (played > 0 || points > 0 || rank > 0) {
+        const entry: LeagueStandingEntry = {
+          rank: rank || currentGroupEntries.length + 1,
+          teamId,
+          teamName,
+          badge,
+          played,
+          won,
+          drawn,
+          lost,
+          goalsFor,
+          goalsAgainst,
+          goalDifference,
+          points,
+          form,
+          zoneCode,
+          zoneColor,
+          zoneLabel,
+        };
+        currentGroupEntries.push(entry);
+        currentTeamEntry = entry;
+      }
+    }
+  }
+
+  flushGroup();
+
+  const flatTable = groups.flatMap((g) => g.table);
+  return { groups, table: flatTable };
 }

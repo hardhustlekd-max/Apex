@@ -279,12 +279,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
 
       {/* Tab Body */}
-      <div className="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto flex-1">
+      <div className="p-3 space-y-2.5 overflow-y-auto flex-1">
         {activeTab === 'DATA' && (
           <div className="space-y-2.5">
             {/* Live Database Metrics Overview */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                 <SectionHeader
                   title="Database Metrics"
                   icon={<Database className="w-3.5 h-3.5" />}
@@ -337,7 +337,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
                 <SectionHeader
                   title="Scraper Health"
                   icon={<Cpu className="w-3.5 h-3.5" />}
@@ -352,7 +352,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
                 <div className="divide-y divide-[var(--border-subdued)] text-sm">
                   {scraperStatus.mirrors.map((m: any, idx: number) => (
-                    <div key={idx} className="min-h-[38px] px-3.5 py-2 flex items-center justify-between gap-2">
+                    <div key={idx} className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                       <span className="truncate text-theme-main font-medium">{m.name}</span>
                       <span className="text-xs font-semibold text-theme-primary shrink-0">
                         {m.status}
@@ -365,7 +365,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Storage Status Section (flattened - single card) */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                 <SectionHeader
                   title="Storage Status"
                   icon={<Server className="w-3.5 h-3.5" />}
@@ -546,19 +546,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2">
               <SectionHeader title="Market Categories" size="sm" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm font-normal text-theme-main">
-                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-amber-400 shrink-0" />
                   <span>1X2 Match Outcomes</span>
                 </div>
-                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />
                   <span>Goals Over/Under (1.5, 2.5, 3.5)</span>
                 </div>
-                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-indigo-400 shrink-0" />
                   <span>Both Teams to Score (BTTS)</span>
                 </div>
-                <div className="min-h-[32px] px-2.5 py-1.5 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-sky-400 shrink-0" />
                   <span>Double Chance (1X, X2, 12)</span>
                 </div>
@@ -582,7 +582,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => theme !== 'light' && onToggleTheme()}
-                  className={`h-[40px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'light'
                       ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
                       : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
@@ -598,7 +598,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => theme !== 'dark' && onToggleTheme()}
-                  className={`h-[40px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'dark'
                       ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
                       : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'

@@ -28,11 +28,11 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  xs: 'h-[28px] min-h-[28px] px-2.5 text-xs gap-1',
-  sm: 'h-[36px] min-h-[36px] px-3 text-sm gap-1.5',
-  md: 'h-[40px] min-h-[40px] px-3.5 text-base gap-1.5',
-  lg: 'h-[44px] min-h-[44px] px-4 text-base gap-2',
-  icon: 'h-[36px] w-[36px] min-h-[36px] min-w-[36px] p-0 justify-center',
+  xs: 'h-[24px] min-h-[24px] px-2 text-xs gap-1',
+  sm: 'h-[30px] min-h-[30px] px-2.5 text-sm gap-1.5',
+  md: 'h-[34px] min-h-[34px] px-3 text-base gap-1.5',
+  lg: 'h-[38px] min-h-[38px] px-3.5 text-base gap-1.5',
+  icon: 'h-[30px] w-[30px] min-h-[30px] min-w-[30px] p-0 justify-center',
 };
 
 export const Button: React.FC<ButtonProps> = ({

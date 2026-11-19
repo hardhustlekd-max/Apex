@@ -46,7 +46,7 @@ export const StatTile: React.FC<StatTileProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`px-3 py-2 transition-colors font-sans ${SURFACE_MAP[surface]} ${className}`}>
+    <div className={`px-2.5 py-2 transition-colors font-sans ${SURFACE_MAP[surface]} ${className}`}>
       <div className="flex items-center gap-1.5 min-w-0">
         {icon && (
           <span className={`shrink-0 flex items-center ${ICON_TONE_MAP[tone]}`}>

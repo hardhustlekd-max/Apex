@@ -8,6 +8,8 @@ import {
   EngineSettings,
   ProviderStatus,
   HeadToHeadMeasurement,
+  StandingsCatalogItem,
+  LeagueStandingTable,
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
@@ -305,6 +307,26 @@ export class EngineService {
     } catch {}
 
     return cached?.data || [];
+  }
+
+  public static async getStandingsCatalog(): Promise<{ syncedCount: number; leagues: StandingsCatalogItem[] }> {
+    const serverData = await this.safeJsonFetch('/api/fixtures/standings/catalog');
+    if (serverData && serverData.success && Array.isArray(serverData.leagues)) {
+      return {
+        syncedCount: serverData.syncedCount ?? serverData.leagues.filter((l: StandingsCatalogItem) => l.hasStandings).length,
+        leagues: serverData.leagues,
+      };
+    }
+    return { syncedCount: 0, leagues: [] };
+  }
+
+  public static async getLeagueStandings(leagueCode: string): Promise<LeagueStandingTable | null> {
+    const cleanCode = (leagueCode || 'england_premier_league').trim();
+    const serverData = await this.safeJsonFetch(`/api/fixtures/standings/${encodeURIComponent(cleanCode)}`);
+    if (serverData && serverData.success && serverData.standings) {
+      return serverData.standings as LeagueStandingTable;
+    }
+    return null;
   }
 
   public static async getSettings(): Promise<EngineSettings> {

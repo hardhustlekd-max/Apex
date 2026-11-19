@@ -24,10 +24,10 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const sizeCls =
     selectSize === 'xs'
-      ? 'h-[30px] min-h-[30px] px-2.5 text-xs pr-7'
+      ? 'h-[26px] min-h-[26px] px-2 text-xs pr-6'
       : selectSize === 'sm'
-      ? 'h-[36px] min-h-[36px] px-3 text-sm pr-8'
-      : 'h-[40px] min-h-[40px] px-3.5 text-base pr-8';
+      ? 'h-[30px] min-h-[30px] px-2.5 text-sm pr-7'
+      : 'h-[34px] min-h-[34px] px-3 text-base pr-7';
   const bgCls =
     surface === 'card'
       ? 'bg-theme-card border border-theme'

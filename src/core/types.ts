@@ -243,6 +243,7 @@ export interface Fixture {
   providerId: string;
   league: LeagueCode | string;
   leagueName: string;
+  leagueUrl?: string;
   matchDate: string;
   kickOffTime: string;
   timestamp?: number;
@@ -359,6 +360,19 @@ export interface LeagueOptionDTO {
   code: string;
   name: string;
   country?: string;
+  leagueUrl?: string;
+}
+
+export interface StandingsCatalogItem {
+  code: string;
+  name: string;
+  country: string;
+  leagueUrl?: string;
+  hasStandings: boolean;
+  teamCount: number;
+  groupCount: number;
+  updatedAt?: string;
+  popularityScore: number;
 }
 
 export interface EngineSettings {
@@ -411,15 +425,25 @@ export interface LeagueStandingEntry {
   goalDifference: number;
   points: number;
   form?: ('W' | 'D' | 'L')[];
+  zoneCode?: string;
+  zoneColor?: string;
+  zoneLabel?: string;
+}
+
+export interface LeagueStandingGroup {
+  name: string;
+  table: LeagueStandingEntry[];
 }
 
 export interface LeagueStandingTable {
   leagueCode: string;
   leagueName: string;
   country?: string;
+  leagueUrl?: string;
   season?: string;
   tournamentId?: string;
   updatedAt: string;
   source: 'FLASHSCORE_SCRAPED';
   table: LeagueStandingEntry[];
+  groups?: LeagueStandingGroup[];
 }

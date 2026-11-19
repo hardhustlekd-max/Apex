@@ -76,7 +76,7 @@ export const MatchDetailModal: React.FC<{ fixture: Fixture | null; onClose: () =
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-2xl h-[88vh] sm:h-[82vh] max-h-[760px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-theme-md animate-in slide-in-from-bottom-4 duration-300">
+      <div className="relative w-full max-w-2xl h-[86vh] sm:h-[80vh] max-h-[680px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-theme-md animate-in slide-in-from-bottom-4 duration-300">
         <MatchDetailView fixture={displayFixture} onClose={onClose} isPanel={false} />
       </div>
     </div>
@@ -359,12 +359,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
     >
       {/* Mobile Drag Handle Affordance */}
       {!isPanel && (
-        <div className="w-9 h-1 bg-theme-dim/40 rounded-full mx-auto mt-2 mb-1 sm:hidden shrink-0 opacity-70" />
+        <div className="w-8 h-1 bg-theme-dim/40 rounded-full mx-auto mt-1.5 mb-0.5 sm:hidden shrink-0 opacity-70" />
       )}
 
       {/* Neon Gradient Header Band */}
-      <div className="bg-theme-header-grad border-b border-theme px-3.5 pt-2 pb-2.5 shrink-0">
-        <div className="min-h-[34px] flex items-center justify-between gap-2 min-w-0">
+      <div className="bg-theme-header-grad border-b border-theme px-3 pt-1.5 pb-2 shrink-0">
+        <div className="min-h-[30px] flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-theme-sub">
             <span className="font-medium text-theme-main truncate whitespace-nowrap">
               {fixture.stage || fixture.leagueName}
@@ -378,7 +378,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
             <button
               type="button"
               onClick={onClose}
-              className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               aria-label="Close match details"
             >
               <X className="w-4 h-4 stroke-[2.25]" />
@@ -387,7 +387,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         </div>
 
         {/* Hero Scoreboard (unboxed directly inside header band) */}
-        <div className="mt-2 py-1.5 flex items-center justify-between gap-2.5">
+        <div className="mt-1.5 py-1 flex items-center justify-between gap-2.5">
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
             <TeamAvatar src={fixture.homeBadge} name={fixture.homeTeam} size="md" />
             <span className="text-base font-semibold text-theme-main truncate block max-w-full tracking-[-0.01em]">
@@ -436,18 +436,18 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
       </div>
 
       {/* Scrollable Content Body */}
-      <div className="p-3 sm:p-3.5 overflow-y-auto overscroll-contain space-y-2.5 flex-1 min-h-0 min-w-0">
+      <div className="p-3 overflow-y-auto overscroll-contain space-y-2.5 flex-1 min-h-0 min-w-0">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'OVERVIEW' && (
           <div className="space-y-2.5">
             {pred ? (
               <>
                 <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                  <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+                  <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                     <SectionHeader title="Projections" size="sm" className="w-full" />
                   </div>
                   <div className="divide-y divide-[var(--border-subdued)] text-sm tabular-nums">
-                    <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                    <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                       <span className="text-theme-sub font-normal">Expected Goals (xG)</span>
                       <div className="font-semibold text-theme-main">
                         <span className="text-theme-primary">{pred?.homeXG ?? '-'}</span>
@@ -457,7 +457,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     </div>
 
                     {pred?.teamStrength ? (
-                      <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Team Strength Index</span>
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.teamStrength.homeStrengthRating}</span>
@@ -466,7 +466,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                         </div>
                       </div>
                     ) : pred?.eloRatings ? (
-                      <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Elo Ratings</span>
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.eloRatings.homeElo}</span>
@@ -477,7 +477,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     ) : null}
 
                     {pred?.tacticalContext && (
-                      <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Rest Days</span>
                         <div className="font-semibold text-theme-main">
                           <span>{pred.tacticalContext.restDaysHome}d</span>
@@ -491,7 +491,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
                 {enrichedFixture.marketOdds && (
                   <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                    <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+                    <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                       <SectionHeader
                         title="Flashscore Market Odds"
                         size="sm"
@@ -506,7 +506,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       />
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
-                      <div className="min-h-[68px] py-2.5 px-2 flex flex-col justify-center">
+                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
                         <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
                         <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
@@ -517,7 +517,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                             : '-'}
                         </span>
                       </div>
-                      <div className="min-h-[68px] py-2.5 px-2 flex flex-col justify-center">
+                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
                         <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
                         <span className="text-lg font-bold text-amber-500 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
@@ -528,7 +528,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                             : '-'}
                         </span>
                       </div>
-                      <div className="min-h-[68px] py-2.5 px-2 flex flex-col justify-center">
+                      <div className="min-h-[58px] py-2 px-2 flex flex-col justify-center">
                         <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
                         <span className="text-lg font-bold text-sky-500 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
@@ -543,7 +543,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     {(enrichedFixture.marketOdds.over25Odds || enrichedFixture.marketOdds.bttsYesOdds) && (
                       <div className="border-t border-theme-subdued grid grid-cols-2 divide-x divide-[var(--border-subdued)] text-sm tabular-nums">
                         {enrichedFixture.marketOdds.over25Odds && (
-                          <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between gap-2">
+                          <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                             <span className="text-theme-sub font-normal">O/U 2.5</span>
                             <span className="font-semibold text-theme-main">
                               {enrichedFixture.marketOdds.over25Odds.toFixed(2)} / {enrichedFixture.marketOdds.under25Odds?.toFixed(2) ?? '-'}
@@ -551,7 +551,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                           </div>
                         )}
                         {enrichedFixture.marketOdds.bttsYesOdds && (
-                          <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between gap-2">
+                          <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                             <span className="text-theme-sub font-normal">BTTS Y/N</span>
                             <span className="font-semibold text-theme-main">
                               {enrichedFixture.marketOdds.bttsYesOdds.toFixed(2)} / {enrichedFixture.marketOdds.bttsNoOdds?.toFixed(2) ?? '-'}
@@ -567,7 +567,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               <EmptyState
                 icon={<Target className="w-5 h-5" />}
                 title="No projections"
-                minHeight="min-h-[160px]"
+                minHeight="min-h-[140px]"
                 className="bg-theme-card-elevated"
               />
             )}
@@ -578,7 +578,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {activeTab === 'H2H' && (
           <div className="space-y-2.5">
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                 <SectionHeader
                   title="Head to Head"
                   icon={<History className="w-3.5 h-3.5" />}
@@ -606,14 +606,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
               {!isLoadingH2H && (
                 <div className="border-t border-theme-subdued divide-y divide-[var(--border-subdued)] text-sm tabular-nums">
-                  <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                  <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                     <span className="text-theme-sub font-normal">Goal Average</span>
                     <span className="font-semibold text-theme-main">
                       {h2h.homeGoalsAvg} vs {h2h.awayGoalsAvg}
                     </span>
                   </div>
 
-                  <div className="min-h-[38px] px-3.5 py-2 flex items-center justify-between">
+                  <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                     <span className="text-theme-sub font-normal">H2H Factor</span>
                     <span className="font-semibold text-theme-primary">
                       x{h2h.h2hMultiplierHome} vs x{h2h.h2hMultiplierAway}
@@ -624,14 +624,14 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
             </Card>
 
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                 <SectionHeader title="Past Meetings" size="sm" className="w-full" />
               </div>
 
               {isLoadingH2H ? (
                 <div className="p-3 space-y-1.5">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="h-9 w-full rounded-lg bg-theme-card animate-pulse" />
+                    <div key={i} className="h-8 w-full rounded-lg bg-theme-card animate-pulse" />
                   ))}
                 </div>
               ) : h2h.recentH2H && h2h.recentH2H.length > 0 ? (
@@ -647,7 +647,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                     return (
                       <div
                         key={idx}
-                        className="min-h-[40px] px-3.5 py-2 flex items-center justify-between gap-2 min-w-0"
+                        className="min-h-[34px] px-3 py-1.5 flex items-center justify-between gap-2 min-w-0"
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span className="text-xs font-normal text-theme-sub shrink-0">{enc.date}</span>
@@ -663,7 +663,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
                         <div className="shrink-0">
                           <span
-                            className={`min-w-[44px] h-[24px] inline-flex items-center justify-center px-2 rounded-md text-xs font-bold leading-none ${
+                            className={`min-w-[38px] h-[21px] inline-flex items-center justify-center px-2 rounded-md text-xs font-bold leading-none ${
                               isHomeWinner
                                 ? 'bg-theme-primary-subtle text-theme-primary'
                                 : isAwayWinner
@@ -717,13 +717,13 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
               },
             ].map((side) => (
               <Card key={side.sideLabel} surface="elevated" padding="none" radius="2xl" className="overflow-hidden min-w-0">
-                <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2">
+                <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
                   <span className="font-semibold text-base text-theme-main truncate block tracking-[-0.01em]">{side.teamName}</span>
                   <span className="text-2xs text-theme-sub uppercase tracking-[0.06em] font-medium shrink-0">{side.sideLabel}</span>
                 </div>
 
                 {side.recentForm.length > 0 && (
-                  <div className="px-3.5 py-2 border-b border-theme-subdued space-y-1.5 min-w-0">
+                  <div className="px-3 py-1.5 border-b border-theme-subdued space-y-1 min-w-0">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-theme-sub font-medium">Form Guide</span>
                       <span className="tabular-nums font-normal text-theme-dim">
@@ -734,7 +734,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       {side.recentForm.slice(0, 10).map((r, i) => (
                         <span
                           key={i}
-                          className={`w-[22px] h-[22px] rounded-md text-2xs leading-none font-bold flex items-center justify-center shrink-0 ${
+                          className={`w-[19px] h-[19px] rounded-md text-2xs leading-none font-bold flex items-center justify-center shrink-0 ${
                             r === 'W'
                               ? side.winBgClass
                               : r === 'D'
@@ -755,7 +755,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                 </div>
 
                 {(side.recentMatches.length > 0 || side.hasStats) && (
-                  <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between tabular-nums text-sm">
+                  <div className="min-h-[32px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between tabular-nums text-sm">
                     <span className="text-theme-sub font-normal">Total Goals</span>
                     <span className="font-semibold text-theme-main">
                       {side.goalsScored} scored · {side.goalsConceded} conceded
@@ -765,12 +765,12 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
 
                 {side.recentMatches.length > 0 && (
                   <div>
-                    <div className="min-h-[36px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center">
+                    <div className="min-h-[32px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                       <SectionHeader title="Recent Matches" size="sm" className="w-full" />
                     </div>
                     <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
                       {side.recentMatches.slice(0, 8).map((m, idx) => (
-                        <div key={idx} className="min-h-[36px] px-3.5 py-1.5 flex items-center justify-between gap-2">
+                        <div key={idx} className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className="text-xs font-normal text-theme-dim shrink-0">{m.date}</span>
                             <span
@@ -788,7 +788,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                               {m.goalsFor}-{m.goalsAgainst}
                             </span>
                             <span
-                              className={`w-[20px] h-[20px] rounded-md flex items-center justify-center text-2xs leading-none font-bold shrink-0 ${
+                              className={`w-[18px] h-[18px] rounded-md flex items-center justify-center text-2xs leading-none font-bold shrink-0 ${
                                 m.result === 'W'
                                   ? side.winBgClass
                                   : m.result === 'D'
@@ -813,7 +813,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-2.5">
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[40px] px-3.5 py-2 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
                 <SectionHeader title="Best Predictions" size="sm" className="w-full" />
               </div>
               {bestMarketsPerGroup && bestMarketsPerGroup.length > 0 ? (
@@ -834,7 +834,7 @@ const MatchDetailModalContent: React.FC<{ fixture: Fixture; onClose?: () => void
                       else if (market.key === 'DOUBLE_CHANCE_X2') { fsOdds = mOdds.dcX2Odds; fsProb = mOdds.dcX2ImpliedProb; }
                     }
                     return (
-                      <div key={idx} className="min-h-[54px] px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <div key={idx} className="min-h-[46px] px-3 py-2 flex items-center justify-between gap-2">
                         <div>
                           <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">
                             {market.groupName} Market

@@ -147,7 +147,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             onSelectDetail(fixture);
           }
         }}
-        className={`group grid grid-cols-12 items-center min-h-[42px] px-3 py-1 border-b border-theme-subdued last:border-b-0 transition-all duration-150 cursor-pointer gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+        className={`group grid grid-cols-12 items-center min-h-[38px] px-2.5 py-1 border-b border-theme-subdued last:border-b-0 transition-all duration-150 cursor-pointer gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
           isSelected
             ? 'bg-theme-primary-subtle'
             : isLive
@@ -172,8 +172,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <span
                 className={`tabular-nums text-sm shrink-0 font-bold ${
                   isLive
-                    ? 'min-w-[22px] h-[20px] inline-flex items-center justify-center px-1.5 rounded-md bg-theme-live text-white text-xs leading-none'
-                    : 'min-w-[16px] text-right text-theme-main'
+                    ? 'min-w-[20px] h-[18px] inline-flex items-center justify-center px-1 rounded-md bg-theme-live text-white text-xs leading-none'
+                    : 'min-w-[14px] text-right text-theme-main'
                 }`}
               >
                 {fixture.score.home}
@@ -196,8 +196,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <span
                 className={`tabular-nums text-sm shrink-0 font-bold ${
                   isLive
-                    ? 'min-w-[22px] h-[20px] inline-flex items-center justify-center px-1.5 rounded-md bg-theme-live text-white text-xs leading-none'
-                    : 'min-w-[16px] text-right text-theme-main'
+                    ? 'min-w-[20px] h-[18px] inline-flex items-center justify-center px-1 rounded-md bg-theme-live text-white text-xs leading-none'
+                    : 'min-w-[14px] text-right text-theme-main'
                 }`}
               >
                 {fixture.score.away}
@@ -206,9 +206,9 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           </div>
 
           {/* Subtext info: Kickoff time, Status, League */}
-          <div className="flex items-center gap-1.5 mt-1 text-xs font-normal tabular-nums whitespace-nowrap min-w-0 truncate">
+          <div className="flex items-center gap-1.5 mt-0.5 text-xs font-normal tabular-nums whitespace-nowrap min-w-0 truncate">
             {isLive ? (
-              <span className="h-[18px] inline-flex items-center gap-1 px-1.5 rounded-md bg-theme-live text-white font-bold text-2xs leading-none animate-pulse shrink-0">
+              <span className="h-[16px] inline-flex items-center gap-1 px-1.5 rounded-md bg-theme-live text-white font-bold text-2xs leading-none animate-pulse shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-white" />
                 <span>LIVE {fixture.minute ? `${fixture.minute}'` : ''}</span>
               </span>
@@ -241,15 +241,15 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
           {/* Section 1: Highest Probability Pick */}
           <div
-            className="w-[36px] sm:w-[68px] flex items-center justify-center shrink-0"
+            className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0"
             title={pick ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})` : 'No Prediction in Database'}
           >
             {pick && hasPred ? (
               <div className="flex items-center justify-center gap-1 tabular-nums">
-                <span className="w-[36px] h-[24px] flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text shadow-theme-sm text-xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
+                <span className="w-[32px] h-[21px] flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text shadow-theme-sm text-xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
                   {pick.shortLabel || pick.type || '1'}
                 </span>
-                <span className="hidden sm:inline-block w-[28px] text-right text-xs font-semibold text-theme-main tabular-nums">
+                <span className="hidden sm:inline-block w-[25px] text-right text-xs font-semibold text-theme-main tabular-nums">
                   {pick.probabilityPercent.toFixed(0)}%
                 </span>
               </div>
@@ -265,7 +265,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             {marketFilter === 'OVER_UNDER' ? (
               <>
                 <span
-                  className={`w-[36px] sm:w-[40px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[32px] sm:w-[36px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     over25 && over25 >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : 'text-theme-sub font-normal'
@@ -274,7 +274,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   {over25 !== null ? over25.toFixed(0) : '-'}
                 </span>
                 <span
-                  className={`w-[36px] sm:w-[40px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[32px] sm:w-[36px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     under25 && under25 >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : 'text-theme-sub font-normal'
@@ -286,7 +286,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             ) : marketFilter === 'BTTS' ? (
               <>
                 <span
-                  className={`w-[36px] sm:w-[40px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[32px] sm:w-[36px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     bttsYes && bttsYes >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : 'text-theme-sub font-normal'
@@ -295,7 +295,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   {bttsYes !== null ? bttsYes.toFixed(0) : '-'}
                 </span>
                 <span
-                  className={`w-[36px] sm:w-[40px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[32px] sm:w-[36px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     bttsNo && bttsNo >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : 'text-theme-sub font-normal'
@@ -307,7 +307,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             ) : (
               <>
                 <span
-                  className={`w-[30px] sm:w-[34px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     homeProb && homeProb >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : homeProb && homeProb >= 35
@@ -318,7 +318,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   {homeProb !== null ? homeProb.toFixed(0) : '-'}
                 </span>
                 <span
-                  className={`w-[30px] sm:w-[34px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     drawProb && drawProb >= 35
                       ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold'
                       : 'text-theme-sub font-normal'
@@ -327,7 +327,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   {drawProb !== null ? drawProb.toFixed(0) : '-'}
                 </span>
                 <span
-                  className={`w-[30px] sm:w-[34px] h-[24px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
+                  className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     awayProb && awayProb >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
                       : awayProb && awayProb >= 35
@@ -371,18 +371,18 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         </div>
       ) : isPercentageSortActive ? (
         <div className="rounded-2xl border border-theme overflow-hidden bg-theme-card shadow-theme-sm transition-all">
-          <div className="bg-theme-header-grad border-b border-theme-subdued grid grid-cols-12 items-center px-3 sm:px-3.5 py-2 gap-1.5 select-none min-h-[44px]">
+          <div className="bg-theme-header-grad border-b border-theme-subdued grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none min-h-[38px]">
             <div className="col-span-6 sm:col-span-6 flex items-center gap-1.5 min-w-0 pr-1">
               <span className="truncate whitespace-nowrap font-semibold text-base tracking-[-0.01em] text-theme-main">Matches</span>
             </div>
             <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-              <div className="w-[36px] sm:w-[68px] flex items-center justify-center shrink-0">
+              <div className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0">
                 <button
                   type="button"
                   onClick={() =>
                     onSelectSortBy?.(sortBy === 'PROB_DESC' ? 'PROB_ASC' : 'PROB_DESC')
                   }
-                  className="h-[28px] flex items-center justify-center gap-1 tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                  className="h-[24px] flex items-center justify-center gap-1 tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                   title="Sort by Model Pick Probability"
                   aria-label="Sort by Model Pick Probability"
                 >
@@ -397,13 +397,13 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">
                 {marketFilter === 'OVER_UNDER' ? (
                   <>
-                    <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">O 2.5</span>
-                    <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">U 2.5</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O 2.5</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U 2.5</span>
                   </>
                 ) : marketFilter === 'BTTS' ? (
                   <>
-                    <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">YES</span>
-                    <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">NO</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">YES</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">NO</span>
                   </>
                 ) : (
                   <>
@@ -412,7 +412,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'HOME_DESC' ? 'DEFAULT' : 'HOME_DESC')
                       }
-                      className={`h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'HOME_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Home Win %"
@@ -426,7 +426,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'DRAW_DESC' ? 'DEFAULT' : 'DRAW_DESC')
                       }
-                      className={`h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'DRAW_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Draw %"
@@ -440,7 +440,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'AWAY_DESC' ? 'DEFAULT' : 'AWAY_DESC')
                       }
-                      className={`h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-md cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'AWAY_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Away Win %"
@@ -469,7 +469,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <button
                 type="button"
                 onClick={handleToggleAllLeagues}
-                className="h-[28px] inline-flex items-center gap-1 text-xs font-medium text-theme-sub hover:text-theme-primary hover:bg-theme-card transition-colors cursor-pointer px-2 rounded-lg whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="h-[24px] inline-flex items-center gap-1 text-xs font-medium text-theme-sub hover:text-theme-primary hover:bg-theme-card transition-colors cursor-pointer px-2 rounded-lg whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
                 {areAllLeaguesExpanded ? (
                   <>
@@ -511,7 +511,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     onClick={() => toggleLeagueExpand(group.headerKey)}
                     aria-expanded={isExpanded}
                     aria-controls={panelId}
-                    className="w-full min-h-[44px] flex items-center justify-between gap-2.5 px-3 sm:px-3.5 py-2 bg-theme-card hover:bg-theme-card-elevated transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                    className="w-full min-h-[38px] flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 bg-theme-card hover:bg-theme-card-elevated transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <ChevronDown className="w-4 h-4 text-theme-primary shrink-0 -rotate-90 transition-transform duration-150" />
@@ -522,19 +522,19 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                         {group.subDivision || group.leagueName}
                       </span>
                     </div>
-                    <span className="h-[22px] min-w-[24px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center shrink-0">
+                    <span className="h-[20px] min-w-[22px] px-1.5 rounded-md bg-theme-subtle text-theme-sub text-2xs font-medium tabular-nums flex items-center justify-center shrink-0">
                       {totalGroupMatches}
                     </span>
                   </button>
                 ) : (
-                  <div className="grid grid-cols-12 items-center px-3 sm:px-3.5 py-2 gap-1.5 select-none transition-colors min-h-[44px] bg-theme-header-grad border-b border-theme-subdued">
+                  <div className="grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none transition-colors min-h-[38px] bg-theme-header-grad border-b border-theme-subdued">
                     <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1">
                       <button
                         type="button"
                         onClick={() => toggleLeagueExpand(group.headerKey)}
                         aria-expanded={isExpanded}
                         aria-controls={panelId}
-                        className="w-full min-h-[28px] flex items-center gap-2 text-left cursor-pointer rounded-lg hover:text-theme-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent min-w-0"
+                        className="w-full min-h-[24px] flex items-center gap-2 text-left cursor-pointer rounded-lg hover:text-theme-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent min-w-0"
                       >
                         <ChevronDown className="w-4 h-4 text-theme-primary shrink-0 rotate-0 transition-transform duration-150" />
                         <span className="font-semibold text-theme-main text-base leading-snug tracking-[-0.01em] break-words">
@@ -547,11 +547,11 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     </div>
 
                     <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-                      <div className="w-[36px] sm:w-[68px] flex items-center justify-center shrink-0">
+                      <div className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0">
                         <button
                           type="button"
                           onClick={() => onSelectSortBy?.('PROB_DESC')}
-                          className="h-[28px] flex items-center justify-center gap-0.5 tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                          className="h-[24px] flex items-center justify-center gap-0.5 tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                           title="Click to sort table by Model Pick %"
                           aria-label="Sort table by Model Pick %"
                         >
@@ -562,20 +562,20 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">
                         {marketFilter === 'OVER_UNDER' ? (
                           <>
-                            <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">O 2.5</span>
-                            <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">U 2.5</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O 2.5</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U 2.5</span>
                           </>
                         ) : marketFilter === 'BTTS' ? (
                           <>
-                            <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">YES</span>
-                            <span className="w-[36px] sm:w-[40px] h-[28px] flex items-center justify-center text-center">NO</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">YES</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">NO</span>
                           </>
                         ) : (
                           <>
                             <button
                               type="button"
                               onClick={() => onSelectSortBy?.('HOME_DESC')}
-                              className="h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                              className="h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                               title="Sort by Home Win %"
                               aria-label="Sort by Home Win %"
                             >
@@ -584,7 +584,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                             <button
                               type="button"
                               onClick={() => onSelectSortBy?.('DRAW_DESC')}
-                              className="h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                              className="h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                               title="Sort by Draw %"
                               aria-label="Sort by Draw %"
                             >
@@ -593,7 +593,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                             <button
                               type="button"
                               onClick={() => onSelectSortBy?.('AWAY_DESC')}
-                              className="h-[28px] w-[30px] sm:w-[34px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                              className="h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center text-center shrink-0 hover:text-theme-primary cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                               title="Sort by Away Win %"
                               aria-label="Sort by Away Win %"
                             >

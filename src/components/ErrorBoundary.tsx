@@ -47,7 +47,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       return (
         <div className="min-h-screen bg-theme-bg text-theme-main flex items-center justify-center p-3.5 font-sans">
           <Card radius="2xl" padding="none" className="max-w-md w-full shadow-theme-md overflow-hidden">
-            <div className="min-h-[44px] px-3.5 py-2.5 bg-theme-header-grad border-b border-theme flex items-center gap-2.5">
+            <div className="min-h-[38px] px-3 py-2 bg-theme-header-grad border-b border-theme flex items-center gap-2.5">
               <AlertTriangle className="w-5 h-5 text-theme-primary shrink-0" />
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-theme-main tracking-[-0.015em]">

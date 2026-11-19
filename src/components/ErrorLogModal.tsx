@@ -71,7 +71,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
               type="button"
               onClick={onRefresh}
               disabled={isLoading}
-              className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               title="Refresh error logs"
               aria-label="Refresh error logs"
             >
@@ -81,7 +81,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
           <button
             type="button"
             onClick={handleCopyLogs}
-            className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Copy error log"
             aria-label="Copy error log"
           >

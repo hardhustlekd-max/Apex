@@ -12,7 +12,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   label = 'Loading...',
   variant = 'spinner',
   rows = 6,
-  minHeight = 'min-h-[180px]',
+  minHeight = 'min-h-[156px]',
   className = '',
 }) => {
   if (variant === 'skeleton') {
@@ -20,7 +20,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       <div className={`bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm space-y-1.5 animate-pulse font-sans ${className}`}>
         <div className="h-3 bg-theme-subtle rounded-lg w-1/3 mb-2" />
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="h-[28px] bg-theme-subtle rounded-lg" />
+          <div key={i} className="h-[24px] bg-theme-subtle rounded-lg" />
         ))}
       </div>
     );

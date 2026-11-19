@@ -43,7 +43,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           onSelectDetail(fixture);
         }
       }}
-      className="p-3.5 flex flex-col justify-between"
+      className="p-3 flex flex-col justify-between"
     >
       <div>
         {/* Top Metadata */}

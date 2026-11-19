@@ -32,7 +32,7 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
               onClick={() => onSelectTab(id)}
               aria-current={isActive ? 'page' : undefined}
               aria-label={ariaLabel}
-              className={`h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 px-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
+              className={`h-[38px] rounded-lg flex flex-col items-center justify-center gap-0.5 px-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
                 isActive
                   ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                   : 'text-theme-sub hover:text-theme-main font-medium'

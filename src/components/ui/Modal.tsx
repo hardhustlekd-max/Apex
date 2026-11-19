@@ -62,11 +62,11 @@ export const Modal: React.FC<ModalProps> = ({
         }`}
       >
         {mobileSheet && (
-          <div className="w-9 h-1 bg-theme-dim/40 rounded-full mx-auto mt-2 mb-1 sm:hidden shrink-0 opacity-70" />
+          <div className="w-8 h-1 bg-theme-dim/40 rounded-full mx-auto mt-1.5 mb-0.5 sm:hidden shrink-0 opacity-70" />
         )}
 
         {/* Header */}
-        <div className="min-h-[44px] px-3.5 py-2 bg-theme-header-grad border-b border-theme flex items-center justify-between gap-2 shrink-0">
+        <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             {icon && (
               <span className="text-theme-primary shrink-0 flex items-center justify-center">
@@ -85,7 +85,7 @@ export const Modal: React.FC<ModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-[34px] h-[34px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center active:scale-95 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               aria-label={closeLabel}
             >
               <X className="w-4 h-4 stroke-[2.25]" />
@@ -98,7 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-3.5 py-2.5 bg-theme-card-elevated border-t border-theme shrink-0">
+          <div className="px-3 py-2 bg-theme-card-elevated border-t border-theme shrink-0">
             {footer}
           </div>
         )}

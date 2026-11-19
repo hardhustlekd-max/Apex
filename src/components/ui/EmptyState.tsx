@@ -14,7 +14,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
   actions,
-  minHeight = 'min-h-[180px]',
+  minHeight = 'min-h-[156px]',
   className = '',
 }) => {
   return (
