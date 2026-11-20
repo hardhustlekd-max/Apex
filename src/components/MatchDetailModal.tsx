@@ -131,6 +131,10 @@ const MatchDetailModalContent: React.FC<{
       marketKey,
       marketName,
       odds,
+      matchDate: fixture.matchDate,
+      kickOffTime: fixture.kickOffTime,
+      timestamp: fixture.timestamp,
+      score: fixture.score,
     });
   };
 

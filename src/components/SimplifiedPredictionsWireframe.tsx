@@ -119,7 +119,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     return Array.from(groupMap.values());
   }, [orderedFixtures, groups]);
 
-  const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean) => {
+  const renderFixtureRow = (fixture: Fixture, showLeagueInRow: boolean, index = 0) => {
     const isLive = fixture.status === 'LIVE';
     const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
@@ -137,7 +137,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
     return (
       <div
-        key={fixture.id}
+        key={`${fixture.id}_${index}`}
         role="button"
         tabIndex={0}
         onClick={() => onSelectDetail(fixture)}
@@ -229,11 +229,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 {kickOff}
               </span>
             )}
-            {isLive && fixture.minute && (
-              <span className="text-theme-live shrink-0 font-semibold tabular-nums">
-                {fixture.minute}&apos;
-              </span>
-            )}
+
           </div>
         </div>
 
@@ -456,7 +452,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             </div>
           </div>
           <div className="bg-theme-card">
-            {paginatedFixtures.map((fixture) => renderFixtureRow(fixture, true))}
+            {paginatedFixtures.map((fixture, idx) => renderFixtureRow(fixture, true, idx))}
           </div>
         </div>
       ) : (
@@ -617,7 +613,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
                       className="bg-theme-card"
                     >
-                      {visibleGroupFixtures.map((fixture) => renderFixtureRow(fixture, false))}
+                      {visibleGroupFixtures.map((fixture, idx) => renderFixtureRow(fixture, false, idx))}
                       {showLeaguePagination && (
                         <PaginationBar
                           embedded

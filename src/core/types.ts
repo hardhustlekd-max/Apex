@@ -498,6 +498,10 @@ export interface BetSelection {
   marketName: string;
   odds: number;
   matchDate?: string;
+  kickOffTime?: string;
+  timestamp?: number;
+  status?: 'PENDING' | 'WON' | 'LOST';
+  score?: { home: number; away: number };
 }
 
 export interface SlipBet {

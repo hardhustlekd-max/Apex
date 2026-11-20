@@ -217,6 +217,9 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                           marketName: market.name,
                           odds: Number(odds.toFixed(2)),
                           matchDate: fixture.matchDate,
+                          kickOffTime: fixture.kickOffTime,
+                          timestamp: fixture.timestamp,
+                          score: fixture.score,
                         });
                       }}
                       className={`h-[28px] px-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${

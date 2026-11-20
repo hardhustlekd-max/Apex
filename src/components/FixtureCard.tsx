@@ -59,12 +59,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-            {fixture.status === 'LIVE' ? (
-              <Badge variant="live" size="xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                <span>LIVE</span>
-              </Badge>
-            ) : isHighConfidence ? (
+            {isHighConfidence ? (
               <span className="text-xs font-semibold text-theme-primary tracking-wide">
                 High Conf.
               </span>

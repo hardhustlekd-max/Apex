@@ -1645,32 +1645,73 @@ export class FootballDB {
       const pendingBets = this.getAllBets().filter((b) => b.status === 'PENDING');
       if (pendingBets.length === 0) return;
 
-      // Gather score cache from predictions, scraped matches, and upcoming fixtures
+      // Gather score cache from historical_matches, upcoming_fixtures, predictions, and flashscore_scraped_matches
       const scoreMap = new Map<string, { home: number; away: number; isFinished: boolean }>();
+
+      const histRows = sqliteDb.prepare("SELECT id, fthg, ftag FROM historical_matches WHERE fthg IS NOT NULL AND ftag IS NOT NULL").all() as any[];
+      for (const r of histRows) {
+        const cleanId = cleanFixtureId(r.id);
+        const entry = {
+          home: Number(r.fthg),
+          away: Number(r.ftag),
+          isFinished: true,
+        };
+        scoreMap.set(cleanId, entry);
+        scoreMap.set(String(r.id), entry);
+      }
+
+      const upcomingRows = sqliteDb.prepare("SELECT id, status, score_json FROM upcoming_fixtures WHERE score_json IS NOT NULL").all() as any[];
+      for (const r of upcomingRows) {
+        const parsedScore = safeJsonParse<{ home?: number; away?: number } | null>(r.score_json, null);
+        if (parsedScore && typeof parsedScore.home === 'number' && typeof parsedScore.away === 'number') {
+          const cleanId = cleanFixtureId(r.id);
+          const isFin = String(r.status || '').toUpperCase() === 'FINISHED';
+          const existing = scoreMap.get(cleanId);
+          if (!existing || !existing.isFinished || isFin) {
+            const entry = {
+              home: parsedScore.home,
+              away: parsedScore.away,
+              isFinished: isFin,
+            };
+            scoreMap.set(cleanId, entry);
+            scoreMap.set(String(r.id), entry);
+          }
+        }
+      }
 
       const predRows = sqliteDb.prepare("SELECT fixture_id, home_score, away_score, status FROM predictions WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
       for (const r of predRows) {
         const id = cleanFixtureId(r.fixture_id);
-        scoreMap.set(id, {
-          home: Number(r.home_score),
-          away: Number(r.away_score),
-          isFinished: String(r.status || '').toUpperCase() === 'FINISHED',
-        });
-        scoreMap.set(String(r.fixture_id), scoreMap.get(id)!);
+        const isFin = String(r.status || '').toUpperCase() === 'FINISHED';
+        const existing = scoreMap.get(id);
+        if (!existing || !existing.isFinished || isFin) {
+          const entry = {
+            home: Number(r.home_score),
+            away: Number(r.away_score),
+            isFinished: isFin,
+          };
+          scoreMap.set(id, entry);
+          scoreMap.set(String(r.fixture_id), entry);
+        }
       }
 
       const scrapedRows = sqliteDb.prepare("SELECT match_id, home_score, away_score, status FROM flashscore_scraped_matches WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
       for (const r of scrapedRows) {
         const id = cleanFixtureId(r.match_id);
-        scoreMap.set(id, {
-          home: Number(r.home_score),
-          away: Number(r.away_score),
-          isFinished: String(r.status || '').toUpperCase() === 'FINISHED' || Number(r.status) === 3 || Number(r.status) === 4,
-        });
-        scoreMap.set(String(r.match_id), scoreMap.get(id)!);
+        const isFin = String(r.status || '').toUpperCase() === 'FINISHED' || Number(r.status) === 3 || Number(r.status) === 4;
+        const existing = scoreMap.get(id);
+        if (!existing || !existing.isFinished || isFin) {
+          const entry = {
+            home: Number(r.home_score),
+            away: Number(r.away_score),
+            isFinished: isFin,
+          };
+          scoreMap.set(id, entry);
+          scoreMap.set(String(r.match_id), entry);
+        }
       }
 
-      const updateStmt = sqliteDb.prepare("UPDATE bets SET status = ?, evaluated_at = ? WHERE id = ?");
+      const updateStmt = sqliteDb.prepare("UPDATE bets SET status = ?, selections_json = ?, evaluated_at = ? WHERE id = ?");
 
       const evaluateSelection = (sel: BetSelection, hs: number, as: number): boolean | null => {
         if (isNaN(hs) || isNaN(as)) return null;
@@ -1686,6 +1727,7 @@ export class FootballDB {
           case 'BTTS_NO': return hs === 0 || as === 0;
           case 'DOUBLE_CHANCE_1X': return hs >= as;
           case 'DOUBLE_CHANCE_X2': return as >= hs;
+          case 'DOUBLE_CHANCE_12': return hs !== as;
           case 'OVER_15': return tot >= 2;
           case 'UNDER_15': return tot <= 1;
           case 'OVER_35': return tot >= 4;
@@ -1701,6 +1743,10 @@ export class FootballDB {
       const evalTx = sqliteDb.transaction((betsToEval: SlipBet[]) => {
         const now = new Date().toISOString();
         for (const bet of betsToEval) {
+          if (!Array.isArray(bet.selections) || bet.selections.length === 0) {
+            continue;
+          }
+
           let allWon = true;
           let anyLost = false;
           let allEvaluated = true;
@@ -1710,27 +1756,43 @@ export class FootballDB {
             const scoreInfo = scoreMap.get(cleanId) || scoreMap.get(String(sel.fixtureId));
 
             if (!scoreInfo) {
+              sel.status = 'PENDING';
               allEvaluated = false;
               allWon = false;
-              break;
+              continue;
+            }
+
+            sel.score = { home: scoreInfo.home, away: scoreInfo.away };
+            if (!scoreInfo.isFinished) {
+              sel.status = 'PENDING';
+              allEvaluated = false;
+              allWon = false;
+              continue;
             }
 
             const res = evaluateSelection(sel, scoreInfo.home, scoreInfo.away);
             if (res === null) {
+              sel.status = 'PENDING';
               allEvaluated = false;
               allWon = false;
-              break;
-            }
-            if (res === false) {
+            } else if (res === false) {
+              sel.status = 'LOST';
               anyLost = true;
-              break;
+            } else {
+              sel.status = 'WON';
             }
           }
 
           if (anyLost) {
-            updateStmt.run('LOST', now, bet.id);
+            bet.status = 'LOST';
+            bet.evaluatedAt = now;
+            updateStmt.run('LOST', JSON.stringify(bet.selections), now, bet.id);
           } else if (allEvaluated && allWon) {
-            updateStmt.run('WON', now, bet.id);
+            bet.status = 'WON';
+            bet.evaluatedAt = now;
+            updateStmt.run('WON', JSON.stringify(bet.selections), now, bet.id);
+          } else {
+            updateStmt.run('PENDING', JSON.stringify(bet.selections), bet.evaluatedAt || null, bet.id);
           }
         }
       });

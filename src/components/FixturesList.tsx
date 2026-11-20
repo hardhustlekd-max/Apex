@@ -641,9 +641,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 {!isCollapsed && (
                   <div id={panelId} className="bg-theme-card">
                     <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {visibleGroupFixtures.map((fixture) => (
+                      {visibleGroupFixtures.map((fixture, idx) => (
                         <FixtureCard
-                          key={fixture.id}
+                          key={`${fixture.id}_${idx}`}
                           fixture={fixture}
                           onSelectDetail={onSelectDetail}
                           isSelected={selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id)}

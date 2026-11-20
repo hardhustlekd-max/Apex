@@ -37,6 +37,7 @@ const RECOVERY_TABLES = [
   'raw_feed_data',
   'flashscore_scraped_matches',
   'league_standings',
+  'bets',
 ];
 
 function createRawDbInstance(): Database.Database {
@@ -658,29 +659,20 @@ export function initSqliteSchema(): void {
 
     // Schema Migration: Ensure new columns exist in upcoming_fixtures
     try {
-      const columns = db.prepare("PRAGMA table_info(upcoming_fixtures)").all() as any[];
-      const columnNames = columns.map(c => c.name);
-      
-      if (!columnNames.includes('information_json')) {
-        console.log('[SQLite] Migrating upcoming_fixtures: Adding information_json column');
-        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN information_json TEXT;");
-      }
-      if (!columnNames.includes('statistics_json')) {
-        console.log('[SQLite] Migrating upcoming_fixtures: Adding statistics_json column');
-        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN statistics_json TEXT;");
-      }
-      if (!columnNames.includes('market_odds_json')) {
-        console.log('[SQLite] Migrating upcoming_fixtures: Adding market_odds_json column');
-        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN market_odds_json TEXT;");
-      }
-      if (!columnNames.includes('timestamp')) {
-        console.log('[SQLite] Migrating upcoming_fixtures: Adding timestamp column and backfilling');
-        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN timestamp INTEGER;");
-        db.exec("UPDATE upcoming_fixtures SET timestamp = CAST(strftime('%s', match_date || ' ' || kick_off_time || ':00') AS INTEGER) WHERE timestamp IS NULL AND kick_off_time LIKE '%:%';");
-      }
-      if (!columnNames.includes('league_url')) {
-        db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN league_url TEXT;");
-      }
+      db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN information_json TEXT;");
+    } catch {}
+    try {
+      db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN statistics_json TEXT;");
+    } catch {}
+    try {
+      db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN market_odds_json TEXT;");
+    } catch {}
+    try {
+      db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN timestamp INTEGER;");
+      db.exec("UPDATE upcoming_fixtures SET timestamp = CAST(strftime('%s', match_date || ' ' || kick_off_time || ':00') AS INTEGER) WHERE timestamp IS NULL AND kick_off_time LIKE '%:%';");
+    } catch {}
+    try {
+      db.exec("ALTER TABLE upcoming_fixtures ADD COLUMN league_url TEXT;");
     } catch (migErr: any) {
       console.warn('[SQLite] Migration note for upcoming_fixtures:', migErr?.message);
     }
