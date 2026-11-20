@@ -167,18 +167,6 @@ const MatchDetailModalContent: React.FC<{
     [enrichedFixture.marketOdds]
   );
 
-  const allMarketsList = useMemo(() => {
-    if (!enrichedFixture.markets || enrichedFixture.markets.length === 0) return [];
-    return enrichedFixture.markets.map((market) => {
-      let groupName = 'Market';
-      if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) groupName = '1X2';
-      else if (['OVER_25', 'UNDER_25'].includes(market.key)) groupName = 'Goals';
-      else if (['BTTS_YES', 'BTTS_NO'].includes(market.key)) groupName = 'BTTS';
-      else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2'].includes(market.key)) groupName = 'Double Chance';
-      return { groupName, ...market };
-    });
-  }, [enrichedFixture.markets]);
-
   const hasTeamFormData = (h?: HeadToHeadMeasurement | null): boolean =>
     !!(
       h &&
@@ -393,10 +381,115 @@ const MatchDetailModalContent: React.FC<{
   const homeStats = currentFixture.homeStats;
   const awayStats = currentFixture.awayStats;
 
+  const { homeStandingInfo, awayStandingInfo } = useMemo(() => {
+    const empty = {
+      homeStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
+      awayStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
+    };
+    if (!standingsTable) return empty;
+    const groups =
+      Array.isArray(standingsTable.groups) && standingsTable.groups.length > 0
+        ? standingsTable.groups
+        : Array.isArray(standingsTable.table) && standingsTable.table.length > 0
+        ? [{ name: 'Standings', table: standingsTable.table }]
+        : [];
+    if (groups.length === 0) return empty;
+
+    const findTeam = (teamName: string) => {
+      let bestScore = 0;
+      let bestRes: { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null = null;
+      for (const grp of groups) {
+        for (const e of grp.table) {
+          const s = teamMatchScore(teamName, e.teamName);
+          if (s > bestScore) {
+            bestScore = s;
+            bestRes = {
+              entry: e,
+              totalTeams: grp.table.length,
+              groupName: grp.name && grp.name !== 'Standings' ? grp.name : undefined,
+            };
+          }
+        }
+      }
+      return bestScore > 0 ? bestRes : null;
+    };
+
+    return {
+      homeStandingInfo: findTeam(fixture.homeTeam),
+      awayStandingInfo: findTeam(fixture.awayTeam),
+    };
+  }, [standingsTable, fixture.homeTeam, fixture.awayTeam]);
+
+  const { isStandingsClose, standingsCloseReason } = useMemo(() => {
+    if (homeStandingInfo && awayStandingInfo) {
+      const h = homeStandingInfo.entry;
+      const a = awayStandingInfo.entry;
+      if (
+        h.rank > 0 &&
+        a.rank > 0 &&
+        h.played >= 1 &&
+        a.played >= 1 &&
+        (!homeStandingInfo.groupName || !awayStandingInfo.groupName || homeStandingInfo.groupName === awayStandingInfo.groupName)
+      ) {
+        const rankDiff = Math.abs(h.rank - a.rank);
+        const pointsDiff = Math.abs(h.points - a.points);
+        const close = rankDiff <= 2;
+        if (close) {
+          const rankText = rankDiff === 0 ? 'tied rank' : `${rankDiff} ${rankDiff === 1 ? 'place' : 'places'} apart`;
+          const ptsText = pointsDiff === 0 ? 'level on pts' : `${pointsDiff} ${pointsDiff === 1 ? 'pt' : 'pts'} apart`;
+          return {
+            isStandingsClose: true,
+            standingsCloseReason: `Standings close (#${h.rank} vs #${a.rank} · ${rankText} · ${ptsText})`,
+          };
+        }
+        return { isStandingsClose: false, standingsCloseReason: undefined };
+      }
+    }
+
+    const explicitClose =
+      currentFixture.standingsClose ??
+      pred?.standingsClose ??
+      pred?.standingsContext?.standingsClose;
+    const explicitReason =
+      currentFixture.standingsCloseReason ??
+      pred?.standingsCloseReason ??
+      pred?.standingsContext?.standingsCloseReason;
+
+    if (typeof explicitClose === 'boolean') {
+      return { isStandingsClose: explicitClose, standingsCloseReason: explicitReason };
+    }
+
+    return { isStandingsClose: false, standingsCloseReason: undefined };
+  }, [
+    currentFixture.standingsClose,
+    currentFixture.standingsCloseReason,
+    pred?.standingsClose,
+    pred?.standingsCloseReason,
+    pred?.standingsContext?.standingsClose,
+    pred?.standingsContext?.standingsCloseReason,
+    homeStandingInfo,
+    awayStandingInfo,
+  ]);
+
+  const allMarketsList = useMemo(() => {
+    if (!currentFixture.markets || currentFixture.markets.length === 0) return [];
+    return currentFixture.markets
+      .filter((market) => !(isStandingsClose && ['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)))
+      .map((market) => {
+        let groupName = 'Market';
+        if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) groupName = '1X2';
+        else if (['OVER_25', 'UNDER_25'].includes(market.key)) groupName = 'Goals';
+        else if (['BTTS_YES', 'BTTS_NO'].includes(market.key)) groupName = 'BTTS';
+        else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2'].includes(market.key)) groupName = 'Double Chance';
+        return { groupName, ...market };
+      });
+  }, [currentFixture.markets, isStandingsClose]);
+
   const bestMarketsPerGroup = useMemo(() => {
     if (!currentFixture.markets) return [];
     const groups: Record<string, MarketOption> = {};
     currentFixture.markets.forEach((market) => {
+      if (isStandingsClose && ['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) return;
       let group = '';
       if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
       else if (['OVER_25', 'UNDER_25'].includes(market.key)) group = 'GOALS';
@@ -407,7 +500,27 @@ const MatchDetailModalContent: React.FC<{
       }
     });
     return Object.entries(groups).map(([groupName, market]) => ({ groupName, ...market }));
-  }, [currentFixture.markets]);
+  }, [currentFixture.markets, isStandingsClose]);
+
+  const recommendedPick = useMemo(() => {
+    const auth = currentFixture.authoritativePick;
+    if (auth && !(isStandingsClose && ['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(auth.key))) {
+      return auth;
+    }
+    if (bestMarketsPerGroup.length > 0) {
+      const sorted = bestMarketsPerGroup.slice().sort((a, b) => b.probability - a.probability);
+      const top = sorted[0];
+      const pct = getProbValue(top.probability, 1);
+      return {
+        key: top.key,
+        label: top.name,
+        probability: top.probability,
+        probabilityPercent: pct,
+        probabilityFormatted: `${pct.toFixed(1)}%`,
+      };
+    }
+    return null;
+  }, [currentFixture.authoritativePick, bestMarketsPerGroup, isStandingsClose]);
 
   const rawH2H: HeadToHeadMeasurement = useMemo(() => (
     scrapedH2H ||
@@ -505,45 +618,8 @@ const MatchDetailModalContent: React.FC<{
 
   const homeWinPct = pred ? getProbValue(pred.homeWinProb, 1) : 0;
   const awayWinPct = pred ? getProbValue(pred.awayWinProb, 1) : 0;
-
-  const { homeStandingInfo, awayStandingInfo } = useMemo(() => {
-    const empty = {
-      homeStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
-      awayStandingInfo: null as { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null,
-    };
-    if (!standingsTable) return empty;
-    const groups =
-      Array.isArray(standingsTable.groups) && standingsTable.groups.length > 0
-        ? standingsTable.groups
-        : Array.isArray(standingsTable.table) && standingsTable.table.length > 0
-        ? [{ name: 'Standings', table: standingsTable.table }]
-        : [];
-    if (groups.length === 0) return empty;
-
-    const findTeam = (teamName: string) => {
-      let bestScore = 0;
-      let bestRes: { entry: LeagueStandingEntry; totalTeams: number; groupName?: string } | null = null;
-      for (const grp of groups) {
-        for (const e of grp.table) {
-          const s = teamMatchScore(teamName, e.teamName);
-          if (s > bestScore) {
-            bestScore = s;
-            bestRes = {
-              entry: e,
-              totalTeams: grp.table.length,
-              groupName: grp.name && grp.name !== 'Standings' ? grp.name : undefined,
-            };
-          }
-        }
-      }
-      return bestScore > 0 ? bestRes : null;
-    };
-
-    return {
-      homeStandingInfo: findTeam(fixture.homeTeam),
-      awayStandingInfo: findTeam(fixture.awayTeam),
-    };
-  }, [standingsTable, fixture.homeTeam, fixture.awayTeam]);
+  const over25Pct = pred ? getProbValue(pred.over25Prob, 1) : 0;
+  const bttsPct = pred ? getProbValue(pred.bttsProb, 1) : 0;
 
   const tabItems = [
     { id: 'OVERVIEW' as ModalTab, label: 'Overview' },
@@ -638,7 +714,7 @@ const MatchDetailModalContent: React.FC<{
                 )}
               </button>
             </div>
-            {pred && (
+            {pred && !isStandingsClose && (
               <span className="text-xs font-semibold tabular-nums text-theme-primary">
                 {homeWinPct}%
               </span>
@@ -652,6 +728,11 @@ const MatchDetailModalContent: React.FC<{
             <span className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] mt-1 tabular-nums">
               {fixture.status === 'LIVE' ? 'LIVE' : fixture.status === 'FINISHED' ? 'FT' : formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
             </span>
+            {isStandingsClose && (
+              <span className="text-2xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5 whitespace-nowrap">
+                Close Table · No 1X2
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
@@ -674,7 +755,7 @@ const MatchDetailModalContent: React.FC<{
                 )}
               </button>
             </div>
-            {pred && (
+            {pred && !isStandingsClose && (
               <span className="text-xs font-semibold tabular-nums text-sky-500 dark:text-sky-400">
                 {awayWinPct}%
               </span>
@@ -757,6 +838,17 @@ const MatchDetailModalContent: React.FC<{
                       </div>
                     )}
 
+                    {isStandingsClose && (
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2 bg-amber-500/10">
+                        <span className="text-amber-700 dark:text-amber-300 font-medium text-xs truncate">
+                          {standingsCloseReason || 'Close league standings — 1X2 / Win predictions disabled'}
+                        </span>
+                        <span className="text-xs font-semibold text-theme-main shrink-0">
+                          O2.5 {over25Pct}% · BTTS {bttsPct}%
+                        </span>
+                      </div>
+                    )}
+
                     {pred?.tacticalContext && (
                       <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Rest Days</span>
@@ -778,7 +870,11 @@ const MatchDetailModalContent: React.FC<{
                         size="sm"
                         className="w-full"
                         action={
-                          enrichedFixture.marketOdds.bookmakersCount ? (
+                          isStandingsClose ? (
+                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                              1X2 locked (Close Table)
+                            </span>
+                          ) : enrichedFixture.marketOdds.bookmakersCount ? (
                             <span className="text-xs font-normal tabular-nums text-theme-dim">
                               {enrichedFixture.marketOdds.bookmakersCount} bookmakers
                             </span>
@@ -788,55 +884,73 @@ const MatchDetailModalContent: React.FC<{
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
                       <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
-                          isSel('HOME_WIN') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        role={isStandingsClose ? undefined : 'button'}
+                        tabIndex={isStandingsClose ? -1 : 0}
+                        onClick={() => !isStandingsClose && handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
+                          isStandingsClose
+                            ? 'opacity-45 cursor-not-allowed'
+                            : isSel('HOME_WIN')
+                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
+                            : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
                         <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
+                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.homeImpliedProb !== undefined
+                          {isStandingsClose
+                            ? 'Blocked'
+                            : enrichedFixture.marketOdds.homeImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.homeImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
                       </div>
                       <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
-                          isSel('DRAW') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        role={isStandingsClose ? undefined : 'button'}
+                        tabIndex={isStandingsClose ? -1 : 0}
+                        onClick={() => !isStandingsClose && handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
+                          isStandingsClose
+                            ? 'opacity-45 cursor-not-allowed'
+                            : isSel('DRAW')
+                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
+                            : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
                         <span className="text-lg font-bold text-amber-500 block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
+                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.drawImpliedProb !== undefined
+                          {isStandingsClose
+                            ? 'Blocked'
+                            : enrichedFixture.marketOdds.drawImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.drawImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
                       </div>
                       <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center cursor-pointer transition-colors ${
-                          isSel('AWAY_WIN') ? 'bg-theme-primary/15 ring-2 ring-theme-primary' : 'hover:bg-theme-card-elevated'
+                        role={isStandingsClose ? undefined : 'button'}
+                        tabIndex={isStandingsClose ? -1 : 0}
+                        onClick={() => !isStandingsClose && handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
+                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
+                          isStandingsClose
+                            ? 'opacity-45 cursor-not-allowed'
+                            : isSel('AWAY_WIN')
+                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
+                            : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
                         <span className="text-lg font-bold text-sky-500 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
+                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.awayImpliedProb !== undefined
+                          {isStandingsClose
+                            ? 'Blocked'
+                            : enrichedFixture.marketOdds.awayImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.awayImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
@@ -1222,32 +1336,41 @@ const MatchDetailModalContent: React.FC<{
         {/* TAB 5: PREDICTIONS */}
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-2.5">
+            {isStandingsClose && (
+              <div className="px-3.5 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex flex-col gap-0.5">
+                <span className="font-semibold">1X2 / Win Prediction Suppressed (Close League Standings)</span>
+                <span className="opacity-90">
+                  {standingsCloseReason || 'Teams sit close on the standings table.'} Alternative markets (Goals, BTTS, Double Chance) remain predicted below.
+                </span>
+              </div>
+            )}
+
             {/* Top Model Recommendation Banner with direct Add to Bet Slip */}
-            {currentFixture.authoritativePick && (
+            {recommendedPick && (
               <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden border border-theme-primary/30">
                 <div className="min-h-[34px] px-3.5 py-1.5 bg-theme-primary-subtle border-b border-theme-subdued flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-theme-primary animate-pulse" />
                     <span className="text-2xs font-bold text-theme-primary uppercase tracking-[0.06em]">
-                      Model Recommendation
+                      {isStandingsClose ? 'Alternative Market Recommendation' : 'Model Recommendation'}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-theme-primary tabular-nums">
-                    {currentFixture.authoritativePick.probabilityFormatted}
+                    {recommendedPick.probabilityFormatted}
                   </span>
                 </div>
                 <div className="p-3 flex items-center justify-between gap-3 flex-wrap">
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-bold text-theme-main tracking-[-0.01em] truncate">
-                      {currentFixture.authoritativePick.label}
+                      {recommendedPick.label}
                     </div>
                     <div className="text-xs text-theme-sub truncate mt-0.5">
                       {currentFixture.homeTeam} vs {currentFixture.awayTeam} · {currentFixture.leagueName}
                     </div>
                   </div>
                   {onAddSelection && (() => {
-                    const authKey = currentFixture.authoritativePick.key;
-                    const { odds: authOdds } = getOddsForMarket(authKey, currentFixture.authoritativePick.probability);
+                    const authKey = recommendedPick.key;
+                    const { odds: authOdds } = getOddsForMarket(authKey, recommendedPick.probability);
                     const isAuthSelected = isSel(authKey);
                     return (
                       <button
@@ -1255,7 +1378,7 @@ const MatchDetailModalContent: React.FC<{
                         onClick={() =>
                           handleAddBet(
                             authKey,
-                            `${currentFixture.authoritativePick!.label} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
+                            `${recommendedPick.label} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
                             authOdds
                           )
                         }
@@ -1265,7 +1388,7 @@ const MatchDetailModalContent: React.FC<{
                             : 'bg-theme-primary text-theme-primary-text hover:opacity-90 shadow-theme-sm'
                         }`}
                         title={isAuthSelected ? 'Remove from Bet Slip' : 'Add to Bet Slip'}
-                        aria-label={`${isAuthSelected ? 'Remove' : 'Add'} ${currentFixture.authoritativePick.label} to Bet Slip`}
+                        aria-label={`${isAuthSelected ? 'Remove' : 'Add'} ${recommendedPick.label} to Bet Slip`}
                       >
                         {isAuthSelected ? (
                           <>

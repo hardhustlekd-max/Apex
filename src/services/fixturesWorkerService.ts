@@ -8,13 +8,16 @@ import {
   FeaturedTipDTO,
   LeagueGroupDTO,
   LeagueOptionDTO,
+  LeagueStandingTable,
   MarketOption,
   ScrapedMarketOdds,
   StandingsCatalogItem,
 } from '../core/types.js';
+import { ApexEngine } from '../core/poisson.js';
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
 import { cleanStr, getLeagueAliases, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
+import { teamMatchScore } from '../core/feedParser.js';
 import {
   getFixtureSortableDateTime,
   getLeaguePopularityScore,
@@ -114,20 +117,153 @@ export function extractFlashscoreOddsServer(
   return null;
 }
 
-function computePrecomputedFields(f: Fixture): {
+function buildWorkerStandingsLookup(tables: LeagueStandingTable[]): {
+  byUrl: Map<string, LeagueStandingTable>;
+  byKey: Map<string, LeagueStandingTable[]>;
+} {
+  const byUrl = new Map<string, LeagueStandingTable>();
+  const byKey = new Map<string, LeagueStandingTable[]>();
+
+  const normUrl = (url?: string) =>
+    (url || '').trim().toLowerCase().replace(/^https?:\/\/[^/]+/, '').replace(/\/+$/, '');
+
+  const addKey = (rawKey: string | undefined, table: LeagueStandingTable) => {
+    if (!rawKey) return;
+    const k = rawKey.trim().toLowerCase();
+    if (!k) return;
+    const list = byKey.get(k);
+    if (!list) byKey.set(k, [table]);
+    else if (!list.includes(table)) list.push(table);
+  };
+
+  for (const table of tables) {
+    if (!table || !Array.isArray(table.table) || table.table.length === 0) continue;
+    const u = normUrl(table.leagueUrl);
+    if (u && !byUrl.has(u)) byUrl.set(u, table);
+
+    addKey(table.leagueCode, table);
+    addKey(cleanStr(table.leagueCode), table);
+    if (table.leagueName) {
+      addKey(table.leagueName, table);
+      addKey(cleanStr(table.leagueName), table);
+    }
+    if (table.country && table.leagueName) {
+      addKey(`${table.country}_${table.leagueName}`, table);
+      addKey(cleanStr(`${table.country}_${table.leagueName}`), table);
+    }
+    for (const alias of getLeagueAliases(table.leagueCode)) {
+      addKey(alias, table);
+      addKey(cleanStr(alias), table);
+    }
+    if (table.leagueName) {
+      for (const alias of getLeagueAliases(table.leagueName)) {
+        addKey(alias, table);
+        addKey(cleanStr(alias), table);
+      }
+    }
+  }
+  return { byUrl, byKey };
+}
+
+function resolveWorkerStandingsClose(
+  f: Fixture,
+  lookup: ReturnType<typeof buildWorkerStandingsLookup>
+): { isClose: boolean; reason?: string } {
+  const normUrl = (f.leagueUrl || '').trim().toLowerCase().replace(/^https?:\/\/[^/]+/, '').replace(/\/+$/, '');
+  let table: LeagueStandingTable | undefined = normUrl ? lookup.byUrl.get(normUrl) : undefined;
+
+  if (!table) {
+    const probeKeys = new Set<string>();
+    const pushKey = (val?: string) => {
+      if (!val || val === 'ALL') return;
+      const t = val.trim().toLowerCase();
+      if (t) probeKeys.add(t);
+      const c = cleanStr(val);
+      if (c) probeKeys.add(c);
+    };
+    pushKey(f.league);
+    pushKey(f.leagueName);
+    if (f.league) for (const a of getLeagueAliases(f.league)) pushKey(a);
+    if (f.leagueName) for (const a of getLeagueAliases(f.leagueName)) pushKey(a);
+
+    outer: for (const key of probeKeys) {
+      const cands = lookup.byKey.get(key);
+      if (!cands) continue;
+      for (const cand of cands) {
+        if (cand.table.some((r) => teamMatchScore(f.homeTeam, r.teamName) > 0 || teamMatchScore(f.awayTeam, r.teamName) > 0)) {
+          table = cand;
+          break outer;
+        }
+      }
+    }
+  }
+
+  if (table) {
+    const { homeMatch, awayMatch } = ApexEngine.findMatchedStandingsPair(f.homeTeam, f.awayTeam, table);
+    if (homeMatch && awayMatch) {
+      const homeSnap = {
+        rank: homeMatch.entry.rank,
+        totalTeams: Math.max(homeMatch.entry.rank || 1, homeMatch.group.table.length),
+        played: homeMatch.entry.played,
+        points: homeMatch.entry.points,
+        ppg: Number((homeMatch.entry.points / Math.max(1, homeMatch.entry.played)).toFixed(2)),
+        groupName: homeMatch.group.name && homeMatch.group.name !== 'Standings' ? homeMatch.group.name : undefined,
+      };
+      const awaySnap = {
+        rank: awayMatch.entry.rank,
+        totalTeams: Math.max(awayMatch.entry.rank || 1, awayMatch.group.table.length),
+        played: awayMatch.entry.played,
+        points: awayMatch.entry.points,
+        ppg: Number((awayMatch.entry.points / Math.max(1, awayMatch.entry.played)).toFixed(2)),
+        groupName: awayMatch.group.name && awayMatch.group.name !== 'Standings' ? awayMatch.group.name : undefined,
+      };
+      const evaluated = ApexEngine.evaluateStandingsCloseStatus(homeSnap, awaySnap);
+      return { isClose: evaluated.isClose, reason: evaluated.reason };
+    }
+  }
+
+  const predClose = f.standingsClose ?? f.prediction?.standingsClose ?? f.prediction?.standingsContext?.standingsClose;
+  const predReason = f.standingsCloseReason ?? f.prediction?.standingsCloseReason ?? f.prediction?.standingsContext?.standingsCloseReason;
+  if (typeof predClose === 'boolean') {
+    return { isClose: predClose, reason: predReason };
+  }
+
+  return { isClose: false };
+}
+
+function computePrecomputedFields(
+  f: Fixture,
+  standingsOverride?: { isClose: boolean; reason?: string }
+): {
   authoritativePick?: Fixture['authoritativePick'];
   highestPick?: Fixture['highestPick'];
   probs?: Fixture['probs'];
   popularityScore: number;
   slimPrediction?: Fixture['prediction'];
   hasPrediction: boolean;
+  standingsClose: boolean;
+  standingsCloseReason?: string;
 } {
   const popularityScore = getLeaguePopularityScore(f.league, f.leagueName, f.stage);
   const pred = f.prediction;
+  const isStandingsClose = Boolean(
+    standingsOverride?.isClose ??
+      f.standingsClose ??
+      pred?.standingsClose ??
+      pred?.standingsContext?.standingsClose
+  );
+  const standingsCloseReason =
+    standingsOverride?.reason ??
+    f.standingsCloseReason ??
+    pred?.standingsCloseReason ??
+    pred?.standingsContext?.standingsCloseReason;
+
   if (!pred) {
     return {
       popularityScore,
       hasPrediction: false,
+      standingsClose: isStandingsClose,
+      standingsCloseReason,
     };
   }
 
@@ -139,33 +275,64 @@ function computePrecomputedFields(f: Fixture): {
   const bttsY = Number(pred.bttsProb ?? 0);
   const bttsN = Math.max(0, 1 - bttsY);
 
-  let authKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
-  let authType: '1' | 'X' | '2' = '1';
-  let authLabel = `${f.homeTeam} Win`;
-  let authProb = hw;
+  const non1x2Candidates: Array<{
+    key: MarketOption['key'];
+    type: 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N';
+    label: string;
+    shortLabel: string;
+    probability: number;
+  }> = [
+    { key: 'OVER_25', type: 'O2.5', label: 'Over 2.5 Goals', shortLabel: 'O 2.5', probability: o25 },
+    { key: 'UNDER_25', type: 'U2.5', label: 'Under 2.5 Goals', shortLabel: 'U 2.5', probability: u25 },
+    { key: 'BTTS_YES', type: 'BTTS_Y', label: 'Both Teams To Score (Yes)', shortLabel: 'BTTS Y', probability: bttsY },
+    { key: 'BTTS_NO', type: 'BTTS_N', label: 'Both Teams To Score (No)', shortLabel: 'BTTS N', probability: bttsN },
+  ];
 
-  if (aw >= hw && aw >= dr) {
-    authKey = 'AWAY_WIN';
-    authType = '2';
-    authLabel = `${f.awayTeam} Win`;
-    authProb = aw;
-  } else if (dr >= hw && dr >= aw) {
-    authKey = 'DRAW';
-    authType = 'X';
-    authLabel = 'Draw';
-    authProb = dr;
+  let authoritativePick: Fixture['authoritativePick'];
+
+  if (isStandingsClose) {
+    const sortedAlt = non1x2Candidates.slice().sort((a, b) => b.probability - a.probability);
+    const bestAlt = sortedAlt[0];
+    const altPercent = round1(bestAlt.probability);
+    authoritativePick = {
+      key: bestAlt.key,
+      type: bestAlt.type,
+      label: bestAlt.label,
+      shortLabel: bestAlt.shortLabel,
+      probability: bestAlt.probability,
+      probabilityPercent: altPercent,
+      probabilityFormatted: format1(bestAlt.probability),
+      isStandingsCloseFallback: true,
+    };
+  } else {
+    let authKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
+    let authType: '1' | 'X' | '2' = '1';
+    let authLabel = `${f.homeTeam} Win`;
+    let authProb = hw;
+
+    if (aw >= hw && aw >= dr) {
+      authKey = 'AWAY_WIN';
+      authType = '2';
+      authLabel = `${f.awayTeam} Win`;
+      authProb = aw;
+    } else if (dr >= hw && dr >= aw) {
+      authKey = 'DRAW';
+      authType = 'X';
+      authLabel = 'Draw';
+      authProb = dr;
+    }
+
+    const authPercent = round1(authProb);
+    authoritativePick = {
+      key: authKey,
+      type: authType,
+      label: authLabel,
+      shortLabel: authType,
+      probability: authProb,
+      probabilityPercent: authPercent,
+      probabilityFormatted: format1(authProb),
+    };
   }
-
-  const authPercent = round1(authProb);
-  const authoritativePick: Fixture['authoritativePick'] = {
-    key: authKey,
-    type: authType,
-    label: authLabel,
-    shortLabel: authType,
-    probability: authProb,
-    probabilityPercent: authPercent,
-    probabilityFormatted: format1(authProb),
-  };
 
   const candidates: Array<{
     type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N';
@@ -173,13 +340,19 @@ function computePrecomputedFields(f: Fixture): {
     shortLabel: string;
     probability: number;
   }> = [
-    { type: '1', label: `${f.homeTeam} Win`, shortLabel: '1', probability: hw },
-    { type: 'X', label: 'Draw', shortLabel: 'X', probability: dr },
-    { type: '2', label: `${f.awayTeam} Win`, shortLabel: '2', probability: aw },
-    { type: 'O2.5', label: 'Over 2.5 Goals', shortLabel: 'O 2.5', probability: o25 },
-    { type: 'U2.5', label: 'Under 2.5 Goals', shortLabel: 'U 2.5', probability: u25 },
-    { type: 'BTTS_Y', label: 'Both Teams To Score (Yes)', shortLabel: 'BTTS Y', probability: bttsY },
-    { type: 'BTTS_N', label: 'Both Teams To Score (No)', shortLabel: 'BTTS N', probability: bttsN },
+    ...(isStandingsClose
+      ? []
+      : [
+          { type: '1' as const, label: `${f.homeTeam} Win`, shortLabel: '1', probability: hw },
+          { type: 'X' as const, label: 'Draw', shortLabel: 'X', probability: dr },
+          { type: '2' as const, label: `${f.awayTeam} Win`, shortLabel: '2', probability: aw },
+        ]),
+    ...non1x2Candidates.map((c) => ({
+      type: c.type,
+      label: c.label,
+      shortLabel: c.shortLabel,
+      probability: c.probability,
+    })),
   ];
 
   candidates.sort((a, b) => b.probability - a.probability);
@@ -211,7 +384,7 @@ function computePrecomputedFields(f: Fixture): {
     tipProbMostLikely: highestPercent,
     tipProbOverUnder: Math.max(over25Pct, under25Pct),
     tipProbBtts: Math.max(bttsYesPct, bttsNoPct),
-    tipProb1X2: authPercent,
+    tipProb1X2: isStandingsClose ? undefined : authoritativePick.probabilityPercent,
   };
 
   // Minimal prediction summary for list views (eliminates heavy 6x6 matrix, H2H, elo, stats blobs)
@@ -225,6 +398,8 @@ function computePrecomputedFields(f: Fixture): {
     over25Prob: pred.over25Prob,
     over35Prob: pred.over35Prob,
     bttsProb: pred.bttsProb,
+    standingsClose: isStandingsClose,
+    standingsCloseReason,
   } as Fixture['prediction'];
 
   return {
@@ -234,14 +409,17 @@ function computePrecomputedFields(f: Fixture): {
     popularityScore,
     slimPrediction,
     hasPrediction: true,
+    standingsClose: isStandingsClose,
+    standingsCloseReason,
   };
 }
 
 function buildSlimFixture(
   source: Fixture,
-  timestamp?: number
+  timestamp?: number,
+  standingsOverride?: { isClose: boolean; reason?: string }
 ): { slimFixture: Fixture; computed: ReturnType<typeof computePrecomputedFields> } {
-  const computed = computePrecomputedFields(source);
+  const computed = computePrecomputedFields(source, standingsOverride);
 
   const slimFixture: Fixture = {
     id: source.id,
@@ -260,6 +438,8 @@ function buildSlimFixture(
     score: source.score,
     minute: source.minute,
     hasPrediction: computed.hasPrediction,
+    standingsClose: computed.standingsClose,
+    standingsCloseReason: computed.standingsCloseReason,
     prediction: computed.slimPrediction,
     authoritativePick: computed.authoritativePick,
     highestPick: computed.highestPick,
@@ -309,7 +489,7 @@ function getTipProbForSort(f: Fixture, marketFilter: string): number {
   if (!f.probs) return 0;
   if (marketFilter === 'OVER_UNDER') return f.probs.tipProbOverUnder ?? Math.max(f.probs.over25, f.probs.under25);
   if (marketFilter === 'BTTS') return f.probs.tipProbBtts ?? Math.max(f.probs.bttsYes, f.probs.bttsNo);
-  if (marketFilter === '1X2') return f.probs.tipProb1X2 ?? (f.authoritativePick?.probabilityPercent ?? 0);
+  if (marketFilter === '1X2') return f.standingsClose ? -1 : (f.probs.tipProb1X2 ?? (f.authoritativePick?.probabilityPercent ?? 0));
   return f.probs.tipProbMostLikely ?? (f.highestPick?.probabilityPercent ?? 0);
 }
 
@@ -321,9 +501,9 @@ function sortFixturesForQuery(fixtures: Fixture[], sortBy: string, marketFilter:
   return fixtures.slice().sort((a, b) => {
     if (sortBy === 'PROB_DESC') return getTipProbForSort(b, marketFilter) - getTipProbForSort(a, marketFilter);
     if (sortBy === 'PROB_ASC') return getTipProbForSort(a, marketFilter) - getTipProbForSort(b, marketFilter);
-    if (sortBy === 'HOME_DESC') return (b.probs?.home ?? 0) - (a.probs?.home ?? 0);
-    if (sortBy === 'DRAW_DESC') return (b.probs?.draw ?? 0) - (a.probs?.draw ?? 0);
-    if (sortBy === 'AWAY_DESC') return (b.probs?.away ?? 0) - (a.probs?.away ?? 0);
+    if (sortBy === 'HOME_DESC') return (b.standingsClose ? -1 : (b.probs?.home ?? -1)) - (a.standingsClose ? -1 : (a.probs?.home ?? -1));
+    if (sortBy === 'DRAW_DESC') return (b.standingsClose ? -1 : (b.probs?.draw ?? -1)) - (a.standingsClose ? -1 : (a.probs?.draw ?? -1));
+    if (sortBy === 'AWAY_DESC') return (b.standingsClose ? -1 : (b.probs?.away ?? -1)) - (a.standingsClose ? -1 : (a.probs?.away ?? -1));
     return 0;
   });
 }
@@ -387,6 +567,7 @@ class FixturesWorkerService {
         const upcomingList = db.getUpcomingFixtures({ skipSort: true, skipPredictionBlobs: true });
         const predictionsList = await predictionsDb.getPredictionsAsync({ state: 'all', skipSort: true });
         const oddsMap = db.getAllMatchOddsCache();
+        const standingsLookup = buildWorkerStandingsLookup(db.getAllLeagueStandingsTables());
 
         // Run multi-day coverage sync in background asynchronously without blocking index boot
         void flashscoreScraperService.ensureUpcomingMultiDayCoverage().catch(() => {});
@@ -421,6 +602,8 @@ class FixturesWorkerService {
                     timestamp: resolvedTimestamp,
                     prediction: p.prediction,
                     markets: p.markets || f.markets,
+                    standingsClose: p.standingsClose ?? f.standingsClose,
+                    standingsCloseReason: p.standingsCloseReason ?? f.standingsCloseReason,
                   }
                 : {
                     ...f,
@@ -428,10 +611,17 @@ class FixturesWorkerService {
                     prediction: undefined,
                   };
 
-            const { slimFixture } = buildSlimFixture(mergedSource, resolvedTimestamp);
+            const standingsStatus = resolveWorkerStandingsClose(mergedSource, standingsLookup);
+            const rawMarkets = p?.markets || f.markets;
+            const filteredMarkets =
+              standingsStatus.isClose && rawMarkets
+                ? rawMarkets.filter((m) => m.key !== 'HOME_WIN' && m.key !== 'DRAW' && m.key !== 'AWAY_WIN')
+                : rawMarkets;
+
+            const { slimFixture } = buildSlimFixture(mergedSource, resolvedTimestamp, standingsStatus);
             const rec: WorkerIndexedRecord = {
               slimFixture,
-              fullMarkets: p?.markets || f.markets,
+              fullMarkets: filteredMarkets,
               marketOdds: resolvedOdds,
               cleanId,
               sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -452,10 +642,15 @@ class FixturesWorkerService {
                   : undefined);
               const resolvedOdds =
                 p.marketOdds || p.prediction?.marketOdds || oddsMap.get(cleanId) || oddsMap.get(p.id);
-              const { slimFixture } = buildSlimFixture(p, pTimestamp);
+              const standingsStatus = resolveWorkerStandingsClose(p, standingsLookup);
+              const filteredMarkets =
+                standingsStatus.isClose && p.markets
+                  ? p.markets.filter((m) => m.key !== 'HOME_WIN' && m.key !== 'DRAW' && m.key !== 'AWAY_WIN')
+                  : p.markets;
+              const { slimFixture } = buildSlimFixture(p, pTimestamp, standingsStatus);
               const rec: WorkerIndexedRecord = {
                 slimFixture,
-                fullMarkets: p.markets,
+                fullMarkets: filteredMarkets,
                 marketOdds: resolvedOdds,
                 cleanId,
                 sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -470,10 +665,15 @@ class FixturesWorkerService {
             const cleanId = cleanFixtureId(p.id);
             const resolvedOdds =
               p.marketOdds || p.prediction?.marketOdds || oddsMap.get(cleanId) || oddsMap.get(p.id);
-            const { slimFixture } = buildSlimFixture(p, p.timestamp);
+            const standingsStatus = resolveWorkerStandingsClose(p, standingsLookup);
+            const filteredMarkets =
+              standingsStatus.isClose && p.markets
+                ? p.markets.filter((m) => m.key !== 'HOME_WIN' && m.key !== 'DRAW' && m.key !== 'AWAY_WIN')
+                : p.markets;
+            const { slimFixture } = buildSlimFixture(p, p.timestamp, standingsStatus);
             const rec: WorkerIndexedRecord = {
               slimFixture,
-              fullMarkets: p.markets,
+              fullMarkets: filteredMarkets,
               marketOdds: resolvedOdds,
               cleanId,
               sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -853,6 +1053,12 @@ class FixturesWorkerService {
       if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') continue;
 
       for (const market of rec.fullMarkets) {
+        if (
+          f.standingsClose &&
+          (market.key === 'HOME_WIN' || market.key === 'DRAW' || market.key === 'AWAY_WIN')
+        ) {
+          continue;
+        }
         if (market.probability >= 0.75) {
           const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
           const hasScrapedOdds = fsOdd !== null;

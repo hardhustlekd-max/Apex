@@ -46,7 +46,7 @@ export function SegmentedTabs<T extends string = string>({
       ? 'h-full px-2 text-sm'
       : size === 'md'
       ? 'h-full px-2.5 sm:px-3 text-base'
-      : 'h-full px-2.5 text-base';
+      : 'h-full px-2 sm:px-2.5 text-sm';
 
   return (
     <div
@@ -71,7 +71,7 @@ export function SegmentedTabs<T extends string = string>({
             } ${btnHeight} rounded-lg transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               isActive
                 ? 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow'
-                : 'text-theme-sub hover:text-theme-main font-medium'
+                : 'text-theme-sub hover:text-theme-main border border-transparent font-medium'
             }`}
           >
             {item.icon}

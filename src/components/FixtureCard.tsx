@@ -17,7 +17,16 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 }) => {
   const probs = fixture.probs;
   const hasPred = Boolean(fixture.hasPrediction || fixture.prediction || probs);
-  const pick = fixture.authoritativePick || null;
+  const isStandingsClose = Boolean(
+    fixture.standingsClose ??
+      fixture.prediction?.standingsClose ??
+      fixture.prediction?.standingsContext?.standingsClose
+  );
+  const rawPick = fixture.authoritativePick || null;
+  const pick =
+    isStandingsClose && rawPick && (rawPick.key === 'HOME_WIN' || rawPick.key === 'DRAW' || rawPick.key === 'AWAY_WIN')
+      ? null
+      : rawPick;
   const topPredictionLabel = pick
     ? `${pick.label} (${pick.probabilityFormatted})`
     : null;
@@ -28,6 +37,8 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
   const homePct = probs ? probs.home : (fixture.prediction ? Math.round((fixture.prediction.homeWinProb ?? 0) * 1000) / 10 : 0);
   const drawPct = probs ? probs.draw : (fixture.prediction ? Math.round((fixture.prediction.drawProb ?? 0) * 1000) / 10 : 0);
   const awayPct = probs ? probs.away : (fixture.prediction ? Math.round((fixture.prediction.awayWinProb ?? 0) * 1000) / 10 : 0);
+  const over25Pct = probs ? probs.over25 : (fixture.prediction ? Math.round((fixture.prediction.over25Prob ?? 0) * 1000) / 10 : 0);
+  const bttsYesPct = probs ? probs.bttsYes : (fixture.prediction ? Math.round((fixture.prediction.bttsProb ?? 0) * 1000) / 10 : 0);
 
   return (
     <Card
@@ -59,7 +70,14 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-            {isHighConfidence ? (
+            {isStandingsClose ? (
+              <span
+                className="text-xs font-semibold text-amber-600 dark:text-amber-400 tracking-wide"
+                title={fixture.standingsCloseReason || '1X2 disabled due to close standings'}
+              >
+                Close Table · No 1X2
+              </span>
+            ) : isHighConfidence ? (
               <span className="text-xs font-semibold text-theme-primary tracking-wide">
                 High Conf.
               </span>
@@ -96,30 +114,52 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 
         {/* Probability Bar Indicator */}
         {hasPred && (
-          <div className="my-2 space-y-1">
-            <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
-              <span className="font-semibold text-theme-main">1 · {homePct.toFixed(0)}%</span>
-              <span className="font-normal text-theme-sub">X · {drawPct.toFixed(0)}%</span>
-              <span className="font-semibold text-theme-main">2 · {awayPct.toFixed(0)}%</span>
+          isStandingsClose ? (
+            <div className="my-2 space-y-1">
+              <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                <span className="font-semibold text-theme-main">O 2.5 · {over25Pct.toFixed(0)}%</span>
+                <span className="font-normal text-amber-600 dark:text-amber-400">1X2 Blocked</span>
+                <span className="font-semibold text-theme-main">BTTS Y · {bttsYesPct.toFixed(0)}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                <div
+                  style={{ width: `${over25Pct}%` }}
+                  className="bg-theme-primary rounded-full transition-all duration-300"
+                  title={`Over 2.5 Goals: ${over25Pct.toFixed(1)}%`}
+                />
+                <div
+                  style={{ width: `${Math.max(0, 100 - over25Pct)}%` }}
+                  className="bg-theme-dim/40 rounded-full transition-all duration-300"
+                  title={`Under 2.5 Goals: ${(100 - over25Pct).toFixed(1)}%`}
+                />
+              </div>
             </div>
-            <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
-              <div
-                style={{ width: `${homePct}%` }}
-                className="bg-theme-primary rounded-full transition-all duration-300"
-                title={`Home Win: ${homePct.toFixed(1)}%`}
-              />
-              <div
-                style={{ width: `${drawPct}%` }}
-                className="bg-theme-dim/40 rounded-full transition-all duration-300"
-                title={`Draw: ${drawPct.toFixed(1)}%`}
-              />
-              <div
-                style={{ width: `${awayPct}%` }}
-                className="bg-theme-main/70 rounded-full transition-all duration-300"
-                title={`Away Win: ${awayPct.toFixed(1)}%`}
-              />
+          ) : (
+            <div className="my-2 space-y-1">
+              <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                <span className="font-semibold text-theme-main">1 · {homePct.toFixed(0)}%</span>
+                <span className="font-normal text-theme-sub">X · {drawPct.toFixed(0)}%</span>
+                <span className="font-semibold text-theme-main">2 · {awayPct.toFixed(0)}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                <div
+                  style={{ width: `${homePct}%` }}
+                  className="bg-theme-primary rounded-full transition-all duration-300"
+                  title={`Home Win: ${homePct.toFixed(1)}%`}
+                />
+                <div
+                  style={{ width: `${drawPct}%` }}
+                  className="bg-theme-dim/40 rounded-full transition-all duration-300"
+                  title={`Draw: ${drawPct.toFixed(1)}%`}
+                />
+                <div
+                  style={{ width: `${awayPct}%` }}
+                  className="bg-theme-main/70 rounded-full transition-all duration-300"
+                  title={`Away Win: ${awayPct.toFixed(1)}%`}
+                />
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
 

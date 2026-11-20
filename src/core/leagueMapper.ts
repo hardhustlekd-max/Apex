@@ -11,7 +11,6 @@ const MAPPING: Record<string, string> = {
   'N1': 'netherlands_eredivisie',
   'P1': 'portugal_primeira_liga',
   'BRA': 'brazil_serie_a',
-  'MLS': 'usa_major_league_soccer',
   'UCL': 'europe_champions_league_league_phase',
   'UEL': 'europe_europa_league_league_phase',
   'UECL': 'europe_uefa_conference_league',
@@ -118,12 +117,6 @@ const ALIAS_GROUPS: string[][] = [
     'BRAZIL_SERIE_A',
     'CAMPEONATO_BRASILEIRO',
     'CAMPEONATO BRASILEIRO',
-  ],
-  [
-    'MLS',
-    'USA_MAJOR_LEAGUE_SOCCER',
-    'MAJOR_LEAGUE_SOCCER',
-    'MAJOR LEAGUE SOCCER',
   ],
   [
     'BE1',
@@ -275,6 +268,52 @@ export function matchesLeague(
   if (ref) {
     const refName = cleanStr(ref.name);
     if (refName && (cleanItem.includes(refName) || cleanName.includes(refName))) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether a league/tournament belongs to an excluded competition (USA MLS).
+ */
+export function isExcludedLeague(
+  league?: string,
+  leagueName?: string,
+  country?: string,
+  leagueUrl?: string
+): boolean {
+  const codeLower = (league || '').trim().toLowerCase();
+  const nameLower = (leagueName || '').trim().toLowerCase();
+  const countryLower = (country || '').trim().toLowerCase();
+  const urlLower = (leagueUrl || '').trim().toLowerCase();
+
+  if (
+    codeLower === 'mls' ||
+    codeLower === 'mls1' ||
+    codeLower.startsWith('usa_mls') ||
+    codeLower.startsWith('usa_msl') ||
+    codeLower.startsWith('usa_major_league_soccer')
+  ) {
+    return true;
+  }
+
+  if (urlLower.includes('/football/usa/mls')) {
+    return true;
+  }
+
+  if (
+    nameLower.includes('major league soccer') ||
+    nameLower.includes('usa: mls') ||
+    nameLower.includes('usa: msl')
+  ) {
+    return true;
+  }
+
+  if (
+    countryLower === 'usa' &&
+    (/\bmls\b/i.test(nameLower) || /\bmsl\b/i.test(nameLower) || nameLower.includes('major league soccer'))
+  ) {
+    return true;
   }
 
   return false;

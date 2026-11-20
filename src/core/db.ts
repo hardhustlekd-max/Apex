@@ -3,6 +3,7 @@ import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
 import { extractTournamentMetadataFromFeed, FlashscoreTournamentMeta, resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
+import { isExcludedLeague } from './leagueMapper.js';
 import { getLeagueAliases } from './leagueMapper.js';
 import {
   sqliteDb,
@@ -218,6 +219,7 @@ export class FootballDB {
     const seen = new Set<string>();
     const unique = fixtures.filter((f) => {
       if (!f.id || seen.has(f.id)) return false;
+      if (isExcludedLeague(f.league, f.leagueName, undefined, f.leagueUrl)) return false;
       seen.add(f.id);
       return true;
     });
@@ -1425,9 +1427,6 @@ export class FootballDB {
       'portugal_primeira_liga': ['p1', 'po1'],
       'bra': ['brazil_serie_a'],
       'brazil_serie_a': ['bra'],
-      'mls': ['usa_major_league_soccer', 'mls1'],
-      'mls1': ['usa_major_league_soccer', 'mls'],
-      'usa_major_league_soccer': ['mls', 'mls1'],
       'sa1': ['saudi_arabia_saudi_professional_league', 'saudi_arabia_saudi_pro_league'],
       'ucl': ['europe_champions_league_league_phase', 'europe_champions_league', 'europe_uefa_champions_league'],
       'europe_champions_league': ['europe_champions_league_league_phase', 'ucl'],
@@ -1572,6 +1571,7 @@ export class FootballDB {
         const colonIdx = rawName.indexOf(':');
         const country = colonIdx > 0 ? rawName.slice(0, colonIdx).trim() : 'International';
         const tournament = colonIdx > 0 ? rawName.slice(colonIdx + 1).trim() : rawName;
+        if (isExcludedLeague(String(r.league || ''), rawName, country, leagueUrl)) continue;
         const key = `${leagueUrl || ''}::${country}::${tournament}`.toLowerCase();
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);

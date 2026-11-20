@@ -142,16 +142,48 @@ export class PredictionsDB {
 
             const pred = f.prediction;
             const bestTip = f.mostLikelyOutcome;
+            const isStandingsClose = Boolean(
+              f.standingsClose ?? pred.standingsClose ?? pred.standingsContext?.standingsClose
+            );
 
-            // Determine authoritative 1X2 tip key/name/prob for DB summary columns
+            // Determine authoritative tip key/name/prob for DB summary columns
             const hw = Number(pred.homeWinProb ?? 0);
             const dr = Number(pred.drawProb ?? 0);
             const aw = Number(pred.awayWinProb ?? 0);
+            const o25 = Number(pred.over25Prob ?? 0);
+            const u25 = Math.max(0, 1 - o25);
+            const bttsY = Number(pred.bttsProb ?? 0);
+            const bttsN = Math.max(0, 1 - bttsY);
+
             let tipKey = bestTip?.marketKey || 'HOME_WIN';
             let tipName = (bestTip as any)?.selection || bestTip?.marketKey || `${f.homeTeam} Win`;
             let tipProb = bestTip?.probability ?? hw;
 
-            if (hw > 0 || dr > 0 || aw > 0) {
+            if (isStandingsClose) {
+              const non1x2Markets = (f.markets || []).filter(
+                (m) => m.key !== 'HOME_WIN' && m.key !== 'DRAW' && m.key !== 'AWAY_WIN'
+              );
+              const bestNon1x2Market = non1x2Markets.sort((a, b) => b.probability - a.probability)[0];
+              if (bestTip && bestTip.marketKey !== 'HOME_WIN' && bestTip.marketKey !== 'DRAW' && bestTip.marketKey !== 'AWAY_WIN') {
+                tipKey = bestTip.marketKey;
+                tipName = (bestTip as any).selection || bestTip.marketKey;
+                tipProb = bestTip.probability;
+              } else if (bestNon1x2Market) {
+                tipKey = bestNon1x2Market.key;
+                tipName = bestNon1x2Market.name;
+                tipProb = bestNon1x2Market.probability;
+              } else {
+                const altCandidates = [
+                  { key: 'OVER_25', name: 'Over 2.5 Goals', prob: o25 },
+                  { key: 'UNDER_25', name: 'Under 2.5 Goals', prob: u25 },
+                  { key: 'BTTS_YES', name: 'Both Teams to Score', prob: bttsY },
+                  { key: 'BTTS_NO', name: 'Both Teams to Score No', prob: bttsN },
+                ].sort((a, b) => b.prob - a.prob);
+                tipKey = altCandidates[0].key as any;
+                tipName = altCandidates[0].name;
+                tipProb = altCandidates[0].prob;
+              }
+            } else if (hw > 0 || dr > 0 || aw > 0) {
               if (hw >= dr && hw >= aw) {
                 tipKey = 'HOME_WIN';
                 tipName = `${f.homeTeam} Win`;
@@ -1002,9 +1034,18 @@ export class PredictionsDB {
           fallbackProb = dr;
         }
 
-        const tipKey = (r.tip_key === 'HOME_WIN' || r.tip_key === 'DRAW' || r.tip_key === 'AWAY_WIN')
-          ? r.tip_key
-          : fallbackTip;
+        const validTips = new Set([
+          'HOME_WIN',
+          'DRAW',
+          'AWAY_WIN',
+          'OVER_25',
+          'UNDER_25',
+          'BTTS_YES',
+          'BTTS_NO',
+          'DOUBLE_CHANCE_1X',
+          'DOUBLE_CHANCE_X2',
+        ]);
+        const tipKey = validTips.has(String(r.tip_key || '')) ? r.tip_key : fallbackTip;
 
         return {
           fixtureId: r.fixture_id,
@@ -1196,8 +1237,8 @@ export class PredictionsDB {
       const dr = Number(item.drawProb ?? item.draw_prob ?? item.prediction?.drawProb ?? 0);
       const aw = Number(item.awayWinProb ?? item.away_win_prob ?? item.prediction?.awayWinProb ?? 0);
 
-      // Determine predicted 1X2 choice
-      let tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
+      // Determine predicted choice (1X2 or alternative market when standings close)
+      let tipKey: string = 'HOME_WIN';
       let tipName = item.tipName || item.tip_name || '';
       let tipProb = Number(item.tipProb ?? item.tip_prob ?? 0);
 
@@ -1208,6 +1249,15 @@ export class PredictionsDB {
         tipKey = 'AWAY_WIN';
       } else if (rawKey === 'DRAW' || rawKey === 'X') {
         tipKey = 'DRAW';
+      } else if (
+        rawKey === 'OVER_25' ||
+        rawKey === 'UNDER_25' ||
+        rawKey === 'BTTS_YES' ||
+        rawKey === 'BTTS_NO' ||
+        rawKey === 'DOUBLE_CHANCE_1X' ||
+        rawKey === 'DOUBLE_CHANCE_X2'
+      ) {
+        tipKey = rawKey;
       } else {
         // Evaluate from probabilities
         if (hw >= dr && hw >= aw) {
@@ -1220,15 +1270,15 @@ export class PredictionsDB {
       }
 
       if (!tipName) {
-        tipName = tipKey === 'HOME_WIN' ? `${homeTeam} Win` : tipKey === 'AWAY_WIN' ? `${awayTeam} Win` : 'Draw';
+        tipName = tipKey === 'HOME_WIN' ? `${homeTeam} Win` : tipKey === 'AWAY_WIN' ? `${awayTeam} Win` : tipKey === 'DRAW' ? 'Draw' : tipKey;
       }
       if (tipProb <= 0) {
-        tipProb = tipKey === 'HOME_WIN' ? hw : tipKey === 'AWAY_WIN' ? aw : dr;
+        tipProb = tipKey === 'HOME_WIN' ? hw : tipKey === 'AWAY_WIN' ? aw : tipKey === 'DRAW' ? dr : tipProb;
       }
 
       if (tipKey === 'HOME_WIN') homePicksCount++;
       else if (tipKey === 'DRAW') drawPicksCount++;
-      else awayPicksCount++;
+      else if (tipKey === 'AWAY_WIN') awayPicksCount++;
 
       // Reconcile actual scores
       let finalHomeScore: number | null = null;
@@ -1305,7 +1355,15 @@ export class PredictionsDB {
         else if (finalAwayScore > finalHomeScore) actualOutcome = 'AWAY_WIN';
         else actualOutcome = 'DRAW';
 
-        isCorrect = tipKey === actualOutcome;
+        const totalGoals = finalHomeScore + finalAwayScore;
+        if (tipKey === 'OVER_25') isCorrect = totalGoals > 2.5;
+        else if (tipKey === 'UNDER_25') isCorrect = totalGoals < 2.5;
+        else if (tipKey === 'BTTS_YES') isCorrect = finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'BTTS_NO') isCorrect = finalHomeScore === 0 || finalAwayScore === 0;
+        else if (tipKey === 'DOUBLE_CHANCE_1X') isCorrect = finalHomeScore >= finalAwayScore;
+        else if (tipKey === 'DOUBLE_CHANCE_X2') isCorrect = finalAwayScore >= finalHomeScore;
+        else isCorrect = tipKey === actualOutcome;
+
         if (isCorrect) {
           evaluationState = 'WON';
           wonCount++;

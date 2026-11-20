@@ -325,17 +325,6 @@ function computeLeaguePopularityScore(
     return 750;
   }
 
-  const isUSA = stageCountry === '' || stageCountry === 'usa';
-  if (
-    isUSA &&
-    (code === 'MLS' ||
-      full.includes('usa: mls') ||
-      full.includes('major league soccer') ||
-      (stageCountry === 'usa' && /\bmls\b/i.test(full)))
-  ) {
-    return 740;
-  }
-
   const isSaudi = stageCountry === '' || stageCountry === 'saudi arabia';
   if (
     isSaudi &&

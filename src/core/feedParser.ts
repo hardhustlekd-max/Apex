@@ -7,6 +7,7 @@ import {
   TeamFormMatch,
 } from './types.js';
 import { getStandardDateStr, normalizeDateStr } from './dateUtils.js';
+import { isExcludedLeague } from './leagueMapper.js';
 
 export const H2H_PARSER_VERSION = 3;
 
@@ -447,7 +448,12 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
         }
       }
 
-      if (matchData.matchId && matchData.homeTeam && matchData.awayTeam) {
+      if (
+        matchData.matchId &&
+        matchData.homeTeam &&
+        matchData.awayTeam &&
+        !isExcludedLeague(undefined, matchData.tournament, matchData.country, matchData.leagueUrl)
+      ) {
         matches.push(matchData as ScrapedRawMatch);
       }
     }
@@ -936,6 +942,7 @@ export function extractTournamentMetadataFromFeed(feedText: string): FlashscoreT
     }
 
     if (!tournament) continue;
+    if (isExcludedLeague(undefined, tournament, country, leagueUrl)) continue;
     const key = `${leagueUrl || ''}::${tournamentId || ''}::${tournamentStageId || ''}::${country}::${tournament}`;
     if (seen.has(key)) continue;
     seen.add(key);

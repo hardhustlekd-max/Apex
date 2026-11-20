@@ -292,6 +292,58 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       return { hG, aG, predictedLabel: 'N/A', topProb: 0, isCorrect: false };
     }
 
+    const isStandingsClose = Boolean(
+      f.standingsClose ?? pred.standingsClose ?? pred.standingsContext?.standingsClose
+    );
+    const totalGoals = hG + aG;
+
+    // Respect non-1X2 pick when standings are close or authoritativePick is non-1X2
+    const authPick = f.authoritativePick;
+    if (
+      isStandingsClose ||
+      (authPick && authPick.key !== 'HOME_WIN' && authPick.key !== 'DRAW' && authPick.key !== 'AWAY_WIN')
+    ) {
+      const mKey =
+        authPick && authPick.key !== 'HOME_WIN' && authPick.key !== 'DRAW' && authPick.key !== 'AWAY_WIN'
+          ? authPick.key
+          : f.mostLikelyOutcome &&
+            f.mostLikelyOutcome.marketKey !== 'HOME_WIN' &&
+            f.mostLikelyOutcome.marketKey !== 'DRAW' &&
+            f.mostLikelyOutcome.marketKey !== 'AWAY_WIN'
+          ? f.mostLikelyOutcome.marketKey
+          : (pred.over25Prob ?? 0) >= 0.5
+          ? 'OVER_25'
+          : 'UNDER_25';
+
+      let predictedLabel = authPick?.label || f.mostLikelyOutcome?.selection || mKey;
+      let topProb = authPick?.probability ?? f.mostLikelyOutcome?.probability ?? 0;
+      let isCorrect = false;
+
+      if (mKey === 'OVER_25') {
+        predictedLabel = authPick?.label || 'Over 2.5 Goals';
+        topProb = topProb || pred.over25Prob || 0;
+        isCorrect = totalGoals > 2.5;
+      } else if (mKey === 'UNDER_25') {
+        predictedLabel = authPick?.label || 'Under 2.5 Goals';
+        topProb = topProb || (1 - (pred.over25Prob || 0));
+        isCorrect = totalGoals < 2.5;
+      } else if (mKey === 'BTTS_YES') {
+        predictedLabel = authPick?.label || 'Both Teams to Score';
+        topProb = topProb || pred.bttsProb || 0;
+        isCorrect = hG > 0 && aG > 0;
+      } else if (mKey === 'BTTS_NO') {
+        predictedLabel = authPick?.label || 'Both Teams to Score No';
+        topProb = topProb || (1 - (pred.bttsProb || 0));
+        isCorrect = hG === 0 || aG === 0;
+      } else if (mKey === 'DOUBLE_CHANCE_1X') {
+        isCorrect = hG >= aG;
+      } else if (mKey === 'DOUBLE_CHANCE_X2') {
+        isCorrect = aG >= hG;
+      }
+
+      return { hG, aG, predictedLabel, topProb, isCorrect };
+    }
+
     let isCorrect = false;
     let predictedLabel = 'Unknown';
     let topProb = 0;

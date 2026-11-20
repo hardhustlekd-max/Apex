@@ -408,7 +408,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           value={activeScope}
           onChange={(val) => setActiveScope(val as 'UPCOMING' | 'LIVE' | 'HISTORY')}
           variant="card"
-          size="md"
+          size="sm"
           className="min-w-0"
           ariaLabel="Match scope"
         />
@@ -418,9 +418,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`h-[38px] min-h-[38px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-xl text-base transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`h-[34px] min-h-[34px] flex items-center justify-center gap-1.5 px-2.5 rounded-xl text-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeFilterCount > 0
-                ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                ? 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow'
                 : 'bg-theme-card border border-theme text-theme-main font-medium hover:bg-theme-card-elevated hover:border-theme-accent shadow-theme-sm'
             }`}
           >

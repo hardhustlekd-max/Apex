@@ -124,12 +124,33 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
     const hasPred = fixture.hasPrediction ?? Boolean(fixture.prediction || fixture.probs);
-    const pick = fixture.authoritativePick;
+    const isStandingsClose = Boolean(
+      fixture.standingsClose ??
+        fixture.prediction?.standingsClose ??
+        fixture.prediction?.standingsContext?.standingsClose
+    );
+    const rawPick = fixture.authoritativePick;
+    const pick =
+      isStandingsClose && rawPick && (rawPick.key === 'HOME_WIN' || rawPick.key === 'DRAW' || rawPick.key === 'AWAY_WIN')
+        ? fixture.highestPick && !['1', 'X', '2'].includes(fixture.highestPick.type)
+          ? {
+              ...fixture.highestPick,
+              key: (fixture.highestPick.type === 'O2.5'
+                ? 'OVER_25'
+                : fixture.highestPick.type === 'U2.5'
+                ? 'UNDER_25'
+                : fixture.highestPick.type === 'BTTS_Y'
+                ? 'BTTS_YES'
+                : 'BTTS_NO') as any,
+              isStandingsCloseFallback: true,
+            }
+          : null
+        : rawPick;
     const probs = fixture.probs;
 
-    const homeProb = hasPred && probs ? probs.home : null;
-    const drawProb = hasPred && probs ? probs.draw : null;
-    const awayProb = hasPred && probs ? probs.away : null;
+    const homeProb = hasPred && probs && !isStandingsClose ? probs.home : null;
+    const drawProb = hasPred && probs && !isStandingsClose ? probs.draw : null;
+    const awayProb = hasPred && probs && !isStandingsClose ? probs.away : null;
     const over25 = hasPred && probs ? probs.over25 : null;
     const under25 = hasPred && probs ? probs.under25 : null;
     const bttsYes = hasPred && probs ? probs.bttsYes : null;
@@ -229,7 +250,17 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 {kickOff}
               </span>
             )}
-
+            {isStandingsClose && (
+              <>
+                <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
+                <span
+                  className="text-2xs font-medium text-amber-600 dark:text-amber-400 truncate"
+                  title={fixture.standingsCloseReason || 'Close league standings — 1X2 suppressed'}
+                >
+                  Close · No 1X2
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -237,12 +268,16 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
           {/* Section 1: Highest Probability Pick */}
           <div
-            className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0"
-            title={pick ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})` : 'No Prediction in Database'}
+            className="w-[46px] sm:w-[76px] flex items-center justify-center shrink-0"
+            title={
+              pick
+                ? `${isStandingsClose ? 'Alt Market Pick (1X2 Suppressed)' : 'Model Pick'}: ${pick.label} (${pick.probabilityFormatted})`
+                : 'No Prediction in Database'
+            }
           >
             {pick && hasPred ? (
               <div className="flex items-center justify-center gap-1 tabular-nums">
-                <span className="w-[32px] h-[21px] flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text shadow-theme-sm text-xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
+                <span className="min-w-[32px] max-w-[52px] px-1.5 h-[21px] flex items-center justify-center rounded-lg bg-theme-model-pick text-theme-primary-text shadow-theme-sm text-2xs sm:text-xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
                   {pick.shortLabel || pick.type || '1'}
                 </span>
                 <span className="hidden sm:inline-block w-[25px] text-right text-xs font-semibold text-theme-main tabular-nums">
@@ -303,6 +338,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             ) : (
               <>
                 <span
+                  title={isStandingsClose ? '1X2 disabled due to close league standings' : undefined}
                   className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     homeProb && homeProb >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
@@ -311,18 +347,20 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       : 'text-theme-sub font-normal'
                   }`}
                 >
-                  {homeProb !== null ? homeProb.toFixed(0) : '-'}
+                  {homeProb !== null ? homeProb.toFixed(0) : isStandingsClose ? '—' : '-'}
                 </span>
                 <span
+                  title={isStandingsClose ? '1X2 disabled due to close league standings' : undefined}
                   className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     drawProb && drawProb >= 35
                       ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold'
                       : 'text-theme-sub font-normal'
                   }`}
                 >
-                  {drawProb !== null ? drawProb.toFixed(0) : '-'}
+                  {drawProb !== null ? drawProb.toFixed(0) : isStandingsClose ? '—' : '-'}
                 </span>
                 <span
+                  title={isStandingsClose ? '1X2 disabled due to close league standings' : undefined}
                   className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-md text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     awayProb && awayProb >= 50
                       ? 'bg-theme-primary-subtle text-theme-primary font-semibold'
@@ -331,7 +369,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       : 'text-theme-sub font-normal'
                   }`}
                 >
-                  {awayProb !== null ? awayProb.toFixed(0) : '-'}
+                  {awayProb !== null ? awayProb.toFixed(0) : isStandingsClose ? '—' : '-'}
                 </span>
               </>
             )}
@@ -372,7 +410,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <span className="truncate whitespace-nowrap font-semibold text-base tracking-[-0.01em] text-theme-main">Matches</span>
             </div>
             <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-              <div className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0">
+              <div className="w-[46px] sm:w-[76px] flex items-center justify-center shrink-0">
                 <button
                   type="button"
                   onClick={() =>
@@ -543,7 +581,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     </div>
 
                     <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-                      <div className="w-[32px] sm:w-[60px] flex items-center justify-center shrink-0">
+                      <div className="w-[46px] sm:w-[76px] flex items-center justify-center shrink-0">
                         <button
                           type="button"
                           onClick={() => onSelectSortBy?.('PROB_DESC')}

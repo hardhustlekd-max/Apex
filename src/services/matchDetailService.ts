@@ -1,9 +1,10 @@
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
-import { cleanFixtureId, Fixture, TeamFormMatch, TeamStatsSummary } from '../core/types.js';
+import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, LeagueStandingTable, TeamFormMatch, TeamStatsSummary } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { convertHistoricalMatchToFixture, flashscoreScraperService } from './flashscoreScraperService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
+import { ApexEngine } from '../core/poisson.js';
 import { loggerService } from './loggerService.js';
 
 function buildFallbackTeamStats(teamName: string, recentMatches: TeamFormMatch[]): TeamStatsSummary {
@@ -225,6 +226,98 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
       stored.awayTeam,
       stored.measurements.h2h.awayRecentMatches
     );
+  }
+
+  // Ensure standing-close 1X2 suppression stays consistent with latest synced league standings
+  if (stored.prediction) {
+    let isStandingsClose = Boolean(
+      stored.standingsClose ??
+        stored.prediction.standingsClose ??
+        stored.prediction.standingsContext?.standingsClose
+    );
+    let standingsCloseReason =
+      stored.standingsCloseReason ??
+      stored.prediction.standingsCloseReason ??
+      stored.prediction.standingsContext?.standingsCloseReason;
+
+    const standingsTable = db.getLeagueStandings(
+      stored.league,
+      stored.leagueUrl,
+      stored.leagueName
+    ) as LeagueStandingTable | null;
+    if (standingsTable) {
+      const { homeMatch, awayMatch } = ApexEngine.findMatchedStandingsPair(
+        stored.homeTeam,
+        stored.awayTeam,
+        standingsTable
+      );
+      if (homeMatch && awayMatch) {
+        const evalRes = ApexEngine.evaluateStandingsCloseStatus(
+          {
+            rank: homeMatch.entry.rank,
+            totalTeams: Math.max(homeMatch.entry.rank || 1, homeMatch.group.table.length),
+            played: homeMatch.entry.played,
+            points: homeMatch.entry.points,
+            ppg: Number((homeMatch.entry.points / Math.max(1, homeMatch.entry.played)).toFixed(2)),
+            groupName: homeMatch.group.name && homeMatch.group.name !== 'Standings' ? homeMatch.group.name : undefined,
+          },
+          {
+            rank: awayMatch.entry.rank,
+            totalTeams: Math.max(awayMatch.entry.rank || 1, awayMatch.group.table.length),
+            played: awayMatch.entry.played,
+            points: awayMatch.entry.points,
+            ppg: Number((awayMatch.entry.points / Math.max(1, awayMatch.entry.played)).toFixed(2)),
+            groupName: awayMatch.group.name && awayMatch.group.name !== 'Standings' ? awayMatch.group.name : undefined,
+          }
+        );
+        isStandingsClose = evalRes.isClose;
+        standingsCloseReason = evalRes.reason;
+      }
+    }
+
+    if (isStandingsClose) {
+      const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
+      const updatedPrediction = {
+        ...stored.prediction,
+        standingsClose: true,
+        standingsCloseReason,
+      };
+      const recalc = ApexEngine.calculateMarkets(
+        updatedPrediction,
+        settings,
+        stored.homeTeam,
+        stored.awayTeam
+      );
+      stored.standingsClose = true;
+      stored.standingsCloseReason = standingsCloseReason;
+      stored.prediction = {
+        ...updatedPrediction,
+        mostLikelyOutcome: recalc.mostLikelyOutcome,
+      };
+      stored.markets = recalc.markets;
+      stored.mostLikelyOutcome = recalc.mostLikelyOutcome;
+    } else if (stored.standingsClose || stored.prediction.standingsClose) {
+      const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
+      const updatedPrediction = {
+        ...stored.prediction,
+        standingsClose: false,
+        standingsCloseReason: undefined,
+      };
+      const recalc = ApexEngine.calculateMarkets(
+        updatedPrediction,
+        settings,
+        stored.homeTeam,
+        stored.awayTeam
+      );
+      stored.standingsClose = false;
+      stored.standingsCloseReason = undefined;
+      stored.prediction = {
+        ...updatedPrediction,
+        mostLikelyOutcome: recalc.mostLikelyOutcome,
+      };
+      stored.markets = recalc.markets;
+      stored.mostLikelyOutcome = recalc.mostLikelyOutcome;
+    }
   }
 
   loggerService.addLog({

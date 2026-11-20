@@ -238,6 +238,122 @@ export class ApexEngine {
     return { entry: bestEntry, group: bestGroup };
   }
 
+  public static findMatchedStandingsPair(
+    homeTeam: string,
+    awayTeam: string,
+    standings?: LeagueStandingTable | null
+  ): {
+    homeMatch: { entry: LeagueStandingEntry; group: LeagueStandingGroup } | null;
+    awayMatch: { entry: LeagueStandingEntry; group: LeagueStandingGroup } | null;
+  } {
+    const groups = this.getStandingsGroups(standings);
+    if (groups.length === 0) {
+      return { homeMatch: null, awayMatch: null };
+    }
+
+    let bestPairScore = 0;
+    let sameGroupPair: {
+      homeMatch: { entry: LeagueStandingEntry; group: LeagueStandingGroup };
+      awayMatch: { entry: LeagueStandingEntry; group: LeagueStandingGroup };
+    } | null = null;
+
+    for (const group of groups) {
+      let bestHScore = 0;
+      let bestHEntry: LeagueStandingEntry | null = null;
+      let bestAScore = 0;
+      let bestAEntry: LeagueStandingEntry | null = null;
+
+      for (const e of group.table) {
+        const hs = teamMatchScore(homeTeam, e.teamName);
+        if (hs > bestHScore) {
+          bestHScore = hs;
+          bestHEntry = e;
+        }
+        const as = teamMatchScore(awayTeam, e.teamName);
+        if (as > bestAScore) {
+          bestAScore = as;
+          bestAEntry = e;
+        }
+      }
+
+      if (
+        bestHEntry &&
+        bestAEntry &&
+        bestHScore > 0 &&
+        bestAScore > 0 &&
+        bestHEntry.played > 0 &&
+        bestAEntry.played > 0 &&
+        bestHEntry.teamName !== bestAEntry.teamName
+      ) {
+        const combined = bestHScore + bestAScore;
+        if (combined > bestPairScore) {
+          bestPairScore = combined;
+          sameGroupPair = {
+            homeMatch: { entry: bestHEntry, group },
+            awayMatch: { entry: bestAEntry, group },
+          };
+        }
+      }
+    }
+
+    if (sameGroupPair) {
+      return sameGroupPair;
+    }
+
+    return {
+      homeMatch: this.findTeamStandingsEntry(homeTeam, groups),
+      awayMatch: this.findTeamStandingsEntry(awayTeam, groups),
+    };
+  }
+
+  public static evaluateStandingsCloseStatus(
+    homeSnap?: Pick<TeamStandingsSnapshot, 'rank' | 'totalTeams' | 'played' | 'points' | 'ppg' | 'groupName'>,
+    awaySnap?: Pick<TeamStandingsSnapshot, 'rank' | 'totalTeams' | 'played' | 'points' | 'ppg' | 'groupName'>
+  ): {
+    isClose: boolean;
+    reason?: string;
+    rankDiff?: number;
+    pointsDiff?: number;
+    ppgDiff?: number;
+  } {
+    if (!homeSnap || !awaySnap) {
+      return { isClose: false };
+    }
+    if (homeSnap.rank <= 0 || awaySnap.rank <= 0 || homeSnap.played < 1 || awaySnap.played < 1) {
+      return { isClose: false };
+    }
+    if (homeSnap.groupName && awaySnap.groupName && homeSnap.groupName !== awaySnap.groupName) {
+      return { isClose: false };
+    }
+
+    const rankDiff = Math.abs(homeSnap.rank - awaySnap.rank);
+    const pointsDiff = Math.abs(homeSnap.points - awaySnap.points);
+    const homePpg = Number.isFinite(homeSnap.ppg) ? homeSnap.ppg : homeSnap.points / Math.max(1, homeSnap.played);
+    const awayPpg = Number.isFinite(awaySnap.ppg) ? awaySnap.ppg : awaySnap.points / Math.max(1, awaySnap.played);
+    const ppgDiff = Number(Math.abs(homePpg - awayPpg).toFixed(2));
+
+    const isClose = rankDiff <= 2;
+
+    if (!isClose) {
+      return { isClose: false, rankDiff, pointsDiff, ppgDiff };
+    }
+
+    const rankText =
+      rankDiff === 0
+        ? 'tied rank'
+        : `${rankDiff} ${rankDiff === 1 ? 'place' : 'places'} apart`;
+    const ptsText = pointsDiff === 0 ? 'level on pts' : `${pointsDiff} ${pointsDiff === 1 ? 'pt' : 'pts'} apart`;
+    const reason = `Standings close (#${homeSnap.rank} vs #${awaySnap.rank} · ${rankText} · ${ptsText})`;
+
+    return {
+      isClose: true,
+      reason,
+      rankDiff,
+      pointsDiff,
+      ppgDiff,
+    };
+  }
+
   private static computeGroupAvgGoalsPerGame(rows: LeagueStandingEntry[]): number {
     let totalGF = 0;
     let totalPlayed = 0;
@@ -1108,17 +1224,24 @@ export class ApexEngine {
 
     // 3. Team News & Tactical Context + Group-Scoped League Standings Context
     const baseTacticalContext = this.computeTacticalAdjustments(homeTeam, awayTeam, tacticalInput);
-    const standingsGroups = this.getStandingsGroups(standings);
-    const homeStandingsMatch = this.findTeamStandingsEntry(homeTeam, standingsGroups);
-    const awayStandingsMatch = this.findTeamStandingsEntry(awayTeam, standingsGroups);
+    const { homeMatch: homeStandingsMatch, awayMatch: awayStandingsMatch } = this.findMatchedStandingsPair(
+      homeTeam,
+      awayTeam,
+      standings
+    );
     const homeSnap = homeStandingsMatch
       ? this.buildTeamStandingsSnapshot(homeStandingsMatch.entry, homeStandingsMatch.group)
       : undefined;
     const awaySnap = awayStandingsMatch
       ? this.buildTeamStandingsSnapshot(awayStandingsMatch.entry, awayStandingsMatch.group)
       : undefined;
+    const standingsCloseEval = this.evaluateStandingsCloseStatus(homeSnap, awaySnap);
 
     const motivation = this.computeZoneStakesMotivation(homeTeam, awayTeam, homeSnap, awaySnap);
+    const tacticalNotes = [...baseTacticalContext.tacticalNotes, ...motivation.notes];
+    if (standingsCloseEval.isClose && standingsCloseEval.reason) {
+      tacticalNotes.push(`${standingsCloseEval.reason} — 1X2/Win suppressed, predicting alternative markets`);
+    }
     const tacticalContext: TacticalContextBreakdown = {
       ...baseTacticalContext,
       fatigueAdjustmentHome: Math.max(
@@ -1129,7 +1252,7 @@ export class ApexEngine {
         0.88,
         Math.min(1.12, Number((baseTacticalContext.fatigueAdjustmentAway * motivation.awayMult).toFixed(3)))
       ),
-      tacticalNotes: [...baseTacticalContext.tacticalNotes, ...motivation.notes],
+      tacticalNotes,
     };
 
     // 4. Head to Head record directly from scraper feed or historical records (recency-weighted)
@@ -1311,6 +1434,11 @@ export class ApexEngine {
               preStandingsAwayMu > 0
                 ? Number((((awayMu - preStandingsAwayMu) / preStandingsAwayMu) * 100).toFixed(1))
                 : undefined,
+            standingsClose: standingsCloseEval.isClose,
+            standingsCloseReason: standingsCloseEval.reason,
+            rankDiff: standingsCloseEval.rankDiff,
+            pointsDiff: standingsCloseEval.pointsDiff,
+            ppgDiff: standingsCloseEval.ppgDiff,
           }
         : undefined;
 
@@ -1493,6 +1621,8 @@ export class ApexEngine {
       xgBreakdown,
       tacticalContext,
       standingsContext,
+      standingsClose: standingsCloseEval.isClose,
+      standingsCloseReason: standingsCloseEval.reason,
       dixonColesParams,
     };
 
@@ -1514,6 +1644,8 @@ export class ApexEngine {
   /**
    * Refactored to remove all odds-related calculations.
    * Focuses strictly on market probabilities and identifying "Banker" status.
+   * When standings are close on the league table, prevents Win / 1X2 predictions
+   * and evaluates alternative markets (Over/Under, BTTS, Double Chance) instead.
    */
   public static calculateMarkets(
     prediction: PoissonPrediction,
@@ -1525,6 +1657,9 @@ export class ApexEngine {
     mostLikelyOutcome?: MostLikelyOutcome;
   } {
     const markets: MarketOption[] = [];
+    const isStandingsClose = Boolean(
+      prediction.standingsClose ?? prediction.standingsContext?.standingsClose
+    );
 
     const addMarket = (
       key: MarketOption['key'],
@@ -1541,10 +1676,12 @@ export class ApexEngine {
       });
     };
 
-    // 1X2 Match Outcomes
-    addMarket('HOME_WIN', `${homeTeam} to Win`, prediction.homeWinProb);
-    addMarket('DRAW', 'Draw', prediction.drawProb);
-    addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
+    // 1X2 Match Outcomes — suppressed whenever standings status is close
+    if (!isStandingsClose) {
+      addMarket('HOME_WIN', `${homeTeam} to Win`, prediction.homeWinProb);
+      addMarket('DRAW', 'Draw', prediction.drawProb);
+      addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
+    }
 
     // Goal Totals
     addMarket('OVER_25', 'Over 2.5 Goals', prediction.over25Prob);
@@ -1561,7 +1698,7 @@ export class ApexEngine {
     const dcX2Prob = Number((prediction.awayWinProb + prediction.drawProb).toFixed(3));
     addMarket('DOUBLE_CHANCE_X2', `Draw or ${awayTeam} (X2)`, dcX2Prob);
 
-    // Identify MOST LIKELY Outcome
+    // Identify MOST LIKELY Outcome from eligible markets
     let mostLikelyMarket = markets[0];
     for (const m of markets) {
       if (m.probability > (mostLikelyMarket?.probability || 0)) {
@@ -1571,7 +1708,9 @@ export class ApexEngine {
 
     let mostLikelyOutcome: MostLikelyOutcome | undefined;
     if (mostLikelyMarket) {
-      const commentary = `${mostLikelyMarket.name} is the most likely outcome with a ${(mostLikelyMarket.probability * 100).toFixed(1)}% probability.`;
+      const commentary = isStandingsClose
+        ? `1X2/Win suppressed due to close league standings; ${mostLikelyMarket.name} leads alternative markets at ${(mostLikelyMarket.probability * 100).toFixed(1)}%.`
+        : `${mostLikelyMarket.name} is the most likely outcome with a ${(mostLikelyMarket.probability * 100).toFixed(1)}% probability.`;
 
       mostLikelyOutcome = {
         selection: mostLikelyMarket.name,

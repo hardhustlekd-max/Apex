@@ -654,7 +654,18 @@ export function initSqliteSchema(): void {
   if (isSchemaInitialized && rawDbInstance) return;
 
   try {
-    const db = getSqliteDb();
+    let db = getSqliteDb();
+    try {
+      const quickCheck = db.pragma('quick_check') as Array<{ quick_check: string }>;
+      const isOk = quickCheck.length === 1 && String(quickCheck[0]?.quick_check || '') === 'ok';
+      if (!isOk) {
+        db = recoverCorruptedSqliteDb();
+      }
+    } catch (qcErr: any) {
+      if (isFatalSqliteCorruptionError(qcErr)) {
+        db = recoverCorruptedSqliteDb();
+      }
+    }
     initSqliteSchemaInternal(db);
 
     // Schema Migration: Ensure new columns exist in upcoming_fixtures
@@ -734,8 +745,25 @@ export function initSqliteSchema(): void {
       );
     } catch {}
 
+    // Purge excluded USA MLS records if present in persisted tables
+    try {
+      db.exec(`
+        DELETE FROM historical_matches WHERE lower(div) IN ('mls', 'mls1') OR lower(div) LIKE 'usa_mls%' OR lower(div) LIKE 'usa_msl%' OR lower(div) LIKE 'usa_major_league_soccer%';
+        DELETE FROM upcoming_fixtures WHERE lower(league) IN ('mls', 'mls1') OR lower(league) LIKE 'usa_mls%' OR lower(league) LIKE 'usa_msl%' OR lower(league) LIKE 'usa_major_league_soccer%' OR lower(league_name) LIKE '%major league soccer%' OR lower(league_name) LIKE '%usa: mls%' OR lower(league_name) LIKE '%usa: msl%' OR lower(league_url) LIKE '%/football/usa/mls%';
+        DELETE FROM predictions WHERE lower(league) IN ('mls', 'mls1') OR lower(league) LIKE 'usa_mls%' OR lower(league) LIKE 'usa_msl%' OR lower(league) LIKE 'usa_major_league_soccer%' OR lower(league_name) LIKE '%major league soccer%' OR lower(league_name) LIKE '%usa: mls%' OR lower(league_name) LIKE '%usa: msl%';
+        DELETE FROM league_standings WHERE lower(league_code) IN ('mls', 'mls1') OR lower(league_code) LIKE 'usa_mls%' OR lower(league_code) LIKE 'usa_msl%' OR lower(league_code) LIKE 'usa_major_league_soccer%' OR lower(league_name) LIKE '%major league soccer%' OR lower(league_name) LIKE '%usa: mls%' OR lower(league_name) LIKE '%usa: msl%' OR (lower(country) = 'usa' AND (lower(league_name) LIKE '%mls%' OR lower(league_name) LIKE '%msl%')) OR lower(league_url) LIKE '%/football/usa/mls%';
+        DELETE FROM flashscore_scraped_matches WHERE lower(league_name) LIKE '%major league soccer%' OR lower(league_name) LIKE '%usa: mls%' OR lower(league_name) LIKE '%usa: msl%' OR (lower(country) = 'usa' AND (lower(league_name) LIKE '%mls%' OR lower(league_name) LIKE '%msl%'));
+      `);
+    } catch {}
+
     isSchemaInitialized = true;
   } catch (err: any) {
+    if (isFatalSqliteCorruptionError(err)) {
+      console.warn('[SQLite] Corruption detected during schema init; triggering automatic recovery...');
+      recoverCorruptedSqliteDb();
+      isSchemaInitialized = true;
+      return;
+    }
     console.warn('[SQLite] Error during schema init:', err?.message);
   }
 }
