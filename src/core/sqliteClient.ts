@@ -855,6 +855,98 @@ export function closeSqliteDb(): void {
   }
 }
 
+/**
+ * Creates a consistent, self-contained SQLite backup snapshot at destPath using SQLite's online backup API.
+ */
+export async function createConsistentSqliteSnapshot(destPath: string): Promise<void> {
+  const db = getSqliteDb();
+  if (fs.existsSync(destPath)) {
+    fs.unlinkSync(destPath);
+  }
+  await db.backup(destPath);
+}
+
+/**
+ * Validates an incoming SQLite file via PRAGMA integrity_check and atomically replaces DB_PATH.
+ * Automatically rolls back if re-opening the restored database fails.
+ */
+export async function replaceSqliteDbFromFile(
+  sourcePath: string
+): Promise<{ sizeBytes: number; tableCounts: Record<string, number> }> {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error('Downloaded SQLite backup file does not exist.');
+  }
+
+  // 1. Validate downloaded SQLite file before touching active DB
+  let probeDb: Database.Database | null = null;
+  try {
+    probeDb = new Database(sourcePath, { readonly: true, timeout: 10000 });
+    const check = probeDb.prepare('PRAGMA integrity_check').all() as Array<{ integrity_check: string }>;
+    const isOk = check.length === 1 && String(check[0]?.integrity_check || '') === 'ok';
+    if (!isOk) {
+      throw new Error('Downloaded Google Drive SQLite file failed PRAGMA integrity_check.');
+    }
+    const tables = probeDb
+      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+      .all() as Array<{ name: string }>;
+    const tableSet = new Set(tables.map((t) => t.name));
+    if (!tableSet.has('predictions') && !tableSet.has('upcoming_fixtures') && !tableSet.has('historical_matches')) {
+      throw new Error('Downloaded file does not contain expected Football Prediction Engine tables.');
+    }
+  } finally {
+    if (probeDb) {
+      try {
+        probeDb.close();
+      } catch {}
+    }
+  }
+
+  // 2. Close current active DB handle and preserve pre-restore backup
+  closeSqliteDb();
+  isSchemaInitialized = false;
+
+  const backupPrevPath = `${DB_PATH}.pre_restore.${Date.now()}`;
+  let movedOldDb = false;
+
+  try {
+    if (fs.existsSync(`${DB_PATH}-wal`)) fs.unlinkSync(`${DB_PATH}-wal`);
+    if (fs.existsSync(`${DB_PATH}-shm`)) fs.unlinkSync(`${DB_PATH}-shm`);
+    if (fs.existsSync(DB_PATH)) {
+      fs.renameSync(DB_PATH, backupPrevPath);
+      movedOldDb = true;
+    }
+
+    fs.copyFileSync(sourcePath, DB_PATH);
+    initSqliteSchema();
+
+    // Remove temporary pre-restore copy after verified init
+    if (movedOldDb && fs.existsSync(backupPrevPath)) {
+      try {
+        fs.unlinkSync(backupPrevPath);
+      } catch {}
+    }
+
+    notifyDbMutation();
+    const stats = getSqliteDbStats();
+    return {
+      sizeBytes: stats.sizeBytes,
+      tableCounts: stats.tableCounts,
+    };
+  } catch (err) {
+    // Rollback to previous DB file if swap failed
+    closeSqliteDb();
+    isSchemaInitialized = false;
+    if (movedOldDb && fs.existsSync(backupPrevPath)) {
+      try {
+        if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
+        fs.renameSync(backupPrevPath, DB_PATH);
+        initSqliteSchema();
+      } catch {}
+    }
+    throw err;
+  }
+}
+
 // Process exit handlers to flush WAL and close DB handles cleanly
 process.on('SIGINT', () => {
   closeSqliteDb();

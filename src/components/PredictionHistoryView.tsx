@@ -319,7 +319,21 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       let topProb = authPick?.probability ?? f.mostLikelyOutcome?.probability ?? 0;
       let isCorrect = false;
 
-      if (mKey === 'OVER_25') {
+      if (mKey === 'OVER_05') {
+        predictedLabel = authPick?.label || 'Over 0.5 Goals';
+        isCorrect = totalGoals >= 1;
+      } else if (mKey === 'UNDER_05') {
+        predictedLabel = authPick?.label || 'Under 0.5 Goals';
+        isCorrect = totalGoals === 0;
+      } else if (mKey === 'OVER_15') {
+        predictedLabel = authPick?.label || 'Over 1.5 Goals';
+        topProb = topProb || pred.over15Prob || 0;
+        isCorrect = totalGoals >= 2;
+      } else if (mKey === 'UNDER_15') {
+        predictedLabel = authPick?.label || 'Under 1.5 Goals';
+        topProb = topProb || (1 - (pred.over15Prob || 0));
+        isCorrect = totalGoals <= 1;
+      } else if (mKey === 'OVER_25') {
         predictedLabel = authPick?.label || 'Over 2.5 Goals';
         topProb = topProb || pred.over25Prob || 0;
         isCorrect = totalGoals > 2.5;
@@ -327,6 +341,18 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         predictedLabel = authPick?.label || 'Under 2.5 Goals';
         topProb = topProb || (1 - (pred.over25Prob || 0));
         isCorrect = totalGoals < 2.5;
+      } else if (mKey === 'OVER_35') {
+        predictedLabel = authPick?.label || 'Over 3.5 Goals';
+        topProb = topProb || pred.over35Prob || 0;
+        isCorrect = totalGoals >= 4;
+      } else if (mKey === 'UNDER_35') {
+        predictedLabel = authPick?.label || 'Under 3.5 Goals';
+        topProb = topProb || (1 - (pred.over35Prob || 0));
+        isCorrect = totalGoals <= 3;
+      } else if (mKey === 'OVER_45') {
+        isCorrect = totalGoals >= 5;
+      } else if (mKey === 'UNDER_45') {
+        isCorrect = totalGoals <= 4;
       } else if (mKey === 'BTTS_YES') {
         predictedLabel = authPick?.label || 'Both Teams to Score';
         topProb = topProb || pred.bttsProb || 0;
@@ -339,6 +365,74 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         isCorrect = hG >= aG;
       } else if (mKey === 'DOUBLE_CHANCE_X2') {
         isCorrect = aG >= hG;
+      } else if (mKey === 'DOUBLE_CHANCE_12') {
+        isCorrect = hG !== aG;
+      } else if (mKey === 'COMBO_1X_OVER_15') {
+        isCorrect = hG >= aG && totalGoals >= 2;
+      } else if (mKey === 'COMBO_X2_OVER_15') {
+        isCorrect = aG >= hG && totalGoals >= 2;
+      } else if (mKey === 'COMBO_12_OVER_15') {
+        isCorrect = hG !== aG && totalGoals >= 2;
+      } else if (mKey === 'COMBO_1X_OVER_25') {
+        isCorrect = hG >= aG && totalGoals >= 3;
+      } else if (mKey === 'COMBO_X2_OVER_25') {
+        isCorrect = aG >= hG && totalGoals >= 3;
+      } else if (mKey === 'COMBO_12_OVER_25') {
+        isCorrect = hG !== aG && totalGoals >= 3;
+      } else if (mKey === 'COMBO_1X_UNDER_25') {
+        isCorrect = hG >= aG && totalGoals <= 2;
+      } else if (mKey === 'COMBO_X2_UNDER_25') {
+        isCorrect = aG >= hG && totalGoals <= 2;
+      } else if (mKey === 'COMBO_1X_UNDER_35') {
+        isCorrect = hG >= aG && totalGoals <= 3;
+      } else if (mKey === 'COMBO_X2_UNDER_35') {
+        isCorrect = aG >= hG && totalGoals <= 3;
+      } else if (mKey === 'COMBO_12_UNDER_35') {
+        isCorrect = hG !== aG && totalGoals <= 3;
+      } else if (mKey === 'COMBO_1X_BTTS') {
+        isCorrect = hG >= aG && hG > 0 && aG > 0;
+      } else if (mKey === 'COMBO_X2_BTTS') {
+        isCorrect = aG >= hG && hG > 0 && aG > 0;
+      } else if (mKey === 'COMBO_12_BTTS') {
+        isCorrect = hG !== aG && hG > 0 && aG > 0;
+      } else if (mKey === 'COMBO_BTTS_OVER_25') {
+        isCorrect = hG > 0 && aG > 0 && totalGoals >= 3;
+      } else if (mKey === 'COMBO_BTTS_OVER_35') {
+        isCorrect = hG > 0 && aG > 0 && totalGoals >= 4;
+      } else if (mKey === 'COMBO_BTTS_UNDER_35') {
+        isCorrect = hG > 0 && aG > 0 && totalGoals <= 3;
+      } else if (mKey === 'COMBO_BTTS_NO_UNDER_25') {
+        isCorrect = (hG === 0 || aG === 0) && totalGoals <= 2;
+      } else if (mKey === 'HOME_OVER_05') {
+        isCorrect = hG >= 1;
+      } else if (mKey === 'HOME_UNDER_05') {
+        isCorrect = hG === 0;
+      } else if (mKey === 'HOME_OVER_15') {
+        isCorrect = hG >= 2;
+      } else if (mKey === 'HOME_UNDER_15') {
+        isCorrect = hG <= 1;
+      } else if (mKey === 'AWAY_OVER_05') {
+        isCorrect = aG >= 1;
+      } else if (mKey === 'AWAY_UNDER_05') {
+        isCorrect = aG === 0;
+      } else if (mKey === 'AWAY_OVER_15') {
+        isCorrect = aG >= 2;
+      } else if (mKey === 'AWAY_UNDER_15') {
+        isCorrect = aG <= 1;
+      } else if (mKey === 'HOME_CLEAN_SHEET') {
+        isCorrect = aG === 0;
+      } else if (mKey === 'AWAY_CLEAN_SHEET') {
+        isCorrect = hG === 0;
+      } else if (mKey === 'MULTIGOALS_1_3') {
+        isCorrect = totalGoals >= 1 && totalGoals <= 3;
+      } else if (mKey === 'MULTIGOALS_2_4') {
+        isCorrect = totalGoals >= 2 && totalGoals <= 4;
+      } else if (mKey === 'MULTIGOALS_2_5') {
+        isCorrect = totalGoals >= 2 && totalGoals <= 5;
+      } else if (mKey === 'GOALS_ODD') {
+        isCorrect = totalGoals % 2 === 1;
+      } else if (mKey === 'GOALS_EVEN') {
+        isCorrect = totalGoals % 2 === 0;
       }
 
       return { hG, aG, predictedLabel, topProb, isCorrect };

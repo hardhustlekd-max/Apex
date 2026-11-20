@@ -55,8 +55,86 @@ export interface ScrapedMarketOdds {
   }>;
 }
 
+export type MarketKey =
+  | 'HOME_WIN'
+  | 'DRAW'
+  | 'AWAY_WIN'
+  | 'DOUBLE_CHANCE_1X'
+  | 'DOUBLE_CHANCE_X2'
+  | 'DOUBLE_CHANCE_12'
+  | 'DNB_HOME'
+  | 'DNB_AWAY'
+  | 'OVER_05'
+  | 'UNDER_05'
+  | 'OVER_15'
+  | 'UNDER_15'
+  | 'OVER_25'
+  | 'UNDER_25'
+  | 'OVER_35'
+  | 'UNDER_35'
+  | 'OVER_45'
+  | 'UNDER_45'
+  | 'BTTS_YES'
+  | 'BTTS_NO'
+  | 'COMBO_1_OVER_15'
+  | 'COMBO_2_OVER_15'
+  | 'COMBO_1_OVER_25'
+  | 'COMBO_2_OVER_25'
+  | 'COMBO_1_OVER_35'
+  | 'COMBO_2_OVER_35'
+  | 'COMBO_1_UNDER_25'
+  | 'COMBO_2_UNDER_25'
+  | 'COMBO_1_UNDER_35'
+  | 'COMBO_2_UNDER_35'
+  | 'COMBO_X_UNDER_25'
+  | 'COMBO_X_OVER_15'
+  | 'COMBO_X_BTTS'
+  | 'COMBO_1X_OVER_15'
+  | 'COMBO_X2_OVER_15'
+  | 'COMBO_12_OVER_15'
+  | 'COMBO_1X_OVER_25'
+  | 'COMBO_X2_OVER_25'
+  | 'COMBO_12_OVER_25'
+  | 'COMBO_1X_UNDER_25'
+  | 'COMBO_X2_UNDER_25'
+  | 'COMBO_1X_UNDER_35'
+  | 'COMBO_X2_UNDER_35'
+  | 'COMBO_12_UNDER_35'
+  | 'COMBO_1X_BTTS'
+  | 'COMBO_X2_BTTS'
+  | 'COMBO_12_BTTS'
+  | 'COMBO_BTTS_OVER_25'
+  | 'COMBO_BTTS_OVER_35'
+  | 'COMBO_BTTS_UNDER_35'
+  | 'COMBO_BTTS_NO_UNDER_25'
+  | 'COMBO_1_BTTS'
+  | 'COMBO_2_BTTS'
+  | 'HOME_OVER_05'
+  | 'HOME_UNDER_05'
+  | 'HOME_OVER_15'
+  | 'HOME_UNDER_15'
+  | 'HOME_OVER_25'
+  | 'HOME_UNDER_25'
+  | 'AWAY_OVER_05'
+  | 'AWAY_UNDER_05'
+  | 'AWAY_OVER_15'
+  | 'AWAY_UNDER_15'
+  | 'AWAY_OVER_25'
+  | 'AWAY_UNDER_25'
+  | 'HOME_CLEAN_SHEET'
+  | 'AWAY_CLEAN_SHEET'
+  | 'HOME_WIN_TO_NIL'
+  | 'AWAY_WIN_TO_NIL'
+  | 'HANDICAP_HOME_MINUS_1'
+  | 'HANDICAP_AWAY_MINUS_1'
+  | 'MULTIGOALS_1_3'
+  | 'MULTIGOALS_2_4'
+  | 'MULTIGOALS_2_5'
+  | 'GOALS_ODD'
+  | 'GOALS_EVEN';
+
 export interface MarketOption {
-  key: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | 'OVER_25' | 'UNDER_25' | 'BTTS_YES' | 'BTTS_NO' | 'DOUBLE_CHANCE_1X' | 'DOUBLE_CHANCE_X2';
+  key: MarketKey;
   name: string;
   probability: number;
   isBanker: boolean;
@@ -510,7 +588,7 @@ export interface BetSelection {
   matchDate?: string;
   kickOffTime?: string;
   timestamp?: number;
-  status?: 'PENDING' | 'WON' | 'LOST';
+  status?: 'PENDING' | 'WON' | 'LOST' | 'VOID';
   score?: { home: number; away: number };
 }
 

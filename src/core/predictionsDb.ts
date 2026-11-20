@@ -1356,20 +1356,97 @@ export class PredictionsDB {
         else actualOutcome = 'DRAW';
 
         const totalGoals = finalHomeScore + finalAwayScore;
-        if (tipKey === 'OVER_25') isCorrect = totalGoals > 2.5;
-        else if (tipKey === 'UNDER_25') isCorrect = totalGoals < 2.5;
-        else if (tipKey === 'BTTS_YES') isCorrect = finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'BTTS_NO') isCorrect = finalHomeScore === 0 || finalAwayScore === 0;
+        const csMatch = /^CORRECT_SCORE_(\d+)_(\d+)$/.exec(tipKey);
+        if (csMatch) {
+          isCorrect = finalHomeScore === Number(csMatch[1]) && finalAwayScore === Number(csMatch[2]);
+        }
+        else if (tipKey === 'HOME_WIN') isCorrect = finalHomeScore > finalAwayScore;
+        else if (tipKey === 'AWAY_WIN') isCorrect = finalAwayScore > finalHomeScore;
+        else if (tipKey === 'DRAW') isCorrect = finalHomeScore === finalAwayScore;
         else if (tipKey === 'DOUBLE_CHANCE_1X') isCorrect = finalHomeScore >= finalAwayScore;
         else if (tipKey === 'DOUBLE_CHANCE_X2') isCorrect = finalAwayScore >= finalHomeScore;
+        else if (tipKey === 'DOUBLE_CHANCE_12') isCorrect = finalHomeScore !== finalAwayScore;
+        else if (tipKey === 'DNB_HOME') isCorrect = finalHomeScore > finalAwayScore ? true : finalHomeScore === finalAwayScore ? null : false;
+        else if (tipKey === 'DNB_AWAY') isCorrect = finalAwayScore > finalHomeScore ? true : finalHomeScore === finalAwayScore ? null : false;
+        else if (tipKey === 'OVER_05') isCorrect = totalGoals >= 1;
+        else if (tipKey === 'UNDER_05') isCorrect = totalGoals === 0;
+        else if (tipKey === 'OVER_15') isCorrect = totalGoals >= 2;
+        else if (tipKey === 'UNDER_15') isCorrect = totalGoals <= 1;
+        else if (tipKey === 'OVER_25') isCorrect = totalGoals >= 3;
+        else if (tipKey === 'UNDER_25') isCorrect = totalGoals <= 2;
+        else if (tipKey === 'OVER_35') isCorrect = totalGoals >= 4;
+        else if (tipKey === 'UNDER_35') isCorrect = totalGoals <= 3;
+        else if (tipKey === 'OVER_45') isCorrect = totalGoals >= 5;
+        else if (tipKey === 'UNDER_45') isCorrect = totalGoals <= 4;
+        else if (tipKey === 'BTTS_YES') isCorrect = finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'BTTS_NO') isCorrect = finalHomeScore === 0 || finalAwayScore === 0;
+        else if (tipKey === 'COMBO_1_OVER_15') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_2_OVER_15') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_1_OVER_25') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 3;
+        else if (tipKey === 'COMBO_2_OVER_25') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 3;
+        else if (tipKey === 'COMBO_1_OVER_35') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 4;
+        else if (tipKey === 'COMBO_2_OVER_35') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 4;
+        else if (tipKey === 'COMBO_1_UNDER_25') isCorrect = finalHomeScore > finalAwayScore && totalGoals <= 2;
+        else if (tipKey === 'COMBO_2_UNDER_25') isCorrect = finalAwayScore > finalHomeScore && totalGoals <= 2;
+        else if (tipKey === 'COMBO_1_UNDER_35') isCorrect = finalHomeScore > finalAwayScore && totalGoals <= 3;
+        else if (tipKey === 'COMBO_2_UNDER_35') isCorrect = finalAwayScore > finalHomeScore && totalGoals <= 3;
+        else if (tipKey === 'COMBO_X_UNDER_25') isCorrect = finalHomeScore === finalAwayScore && totalGoals <= 2;
+        else if (tipKey === 'COMBO_X_OVER_15') isCorrect = finalHomeScore === finalAwayScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_X_BTTS') isCorrect = finalHomeScore === finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'COMBO_1X_OVER_15') isCorrect = finalHomeScore >= finalAwayScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_X2_OVER_15') isCorrect = finalAwayScore >= finalHomeScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_12_OVER_15') isCorrect = finalHomeScore !== finalAwayScore && totalGoals >= 2;
+        else if (tipKey === 'COMBO_1X_OVER_25') isCorrect = finalHomeScore >= finalAwayScore && totalGoals >= 3;
+        else if (tipKey === 'COMBO_X2_OVER_25') isCorrect = finalAwayScore >= finalHomeScore && totalGoals >= 3;
+        else if (tipKey === 'COMBO_12_OVER_25') isCorrect = finalHomeScore !== finalAwayScore && totalGoals >= 3;
+        else if (tipKey === 'COMBO_1X_UNDER_25') isCorrect = finalHomeScore >= finalAwayScore && totalGoals <= 2;
+        else if (tipKey === 'COMBO_X2_UNDER_25') isCorrect = finalAwayScore >= finalHomeScore && totalGoals <= 2;
+        else if (tipKey === 'COMBO_1X_UNDER_35') isCorrect = finalHomeScore >= finalAwayScore && totalGoals <= 3;
+        else if (tipKey === 'COMBO_X2_UNDER_35') isCorrect = finalAwayScore >= finalHomeScore && totalGoals <= 3;
+        else if (tipKey === 'COMBO_12_UNDER_35') isCorrect = finalHomeScore !== finalAwayScore && totalGoals <= 3;
+        else if (tipKey === 'COMBO_1X_BTTS') isCorrect = finalHomeScore >= finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'COMBO_X2_BTTS') isCorrect = finalAwayScore >= finalHomeScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'COMBO_12_BTTS') isCorrect = finalHomeScore !== finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'COMBO_BTTS_OVER_25') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals >= 3;
+        else if (tipKey === 'COMBO_BTTS_OVER_35') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals >= 4;
+        else if (tipKey === 'COMBO_BTTS_UNDER_35') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals <= 3;
+        else if (tipKey === 'COMBO_BTTS_NO_UNDER_25') isCorrect = (finalHomeScore === 0 || finalAwayScore === 0) && totalGoals <= 2;
+        else if (tipKey === 'COMBO_1_BTTS') isCorrect = finalHomeScore > finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'COMBO_2_BTTS') isCorrect = finalAwayScore > finalHomeScore && finalHomeScore > 0 && finalAwayScore > 0;
+        else if (tipKey === 'HOME_OVER_05') isCorrect = finalHomeScore >= 1;
+        else if (tipKey === 'HOME_UNDER_05') isCorrect = finalHomeScore === 0;
+        else if (tipKey === 'HOME_OVER_15') isCorrect = finalHomeScore >= 2;
+        else if (tipKey === 'HOME_UNDER_15') isCorrect = finalHomeScore <= 1;
+        else if (tipKey === 'HOME_OVER_25') isCorrect = finalHomeScore >= 3;
+        else if (tipKey === 'HOME_UNDER_25') isCorrect = finalHomeScore <= 2;
+        else if (tipKey === 'AWAY_OVER_05') isCorrect = finalAwayScore >= 1;
+        else if (tipKey === 'AWAY_UNDER_05') isCorrect = finalAwayScore === 0;
+        else if (tipKey === 'AWAY_OVER_15') isCorrect = finalAwayScore >= 2;
+        else if (tipKey === 'AWAY_UNDER_15') isCorrect = finalAwayScore <= 1;
+        else if (tipKey === 'AWAY_OVER_25') isCorrect = finalAwayScore >= 3;
+        else if (tipKey === 'AWAY_UNDER_25') isCorrect = finalAwayScore <= 2;
+        else if (tipKey === 'HOME_CLEAN_SHEET') isCorrect = finalAwayScore === 0;
+        else if (tipKey === 'AWAY_CLEAN_SHEET') isCorrect = finalHomeScore === 0;
+        else if (tipKey === 'HOME_WIN_TO_NIL') isCorrect = finalHomeScore > finalAwayScore && finalAwayScore === 0;
+        else if (tipKey === 'AWAY_WIN_TO_NIL') isCorrect = finalAwayScore > finalHomeScore && finalHomeScore === 0;
+        else if (tipKey === 'HANDICAP_HOME_MINUS_1') isCorrect = (finalHomeScore - finalAwayScore) >= 2;
+        else if (tipKey === 'HANDICAP_AWAY_MINUS_1') isCorrect = (finalAwayScore - finalHomeScore) >= 2;
+        else if (tipKey === 'MULTIGOALS_1_3') isCorrect = totalGoals >= 1 && totalGoals <= 3;
+        else if (tipKey === 'MULTIGOALS_2_4') isCorrect = totalGoals >= 2 && totalGoals <= 4;
+        else if (tipKey === 'MULTIGOALS_2_5') isCorrect = totalGoals >= 2 && totalGoals <= 5;
+        else if (tipKey === 'GOALS_ODD') isCorrect = totalGoals % 2 === 1;
+        else if (tipKey === 'GOALS_EVEN') isCorrect = totalGoals % 2 === 0;
         else isCorrect = tipKey === actualOutcome;
 
-        if (isCorrect) {
+        if (isCorrect === true) {
           evaluationState = 'WON';
           wonCount++;
-        } else {
+        } else if (isCorrect === false) {
           evaluationState = 'LOST';
           lostCount++;
+        } else {
+          evaluationState = 'PENDING';
+          pendingCount++;
         }
       } else {
         evaluationState = 'PENDING';

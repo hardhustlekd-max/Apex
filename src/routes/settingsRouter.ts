@@ -26,6 +26,7 @@ const getStorageStatusHandler = (_req: any, res: any) => {
     storageEngine: {
       status: 'ONLINE',
       mode: 'LOCAL_SQLITE_WAL',
+      isDevPreview: process.env.NODE_ENV !== 'production',
       dbPath: stats.path,
       sizeMB: stats.sizeMB,
       sizeBytes: stats.sizeBytes,

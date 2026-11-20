@@ -8,6 +8,7 @@ import { Card, LoadingState, SectionHeader, SegmentedTabs, SegmentedTabItem } fr
 interface DailyFeaturedTipProps {
   onSelectDetail?: (fixture: Fixture) => void;
   onAddSelection?: (selection: BetSelection) => void;
+  onAddCombo?: (selections: BetSelection[]) => void;
   selectedSelections?: BetSelection[];
   refreshKey?: number;
 }
@@ -22,15 +23,16 @@ const MARKET_CATEGORY_META: Array<{ id: Exclude<FeaturedMarketCategory, 'ALL'>; 
 ];
 
 function getMarketCategory(key: MarketOption['key']): Exclude<FeaturedMarketCategory, 'ALL'> {
-  if (key === 'DOUBLE_CHANCE_1X' || key === 'DOUBLE_CHANCE_X2') return 'DOUBLE_CHANCE';
-  if (key === 'OVER_25' || key === 'UNDER_25') return 'OVER_UNDER';
-  if (key === 'BTTS_YES' || key === 'BTTS_NO') return 'BTTS';
+  if (key.startsWith('DOUBLE_CHANCE_')) return 'DOUBLE_CHANCE';
+  if (key.startsWith('OVER_') || key.startsWith('UNDER_')) return 'OVER_UNDER';
+  if (key.startsWith('BTTS_')) return 'BTTS';
   return '1X2';
 }
 
 export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
   onSelectDetail,
   onAddSelection,
+  onAddCombo,
   selectedSelections = [],
   refreshKey = 0,
 }) => {
@@ -153,13 +155,50 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
             icon={<Award className="w-4 h-4" />}
             size="md"
           />
-          <div className="flex items-center gap-1.5 text-sm tabular-nums">
-            <span className="text-theme-sub font-medium">Total Odds:</span>
-            <span className="font-bold text-theme-primary">{filteredTotalOdds.toFixed(2)}x</span>
-            <span aria-hidden="true" className="text-theme-dim">·</span>
-            <span className="text-xs text-theme-sub font-medium">
-              {filteredTips.length} {filteredTips.length === 1 ? 'match' : 'matches'}
-            </span>
+          <div className="flex items-center gap-2.5 text-sm tabular-nums flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-theme-sub font-medium">Total Odds:</span>
+              <span className="font-bold text-theme-primary">{filteredTotalOdds.toFixed(2)}x</span>
+              <span aria-hidden="true" className="text-theme-dim">·</span>
+              <span className="text-xs text-theme-sub font-medium">
+                {filteredTips.length} {filteredTips.length === 1 ? 'match' : 'matches'}
+              </span>
+            </div>
+            {onAddCombo && filteredTips.length > 0 && (() => {
+              const allInSlip = filteredTips.every(({ fixture, market }) =>
+                selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === market.key)
+              );
+              return (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAddCombo(
+                      filteredTips.map(({ fixture, market, odds }) => ({
+                        fixtureId: fixture.id,
+                        homeTeam: fixture.homeTeam,
+                        awayTeam: fixture.awayTeam,
+                        leagueName: fixture.leagueName,
+                        marketKey: market.key,
+                        marketName: market.name,
+                        odds: Number(odds.toFixed(2)),
+                        matchDate: fixture.matchDate,
+                        kickOffTime: fixture.kickOffTime,
+                        timestamp: fixture.timestamp,
+                        score: fixture.score,
+                      }))
+                    )
+                  }
+                  className={`h-[28px] px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                    allInSlip
+                      ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                      : 'bg-theme-primary/15 text-theme-primary border border-theme-primary/30 hover:bg-theme-primary hover:text-theme-primary-text'
+                  }`}
+                >
+                  {allInSlip ? <Check className="w-3.5 h-3.5" /> : <Ticket className="w-3.5 h-3.5" />}
+                  <span>{allInSlip ? 'Combo in Slip' : `Add ${filteredTips.length}-Fold Combo`}</span>
+                </button>
+              );
+            })()}
           </div>
         </div>
 

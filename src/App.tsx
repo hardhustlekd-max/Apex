@@ -58,6 +58,15 @@ export default function App() {
   const handleClearSelections = () => {
     setBetSelections([]);
   };
+
+  const handleAddComboSelections = (items: BetSelection[]) => {
+    setBetSelections((prev) => {
+      const incomingMap = new Map(items.map((item) => [item.fixtureId, item]));
+      const merged = prev.filter((s) => !incomingMap.has(s.fixtureId));
+      return [...merged, ...items];
+    });
+    showNotification(`Added ${items.length}-Fold Combo to Bet Slip`, 'success');
+  };
   const [activeScope, setActiveScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [fixtureGroups, setFixtureGroups] = useState<LeagueGroupDTO[]>([]);
@@ -805,6 +814,7 @@ export default function App() {
                   <DailyFeaturedTip
                     onSelectDetail={handleSelectFixture}
                     onAddSelection={handleToggleSelection}
+                    onAddCombo={handleAddComboSelections}
                     selectedSelections={betSelections}
                     refreshKey={dataRefreshVersion}
                   />

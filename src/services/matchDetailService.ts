@@ -275,12 +275,14 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
       }
     }
 
-    if (isStandingsClose) {
+    const hasComprehensiveMarkets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'COMBO_1X_BTTS');
+
+    if (isStandingsClose || stored.standingsClose || stored.prediction.standingsClose || !hasComprehensiveMarkets) {
       const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
       const updatedPrediction = {
         ...stored.prediction,
-        standingsClose: true,
-        standingsCloseReason,
+        standingsClose: isStandingsClose,
+        standingsCloseReason: isStandingsClose ? standingsCloseReason : undefined,
       };
       const recalc = ApexEngine.calculateMarkets(
         updatedPrediction,
@@ -288,29 +290,8 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
         stored.homeTeam,
         stored.awayTeam
       );
-      stored.standingsClose = true;
-      stored.standingsCloseReason = standingsCloseReason;
-      stored.prediction = {
-        ...updatedPrediction,
-        mostLikelyOutcome: recalc.mostLikelyOutcome,
-      };
-      stored.markets = recalc.markets;
-      stored.mostLikelyOutcome = recalc.mostLikelyOutcome;
-    } else if (stored.standingsClose || stored.prediction.standingsClose) {
-      const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
-      const updatedPrediction = {
-        ...stored.prediction,
-        standingsClose: false,
-        standingsCloseReason: undefined,
-      };
-      const recalc = ApexEngine.calculateMarkets(
-        updatedPrediction,
-        settings,
-        stored.homeTeam,
-        stored.awayTeam
-      );
-      stored.standingsClose = false;
-      stored.standingsCloseReason = undefined;
+      stored.standingsClose = isStandingsClose;
+      stored.standingsCloseReason = isStandingsClose ? standingsCloseReason : undefined;
       stored.prediction = {
         ...updatedPrediction,
         mostLikelyOutcome: recalc.mostLikelyOutcome,

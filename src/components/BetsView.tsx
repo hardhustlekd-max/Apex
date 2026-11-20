@@ -31,13 +31,6 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
       const list = await EngineService.getBets();
       const safeList = Array.isArray(list) ? list : [];
       setBets(safeList);
-      // Automatically expand all slips on initial load so user can easily browse
-      setExpandedIds((prev) => {
-        if (prev.size === 0 && safeList.length > 0) {
-          return new Set(safeList.map((b) => b.id));
-        }
-        return prev;
-      });
     } catch (err) {
       console.error('Failed to load bets:', err);
     } finally {
@@ -68,19 +61,28 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
     });
   };
 
+  const filteredBets = bets.filter((b) => (filterStatus === 'ALL' ? true : b.status === filterStatus));
+  const allExpanded = filteredBets.length > 0 && filteredBets.every((b) => expandedIds.has(b.id));
+
   const toggleAll = () => {
-    if (expandedIds.size === filteredBets.length) {
-      setExpandedIds(new Set());
+    if (allExpanded) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const b of filteredBets) next.delete(b.id);
+        return next;
+      });
     } else {
-      setExpandedIds(new Set(filteredBets.map((b) => b.id)));
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const b of filteredBets) next.add(b.id);
+        return next;
+      });
     }
   };
 
   useEffect(() => {
     void loadBets();
   }, [loadBets, refreshKey]);
-
-  const filteredBets = bets.filter((b) => (filterStatus === 'ALL' ? true : b.status === filterStatus));
 
   const stats = {
     total: bets.length,
@@ -105,10 +107,10 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
               variant="subtle"
               size="xs"
               onClick={toggleAll}
-              title={expandedIds.size === filteredBets.length ? 'Collapse All Slips' : 'Expand All Slips'}
+              title={allExpanded ? 'Collapse All Slips' : 'Expand All Slips'}
             >
               <ChevronsUpDown className="w-3.5 h-3.5" />
-              <span>{expandedIds.size === filteredBets.length ? 'Collapse All' : 'Expand All'}</span>
+              <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
             </Button>
           )}
           <Button variant="secondary" size="xs" onClick={() => void loadBets()} disabled={isLoading}>
@@ -293,6 +295,8 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 ? 'border-l-4 border-emerald-500 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]'
                                 : legStatus === 'LOST'
                                 ? 'border-l-4 border-rose-500 bg-rose-500/[0.04] hover:bg-rose-500/[0.08]'
+                                : legStatus === 'VOID'
+                                ? 'border-l-4 border-sky-500/60 bg-sky-500/[0.04] hover:bg-sky-500/[0.08]'
                                 : 'border-l-4 border-amber-500/40 hover:bg-theme-card-elevated'
                             }`}
                           >
@@ -311,12 +315,25 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                             </div>
                             <div className="shrink-0 flex items-center gap-3">
                               <div className="text-right">
-                                <span className="font-bold text-theme-main text-base block">
+                                <span className={`font-bold text-base block ${legStatus === 'VOID' ? 'line-through text-theme-dim' : 'text-theme-main'}`}>
                                   {sel.odds.toFixed(2)}
                                 </span>
+                                {legStatus === 'VOID' && (
+                                  <span className="text-2xs font-semibold text-sky-500 dark:text-sky-400 block">
+                                    1.00x Void
+                                  </span>
+                                )}
                                 {sel.score ? (
-                                  <span className={`text-xs font-semibold tabular-nums block mt-0.5 ${legStatus === 'WON' ? 'text-emerald-600 dark:text-emerald-400' : legStatus === 'LOST' ? 'text-rose-500' : 'text-theme-sub'}`}>
-                                    {legStatus === 'WON' || legStatus === 'LOST' ? 'FT' : 'Live'} {sel.score.home} - {sel.score.away}
+                                  <span className={`text-xs font-semibold tabular-nums block mt-0.5 ${
+                                    legStatus === 'WON'
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : legStatus === 'LOST'
+                                      ? 'text-rose-500'
+                                      : legStatus === 'VOID'
+                                      ? 'text-sky-500 dark:text-sky-400'
+                                      : 'text-theme-sub'
+                                  }`}>
+                                    {legStatus === 'WON' || legStatus === 'LOST' || legStatus === 'VOID' ? 'FT' : 'Live'} {sel.score.home} - {sel.score.away}
                                   </span>
                                 ) : (
                                   <span className="text-2xs text-theme-dim uppercase block mt-0.5">
@@ -334,6 +351,10 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                   <Badge variant="danger" size="xs">
                                     <XCircle className="w-3 h-3" />
                                     <span>Lost</span>
+                                  </Badge>
+                                ) : legStatus === 'VOID' ? (
+                                  <Badge variant="info" size="xs">
+                                    <span>Void</span>
                                   </Badge>
                                 ) : (
                                   <Badge variant="warning" size="xs">

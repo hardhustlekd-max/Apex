@@ -1711,31 +1711,96 @@ export class FootballDB {
         }
       }
 
-      const updateStmt = sqliteDb.prepare("UPDATE bets SET status = ?, selections_json = ?, evaluated_at = ? WHERE id = ?");
+      const updateStmt = sqliteDb.prepare(
+        "UPDATE bets SET status = ?, total_odds = ?, potential_win = ?, selections_json = ?, evaluated_at = ? WHERE id = ?"
+      );
 
-      const evaluateSelection = (sel: BetSelection, hs: number, as: number): boolean | null => {
+      const evaluateSelection = (sel: BetSelection, hs: number, as: number): 'WON' | 'LOST' | 'VOID' | null => {
         if (isNaN(hs) || isNaN(as)) return null;
-        const key = (sel.marketKey || '').toUpperCase();
+        const key = (sel.marketKey || '').toUpperCase().trim();
         const tot = hs + as;
+        const csMatch = /^CORRECT_SCORE_(\d+)_(\d+)$/.exec(key);
+        if (csMatch) {
+          return hs === Number(csMatch[1]) && as === Number(csMatch[2]) ? 'WON' : 'LOST';
+        }
         switch (key) {
-          case 'HOME_WIN': return hs > as;
-          case 'AWAY_WIN': return as > hs;
-          case 'DRAW': return hs === as;
-          case 'OVER_25': return tot >= 3;
-          case 'UNDER_25': return tot <= 2;
-          case 'BTTS_YES': return hs > 0 && as > 0;
-          case 'BTTS_NO': return hs === 0 || as === 0;
-          case 'DOUBLE_CHANCE_1X': return hs >= as;
-          case 'DOUBLE_CHANCE_X2': return as >= hs;
-          case 'DOUBLE_CHANCE_12': return hs !== as;
-          case 'OVER_15': return tot >= 2;
-          case 'UNDER_15': return tot <= 1;
-          case 'OVER_35': return tot >= 4;
-          case 'UNDER_35': return tot <= 3;
+          case 'HOME_WIN': return hs > as ? 'WON' : 'LOST';
+          case 'AWAY_WIN': return as > hs ? 'WON' : 'LOST';
+          case 'DRAW': return hs === as ? 'WON' : 'LOST';
+          case 'DOUBLE_CHANCE_1X': return hs >= as ? 'WON' : 'LOST';
+          case 'DOUBLE_CHANCE_X2': return as >= hs ? 'WON' : 'LOST';
+          case 'DOUBLE_CHANCE_12': return hs !== as ? 'WON' : 'LOST';
+          case 'DNB_HOME': return hs > as ? 'WON' : hs === as ? 'VOID' : 'LOST';
+          case 'DNB_AWAY': return as > hs ? 'WON' : hs === as ? 'VOID' : 'LOST';
+          case 'OVER_05': return tot >= 1 ? 'WON' : 'LOST';
+          case 'UNDER_05': return tot === 0 ? 'WON' : 'LOST';
+          case 'OVER_15': return tot >= 2 ? 'WON' : 'LOST';
+          case 'UNDER_15': return tot <= 1 ? 'WON' : 'LOST';
+          case 'OVER_25': return tot >= 3 ? 'WON' : 'LOST';
+          case 'UNDER_25': return tot <= 2 ? 'WON' : 'LOST';
+          case 'OVER_35': return tot >= 4 ? 'WON' : 'LOST';
+          case 'UNDER_35': return tot <= 3 ? 'WON' : 'LOST';
+          case 'OVER_45': return tot >= 5 ? 'WON' : 'LOST';
+          case 'UNDER_45': return tot <= 4 ? 'WON' : 'LOST';
+          case 'BTTS_YES': return hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'BTTS_NO': return hs === 0 || as === 0 ? 'WON' : 'LOST';
+          case 'COMBO_1_OVER_15': return hs > as && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_2_OVER_15': return as > hs && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_1_OVER_25': return hs > as && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_2_OVER_25': return as > hs && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_1_OVER_35': return hs > as && tot >= 4 ? 'WON' : 'LOST';
+          case 'COMBO_2_OVER_35': return as > hs && tot >= 4 ? 'WON' : 'LOST';
+          case 'COMBO_1_UNDER_25': return hs > as && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_2_UNDER_25': return as > hs && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_1_UNDER_35': return hs > as && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_2_UNDER_35': return as > hs && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_X_UNDER_25': return hs === as && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_X_OVER_15': return hs === as && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_X_BTTS': return hs === as && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'COMBO_1X_OVER_15': return hs >= as && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_X2_OVER_15': return as >= hs && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_12_OVER_15': return hs !== as && tot >= 2 ? 'WON' : 'LOST';
+          case 'COMBO_1X_OVER_25': return hs >= as && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_X2_OVER_25': return as >= hs && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_12_OVER_25': return hs !== as && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_1X_UNDER_25': return hs >= as && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_X2_UNDER_25': return as >= hs && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_1X_UNDER_35': return hs >= as && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_X2_UNDER_35': return as >= hs && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_12_UNDER_35': return hs !== as && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_1X_BTTS': return hs >= as && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'COMBO_X2_BTTS': return as >= hs && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'COMBO_12_BTTS': return hs !== as && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'COMBO_BTTS_OVER_25': return hs > 0 && as > 0 && tot >= 3 ? 'WON' : 'LOST';
+          case 'COMBO_BTTS_OVER_35': return hs > 0 && as > 0 && tot >= 4 ? 'WON' : 'LOST';
+          case 'COMBO_BTTS_UNDER_35': return hs > 0 && as > 0 && tot <= 3 ? 'WON' : 'LOST';
+          case 'COMBO_BTTS_NO_UNDER_25': return (hs === 0 || as === 0) && tot <= 2 ? 'WON' : 'LOST';
+          case 'COMBO_1_BTTS': return hs > as && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'COMBO_2_BTTS': return as > hs && hs > 0 && as > 0 ? 'WON' : 'LOST';
+          case 'HOME_OVER_05': return hs >= 1 ? 'WON' : 'LOST';
+          case 'HOME_UNDER_05': return hs === 0 ? 'WON' : 'LOST';
+          case 'HOME_OVER_15': return hs >= 2 ? 'WON' : 'LOST';
+          case 'HOME_UNDER_15': return hs <= 1 ? 'WON' : 'LOST';
+          case 'HOME_OVER_25': return hs >= 3 ? 'WON' : 'LOST';
+          case 'HOME_UNDER_25': return hs <= 2 ? 'WON' : 'LOST';
+          case 'AWAY_OVER_05': return as >= 1 ? 'WON' : 'LOST';
+          case 'AWAY_UNDER_05': return as === 0 ? 'WON' : 'LOST';
+          case 'AWAY_OVER_15': return as >= 2 ? 'WON' : 'LOST';
+          case 'AWAY_UNDER_15': return as <= 1 ? 'WON' : 'LOST';
+          case 'AWAY_OVER_25': return as >= 3 ? 'WON' : 'LOST';
+          case 'AWAY_UNDER_25': return as <= 2 ? 'WON' : 'LOST';
+          case 'HOME_CLEAN_SHEET': return as === 0 ? 'WON' : 'LOST';
+          case 'AWAY_CLEAN_SHEET': return hs === 0 ? 'WON' : 'LOST';
+          case 'HOME_WIN_TO_NIL': return hs > as && as === 0 ? 'WON' : 'LOST';
+          case 'AWAY_WIN_TO_NIL': return as > hs && hs === 0 ? 'WON' : 'LOST';
+          case 'HANDICAP_HOME_MINUS_1': return (hs - as) >= 2 ? 'WON' : 'LOST';
+          case 'HANDICAP_AWAY_MINUS_1': return (as - hs) >= 2 ? 'WON' : 'LOST';
+          case 'MULTIGOALS_1_3': return tot >= 1 && tot <= 3 ? 'WON' : 'LOST';
+          case 'MULTIGOALS_2_4': return tot >= 2 && tot <= 4 ? 'WON' : 'LOST';
+          case 'MULTIGOALS_2_5': return tot >= 2 && tot <= 5 ? 'WON' : 'LOST';
+          case 'GOALS_ODD': return tot % 2 === 1 ? 'WON' : 'LOST';
+          case 'GOALS_EVEN': return tot % 2 === 0 ? 'WON' : 'LOST';
           default:
-            if (key.includes('HOME') || key.includes('1')) return hs > as;
-            if (key.includes('AWAY') || key.includes('2')) return as > hs;
-            if (key.includes('DRAW') || key.includes('X')) return hs === as;
             return null;
         }
       };
@@ -1747,9 +1812,9 @@ export class FootballDB {
             continue;
           }
 
-          let allWon = true;
           let anyLost = false;
           let allEvaluated = true;
+          let effectiveTotalOdds = 1;
 
           for (const sel of bet.selections) {
             const cleanId = cleanFixtureId(sel.fixtureId);
@@ -1758,7 +1823,7 @@ export class FootballDB {
             if (!scoreInfo) {
               sel.status = 'PENDING';
               allEvaluated = false;
-              allWon = false;
+              effectiveTotalOdds *= Number(sel.odds) || 1;
               continue;
             }
 
@@ -1766,7 +1831,7 @@ export class FootballDB {
             if (!scoreInfo.isFinished) {
               sel.status = 'PENDING';
               allEvaluated = false;
-              allWon = false;
+              effectiveTotalOdds *= Number(sel.odds) || 1;
               continue;
             }
 
@@ -1774,25 +1839,37 @@ export class FootballDB {
             if (res === null) {
               sel.status = 'PENDING';
               allEvaluated = false;
-              allWon = false;
-            } else if (res === false) {
+              effectiveTotalOdds *= Number(sel.odds) || 1;
+            } else if (res === 'LOST') {
               sel.status = 'LOST';
               anyLost = true;
+              effectiveTotalOdds *= Number(sel.odds) || 1;
+            } else if (res === 'VOID') {
+              sel.status = 'VOID';
+              // Void leg settles at 1.00x multiplier
             } else {
               sel.status = 'WON';
+              effectiveTotalOdds *= Number(sel.odds) || 1;
             }
           }
+
+          const updatedTotalOdds = Number(effectiveTotalOdds.toFixed(2));
+          const updatedPotentialWin = Number((bet.stake * updatedTotalOdds).toFixed(2));
 
           if (anyLost) {
             bet.status = 'LOST';
             bet.evaluatedAt = now;
-            updateStmt.run('LOST', JSON.stringify(bet.selections), now, bet.id);
-          } else if (allEvaluated && allWon) {
+            updateStmt.run('LOST', bet.totalOdds, bet.potentialWin, JSON.stringify(bet.selections), now, bet.id);
+          } else if (allEvaluated) {
             bet.status = 'WON';
+            bet.totalOdds = updatedTotalOdds;
+            bet.potentialWin = updatedPotentialWin;
             bet.evaluatedAt = now;
-            updateStmt.run('WON', JSON.stringify(bet.selections), now, bet.id);
+            updateStmt.run('WON', updatedTotalOdds, updatedPotentialWin, JSON.stringify(bet.selections), now, bet.id);
           } else {
-            updateStmt.run('PENDING', JSON.stringify(bet.selections), bet.evaluatedAt || null, bet.id);
+            bet.totalOdds = updatedTotalOdds;
+            bet.potentialWin = updatedPotentialWin;
+            updateStmt.run('PENDING', updatedTotalOdds, updatedPotentialWin, JSON.stringify(bet.selections), bet.evaluatedAt || null, bet.id);
           }
         }
       });

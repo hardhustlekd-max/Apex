@@ -378,6 +378,7 @@ export class EngineService {
     storageEngine?: {
       status: string;
       mode: string;
+      isDevPreview?: boolean;
     };
   } | null> {
     const serverData = await this.safeJsonFetch('/api/settings/storage-status');
@@ -385,6 +386,115 @@ export class EngineService {
       return serverData as any;
     }
     return null;
+  }
+
+  public static async getDriveDbStatus(accessToken?: string | null): Promise<{
+    success: boolean;
+    isDevPreview?: boolean;
+    authenticated?: boolean;
+    needsReauth?: boolean;
+    driveFile?: {
+      id: string;
+      name: string;
+      size?: string;
+      modifiedTime?: string;
+      mimeType?: string;
+      webViewLink?: string;
+    } | null;
+    localStats?: {
+      path: string;
+      sizeBytes: number;
+      sizeMB: number;
+      tableCounts: Record<string, number>;
+    };
+    error?: string;
+  }> {
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      const res = await fetch('/api/drive-db/status', { headers });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Network error checking Google Drive backup.' };
+    }
+  }
+
+  public static async uploadDbToDrive(
+    accessToken: string,
+    fileId?: string
+  ): Promise<{
+    success: boolean;
+    action?: 'CREATED' | 'UPDATED';
+    needsReauth?: boolean;
+    driveFile?: {
+      id: string;
+      name: string;
+      size?: string;
+      modifiedTime?: string;
+      webViewLink?: string;
+    };
+    sizeBytes?: number;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch('/api/drive-db/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to upload database to Google Drive.' };
+    }
+  }
+
+  public static async restoreDbFromDrive(
+    accessToken: string,
+    fileId?: string
+  ): Promise<{
+    success: boolean;
+    needsReauth?: boolean;
+    restoredFileId?: string;
+    sizeBytes?: number;
+    tableCounts?: Record<string, number>;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch('/api/drive-db/restore', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileId }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to restore database from Google Drive.' };
+    }
+  }
+
+  public static async deleteDriveDbFile(
+    accessToken: string,
+    fileId: string
+  ): Promise<{ success: boolean; needsReauth?: boolean; error?: string }> {
+    try {
+      const res = await fetch(`/api/drive-db/file/${encodeURIComponent(fileId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to delete Google Drive backup.' };
+    }
   }
 
   public static async getScraperStatus(): Promise<{

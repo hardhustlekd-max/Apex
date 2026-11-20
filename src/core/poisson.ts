@@ -1683,24 +1683,268 @@ export class ApexEngine {
       addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
     }
 
-    // Goal Totals
-    addMarket('OVER_25', 'Over 2.5 Goals', prediction.over25Prob);
-    addMarket('UNDER_25', 'Under 2.5 Goals', Number((1 - prediction.over25Prob).toFixed(3)));
-
-    // Both Teams to Score
-    addMarket('BTTS_YES', 'Both Teams to Score', prediction.bttsProb);
-    addMarket('BTTS_NO', 'Both Teams to Score No', Number((1 - prediction.bttsProb).toFixed(3)));
-
     // Double Chance
-    const dc1XProb = Number((prediction.homeWinProb + prediction.drawProb).toFixed(3));
+    const dc1XProb = Number(Math.min(0.99, prediction.homeWinProb + prediction.drawProb).toFixed(3));
     addMarket('DOUBLE_CHANCE_1X', `${homeTeam} or Draw (1X)`, dc1XProb);
 
-    const dcX2Prob = Number((prediction.awayWinProb + prediction.drawProb).toFixed(3));
+    const dcX2Prob = Number(Math.min(0.99, prediction.awayWinProb + prediction.drawProb).toFixed(3));
     addMarket('DOUBLE_CHANCE_X2', `Draw or ${awayTeam} (X2)`, dcX2Prob);
 
-    // Identify MOST LIKELY Outcome from eligible markets
-    let mostLikelyMarket = markets[0];
-    for (const m of markets) {
+    const dc12Prob = Number(Math.min(0.99, prediction.homeWinProb + prediction.awayWinProb).toFixed(3));
+    addMarket('DOUBLE_CHANCE_12', `${homeTeam} or ${awayTeam} (12)`, dc12Prob);
+
+    // Draw No Bet (DNB)
+    const dnbSum = prediction.homeWinProb + prediction.awayWinProb || 1.0;
+    const dnbHomeProb = Number((prediction.homeWinProb / dnbSum).toFixed(3));
+    const dnbAwayProb = Number((prediction.awayWinProb / dnbSum).toFixed(3));
+    if (!isStandingsClose) {
+      addMarket('DNB_HOME', `Draw No Bet - ${homeTeam}`, dnbHomeProb);
+      addMarket('DNB_AWAY', `Draw No Bet - ${awayTeam}`, dnbAwayProb);
+    }
+
+    // Derive exact goal & combo probabilities from Poisson probabilityMatrix
+    const over15 = prediction.over15Prob ?? 0.75;
+    const over35 = prediction.over35Prob ?? 0.25;
+    const mat = prediction.probabilityMatrix;
+
+    let over05 = 0;
+    let over45 = 0;
+    let homeOver05 = 0, homeOver15 = 0, homeOver25 = 0;
+    let awayOver05 = 0, awayOver15 = 0, awayOver25 = 0;
+    let goalsOdd = 0;
+    let homeCleanSheet = 0, awayCleanSheet = 0;
+    let homeWinToNil = 0, awayWinToNil = 0;
+    let hMinus1 = 0, aMinus1 = 0;
+    let mg13 = 0, mg24 = 0, mg25 = 0;
+    let c1O15 = 0, c2O15 = 0, c1O25 = 0, c2O25 = 0, c1O35 = 0, c2O35 = 0;
+    let c1U25 = 0, c2U25 = 0, c1U35 = 0, c2U35 = 0;
+    let cXU25 = 0, cXO15 = 0, cXBtts = 0;
+    let c1XO15 = 0, cX2O15 = 0, c12O15 = 0;
+    let c1XO25 = 0, cX2O25 = 0, c12O25 = 0;
+    let c1XU25 = 0, cX2U25 = 0, c1XU35 = 0, cX2U35 = 0, c12U35 = 0;
+    let c1XBtts = 0, cX2Btts = 0, c12Btts = 0;
+    let cBttsO25 = 0, cBttsO35 = 0, cBttsU35 = 0, cBttsNoU25 = 0;
+    let c1Btts = 0, c2Btts = 0;
+
+    if (mat && Array.isArray(mat) && mat.length > 0) {
+      for (let h = 0; h < mat.length; h++) {
+        if (!Array.isArray(mat[h])) continue;
+        for (let a = 0; a < mat[h].length; a++) {
+          const p = mat[h][a] || 0;
+          const tot = h + a;
+          const bothScored = h > 0 && a > 0;
+          if (tot >= 1) over05 += p;
+          if (tot >= 5) over45 += p;
+          if (h >= 1) homeOver05 += p;
+          if (h >= 2) homeOver15 += p;
+          if (h >= 3) homeOver25 += p;
+          if (a >= 1) awayOver05 += p;
+          if (a >= 2) awayOver15 += p;
+          if (a >= 3) awayOver25 += p;
+          if (tot % 2 === 1) goalsOdd += p;
+          if (a === 0) homeCleanSheet += p;
+          if (h === 0) awayCleanSheet += p;
+          if (h > a && a === 0) homeWinToNil += p;
+          if (a > h && h === 0) awayWinToNil += p;
+          if (h - a >= 2) hMinus1 += p;
+          if (a - h >= 2) aMinus1 += p;
+          if (tot >= 1 && tot <= 3) mg13 += p;
+          if (tot >= 2 && tot <= 4) mg24 += p;
+          if (tot >= 2 && tot <= 5) mg25 += p;
+
+          if (h > a && tot >= 2) c1O15 += p;
+          if (a > h && tot >= 2) c2O15 += p;
+          if (h > a && tot >= 3) c1O25 += p;
+          if (a > h && tot >= 3) c2O25 += p;
+          if (h > a && tot >= 4) c1O35 += p;
+          if (a > h && tot >= 4) c2O35 += p;
+          if (h > a && tot <= 2) c1U25 += p;
+          if (a > h && tot <= 2) c2U25 += p;
+          if (h > a && tot <= 3) c1U35 += p;
+          if (a > h && tot <= 3) c2U35 += p;
+          if (h === a && tot <= 2) cXU25 += p;
+          if (h === a && tot >= 2) cXO15 += p;
+          if (h === a && bothScored) cXBtts += p;
+
+          if (h >= a && tot >= 2) c1XO15 += p;
+          if (a >= h && tot >= 2) cX2O15 += p;
+          if (h !== a && tot >= 2) c12O15 += p;
+          if (h >= a && tot >= 3) c1XO25 += p;
+          if (a >= h && tot >= 3) cX2O25 += p;
+          if (h !== a && tot >= 3) c12O25 += p;
+          if (h >= a && tot <= 2) c1XU25 += p;
+          if (a >= h && tot <= 2) cX2U25 += p;
+          if (h >= a && tot <= 3) c1XU35 += p;
+          if (a >= h && tot <= 3) cX2U35 += p;
+          if (h !== a && tot <= 3) c12U35 += p;
+          if (h >= a && bothScored) c1XBtts += p;
+          if (a >= h && bothScored) cX2Btts += p;
+          if (h !== a && bothScored) c12Btts += p;
+
+          if (bothScored && tot >= 3) cBttsO25 += p;
+          if (bothScored && tot >= 4) cBttsO35 += p;
+          if (bothScored && tot <= 3) cBttsU35 += p;
+          if (!bothScored && tot <= 2) cBttsNoU25 += p;
+          if (h > a && bothScored) c1Btts += p;
+          if (a > h && bothScored) c2Btts += p;
+        }
+      }
+    } else {
+      over05 = Math.min(0.97, Math.max(over15, 0.88));
+      over45 = Math.max(0.05, over35 * 0.4);
+      homeOver05 = Math.min(0.95, prediction.homeWinProb + prediction.drawProb * 0.6);
+      homeOver15 = Math.max(0.15, prediction.homeWinProb * 0.7);
+      homeOver25 = Math.max(0.05, homeOver15 * 0.45);
+      awayOver05 = Math.min(0.90, prediction.awayWinProb + prediction.drawProb * 0.5);
+      awayOver15 = Math.max(0.10, prediction.awayWinProb * 0.6);
+      awayOver25 = Math.max(0.03, awayOver15 * 0.4);
+      goalsOdd = 0.5;
+      homeCleanSheet = Number((1 - awayOver05).toFixed(3));
+      awayCleanSheet = Number((1 - homeOver05).toFixed(3));
+      homeWinToNil = Math.max(0.05, prediction.homeWinProb * 0.35);
+      awayWinToNil = Math.max(0.03, prediction.awayWinProb * 0.35);
+      hMinus1 = Math.max(0.05, prediction.homeWinProb * 0.45);
+      aMinus1 = Math.max(0.03, prediction.awayWinProb * 0.4);
+      mg13 = 0.72;
+      mg24 = 0.60;
+      mg25 = 0.68;
+      c1O15 = Number((prediction.homeWinProb * 0.78).toFixed(3));
+      c2O15 = Number((prediction.awayWinProb * 0.75).toFixed(3));
+      c1O25 = Number((prediction.homeWinProb * prediction.over25Prob).toFixed(3));
+      c2O25 = Number((prediction.awayWinProb * prediction.over25Prob).toFixed(3));
+      c1O35 = Number((prediction.homeWinProb * over35).toFixed(3));
+      c2O35 = Number((prediction.awayWinProb * over35).toFixed(3));
+      c1U25 = Number((prediction.homeWinProb * (1 - prediction.over25Prob)).toFixed(3));
+      c2U25 = Number((prediction.awayWinProb * (1 - prediction.over25Prob)).toFixed(3));
+      c1U35 = Number((prediction.homeWinProb * (1 - over35)).toFixed(3));
+      c2U35 = Number((prediction.awayWinProb * (1 - over35)).toFixed(3));
+      cXU25 = Number((prediction.drawProb * 0.75).toFixed(3));
+      cXO15 = Number((prediction.drawProb * 0.65).toFixed(3));
+      cXBtts = Number((prediction.drawProb * 0.65).toFixed(3));
+      c1XO15 = Number((dc1XProb * over15).toFixed(3));
+      cX2O15 = Number((dcX2Prob * over15).toFixed(3));
+      c12O15 = Number((dc12Prob * over15).toFixed(3));
+      c1XO25 = Number((dc1XProb * prediction.over25Prob).toFixed(3));
+      cX2O25 = Number((dcX2Prob * prediction.over25Prob).toFixed(3));
+      c12O25 = Number((dc12Prob * prediction.over25Prob).toFixed(3));
+      c1XU25 = Number((dc1XProb * (1 - prediction.over25Prob)).toFixed(3));
+      cX2U25 = Number((dcX2Prob * (1 - prediction.over25Prob)).toFixed(3));
+      c1XU35 = Number((dc1XProb * (1 - over35)).toFixed(3));
+      cX2U35 = Number((dcX2Prob * (1 - over35)).toFixed(3));
+      c12U35 = Number((dc12Prob * (1 - over35)).toFixed(3));
+      c1XBtts = Number((dc1XProb * prediction.bttsProb).toFixed(3));
+      cX2Btts = Number((dcX2Prob * prediction.bttsProb).toFixed(3));
+      c12Btts = Number((dc12Prob * prediction.bttsProb).toFixed(3));
+      cBttsO25 = Number((prediction.bttsProb * 0.82).toFixed(3));
+      cBttsO35 = Number((prediction.bttsProb * over35).toFixed(3));
+      cBttsU35 = Number((prediction.bttsProb * (1 - over35)).toFixed(3));
+      cBttsNoU25 = Number(((1 - prediction.bttsProb) * (1 - prediction.over25Prob)).toFixed(3));
+      c1Btts = Number((prediction.homeWinProb * prediction.bttsProb).toFixed(3));
+      c2Btts = Number((prediction.awayWinProb * prediction.bttsProb).toFixed(3));
+    }
+
+    const r3 = (v: number) => Number(Math.max(0.001, Math.min(0.999, v)).toFixed(3));
+
+    // Goal Totals (0.5, 1.5, 2.5, 3.5, 4.5)
+    addMarket('OVER_05', 'Over 0.5 Goals', r3(over05));
+    addMarket('UNDER_05', 'Under 0.5 Goals (0-0)', r3(1 - over05));
+    addMarket('OVER_15', 'Over 1.5 Goals', r3(over15));
+    addMarket('UNDER_15', 'Under 1.5 Goals', r3(1 - over15));
+    addMarket('OVER_25', 'Over 2.5 Goals', prediction.over25Prob);
+    addMarket('UNDER_25', 'Under 2.5 Goals', r3(1 - prediction.over25Prob));
+    addMarket('OVER_35', 'Over 3.5 Goals', r3(over35));
+    addMarket('UNDER_35', 'Under 3.5 Goals', r3(1 - over35));
+    addMarket('OVER_45', 'Over 4.5 Goals', r3(over45));
+    addMarket('UNDER_45', 'Under 4.5 Goals', r3(1 - over45));
+
+    // Both Teams to Score
+    addMarket('BTTS_YES', 'Both Teams to Score (Yes)', prediction.bttsProb);
+    addMarket('BTTS_NO', 'Both Teams to Score (No)', r3(1 - prediction.bttsProb));
+
+    // Match Result & Goals Combos
+    if (!isStandingsClose) {
+      addMarket('COMBO_1_OVER_15', `${homeTeam} Win & Over 1.5 Goals`, r3(c1O15));
+      addMarket('COMBO_2_OVER_15', `${awayTeam} Win & Over 1.5 Goals`, r3(c2O15));
+      addMarket('COMBO_1_OVER_25', `${homeTeam} Win & Over 2.5 Goals`, r3(c1O25));
+      addMarket('COMBO_2_OVER_25', `${awayTeam} Win & Over 2.5 Goals`, r3(c2O25));
+      addMarket('COMBO_1_OVER_35', `${homeTeam} Win & Over 3.5 Goals`, r3(c1O35));
+      addMarket('COMBO_2_OVER_35', `${awayTeam} Win & Over 3.5 Goals`, r3(c2O35));
+      addMarket('COMBO_1_UNDER_25', `${homeTeam} Win & Under 2.5 Goals`, r3(c1U25));
+      addMarket('COMBO_2_UNDER_25', `${awayTeam} Win & Under 2.5 Goals`, r3(c2U25));
+      addMarket('COMBO_1_UNDER_35', `${homeTeam} Win & Under 3.5 Goals`, r3(c1U35));
+      addMarket('COMBO_2_UNDER_35', `${awayTeam} Win & Under 3.5 Goals`, r3(c2U35));
+      addMarket('COMBO_X_UNDER_25', 'Draw & Under 2.5 Goals', r3(cXU25));
+      addMarket('COMBO_X_OVER_15', 'Draw & Over 1.5 Goals', r3(cXO15));
+      addMarket('COMBO_1_BTTS', `${homeTeam} Win & BTTS Yes`, r3(c1Btts));
+      addMarket('COMBO_2_BTTS', `${awayTeam} Win & BTTS Yes`, r3(c2Btts));
+      addMarket('COMBO_X_BTTS', 'Draw & BTTS Yes', r3(cXBtts));
+    }
+    addMarket('COMBO_1X_OVER_15', `1X & Over 1.5 Goals`, r3(c1XO15));
+    addMarket('COMBO_X2_OVER_15', `X2 & Over 1.5 Goals`, r3(cX2O15));
+    addMarket('COMBO_12_OVER_15', `12 & Over 1.5 Goals`, r3(c12O15));
+    addMarket('COMBO_1X_OVER_25', `1X & Over 2.5 Goals`, r3(c1XO25));
+    addMarket('COMBO_X2_OVER_25', `X2 & Over 2.5 Goals`, r3(cX2O25));
+    addMarket('COMBO_12_OVER_25', `12 & Over 2.5 Goals`, r3(c12O25));
+    addMarket('COMBO_1X_UNDER_25', `1X & Under 2.5 Goals`, r3(c1XU25));
+    addMarket('COMBO_X2_UNDER_25', `X2 & Under 2.5 Goals`, r3(cX2U25));
+    addMarket('COMBO_1X_UNDER_35', `1X & Under 3.5 Goals`, r3(c1XU35));
+    addMarket('COMBO_X2_UNDER_35', `X2 & Under 3.5 Goals`, r3(cX2U35));
+    addMarket('COMBO_12_UNDER_35', `12 & Under 3.5 Goals`, r3(c12U35));
+    addMarket('COMBO_1X_BTTS', `1X & BTTS Yes`, r3(c1XBtts));
+    addMarket('COMBO_X2_BTTS', `X2 & BTTS Yes`, r3(cX2Btts));
+    addMarket('COMBO_12_BTTS', `12 & BTTS Yes`, r3(c12Btts));
+    addMarket('COMBO_BTTS_OVER_25', 'BTTS Yes & Over 2.5 Goals', r3(cBttsO25));
+    addMarket('COMBO_BTTS_OVER_35', 'BTTS Yes & Over 3.5 Goals', r3(cBttsO35));
+    addMarket('COMBO_BTTS_UNDER_35', 'BTTS Yes & Under 3.5 Goals', r3(cBttsU35));
+    addMarket('COMBO_BTTS_NO_UNDER_25', 'BTTS No & Under 2.5 Goals', r3(cBttsNoU25));
+
+    // Team Goals & Clean Sheets
+    addMarket('HOME_OVER_05', `${homeTeam} Over 0.5 Goals`, r3(homeOver05));
+    addMarket('HOME_UNDER_05', `${homeTeam} Under 0.5 Goals`, r3(1 - homeOver05));
+    addMarket('HOME_OVER_15', `${homeTeam} Over 1.5 Goals`, r3(homeOver15));
+    addMarket('HOME_UNDER_15', `${homeTeam} Under 1.5 Goals`, r3(1 - homeOver15));
+    addMarket('HOME_OVER_25', `${homeTeam} Over 2.5 Goals`, r3(homeOver25));
+    addMarket('HOME_UNDER_25', `${homeTeam} Under 2.5 Goals`, r3(1 - homeOver25));
+
+    addMarket('AWAY_OVER_05', `${awayTeam} Over 0.5 Goals`, r3(awayOver05));
+    addMarket('AWAY_UNDER_05', `${awayTeam} Under 0.5 Goals`, r3(1 - awayOver05));
+    addMarket('AWAY_OVER_15', `${awayTeam} Over 1.5 Goals`, r3(awayOver15));
+    addMarket('AWAY_UNDER_15', `${awayTeam} Under 1.5 Goals`, r3(1 - awayOver15));
+    addMarket('AWAY_OVER_25', `${awayTeam} Over 2.5 Goals`, r3(awayOver25));
+    addMarket('AWAY_UNDER_25', `${awayTeam} Under 2.5 Goals`, r3(1 - awayOver25));
+
+    addMarket('HOME_CLEAN_SHEET', `${homeTeam} Clean Sheet (Yes)`, r3(homeCleanSheet));
+    addMarket('AWAY_CLEAN_SHEET', `${awayTeam} Clean Sheet (Yes)`, r3(awayCleanSheet));
+
+    if (!isStandingsClose) {
+      addMarket('HOME_WIN_TO_NIL', `${homeTeam} Win to Nil`, r3(homeWinToNil));
+      addMarket('AWAY_WIN_TO_NIL', `${awayTeam} Win to Nil`, r3(awayWinToNil));
+      addMarket('HANDICAP_HOME_MINUS_1', `${homeTeam} (-1.5) Handicap`, r3(hMinus1));
+      addMarket('HANDICAP_AWAY_MINUS_1', `${awayTeam} (-1.5) Handicap`, r3(aMinus1));
+    }
+
+    // Multi-Goals & Odd/Even Specials
+    addMarket('MULTIGOALS_1_3', 'Multi-Goals: 1 - 3 Goals', r3(mg13));
+    addMarket('MULTIGOALS_2_4', 'Multi-Goals: 2 - 4 Goals', r3(mg24));
+    addMarket('MULTIGOALS_2_5', 'Multi-Goals: 2 - 5 Goals', r3(mg25));
+    addMarket('GOALS_ODD', 'Total Goals - Odd', r3(goalsOdd));
+    addMarket('GOALS_EVEN', 'Total Goals - Even', r3(1 - goalsOdd));
+
+    // Identify MOST LIKELY Outcome strictly from core primary markets so extreme O/U 0.5/4.5 lines don't overshadow main tips
+    const CORE_PRIMARY_KEYS = new Set<MarketOption['key']>([
+      'HOME_WIN',
+      'DRAW',
+      'AWAY_WIN',
+      'OVER_25',
+      'UNDER_25',
+      'BTTS_YES',
+      'BTTS_NO',
+      'DOUBLE_CHANCE_1X',
+      'DOUBLE_CHANCE_X2',
+    ]);
+    const coreCandidates = markets.filter((m) => CORE_PRIMARY_KEYS.has(m.key));
+    let mostLikelyMarket = coreCandidates[0] || markets[0];
+    for (const m of coreCandidates) {
       if (m.probability > (mostLikelyMarket?.probability || 0)) {
         mostLikelyMarket = m;
       }

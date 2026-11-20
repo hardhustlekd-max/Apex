@@ -20,6 +20,7 @@
     "better-sqlite3": "^13.0.3",
     "compression": "^1.8.2",
     "express": "^4.21.2",
+    "firebase": "^13.4.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",

@@ -86,6 +86,9 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
           <span className="font-semibold text-sm text-theme-main">
             Bet Slip ({selections.length})
           </span>
+          <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-md bg-theme-primary/15 text-theme-primary">
+            {selections.length > 1 ? `Combo (${selections.length}-Fold)` : 'Single'}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-theme-primary tabular-nums">
@@ -136,6 +139,23 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   placeholder="100"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 tabular-nums">
+              {[50, 100, 250, 500].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setStake(String(preset))}
+                  className={`h-[26px] rounded-lg text-2xs font-semibold transition-colors cursor-pointer ${
+                    numericStake === preset
+                      ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                      : 'bg-theme-subtle text-theme-sub hover:text-theme-main border border-theme-subdued'
+                  }`}
+                >
+                  {preset} Br
+                </button>
+              ))}
             </div>
 
             <div className="flex items-center justify-between text-xs tabular-nums">
