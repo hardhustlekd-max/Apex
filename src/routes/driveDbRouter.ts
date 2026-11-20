@@ -46,6 +46,54 @@ function extractBearerToken(req: Request): string | null {
   return token.length > 10 ? token : null;
 }
 
+async function parseGoogleDriveError(resp: Response, fallbackPrefix: string): Promise<{
+  status: number;
+  needsReauth: boolean;
+  message: string;
+}> {
+  const errText = await resp.text().catch(() => '');
+  let apiMessage = '';
+  let reason = '';
+  try {
+    const parsed = JSON.parse(errText);
+    apiMessage = parsed?.error?.message || '';
+    reason = parsed?.error?.errors?.[0]?.reason || '';
+  } catch {}
+
+  const lowerMsg = apiMessage.toLowerCase();
+  const isScopeOrTokenError =
+    resp.status === 401 ||
+    reason === 'authError' ||
+    reason === 'insufficientPermissions' ||
+    reason === 'unauthorized' ||
+    lowerMsg.includes('insufficient authentication scopes') ||
+    lowerMsg.includes('invalid credentials');
+
+  if (reason === 'accessNotConfigured' || lowerMsg.includes('has not been used in project') || lowerMsg.includes('it is disabled')) {
+    return {
+      status: 403,
+      needsReauth: false,
+      message: apiMessage || 'Google Drive API is not enabled on the Google Cloud project.',
+    };
+  }
+
+  if (isScopeOrTokenError) {
+    return {
+      status: 401,
+      needsReauth: true,
+      message: apiMessage
+        ? `Google Drive authorization failed (${apiMessage}). Please sign in again and allow Google Drive file access.`
+        : 'Google Drive session expired or missing Drive file permission. Please sign in again.',
+    };
+  }
+
+  return {
+    status: resp.status >= 400 ? resp.status : 500,
+    needsReauth: false,
+    message: apiMessage || `${fallbackPrefix} (${resp.status})${errText ? `: ${errText.slice(0, 180)}` : ''}`,
+  };
+}
+
 async function listDriveBackupFiles(token: string): Promise<DriveFileMeta[]> {
   const q = encodeURIComponent(`name = '${DRIVE_DB_FILENAME}' and trashed = false`);
   const fields = encodeURIComponent('files(id, name, size, modifiedTime, mimeType, webViewLink)');
@@ -55,17 +103,12 @@ async function listDriveBackupFiles(token: string): Promise<DriveFileMeta[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (resp.status === 401 || resp.status === 403) {
-    const errText = await resp.text().catch(() => '');
-    const err: any = new Error('Google Drive authorization expired or insufficient permissions.');
-    err.status = resp.status;
-    err.details = errText;
-    throw err;
-  }
-
   if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`Google Drive list failed (${resp.status}): ${errText.slice(0, 200)}`);
+    const parsed = await parseGoogleDriveError(resp, 'Google Drive list failed');
+    const err: any = new Error(parsed.message);
+    err.status = parsed.status;
+    err.needsReauth = parsed.needsReauth;
+    throw err;
   }
 
   const data = (await resp.json()) as { files?: DriveFileMeta[] };
@@ -101,11 +144,12 @@ driveDbRouter.get('/status', async (req: Request, res: Response) => {
       localStats,
     });
   } catch (err: any) {
-    const status = err?.status === 401 || err?.status === 403 ? 401 : 500;
+    const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
+    const needsReauth = Boolean(err?.needsReauth || status === 401);
     return res.status(status).json({
       success: false,
       isDevPreview: true,
-      needsReauth: status === 401,
+      needsReauth,
       error: err?.message || 'Failed to check Google Drive backup status.',
     });
   }
@@ -172,17 +216,12 @@ driveDbRouter.post('/upload', async (req: Request, res: Response) => {
       body: JSON.stringify(metadata),
     });
 
-    if (initResp.status === 401 || initResp.status === 403) {
-      return res.status(401).json({
-        success: false,
-        needsReauth: true,
-        error: 'Google Drive session expired. Please sign in with Google again.',
-      });
-    }
-
     if (!initResp.ok) {
-      const errText = await initResp.text().catch(() => '');
-      throw new Error(`Failed to initiate Google Drive upload (${initResp.status}): ${errText.slice(0, 200)}`);
+      const parsed = await parseGoogleDriveError(initResp, 'Failed to initiate Google Drive upload');
+      const err: any = new Error(parsed.message);
+      err.status = parsed.status;
+      err.needsReauth = parsed.needsReauth;
+      throw err;
     }
 
     const uploadUri = initResp.headers.get('location');
@@ -222,10 +261,10 @@ driveDbRouter.post('/upload', async (req: Request, res: Response) => {
       sizeBytes: fileSize,
     });
   } catch (err: any) {
-    const status = err?.status === 401 || err?.status === 403 ? 401 : 500;
+    const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
     return res.status(status).json({
       success: false,
-      needsReauth: status === 401,
+      needsReauth: Boolean(err?.needsReauth || status === 401),
       error: err?.message || 'Failed to upload SQLite database to Google Drive.',
     });
   } finally {
@@ -273,17 +312,12 @@ driveDbRouter.post('/restore', async (req: Request, res: Response) => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (downloadResp.status === 401 || downloadResp.status === 403) {
-      return res.status(401).json({
-        success: false,
-        needsReauth: true,
-        error: 'Google Drive session expired. Please sign in with Google again.',
-      });
-    }
-
     if (!downloadResp.ok) {
-      const errText = await downloadResp.text().catch(() => '');
-      throw new Error(`Failed to download Google Drive backup (${downloadResp.status}): ${errText.slice(0, 200)}`);
+      const parsed = await parseGoogleDriveError(downloadResp, 'Failed to download Google Drive backup');
+      const err: any = new Error(parsed.message);
+      err.status = parsed.status;
+      err.needsReauth = parsed.needsReauth;
+      throw err;
     }
 
     const arrayBuf = await downloadResp.arrayBuffer();
@@ -311,10 +345,10 @@ driveDbRouter.post('/restore', async (req: Request, res: Response) => {
       tableCounts: restoreResult.tableCounts,
     });
   } catch (err: any) {
-    const status = err?.status === 401 || err?.status === 403 ? 401 : 500;
+    const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
     return res.status(status).json({
       success: false,
-      needsReauth: status === 401,
+      needsReauth: Boolean(err?.needsReauth || status === 401),
       error: err?.message || 'Failed to restore SQLite database from Google Drive.',
     });
   } finally {
@@ -349,17 +383,12 @@ driveDbRouter.delete('/file/:fileId', async (req: Request, res: Response) => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (delResp.status === 401 || delResp.status === 403) {
-      return res.status(401).json({
-        success: false,
-        needsReauth: true,
-        error: 'Google Drive session expired. Please sign in with Google again.',
-      });
-    }
-
     if (!delResp.ok && delResp.status !== 204) {
-      const errText = await delResp.text().catch(() => '');
-      throw new Error(`Failed to delete Google Drive backup (${delResp.status}): ${errText.slice(0, 200)}`);
+      const parsed = await parseGoogleDriveError(delResp, 'Failed to delete Google Drive backup');
+      const err: any = new Error(parsed.message);
+      err.status = parsed.status;
+      err.needsReauth = parsed.needsReauth;
+      throw err;
     }
 
     loggerService.addLog({
@@ -371,10 +400,10 @@ driveDbRouter.delete('/file/:fileId', async (req: Request, res: Response) => {
 
     return res.json({ success: true, deletedFileId: fileId });
   } catch (err: any) {
-    const status = err?.status === 401 || err?.status === 403 ? 401 : 500;
+    const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
     return res.status(status).json({
       success: false,
-      needsReauth: status === 401,
+      needsReauth: Boolean(err?.needsReauth || status === 401),
       error: err?.message || 'Failed to delete Google Drive backup.',
     });
   }

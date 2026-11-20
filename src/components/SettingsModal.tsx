@@ -18,16 +18,18 @@ import {
   LogOut,
   AlertTriangle,
 } from 'lucide-react';
-import type { User as FirebaseUser } from 'firebase/auth';
 import { EngineSettings, ProviderStatus } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import {
   initDriveAuth,
   googleDriveSignIn,
+  googleDriveSignInViaGis,
+  preloadGoogleIdentityServices,
   getDriveAccessToken,
   clearDriveAccessToken,
   driveLogout,
   getCurrentDriveUser,
+  DriveUserProfile,
 } from '../core/googleDriveAuth.js';
 import { COLOR_THEMES, applyColorTheme, getActiveColorThemeId } from '../core/themeEngine.js';
 import {
@@ -116,10 +118,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Dev Preview Only: Google Drive SQLite Sync state (token strictly kept in memory)
   const isDevPreviewClient = Boolean(isViteDev) && storageStatus?.storageEngine?.isDevPreview !== false;
-  const [driveUser, setDriveUser] = useState<FirebaseUser | null>(() => getCurrentDriveUser());
+  const [driveUser, setDriveUser] = useState<DriveUserProfile | null>(() => getCurrentDriveUser());
   const [driveToken, setDriveToken] = useState<string | null>(() => getDriveAccessToken());
   const [driveNeedsAuth, setDriveNeedsAuth] = useState<boolean>(() => !getDriveAccessToken());
   const [isDriveLoggingIn, setIsDriveLoggingIn] = useState<boolean>(false);
+  const [showDirectOAuthFallback, setShowDirectOAuthFallback] = useState<boolean>(false);
   const [isCheckingDrive, setIsCheckingDrive] = useState<boolean>(false);
   const [isDriveMutating, setIsDriveMutating] = useState<boolean>(false);
   const [driveFileMeta, setDriveFileMeta] = useState<{
@@ -147,6 +150,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setDriveToken(null);
         setDriveNeedsAuth(true);
         setDriveFileMeta(null);
+        setDriveNotice({
+          type: 'error',
+          text: res.error || 'Google Drive session expired or missing permissions. Please sign in again.',
+        });
         return;
       }
       if (res.success) {
@@ -162,11 +169,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (!isViteDev) return;
+    void preloadGoogleIdentityServices();
     const unsub = initDriveAuth(
       (u, tok) => {
         setDriveUser(u);
         setDriveToken(tok);
         setDriveNeedsAuth(false);
+        setShowDirectOAuthFallback(false);
       },
       () => {
         setDriveUser(getCurrentDriveUser());
@@ -178,18 +187,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return () => unsub();
   }, []);
 
-  const handleDriveSignIn = async () => {
+  const handleDriveSignIn = async (mode: 'FIREBASE' | 'GIS' = 'FIREBASE') => {
     setIsDriveLoggingIn(true);
     setDriveNotice(null);
     try {
-      const res = await googleDriveSignIn();
+      const res = mode === 'GIS' ? await googleDriveSignInViaGis() : await googleDriveSignIn();
       if (res) {
         setDriveUser(res.user);
         setDriveToken(res.accessToken);
         setDriveNeedsAuth(false);
+        setShowDirectOAuthFallback(false);
         await checkDriveBackupStatus(res.accessToken);
       }
     } catch (err: any) {
+      if (mode === 'FIREBASE') {
+        setShowDirectOAuthFallback(true);
+      }
       setDriveNotice({ type: 'error', text: err?.message || 'Google sign-in failed.' });
     } finally {
       setIsDriveLoggingIn(false);
@@ -628,25 +641,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Store or restore <span className="font-mono text-theme-main">football_engine.db</span> ({storageStatus?.storageEngine?.sizeMB ?? 0} MB) in your Google Drive strictly for dev server preview sessions.
                   </p>
 
+                  {driveNotice && (
+                    <div
+                      className={`px-2.5 py-2 rounded-xl text-xs font-medium flex items-start gap-2 border ${
+                        driveNotice.type === 'success'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400'
+                      }`}
+                    >
+                      {driveNotice.type === 'success' ? (
+                        <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      )}
+                      <span className="break-words">{driveNotice.text}</span>
+                    </div>
+                  )}
+
                   {driveNeedsAuth || !driveToken ? (
                     <div className="pt-0.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <span className="text-xs text-theme-dim">
                         Sign in to connect Google Drive for dev preview database sync.
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => void handleDriveSignIn()}
-                        disabled={isDriveLoggingIn}
-                        className="inline-flex items-center justify-center gap-2.5 h-[38px] px-4 rounded-xl bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm shadow-xs transition-colors cursor-pointer disabled:opacity-60 shrink-0"
-                      >
-                        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                        </svg>
-                        <span>{isDriveLoggingIn ? 'Signing in...' : 'Sign in with Google'}</span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => void handleDriveSignIn('FIREBASE')}
+                          disabled={isDriveLoggingIn}
+                          className="inline-flex items-center justify-center gap-2.5 h-[38px] px-4 rounded-xl bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm shadow-xs transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                          </svg>
+                          <span>{isDriveLoggingIn ? 'Signing in...' : 'Sign in with Google'}</span>
+                        </button>
+                        {showDirectOAuthFallback && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => void handleDriveSignIn('GIS')}
+                            disabled={isDriveLoggingIn}
+                            title="Connect directly via Google Identity Services OAuth popup"
+                          >
+                            <span>Direct Google OAuth</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-2.5">
@@ -688,23 +731,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </Button>
                         </div>
                       </div>
-
-                      {driveNotice && (
-                        <div
-                          className={`px-2.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border ${
-                            driveNotice.type === 'success'
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400'
-                          }`}
-                        >
-                          {driveNotice.type === 'success' ? (
-                            <Check className="w-3.5 h-3.5 shrink-0" />
-                          ) : (
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          )}
-                          <span>{driveNotice.text}</span>
-                        </div>
-                      )}
 
                       {pendingDriveConfirm ? (
                         <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">

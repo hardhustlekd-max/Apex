@@ -286,6 +286,15 @@ export class FootballDB {
           updated_at = excluded.updated_at
       `);
 
+      const syncPredLiveStmt = sqliteDb.prepare(`
+        UPDATE predictions
+        SET status = ?,
+            match_state = CASE WHEN ? IN ('FINISHED', 'CANCELLED', 'POSTPONED') THEN 'completed' ELSE match_state END,
+            home_score = COALESCE(?, home_score),
+            away_score = COALESCE(?, away_score)
+        WHERE fixture_id IN (?, ?)
+      `);
+
       const now = new Date().toISOString();
       const insertMany = sqliteDb.transaction((rows: Fixture[]) => {
         for (const f of rows) {
@@ -320,6 +329,17 @@ export class FootballDB {
             f.leagueUrl || (f as any).league_url || null,
             now
           );
+          if (f.status === 'LIVE' || f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') {
+            const cleanId = cleanFixtureId(f.id);
+            syncPredLiveStmt.run(
+              f.status,
+              f.status,
+              f.score?.home ?? null,
+              f.score?.away ?? null,
+              cleanId,
+              `fs_${cleanId}`
+            );
+          }
         }
       });
 
@@ -376,16 +396,32 @@ export class FootballDB {
             updated_at = ?
         WHERE id IN (?, ?)
       `);
+      const syncPredStmt = sqliteDb.prepare(`
+        UPDATE predictions
+        SET status = ?,
+            match_state = CASE WHEN ? IN ('FINISHED', 'CANCELLED', 'POSTPONED') THEN 'completed' ELSE match_state END,
+            home_score = COALESCE(?, home_score),
+            away_score = COALESCE(?, away_score)
+        WHERE fixture_id IN (?, ?)
+      `);
       const now = new Date().toISOString();
       const applyUpdates = sqliteDb.transaction((items: typeof updates) => {
         for (const u of items) {
-          const cleanId = u.id.replace(/^fs_/, '');
+          const cleanId = cleanFixtureId(u.id);
           stmt.run(
             u.status,
             u.kickOffTime || null,
             u.score ? JSON.stringify(u.score) : null,
             now,
             u.id,
+            `fs_${cleanId}`
+          );
+          syncPredStmt.run(
+            u.status,
+            u.status,
+            u.score?.home ?? null,
+            u.score?.away ?? null,
+            cleanId,
             `fs_${cleanId}`
           );
         }
@@ -1640,74 +1676,139 @@ export class FootballDB {
     }
   }
 
-  evaluateBets(): void {
+  evaluateBets(
+    liveScoresOverride?: Array<{ fixtureId: string; homeScore: number; awayScore: number; minute?: number; status?: string }>
+  ): void {
     try {
-      const pendingBets = this.getAllBets().filter((b) => b.status === 'PENDING');
-      if (pendingBets.length === 0) return;
+      const betsToCheck = this.getAllBets().filter(
+        (b) => b.status === 'PENDING' || b.selections.some((s) => (s.status || 'PENDING') === 'PENDING')
+      );
+      if (betsToCheck.length === 0) return;
+
+      type ScoreMapEntry = {
+        home?: number;
+        away?: number;
+        isFinished: boolean;
+        isVoided?: boolean;
+        matchStatus: 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'CANCELLED' | 'POSTPONED';
+        minute?: number;
+      };
 
       // Gather score cache from historical_matches, upcoming_fixtures, predictions, and flashscore_scraped_matches
-      const scoreMap = new Map<string, { home: number; away: number; isFinished: boolean }>();
+      const scoreMap = new Map<string, ScoreMapEntry>();
 
       const histRows = sqliteDb.prepare("SELECT id, fthg, ftag FROM historical_matches WHERE fthg IS NOT NULL AND ftag IS NOT NULL").all() as any[];
       for (const r of histRows) {
         const cleanId = cleanFixtureId(r.id);
-        const entry = {
+        const entry: ScoreMapEntry = {
           home: Number(r.fthg),
           away: Number(r.ftag),
           isFinished: true,
+          matchStatus: 'FINISHED',
         };
         scoreMap.set(cleanId, entry);
         scoreMap.set(String(r.id), entry);
       }
 
-      const upcomingRows = sqliteDb.prepare("SELECT id, status, score_json FROM upcoming_fixtures WHERE score_json IS NOT NULL").all() as any[];
+      const upcomingRows = sqliteDb
+        .prepare("SELECT id, status, score_json FROM upcoming_fixtures WHERE score_json IS NOT NULL OR status IN ('LIVE', 'FINISHED', 'CANCELLED', 'POSTPONED')")
+        .all() as any[];
       for (const r of upcomingRows) {
+        const rawStatus = String(r.status || '').toUpperCase();
+        const isFin = rawStatus === 'FINISHED';
+        const isCanc = rawStatus === 'CANCELLED';
+        const isPostp = rawStatus === 'POSTPONED';
+        const isLive = rawStatus === 'LIVE';
         const parsedScore = safeJsonParse<{ home?: number; away?: number } | null>(r.score_json, null);
-        if (parsedScore && typeof parsedScore.home === 'number' && typeof parsedScore.away === 'number') {
-          const cleanId = cleanFixtureId(r.id);
-          const isFin = String(r.status || '').toUpperCase() === 'FINISHED';
-          const existing = scoreMap.get(cleanId);
-          if (!existing || !existing.isFinished || isFin) {
-            const entry = {
-              home: parsedScore.home,
-              away: parsedScore.away,
-              isFinished: isFin,
-            };
-            scoreMap.set(cleanId, entry);
-            scoreMap.set(String(r.id), entry);
-          }
+        const hasScore = Boolean(parsedScore && typeof parsedScore.home === 'number' && typeof parsedScore.away === 'number');
+        if (!hasScore && !isCanc && !isPostp) continue;
+
+        const cleanId = cleanFixtureId(r.id);
+        const existing = scoreMap.get(cleanId);
+        if (!existing || (!existing.isFinished && (isFin || isLive || isCanc || isPostp)) || isFin) {
+          const entry: ScoreMapEntry = {
+            home: hasScore ? Number(parsedScore!.home) : undefined,
+            away: hasScore ? Number(parsedScore!.away) : undefined,
+            isFinished: isFin,
+            isVoided: isCanc || isPostp,
+            matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
+          };
+          scoreMap.set(cleanId, entry);
+          scoreMap.set(String(r.id), entry);
         }
       }
 
-      const predRows = sqliteDb.prepare("SELECT fixture_id, home_score, away_score, status FROM predictions WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
+      const predRows = sqliteDb
+        .prepare("SELECT fixture_id, home_score, away_score, status FROM predictions WHERE home_score IS NOT NULL AND away_score IS NOT NULL OR status IN ('CANCELLED', 'POSTPONED')")
+        .all() as any[];
       for (const r of predRows) {
         const id = cleanFixtureId(r.fixture_id);
-        const isFin = String(r.status || '').toUpperCase() === 'FINISHED';
+        const rawStatus = String(r.status || '').toUpperCase();
+        const isFin = rawStatus === 'FINISHED';
+        const isCanc = rawStatus === 'CANCELLED';
+        const isPostp = rawStatus === 'POSTPONED';
+        const isLive = rawStatus === 'LIVE';
+        const hasScore = r.home_score !== null && r.away_score !== null;
+        if (!hasScore && !isCanc && !isPostp) continue;
+
         const existing = scoreMap.get(id);
-        if (!existing || !existing.isFinished || isFin) {
-          const entry = {
-            home: Number(r.home_score),
-            away: Number(r.away_score),
+        if (!existing || (!existing.isFinished && (isFin || isLive || isCanc || isPostp)) || isFin) {
+          const entry: ScoreMapEntry = {
+            home: hasScore ? Number(r.home_score) : undefined,
+            away: hasScore ? Number(r.away_score) : undefined,
             isFinished: isFin,
+            isVoided: isCanc || isPostp,
+            matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
           };
           scoreMap.set(id, entry);
           scoreMap.set(String(r.fixture_id), entry);
         }
       }
 
-      const scrapedRows = sqliteDb.prepare("SELECT match_id, home_score, away_score, status FROM flashscore_scraped_matches WHERE home_score IS NOT NULL AND away_score IS NOT NULL").all() as any[];
+      const scrapedRows = sqliteDb
+        .prepare("SELECT match_id, home_score, away_score, status FROM flashscore_scraped_matches WHERE home_score IS NOT NULL AND away_score IS NOT NULL OR status IN ('CANCELLED', 'POSTPONED')")
+        .all() as any[];
       for (const r of scrapedRows) {
         const id = cleanFixtureId(r.match_id);
-        const isFin = String(r.status || '').toUpperCase() === 'FINISHED' || Number(r.status) === 3 || Number(r.status) === 4;
+        const rawStatus = String(r.status || '').toUpperCase();
+        const isFin = rawStatus === 'FINISHED' || Number(r.status) === 3 || Number(r.status) === 4;
+        const isCanc = rawStatus === 'CANCELLED';
+        const isPostp = rawStatus === 'POSTPONED';
+        const isLive = rawStatus === 'LIVE';
+        const hasScore = r.home_score !== null && r.away_score !== null;
+        if (!hasScore && !isCanc && !isPostp) continue;
+
         const existing = scoreMap.get(id);
-        if (!existing || !existing.isFinished || isFin) {
-          const entry = {
-            home: Number(r.home_score),
-            away: Number(r.away_score),
+        if (!existing || (!existing.isFinished && (isFin || isLive || isCanc || isPostp)) || isFin) {
+          const entry: ScoreMapEntry = {
+            home: hasScore ? Number(r.home_score) : undefined,
+            away: hasScore ? Number(r.away_score) : undefined,
             isFinished: isFin,
+            isVoided: isCanc || isPostp,
+            matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
           };
           scoreMap.set(id, entry);
           scoreMap.set(String(r.match_id), entry);
+        }
+      }
+
+      if (Array.isArray(liveScoresOverride)) {
+        for (const ls of liveScoresOverride) {
+          if (!ls.fixtureId) continue;
+          const cleanId = cleanFixtureId(ls.fixtureId);
+          const existing = scoreMap.get(cleanId);
+          // Overlay live score & minute if match isn't already definitively finished
+          if (!existing || !existing.isFinished) {
+            const entry: ScoreMapEntry = {
+              home: Number(ls.homeScore ?? 0),
+              away: Number(ls.awayScore ?? 0),
+              isFinished: false,
+              matchStatus: 'LIVE',
+              minute: typeof ls.minute === 'number' ? ls.minute : undefined,
+            };
+            scoreMap.set(cleanId, entry);
+            scoreMap.set(ls.fixtureId, entry);
+          }
         }
       }
 
@@ -1805,9 +1906,9 @@ export class FootballDB {
         }
       };
 
-      const evalTx = sqliteDb.transaction((betsToEval: SlipBet[]) => {
+      const evalTx = sqliteDb.transaction((betsList: SlipBet[]) => {
         const now = new Date().toISOString();
-        for (const bet of betsToEval) {
+        for (const bet of betsList) {
           if (!Array.isArray(bet.selections) || bet.selections.length === 0) {
             continue;
           }
@@ -1822,13 +1923,24 @@ export class FootballDB {
 
             if (!scoreInfo) {
               sel.status = 'PENDING';
+              sel.matchStatus = sel.matchStatus || 'SCHEDULED';
               allEvaluated = false;
               effectiveTotalOdds *= Number(sel.odds) || 1;
               continue;
             }
 
-            sel.score = { home: scoreInfo.home, away: scoreInfo.away };
-            if (!scoreInfo.isFinished) {
+            sel.matchStatus = scoreInfo.matchStatus;
+            sel.minute = scoreInfo.matchStatus === 'LIVE' ? scoreInfo.minute : undefined;
+            if (typeof scoreInfo.home === 'number' && typeof scoreInfo.away === 'number') {
+              sel.score = { home: scoreInfo.home, away: scoreInfo.away };
+            }
+
+            if (scoreInfo.isVoided) {
+              sel.status = 'VOID';
+              continue;
+            }
+
+            if (!scoreInfo.isFinished || typeof scoreInfo.home !== 'number' || typeof scoreInfo.away !== 'number') {
               sel.status = 'PENDING';
               allEvaluated = false;
               effectiveTotalOdds *= Number(sel.odds) || 1;
@@ -1853,6 +1965,12 @@ export class FootballDB {
             }
           }
 
+          if (bet.status === 'LOST') {
+            // Preserve settled LOST slip status while updating live/final scores on remaining legs
+            updateStmt.run('LOST', bet.totalOdds, bet.potentialWin, JSON.stringify(bet.selections), bet.evaluatedAt || now, bet.id);
+            continue;
+          }
+
           const updatedTotalOdds = Number(effectiveTotalOdds.toFixed(2));
           const updatedPotentialWin = Number((bet.stake * updatedTotalOdds).toFixed(2));
 
@@ -1874,7 +1992,7 @@ export class FootballDB {
         }
       });
 
-      evalTx(pendingBets);
+      evalTx(betsToCheck);
     } catch (err: any) {
       console.warn('[FootballDB] Error evaluating bets:', err?.message);
     }
