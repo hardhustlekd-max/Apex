@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install --include=dev || npm ci --include=dev || npm install
 
 COPY . .
 RUN mkdir -p data && npm run build && npm prune --omit=dev
