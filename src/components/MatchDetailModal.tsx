@@ -390,6 +390,28 @@ const MatchDetailModalContent: React.FC<{
     };
   }, [fixture.id, fixture.homeTeam, fixture.awayTeam]);
 
+  // Synchronize live status, score, and minute updates from parent fixture updates
+  useEffect(() => {
+    setEnrichedFixture((prev) => {
+      const statusChanged = fixture.status && fixture.status !== prev.status;
+      const minuteChanged = fixture.minute !== undefined && fixture.minute !== prev.minute;
+      const scoreChanged =
+        fixture.score &&
+        (fixture.score.home !== prev.score?.home || fixture.score.away !== prev.score?.away);
+
+      if (!statusChanged && !minuteChanged && !scoreChanged) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        status: fixture.status || prev.status,
+        minute: fixture.minute !== undefined ? fixture.minute : prev.minute,
+        score: fixture.score || prev.score,
+      };
+    });
+  }, [fixture.status, fixture.minute, fixture.score?.home, fixture.score?.away]);
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -803,12 +825,25 @@ const MatchDetailModalContent: React.FC<{
           </div>
 
           <div className="flex flex-col items-center shrink-0 px-1.5">
-            <span className="text-xl leading-none font-bold tabular-nums text-theme-main tracking-[-0.025em]">
-              {fixture.score ? `${fixture.score.home} - ${fixture.score.away}` : 'VS'}
+            <span className={`text-xl leading-none font-bold tabular-nums tracking-[-0.025em] ${
+              (currentFixture.status || fixture.status) === 'LIVE' ? 'text-rose-600 dark:text-rose-400' : 'text-theme-main'
+            }`}>
+              {(currentFixture.score || fixture.score) ? `${(currentFixture.score || fixture.score)!.home} - ${(currentFixture.score || fixture.score)!.away}` : 'VS'}
             </span>
-            <span className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] mt-1 tabular-nums">
-              {fixture.status === 'LIVE' ? 'LIVE' : fixture.status === 'FINISHED' ? 'FT' : formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
-            </span>
+            {(currentFixture.status || fixture.status) === 'LIVE' ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 mt-1 tabular-nums whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                <span>{(currentFixture.minute ?? fixture.minute) ? `${currentFixture.minute ?? fixture.minute}'` : 'LIVE'}</span>
+              </span>
+            ) : (currentFixture.status || fixture.status) === 'FINISHED' ? (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-1 tabular-nums whitespace-nowrap">
+                FT
+              </span>
+            ) : (
+              <span className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] mt-1 tabular-nums">
+                {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
+              </span>
+            )}
             {isStandingsClose && (
               <span className="text-2xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5 whitespace-nowrap">
                 Close Table · No 1X2

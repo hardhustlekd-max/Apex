@@ -1,26 +1,16 @@
 import express from 'express';
 import path from 'path';
-import { db } from './src/core/db.js';
-import { predictionsDb } from './src/core/predictionsDb.js';
 import { app } from './src/app.js';
-import { fixturesWorkerService } from './src/services/fixturesWorkerService.js';
+import { getSqliteGateState } from './src/core/sqliteClient.js';
 
 async function startServer() {
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Initialize local SQLite database engine
-  console.log('Initializing local SQLite database engine (better-sqlite3 WAL Mode)...');
-  await db.init();
-  try {
-    await predictionsDb.init();
-  } catch (err) {
-    console.warn('predictionsDb init notice:', err);
-  }
-
-  // Warm the server-side fixtures projection worker index in the background
-  void fixturesWorkerService.ensureIndexReady(false).catch((err) => {
-    console.warn('fixturesWorkerService warmup notice:', err);
-  });
+  // SQLite DB initialization is intentionally blocked at startup unless switched on manually
+  const gate = getSqliteGateState();
+  console.log(
+    `[SQLite] Startup initialization blocked (enabled=${gate.enabled}, dbExists=${gate.dbExists}). Waiting for manual switch.`
+  );
 
   // Vite integration: development middleware or static production serving
   if (process.env.NODE_ENV !== 'production') {

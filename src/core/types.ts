@@ -453,8 +453,19 @@ export interface LeagueGroupDTO {
   fixtureIds: string[];
 }
 
+export interface SqliteGateState {
+  enabled: boolean;
+  initialized: boolean;
+  dbExists: boolean;
+  dbPath: string;
+  isDevPreview: boolean;
+  blockedReason: 'NOT_STARTED_MANUALLY' | 'MISSING_DB_ON_PREVIEW' | null;
+}
+
 export interface FixturesQueryResponse {
   success: boolean;
+  sqliteBlocked?: boolean;
+  sqliteGate?: SqliteGateState;
   provider: string;
   count: number;
   totalDatabaseCount: number;
@@ -465,6 +476,8 @@ export interface FixturesQueryResponse {
 
 export interface LiveFixturesResponse {
   success: boolean;
+  sqliteBlocked?: boolean;
+  sqliteGate?: SqliteGateState;
   provider: string;
   count: number;
   fixtures: Fixture[];
@@ -480,6 +493,8 @@ export interface FeaturedTipDTO {
 
 export interface FeaturedTipsResponse {
   success: boolean;
+  sqliteBlocked?: boolean;
+  sqliteGate?: SqliteGateState;
   count: number;
   totalOdds: number;
   tips: FeaturedTipDTO[];

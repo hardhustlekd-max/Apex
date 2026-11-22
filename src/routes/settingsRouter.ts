@@ -1,9 +1,19 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
+import { predictionsDb } from '../core/predictionsDb.js';
 import { DEFAULT_ENGINE_SETTINGS, EngineSettings } from '../core/types.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
-import { DB_PATH, getSqliteDbStats } from '../core/sqliteClient.js';
+import {
+  DB_PATH,
+  disableSqliteManually,
+  enableSqliteManually,
+  getSqliteDbStats,
+  getSqliteGateState,
+  isSqliteEnabled,
+} from '../core/sqliteClient.js';
 import { syncJobService } from '../services/syncJobService.js';
+import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
+import { loggerService } from '../services/loggerService.js';
 
 export const settingsRouter = Router();
 
@@ -21,12 +31,18 @@ settingsRouter.get('/', (req, res) => {
 
 const getStorageStatusHandler = (_req: any, res: any) => {
   const stats = getSqliteDbStats();
+  const gate = getSqliteGateState();
   res.json({
     success: true,
+    sqliteGate: gate,
     storageEngine: {
-      status: 'ONLINE',
-      mode: 'LOCAL_SQLITE_WAL',
-      isDevPreview: process.env.NODE_ENV !== 'production',
+      status: gate.enabled ? (gate.initialized ? 'ONLINE' : 'STANDBY') : 'BLOCKED',
+      mode: gate.enabled ? 'LOCAL_SQLITE_WAL' : 'MANUAL_SWITCH_REQUIRED',
+      isDevPreview: gate.isDevPreview,
+      enabled: gate.enabled,
+      initialized: gate.initialized,
+      dbExists: gate.dbExists,
+      blockedReason: gate.blockedReason,
       dbPath: stats.path,
       sizeMB: stats.sizeMB,
       sizeBytes: stats.sizeBytes,
@@ -34,22 +50,94 @@ const getStorageStatusHandler = (_req: any, res: any) => {
       tableCounts: stats.tableCounts,
     },
     footballDb: {
-      configured: true,
-      status: 'CONNECTED',
-      url: `Local SQLite (${stats.sizeMB} MB, WAL Mode)`,
-      latencyMs: 1,
+      configured: gate.dbExists,
+      status: gate.enabled ? 'CONNECTED' : 'BLOCKED',
+      url: gate.enabled
+        ? `Local SQLite (${stats.sizeMB} MB, WAL Mode)`
+        : gate.dbExists
+        ? `Blocked (${stats.sizeMB} MB on disk — switch on manually)`
+        : 'Not initialized (No DB file on preview)',
+      latencyMs: gate.enabled ? 1 : 0,
       sizeMB: stats.sizeMB,
     },
     predictionsDb: {
-      configured: true,
-      status: 'CONNECTED',
-      url: `${DB_PATH} (${stats.tableCounts['predictions'] || 0} predictions)`,
-      latencyMs: 1,
+      configured: gate.dbExists,
+      status: gate.enabled ? 'CONNECTED' : 'BLOCKED',
+      url: gate.enabled
+        ? `${DB_PATH} (${stats.tableCounts['predictions'] || 0} predictions)`
+        : 'SQLite initialization blocked until switched on manually',
+      latencyMs: gate.enabled ? 1 : 0,
     },
   });
 };
 
 settingsRouter.get('/storage-status', getStorageStatusHandler);
+
+settingsRouter.post('/sqlite-toggle', async (req, res) => {
+  try {
+    const requestedEnabled = Boolean(req.body?.enabled);
+
+    if (requestedEnabled) {
+      const gateBefore = getSqliteGateState();
+      const gate = enableSqliteManually();
+      await db.init();
+      await predictionsDb.init().catch(() => {});
+      await fixturesWorkerService.ensureIndexReady(true).catch(() => {});
+      const finalGate = getSqliteGateState();
+      const stats = getSqliteDbStats();
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'DATABASE',
+        source: 'SQLiteGate',
+        message: gateBefore.dbExists
+          ? `SQLite DB manually switched ON (${stats.sizeMB} MB loaded from ${DB_PATH})`
+          : `SQLite DB manually switched ON and initialized at ${DB_PATH}`,
+      });
+
+      return res.json({
+        success: true,
+        sqliteGate: finalGate,
+        stats,
+        message: gate.dbExists
+          ? 'SQLite database switched ON and initialized.'
+          : 'SQLite database created and initialized manually.',
+      });
+    } else {
+      const activeJob = syncJobService.getActiveJob();
+      if (activeJob && (activeJob.status === 'RUNNING' || activeJob.status === 'PENDING')) {
+        return res.status(409).json({
+          success: false,
+          error: 'Cannot switch off SQLite while a background sync or prediction job is running.',
+        });
+      }
+
+      const gate = disableSqliteManually();
+      await db.init();
+      await predictionsDb.init();
+      fixturesWorkerService.invalidate();
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'DATABASE',
+        source: 'SQLiteGate',
+        message: 'SQLite DB manually switched OFF (connections closed and auto-init blocked).',
+      });
+
+      return res.json({
+        success: true,
+        sqliteGate: gate,
+        stats: getSqliteDbStats(),
+        message: 'SQLite database switched OFF and auto-initialization blocked.',
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to toggle SQLite database state',
+    });
+  }
+});
 
 settingsRouter.get('/scraper-status', (req, res) => {
   try {
@@ -96,6 +184,13 @@ settingsRouter.put('/', (req, res) => {
 
 settingsRouter.post('/update-predictions', async (req, res) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        error: 'SQLite database is switched off. Enable SQLite DB manually before calculating predictions.',
+      });
+    }
     const job = syncJobService.startPredictionJob();
     res.status(202).json({
       success: true,

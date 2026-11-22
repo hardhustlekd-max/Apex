@@ -5,6 +5,7 @@ import { flashscoreScraperService } from '../services/flashscoreScraperService.j
 import { loggerService } from '../services/loggerService.js';
 import { syncJobService } from '../services/syncJobService.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
+import { isSqliteEnabled } from '../core/sqliteClient.js';
 
 export const providersRouter = Router();
 
@@ -59,6 +60,13 @@ providersRouter.get('/live-scores', async (req, res) => {
 // Starts a detached background sync job and returns HTTP 202 immediately with Job ID
 providersRouter.post('/sync/start', (req, res) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        error: 'SQLite database is switched off. Enable SQLite DB manually before starting Full Data Sync.',
+      });
+    }
     const resetDatabase = req.body?.resetDatabase ?? true;
     const resetRawFeeds = req.body?.resetRawFeeds ?? true;
     const job = syncJobService.startJob({ resetDatabase, resetRawFeeds });
@@ -97,6 +105,13 @@ providersRouter.post('/sync/cancel/:jobId', (req, res) => {
 // Dedicated Historical Data Scraper Endpoint
 providersRouter.post('/flashscore/sync-history', async (req, res) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        error: 'SQLite database is switched off. Enable SQLite DB manually before syncing history.',
+      });
+    }
     loggerService.addLog({
       level: 'INFO',
       category: 'SCRAPER',

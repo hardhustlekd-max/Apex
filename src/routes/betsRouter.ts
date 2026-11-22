@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../core/db.js';
+import { getSqliteGateState, isSqliteEnabled } from '../core/sqliteClient.js';
 import { cleanFixtureId } from '../core/types.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
@@ -12,6 +13,15 @@ const DIRECT_PROBE_TTL_MS = 20_000;
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.json({
+        success: true,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        count: 0,
+        bets: [],
+      });
+    }
     const forceLive = req.query.live === '1' || req.query.force === '1';
     const currentBets = db.getAllBets();
     const pendingLegs = currentBets.flatMap((b) =>
@@ -106,6 +116,14 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', (req: Request, res: Response) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        error: 'SQLite database is switched off. Enable SQLite DB manually before placing bets.',
+      });
+    }
     const bet = req.body;
     if (!bet || !bet.id || !Array.isArray(bet.selections)) {
       return res.status(400).json({ success: false, error: 'Invalid bet object format' });
@@ -120,6 +138,14 @@ router.post('/', (req: Request, res: Response) => {
 
 router.delete('/:id', (req: Request, res: Response) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        error: 'SQLite database is switched off. Enable SQLite DB manually before deleting bets.',
+      });
+    }
     const { id } = req.params;
     db.deleteBet(id);
     res.json({ success: true, message: 'Bet deleted successfully' });

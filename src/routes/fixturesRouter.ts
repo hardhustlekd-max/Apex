@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
+import { getSqliteGateState, isSqliteEnabled } from '../core/sqliteClient.js';
 import { cleanFixtureId } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { loggerService } from '../services/loggerService.js';
@@ -160,6 +161,14 @@ fixturesRouter.get('/history', async (req, res) => {
 
 fixturesRouter.get('/predictions/export', async (req, res) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        error: 'SQLite database is switched off. Enable SQLite DB manually before exporting predictions.',
+      });
+    }
     await db.init();
     await predictionsDb.init();
     const sortByProb = req.query.sortByProb as 'desc' | 'asc' | undefined;
@@ -243,8 +252,8 @@ fixturesRouter.get('/:id/h2h', async (req, res) => {
     let awayTeam = req.query.away as string | undefined;
     const cleanId = cleanFixtureId(fixtureId);
 
-    // If home or away team not provided in query params, resolve from DB
-    if (!homeTeam || !awayTeam) {
+    // If home or away team not provided in query params, resolve from DB when SQLite is enabled
+    if ((!homeTeam || !awayTeam) && isSqliteEnabled()) {
       await db.init();
       await predictionsDb.init();
       const stored =

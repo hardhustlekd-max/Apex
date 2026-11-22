@@ -22,12 +22,14 @@ interface BetsViewProps {
 export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
   const [bets, setBets] = useState<SlipBet[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLiveSyncing, setIsLiveSyncing] = useState<boolean>(false);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'WON' | 'LOST'>('ALL');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
-  const loadBets = useCallback(async () => {
+  const loadBets = useCallback(async (isSilent = false) => {
     try {
-      setIsLoading(true);
+      if (!isSilent) setIsLoading(true);
+      else setIsLiveSyncing(true);
       const list = await EngineService.getBets();
       const safeList = Array.isArray(list) ? list : [];
       setBets(safeList);
@@ -35,6 +37,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
       console.error('Failed to load bets:', err);
     } finally {
       setIsLoading(false);
+      setIsLiveSyncing(false);
     }
   }, []);
 
@@ -81,7 +84,12 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
   };
 
   useEffect(() => {
-    void loadBets();
+    void loadBets(false);
+    // Background polling every 12 seconds so live match scores, minutes, and slip settlement update live
+    const interval = setInterval(() => {
+      void loadBets(true);
+    }, 12000);
+    return () => clearInterval(interval);
   }, [loadBets, refreshKey]);
 
   const stats = {
@@ -96,11 +104,17 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
   return (
     <div className="max-w-4xl mx-auto w-full space-y-3 font-sans">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <SectionHeader
-          title="My Bet Slips"
-          icon={<Ticket className="w-4 h-4" />}
-          size="md"
-        />
+        <div className="flex items-center gap-2">
+          <SectionHeader
+            title="My Bet Slips"
+            icon={<Ticket className="w-4 h-4" />}
+            size="md"
+          />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isLiveSyncing ? 'animate-ping' : 'animate-pulse'}`} />
+            <span>Live Sync</span>
+          </span>
+        </div>
         <div className="flex items-center gap-1.5">
           {filteredBets.length > 0 && (
             <Button
@@ -113,8 +127,8 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
               <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
             </Button>
           )}
-          <Button variant="secondary" size="xs" onClick={() => void loadBets()} disabled={isLoading}>
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button variant="secondary" size="xs" onClick={() => void loadBets(false)} disabled={isLoading}>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading || isLiveSyncing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </Button>
         </div>
@@ -331,9 +345,18 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                       ? 'text-rose-500'
                                       : legStatus === 'VOID'
                                       ? 'text-sky-500 dark:text-sky-400'
+                                      : sel.matchStatus === 'LIVE'
+                                      ? 'text-rose-500 dark:text-rose-400 font-bold'
                                       : 'text-theme-sub'
                                   }`}>
-                                    {legStatus === 'WON' || legStatus === 'LOST' || legStatus === 'VOID' ? 'FT' : 'Live'} {sel.score.home} - {sel.score.away}
+                                    {legStatus === 'WON' || legStatus === 'LOST' || legStatus === 'VOID'
+                                      ? 'FT'
+                                      : sel.minute
+                                      ? `Live ${sel.minute}'`
+                                      : sel.matchStatus === 'LIVE'
+                                      ? 'Live'
+                                      : 'Score'}{' '}
+                                    {sel.score.home} - {sel.score.away}
                                   </span>
                                 ) : (
                                   <span className="text-2xs text-theme-dim uppercase block mt-0.5">

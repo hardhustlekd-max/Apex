@@ -24,8 +24,80 @@ export function notifyDbMutation(): void {
 export const DATA_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
 export const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
 
+export class SqliteBlockedError extends Error {
+  public readonly sqliteBlocked = true;
+  constructor(message = 'SQLite database initialization is blocked until switched on manually.') {
+    super(message);
+    this.name = 'SqliteBlockedError';
+  }
+}
+
+export function isSqliteBlockedError(err: any): boolean {
+  return Boolean(err?.sqliteBlocked || err?.name === 'SqliteBlockedError');
+}
+
+export interface SqliteGateState {
+  enabled: boolean;
+  initialized: boolean;
+  dbExists: boolean;
+  dbPath: string;
+  isDevPreview: boolean;
+  blockedReason: 'NOT_STARTED_MANUALLY' | 'MISSING_DB_ON_PREVIEW' | null;
+}
+
 let rawDbInstance: Database.Database | null = null;
 let isRecoveringDb = false;
+let sqliteManualEnabled = false;
+let isSchemaInitialized = false;
+
+export function isSqliteDbFilePresent(): boolean {
+  return fs.existsSync(DB_PATH);
+}
+
+export function isSqliteEnabled(): boolean {
+  return sqliteManualEnabled;
+}
+
+export function getSqliteGateState(): SqliteGateState {
+  const dbExists = fs.existsSync(DB_PATH);
+  const isDevPreview = process.env.NODE_ENV !== 'production';
+  let blockedReason: SqliteGateState['blockedReason'] = null;
+  if (!sqliteManualEnabled) {
+    blockedReason = !dbExists ? 'MISSING_DB_ON_PREVIEW' : 'NOT_STARTED_MANUALLY';
+  }
+  return {
+    enabled: sqliteManualEnabled,
+    initialized: Boolean(sqliteManualEnabled && rawDbInstance && isSchemaInitialized),
+    dbExists,
+    dbPath: DB_PATH,
+    isDevPreview,
+    blockedReason,
+  };
+}
+
+export function enableSqliteManually(): SqliteGateState {
+  sqliteManualEnabled = true;
+  initSqliteSchema();
+  notifyDbMutation();
+  return getSqliteGateState();
+}
+
+export function disableSqliteManually(): SqliteGateState {
+  sqliteManualEnabled = false;
+  closeSqliteDb();
+  isSchemaInitialized = false;
+  notifyDbMutation();
+  return getSqliteGateState();
+}
+
+function assertSqliteAllowed(): void {
+  if (!sqliteManualEnabled) {
+    const reason = !fs.existsSync(DB_PATH)
+      ? 'SQLite database does not exist on preview and auto-initialization is blocked until switched on manually.'
+      : 'SQLite database initialization is blocked on app startup until switched on manually.';
+    throw new SqliteBlockedError(reason);
+  }
+}
 
 const RECOVERY_TABLES = [
   'app_settings',
@@ -41,6 +113,7 @@ const RECOVERY_TABLES = [
 ];
 
 function createRawDbInstance(): Database.Database {
+  assertSqliteAllowed();
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
@@ -97,6 +170,7 @@ function cleanupOldCorruptBackups(): void {
  * Falls back to empty DB reset only if the file is completely unreadable.
  */
 export function recoverCorruptedSqliteDb(): Database.Database {
+  assertSqliteAllowed();
   if (isRecoveringDb && rawDbInstance) {
     return rawDbInstance;
   }
@@ -244,6 +318,7 @@ export function recoverCorruptedSqliteDb(): Database.Database {
  * Safely backs up and resets a confirmed corrupted SQLite database on disk
  */
 export function resetCorruptedSqliteDb(): Database.Database {
+  assertSqliteAllowed();
   console.warn('[SQLite] Backing up and resetting confirmed corrupted database file...');
   if (rawDbInstance) {
     try {
@@ -324,6 +399,7 @@ function isFatalSqliteCorruptionError(err: any): boolean {
  * Returns the current active raw SQLite database instance
  */
 export function getSqliteDb(): Database.Database {
+  assertSqliteAllowed();
   if (!rawDbInstance) {
     try {
       rawDbInstance = createRawDbInstance();
@@ -645,12 +721,11 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
   `);
 }
 
-let isSchemaInitialized = false;
-
 /**
  * Initializes all database tables and indexes for the unified 5-Pillar Football Engine
  */
 export function initSqliteSchema(): void {
+  assertSqliteAllowed();
   if (isSchemaInitialized && rawDbInstance) return;
 
   try {
@@ -791,6 +866,9 @@ export function decompressBuffer(buf: Buffer): string {
  */
 export function getSqliteDbStats(): {
   path: string;
+  dbExists: boolean;
+  enabled: boolean;
+  initialized: boolean;
   sizeBytes: number;
   sizeMB: number;
   journalMode: string;
@@ -799,9 +877,10 @@ export function getSqliteDbStats(): {
 } {
   let sizeBytes = 0;
   let walSizeBytes = 0;
+  const dbExists = fs.existsSync(DB_PATH);
 
   try {
-    if (fs.existsSync(DB_PATH)) {
+    if (dbExists) {
       sizeBytes = fs.statSync(DB_PATH).size;
     }
     const walPath = `${DB_PATH}-wal`;
@@ -822,11 +901,17 @@ export function getSqliteDbStats(): {
     'league_standings',
   ];
 
-  for (const table of tables) {
-    try {
-      const row = sqliteDb.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as any;
-      tableCounts[table] = row ? Number(row.count) : 0;
-    } catch {
+  if (sqliteManualEnabled && dbExists) {
+    for (const table of tables) {
+      try {
+        const row = sqliteDb.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as any;
+        tableCounts[table] = row ? Number(row.count) : 0;
+      } catch {
+        tableCounts[table] = 0;
+      }
+    }
+  } else {
+    for (const table of tables) {
       tableCounts[table] = 0;
     }
   }
@@ -835,9 +920,12 @@ export function getSqliteDbStats(): {
 
   return {
     path: DB_PATH,
+    dbExists,
+    enabled: sqliteManualEnabled,
+    initialized: Boolean(sqliteManualEnabled && rawDbInstance && isSchemaInitialized),
     sizeBytes: totalSize,
     sizeMB: Number((totalSize / (1024 * 1024)).toFixed(2)),
-    journalMode: 'WAL',
+    journalMode: sqliteManualEnabled ? 'WAL' : 'BLOCKED',
     tableCounts,
     walSizeBytes,
   };
@@ -853,6 +941,7 @@ export function closeSqliteDb(): void {
     }
     rawDbInstance = null;
   }
+  isSchemaInitialized = false;
 }
 
 /**
@@ -902,6 +991,7 @@ export async function replaceSqliteDbFromFile(
   }
 
   // 2. Close current active DB handle and preserve pre-restore backup
+  const prevManualEnabled = sqliteManualEnabled;
   closeSqliteDb();
   isSchemaInitialized = false;
 
@@ -917,6 +1007,7 @@ export async function replaceSqliteDbFromFile(
     }
 
     fs.copyFileSync(sourcePath, DB_PATH);
+    sqliteManualEnabled = true;
     initSqliteSchema();
 
     // Remove temporary pre-restore copy after verified init
@@ -935,12 +1026,15 @@ export async function replaceSqliteDbFromFile(
   } catch (err) {
     // Rollback to previous DB file if swap failed
     closeSqliteDb();
+    sqliteManualEnabled = prevManualEnabled;
     isSchemaInitialized = false;
     if (movedOldDb && fs.existsSync(backupPrevPath)) {
       try {
         if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
         fs.renameSync(backupPrevPath, DB_PATH);
-        initSqliteSchema();
+        if (sqliteManualEnabled) {
+          initSqliteSchema();
+        }
       } catch {}
     }
     throw err;

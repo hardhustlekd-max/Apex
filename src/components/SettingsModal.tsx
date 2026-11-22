@@ -17,8 +17,9 @@ import {
   Trash2,
   LogOut,
   AlertTriangle,
+  Power,
 } from 'lucide-react';
-import { EngineSettings, ProviderStatus } from '../core/types.js';
+import { EngineSettings, ProviderStatus, SqliteGateState } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import {
   initDriveAuth,
@@ -69,6 +70,9 @@ interface SettingsModalProps {
   onToggleTheme: () => void;
   onOpenTerminal?: () => void;
   onRefreshMetrics?: () => void | Promise<void>;
+  sqliteGate?: SqliteGateState | null;
+  isTogglingSqlite?: boolean;
+  onToggleSqlite?: (enabled: boolean) => Promise<void> | void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -85,6 +89,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleTheme,
   onOpenTerminal,
   onRefreshMetrics,
+  sqliteGate,
+  isTogglingSqlite = false,
+  onToggleSqlite,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('DATA');
   const [activeThemeId, setActiveThemeId] = useState<string>(
@@ -353,6 +360,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const [internalTogglingSqlite, setInternalTogglingSqlite] = useState<boolean>(false);
+
+  const handleManualSqliteToggle = async (nextEnabled: boolean) => {
+    setInternalTogglingSqlite(true);
+    try {
+      if (onToggleSqlite) {
+        await onToggleSqlite(nextEnabled);
+      } else {
+        await EngineService.toggleSqliteDb(nextEnabled);
+      }
+      await Promise.all([fetchStorageStatus(), fetchScraperStatus(), fetchFreshStats()]);
+      if (isViteDev && getDriveAccessToken()) {
+        await checkDriveBackupStatus(getDriveAccessToken());
+      }
+    } finally {
+      setInternalTogglingSqlite(false);
+    }
+  };
+
   const handleRefreshMetrics = async () => {
     setIsRefreshingMetrics(true);
     try {
@@ -367,7 +393,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const isOperating = Boolean(isResettingAndSyncing || isSyncingData);
+  const isSqliteTogglingNow = Boolean(isTogglingSqlite || internalTogglingSqlite);
+  const effectiveGate: SqliteGateState | null = storageStatus?.sqliteGate || sqliteGate || null;
+  const isSqliteActive = effectiveGate ? effectiveGate.enabled : storageStatus?.storageEngine?.enabled !== false;
+  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isSqliteTogglingNow);
 
   useEffect(() => {
     if (!isOpen) {
@@ -578,28 +607,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="sm"
                   className="w-full"
                   action={
-                    <Button
-                      variant="secondary"
-                      size="xs"
-                      onClick={fetchStorageStatus}
-                      disabled={isCheckingStorage}
-                    >
-                      <RefreshCw
-                        className={`w-3.5 h-3.5 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`}
-                      />
-                      <span>Test Storage</span>
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={isSqliteActive ? 'accent' : 'warning'} size="xs">
+                        {isSqliteActive ? 'ONLINE' : 'BLOCKED · OFF'}
+                      </Badge>
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        onClick={fetchStorageStatus}
+                        disabled={isCheckingStorage}
+                      >
+                        <RefreshCw
+                          className={`w-3.5 h-3.5 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`}
+                        />
+                        <span>Test</span>
+                      </Button>
+                    </div>
                   }
                 />
               </div>
 
-              <div className="px-3.5 py-2.5 space-y-1.5 text-sm tabular-nums">
+              <div className="px-3.5 py-2.5 space-y-2 text-sm tabular-nums">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold text-theme-main">SQLite Storage Engine</span>
-                  <span className="text-xs font-medium text-theme-primary">
-                    better-sqlite3 · 5 Pillars
-                  </span>
+                  <div>
+                    <span className="font-semibold text-theme-main">SQLite Storage Engine</span>
+                    <div className="text-xs text-theme-sub mt-0.5">
+                      {effectiveGate?.dbExists
+                        ? 'football_engine.db present on disk'
+                        : 'No football_engine.db file on preview'}
+                      {' · '}
+                      {isSqliteActive ? 'Manually Switched ON' : 'Auto-init blocked until switched ON'}
+                    </div>
+                  </div>
+                  <Button
+                    id="manual-sqlite-toggle-btn"
+                    variant={isSqliteActive ? 'secondary' : 'primary'}
+                    size="xs"
+                    onClick={() => void handleManualSqliteToggle(!isSqliteActive)}
+                    disabled={isSqliteTogglingNow || Boolean(isResettingAndSyncing || isSyncingData)}
+                    title={
+                      isSqliteActive
+                        ? 'Switch SQLite DB OFF (closes connection and blocks auto-init)'
+                        : 'Switch SQLite DB ON manually'
+                    }
+                  >
+                    <Power className="w-3.5 h-3.5" />
+                    <span>
+                      {isSqliteTogglingNow
+                        ? isSqliteActive
+                          ? 'Switching Off...'
+                          : 'Switching On...'
+                        : isSqliteActive
+                        ? 'Switch SQLite OFF'
+                        : 'Switch SQLite ON'}
+                    </span>
+                  </Button>
                 </div>
+
+                {!isSqliteActive && (
+                  <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <span>
+                      SQLite initialization is blocked on app startup and when{' '}
+                      <span className="font-mono">football_engine.db</span> is missing on preview. Switch ON manually above or restore a backup from Google Drive below.
+                    </span>
+                  </div>
+                )}
 
                 <div className="truncate text-theme-sub text-xs font-normal">
                   Path:{' '}
@@ -610,9 +683,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between text-xs font-normal">
                   <span className="text-theme-sub">
                     Disk Size:{' '}
-                    <strong className="text-theme-primary font-semibold">{storageStatus?.storageEngine?.sizeMB ?? 0.1} MB</strong>
+                    <strong className="text-theme-primary font-semibold">{storageStatus?.storageEngine?.sizeMB ?? 0} MB</strong>
                   </span>
-                  <span className="text-theme-primary font-medium">WAL Mode</span>
+                  <span className="text-theme-primary font-medium">
+                    {storageStatus?.storageEngine?.journalMode || (isSqliteActive ? 'WAL Mode' : 'BLOCKED')}
+                  </span>
                 </div>
                 {(storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error) && (
                   <p className="text-xs text-rose-500 dark:text-rose-400 truncate font-medium">
@@ -779,7 +854,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             variant="primary"
                             size="sm"
                             onClick={() => setPendingDriveConfirm('UPLOAD')}
-                            disabled={isDriveMutating || isOperating}
+                            disabled={!isSqliteActive || isDriveMutating || isOperating}
+                            title={!isSqliteActive ? 'Switch SQLite DB ON manually before backing up to Drive' : undefined}
                           >
                             <Upload className="w-3.5 h-3.5" />
                             <span>
@@ -794,7 +870,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             variant="secondary"
                             size="sm"
                             onClick={() => setPendingDriveConfirm('RESTORE')}
-                            disabled={!driveFileMeta || isDriveMutating || isOperating}
+                            disabled={!driveFileMeta || isDriveMutating || Boolean(isResettingAndSyncing || isSyncingData)}
                           >
                             <Download className="w-3.5 h-3.5" />
                             <span>Restore from Drive</span>
@@ -827,6 +903,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 icon={<RefreshCw className="w-3.5 h-3.5" />}
               />
 
+              {!isSqliteActive && (
+                <p className="text-xs text-theme-sub">
+                  Switch SQLite DB ON manually in Storage Status above before running Full Data Sync.
+                </p>
+              )}
+
               {!isConfirmingReset ? (
                 <Button
                   id="full-data-sync-btn"
@@ -834,7 +916,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="md"
                   fullWidth
                   onClick={() => setIsConfirmingReset(true)}
-                  disabled={isOperating}
+                  disabled={!isSqliteActive || isOperating}
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Full Data Sync</span>
@@ -888,7 +970,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 size="md"
                 fullWidth
                 onClick={handleCalculatePredictions}
-                disabled={isOperating}
+                disabled={!isSqliteActive || isOperating}
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Calculate Predictions</span>
@@ -938,7 +1020,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 size="md"
                 fullWidth
                 onClick={handleExportPredictions}
-                disabled={isExporting || isOperating}
+                disabled={!isSqliteActive || isExporting || isOperating}
               >
                 <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
                 <span>{isExporting ? 'Exporting Predictions...' : 'Export 1X2 Predictions (JSON)'}</span>

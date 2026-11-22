@@ -64,9 +64,20 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
               {fixture.stage || fixture.leagueName}
             </span>
             <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
-            <span className="text-xs font-normal tabular-nums whitespace-nowrap shrink-0 text-theme-sub">
-              {fixture.status === 'LIVE' ? (fixture.minute ? `${fixture.minute}'` : 'Live') : fixture.status === 'FINISHED' ? 'FT' : `${localDate} · ${localTime}`}
-            </span>
+            {fixture.status === 'LIVE' ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                <span>{fixture.minute ? `${fixture.minute}'` : 'LIVE'}</span>
+              </span>
+            ) : fixture.status === 'FINISHED' ? (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap shrink-0">
+                FT
+              </span>
+            ) : (
+              <span className="text-xs font-normal tabular-nums whitespace-nowrap shrink-0 text-theme-sub">
+                {localDate} · {localTime}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">

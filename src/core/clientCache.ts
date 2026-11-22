@@ -170,4 +170,34 @@ export class ClientCache {
       await setToStore<EngineSettings>('engine_settings', settings);
     } catch {}
   }
+
+  public static async clearDynamicData(): Promise<void> {
+    const keepKeys = new Set(['engine_settings', 'leagues_catalog']);
+    for (const key of Array.from(memoryCache.keys())) {
+      if (!keepKeys.has(key)) {
+        memoryCache.delete(key);
+      }
+    }
+    const db = await openDatabase();
+    if (!db) return;
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.openCursor();
+        req.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+          if (!cursor) return;
+          if (!keepKeys.has(String(cursor.key))) {
+            cursor.delete();
+          }
+          cursor.continue();
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
 }

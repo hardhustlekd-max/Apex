@@ -1,7 +1,7 @@
 import { cleanFixtureId, Fixture } from './types.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
 import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
-import { sqliteDb, notifyDbMutation } from './sqliteClient.js';
+import { sqliteDb, notifyDbMutation, isSqliteEnabled } from './sqliteClient.js';
 import { loggerService } from '../services/loggerService.js';
 
 export interface PredictionEvaluationSummary {
@@ -60,6 +60,10 @@ export class PredictionsDB {
   private readonly REMOTE_SYNC_COOLDOWN_MS = 30_000;
 
   async init(): Promise<void> {
+    if (!isSqliteEnabled()) {
+      this.isInitialized = false;
+      return;
+    }
     if (this.isInitialized) return;
 
     try {
@@ -265,6 +269,7 @@ export class PredictionsDB {
     state?: 'upcoming' | 'completed' | 'all';
     skipSort?: boolean;
   }): Fixture[] {
+    if (!isSqliteEnabled()) return [];
     try {
       const stateFilter = filters?.state || 'upcoming';
       let query = `
@@ -332,7 +337,7 @@ export class PredictionsDB {
   }
 
   getPredictionById(fixtureId: string): Fixture | null {
-    if (!fixtureId) return null;
+    if (!isSqliteEnabled() || !fixtureId) return null;
     const cleanId = getCleanId(fixtureId);
 
     try {
@@ -357,7 +362,7 @@ export class PredictionsDB {
 
   getPredictionsByIds(fixtureIds: string[]): Map<string, Fixture> {
     const result = new Map<string, Fixture>();
-    if (!fixtureIds || fixtureIds.length === 0) return result;
+    if (!isSqliteEnabled() || !fixtureIds || fixtureIds.length === 0) return result;
 
     try {
       const candidateIds = new Set<string>();
@@ -406,6 +411,7 @@ export class PredictionsDB {
   }
 
   count(state: 'upcoming' | 'completed' | 'all' = 'upcoming'): number {
+    if (!isSqliteEnabled()) return 0;
     try {
       let query = 'SELECT COUNT(*) as count FROM predictions';
       const params: any[] = [];
@@ -503,6 +509,7 @@ export class PredictionsDB {
   }
 
   countHistoricalPredictions(): number {
+    if (!isSqliteEnabled()) return 0;
     try {
       const row = sqliteDb.prepare(`
         SELECT COUNT(*) as count
@@ -519,6 +526,16 @@ export class PredictionsDB {
   }
 
   getEvaluationSummary(): PredictionEvaluationSummary {
+    if (!isSqliteEnabled()) {
+      return {
+        upcomingFixturesInDb: 0,
+        totalPredictions: 0,
+        upcomingPredictions: 0,
+        livePredictions: 0,
+        completedWithScore: 0,
+        completedAwaitingScore: 0,
+      };
+    }
     const todayStr = getRelativeDateStr(0);
     try {
       const upcomingFixturesRow = sqliteDb
@@ -691,6 +708,7 @@ export class PredictionsDB {
   }
 
   async reconcileStaleMatches(): Promise<number> {
+    if (!isSqliteEnabled()) return 0;
     let updatedCount = 0;
 
     try {
@@ -829,6 +847,7 @@ export class PredictionsDB {
   }
 
   async syncPendingPredictionResultsFromRemote(force = false): Promise<void> {
+    if (!isSqliteEnabled()) return;
     if (this.remoteSyncInFlight) {
       await this.remoteSyncInFlight;
       if (!force) return;
@@ -991,6 +1010,16 @@ export class PredictionsDB {
       predictedAt: string;
     }>;
   } {
+    if (!isSqliteEnabled()) {
+      return {
+        format: 'APEX_1X2_PREDICTIONS',
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        count: 0,
+        predictions: [],
+      };
+    }
+
     try {
       let orderClause = 'ORDER BY match_date ASC, kick_off_time ASC, fixture_id ASC';
       if (sortByProb === 'desc') {
@@ -1180,38 +1209,48 @@ export class PredictionsDB {
       };
     }
 
-    // Prepare lookup statements against SQLite database to reconcile actual scores
-    const predStmt = sqliteDb.prepare(`
-      SELECT status, home_score, away_score
-      FROM predictions
-      WHERE (fixture_id = ? OR fixture_id = ?)
-        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
-      LIMIT 1
-    `);
+    const sqliteActive = isSqliteEnabled();
 
-    const scrapedStmt = sqliteDb.prepare(`
-      SELECT status, home_score, away_score
-      FROM flashscore_scraped_matches
-      WHERE (match_id = ? OR match_id = ?)
-        OR (LOWER(home_name) = LOWER(?) AND LOWER(away_name) = LOWER(?) AND SUBSTR(match_date, 1, 10) = ?)
-      LIMIT 1
-    `);
+    // Prepare lookup statements against SQLite database to reconcile actual scores (only if SQLite is enabled)
+    const predStmt = sqliteActive
+      ? sqliteDb.prepare(`
+          SELECT status, home_score, away_score
+          FROM predictions
+          WHERE (fixture_id = ? OR fixture_id = ?)
+            OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+          LIMIT 1
+        `)
+      : null;
 
-    const histStmt = sqliteDb.prepare(`
-      SELECT fthg as home_score, ftag as away_score
-      FROM historical_matches
-      WHERE (id = ? OR id = ? OR id = ?)
-        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
-      LIMIT 1
-    `);
+    const scrapedStmt = sqliteActive
+      ? sqliteDb.prepare(`
+          SELECT status, home_score, away_score
+          FROM flashscore_scraped_matches
+          WHERE (match_id = ? OR match_id = ?)
+            OR (LOWER(home_name) = LOWER(?) AND LOWER(away_name) = LOWER(?) AND SUBSTR(match_date, 1, 10) = ?)
+          LIMIT 1
+        `)
+      : null;
 
-    const upcomingStmt = sqliteDb.prepare(`
-      SELECT status, score_json
-      FROM upcoming_fixtures
-      WHERE (id = ? OR id = ?)
-        OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
-      LIMIT 1
-    `);
+    const histStmt = sqliteActive
+      ? sqliteDb.prepare(`
+          SELECT fthg as home_score, ftag as away_score
+          FROM historical_matches
+          WHERE (id = ? OR id = ? OR id = ?)
+            OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+          LIMIT 1
+        `)
+      : null;
+
+    const upcomingStmt = sqliteActive
+      ? sqliteDb.prepare(`
+          SELECT status, score_json
+          FROM upcoming_fixtures
+          WHERE (id = ? OR id = ?)
+            OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
+          LIMIT 1
+        `)
+      : null;
 
     let wonCount = 0;
     let lostCount = 0;
@@ -1301,7 +1340,7 @@ export class PredictionsDB {
       }
 
       // Priority 2: Look up updated result in predictions DB
-      if (finalHomeScore === null || finalAwayScore === null) {
+      if (predStmt && (finalHomeScore === null || finalAwayScore === null)) {
         const predRow = predStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
         if (predRow && predRow.home_score !== null && predRow.away_score !== null) {
           finalHomeScore = Number(predRow.home_score);
@@ -1311,7 +1350,7 @@ export class PredictionsDB {
       }
 
       // Priority 3: Look up in flashscore_scraped_matches
-      if (finalHomeScore === null || finalAwayScore === null) {
+      if (scrapedStmt && (finalHomeScore === null || finalAwayScore === null)) {
         const scrapedRow = scrapedStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
         if (scrapedRow && scrapedRow.home_score !== null && scrapedRow.away_score !== null) {
           finalHomeScore = Number(scrapedRow.home_score);
@@ -1321,7 +1360,7 @@ export class PredictionsDB {
       }
 
       // Priority 4: Look up in historical_matches
-      if (finalHomeScore === null || finalAwayScore === null) {
+      if (histStmt && (finalHomeScore === null || finalAwayScore === null)) {
         const histRow = histStmt.get(fixtureId, cleanId, `fs_hist_${cleanId}`, homeTeam, awayTeam, matchDate) as any;
         if (histRow && histRow.home_score !== null && histRow.away_score !== null) {
           finalHomeScore = Number(histRow.home_score);
@@ -1331,7 +1370,7 @@ export class PredictionsDB {
       }
 
       // Priority 5: Look up in upcoming_fixtures
-      if (finalHomeScore === null || finalAwayScore === null) {
+      if (upcomingStmt && (finalHomeScore === null || finalAwayScore === null)) {
         const upRow = upcomingStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
         if (upRow && upRow.score_json) {
           try {

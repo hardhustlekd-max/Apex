@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Database, Power } from 'lucide-react';
 import { Header } from './components/Header.js';
 import { DesktopSidebar } from './components/DesktopSidebar.js';
 import { FixturesList } from './components/FixturesList.js';
@@ -23,6 +23,8 @@ import {
   EngineSettings,
   ProviderStatus,
   BetSelection,
+  SqliteGateState,
+  cleanFixtureId,
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
 import { EngineService } from './services/engineService.js';
@@ -108,6 +110,8 @@ export default function App() {
   const [isCalculatingPredictions, setIsCalculatingPredictions] = useState<boolean>(false);
   const [activeSyncJob, setActiveSyncJob] = useState<SyncJobState | null>(null);
   const [dataRefreshVersion, setDataRefreshVersion] = useState<number>(0);
+  const [sqliteGate, setSqliteGate] = useState<SqliteGateState | null>(null);
+  const [isTogglingSqlite, setIsTogglingSqlite] = useState<boolean>(false);
 
   const hasInitializedDateFilterRef = useRef<boolean>(false);
   const skipNextDateFilterFetchRef = useRef<boolean>(false);
@@ -202,6 +206,54 @@ export default function App() {
       return updated || prev;
     });
   }, [fixtures, liveFixtures]);
+
+  // Synchronize selectedDetailFixture live scores and in-play minutes as liveScores poll updates
+  useEffect(() => {
+    if (!selectedDetailFixture || liveScores.length === 0) return;
+
+    const selCleanId = cleanFixtureId(selectedDetailFixture.id);
+    const selHome = selectedDetailFixture.homeTeam.trim().toLowerCase();
+    const selAway = selectedDetailFixture.awayTeam.trim().toLowerCase();
+
+    const matchedScore = liveScores.find((ls) => {
+      const lsCleanId = cleanFixtureId(ls.fixtureId);
+      if (lsCleanId && selCleanId && (lsCleanId === selCleanId || lsCleanId.includes(selCleanId) || selCleanId.includes(lsCleanId))) {
+        return true;
+      }
+      const lsHome = ls.homeTeam.trim().toLowerCase();
+      const lsAway = ls.awayTeam.trim().toLowerCase();
+      return (
+        (lsHome === selHome && lsAway === selAway) ||
+        (lsHome.includes(selHome) && lsAway.includes(selAway)) ||
+        (selHome.includes(lsHome) && selAway.includes(lsAway))
+      );
+    });
+
+    if (matchedScore) {
+      const isFinished = matchedScore.status === 'FINISHED';
+      const liveStatus = isFinished ? 'FINISHED' : 'LIVE';
+      const newScore = { home: matchedScore.homeScore, away: matchedScore.awayScore };
+      const newMinute = matchedScore.minute;
+
+      setSelectedDetailFixture((prev) => {
+        if (!prev) return prev;
+        if (
+          prev.status === liveStatus &&
+          prev.minute === newMinute &&
+          prev.score?.home === newScore.home &&
+          prev.score?.away === newScore.away
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          status: liveStatus,
+          minute: newMinute,
+          score: newScore,
+        };
+      });
+    }
+  }, [liveScores, selectedDetailFixture?.id, selectedDetailFixture?.homeTeam, selectedDetailFixture?.awayTeam]);
 
   const handleResetAndSyncData = async () => {
     if (isSyncingData || isCalculatingPredictions) return;
@@ -402,10 +454,10 @@ export default function App() {
         marketFilter: params.marketChoiceFilter,
       });
 
-      if (!options?.forceRefresh) {
+      if (!options?.forceRefresh && sqliteGate?.enabled !== false) {
         const cached = await ClientCache.getCachedQueryResponse(cacheKey);
         if (controller.signal.aborted) return;
-        if (cached?.data && Array.isArray(cached.data.fixtures)) {
+        if (cached?.data && !cached.data.sqliteBlocked && Array.isArray(cached.data.fixtures)) {
           setFixtures(cached.data.fixtures);
           setFixtureGroups(cached.data.groups || []);
           setTotalDatabaseCount(cached.data.totalDatabaseCount ?? cached.data.fixtures.length);
@@ -429,6 +481,17 @@ export default function App() {
       );
 
       if (controller.signal.aborted) return;
+
+      if (res?.sqliteGate) {
+        setSqliteGate(res.sqliteGate);
+      }
+
+      if (res?.sqliteBlocked) {
+        setFixtures([]);
+        setFixtureGroups([]);
+        setTotalDatabaseCount(0);
+        return;
+      }
 
       if (res && Array.isArray(res.fixtures)) {
         setFixtures(res.fixtures);
@@ -455,19 +518,24 @@ export default function App() {
         setIsLoadingFixtures(false);
       }
     }
-  }, []);
+  }, [sqliteGate?.enabled]);
 
   const fetchSettingsAndProviders = useCallback(async () => {
     try {
-      const [sData, pData, statsData] = await Promise.all([
+      const [sData, pData, statsData, storageData] = await Promise.all([
         EngineService.getSettings(),
         EngineService.getProviders(),
         EngineService.getStats(),
+        EngineService.getStorageStatus(),
       ]);
 
       setSettings(sData);
       setProviders(pData);
       setStats(statsData);
+      const nextGate = storageData?.sqliteGate || statsData?.sqliteGate || null;
+      if (nextGate) {
+        setSqliteGate(nextGate);
+      }
     } catch (e) {
       console.error('Failed to fetch settings/providers/stats:', e);
     }
@@ -674,6 +742,42 @@ export default function App() {
     ]);
   };
 
+  const handleToggleSqlite = async (enabled: boolean) => {
+    if (isTogglingSqlite) return;
+    setIsTogglingSqlite(true);
+    try {
+      const res = await EngineService.toggleSqliteDb(enabled);
+      if (res.sqliteGate) {
+        setSqliteGate(res.sqliteGate);
+      }
+      if (!res.success) {
+        showNotification(res.error || `Failed to switch SQLite DB ${enabled ? 'ON' : 'OFF'}.`, 'info');
+        return;
+      }
+
+      if (enabled) {
+        hasInitializedDateFilterRef.current = false;
+        await handleRefresh();
+        setDataRefreshVersion((v) => v + 1);
+        showNotification(res.message || 'SQLite database switched ON.', 'success');
+      } else {
+        setFixtures([]);
+        setFixtureGroups([]);
+        setLiveFixtures([]);
+        setLiveGroups([]);
+        setTotalDatabaseCount(0);
+        setSelectedDetailFixture(null);
+        await fetchSettingsAndProviders();
+        setDataRefreshVersion((v) => v + 1);
+        showNotification(res.message || 'SQLite database switched OFF.', 'info');
+      }
+    } finally {
+      setIsTogglingSqlite(false);
+    }
+  };
+
+  const isSqliteBlocked = Boolean(sqliteGate && !sqliteGate.enabled);
+
   const isProcessingActive = Boolean(
     isSyncingData ||
     isCalculatingPredictions ||
@@ -757,7 +861,48 @@ export default function App() {
                 />
               )}
 
-
+              {/* Manual SQLite Gate Banner when DB initialization is blocked */}
+              {isSqliteBlocked && (
+                <Card surface="elevated" padding="sm" radius="2xl" className="border-amber-500/35 bg-amber-500/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                        <Database className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-theme-main">
+                          {sqliteGate?.blockedReason === 'MISSING_DB_ON_PREVIEW'
+                            ? 'SQLite Blocked — No Database File Found on Preview'
+                            : 'SQLite Blocked on Startup — Switched Off'}
+                        </div>
+                        <p className="text-xs text-theme-sub leading-relaxed mt-0.5">
+                          Automatic SQLite initialization is disabled. Switch SQLite ON manually to open or create{' '}
+                          <span className="font-mono text-theme-main">football_engine.db</span>, or restore your backup from Google Drive in Settings.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <Button
+                        id="banner-switch-on-sqlite-btn"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => void handleToggleSqlite(true)}
+                        disabled={isTogglingSqlite || isProcessingActive}
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                        <span>{isTogglingSqlite ? 'Switching On...' : 'Switch SQLite ON'}</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsSettingsOpen(true)}
+                      >
+                        <span>Settings / Drive</span>
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {activeTab === 'FIXTURES' && (
                 <div className={`w-full grid grid-cols-12 gap-3 lg:gap-3.5 items-start ${isProcessingActive ? 'pointer-events-none opacity-40 select-none' : ''}`}>
@@ -794,6 +939,11 @@ export default function App() {
                       isProcessingActive={isProcessingActive}
                       onTriggerFullSync={handleResetAndSyncData}
                       refreshKey={dataRefreshVersion}
+                      sqliteBlocked={isSqliteBlocked}
+                      sqliteGate={sqliteGate}
+                      onSwitchOnSqlite={() => void handleToggleSqlite(true)}
+                      isTogglingSqlite={isTogglingSqlite}
+                      onOpenSettings={() => setIsSettingsOpen(true)}
                     />
                   </div>
 
@@ -923,6 +1073,9 @@ export default function App() {
           setIsTerminalOpen(true);
         }}
         onRefreshMetrics={handleRefresh}
+        sqliteGate={sqliteGate}
+        isTogglingSqlite={isTogglingSqlite}
+        onToggleSqlite={handleToggleSqlite}
       />
 
       {/* Floating Bottom Navigation Dock (Mobile Only) */}

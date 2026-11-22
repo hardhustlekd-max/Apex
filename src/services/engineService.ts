@@ -11,6 +11,7 @@ import {
   StandingsCatalogItem,
   LeagueStandingTable,
   SlipBet,
+  SqliteGateState,
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
@@ -216,6 +217,10 @@ export class EngineService {
         const text = await res.text();
         if (text) {
           const serverData = JSON.parse(text) as FixturesQueryResponse;
+          if (serverData?.sqliteBlocked) {
+            void ClientCache.clearDynamicData();
+            return serverData;
+          }
           if (serverData && serverData.success && Array.isArray(serverData.fixtures)) {
             const etag = res.headers.get('ETag') || undefined;
             void ClientCache.setCachedQueryResponse(cacheKey, serverData, etag);
@@ -272,6 +277,10 @@ export class EngineService {
       }
       if (res.ok) {
         const data = (await res.json()) as FeaturedTipsResponse;
+        if (data?.sqliteBlocked) {
+          void ClientCache.clearDynamicData();
+          return data;
+        }
         if (data && data.success && Array.isArray(data.tips)) {
           const etag = res.headers.get('ETag') || undefined;
           void ClientCache.setCachedFeaturedTips(data, etag);
@@ -361,16 +370,18 @@ export class EngineService {
   }
 
   public static async getStorageStatus(): Promise<{
+    sqliteGate?: SqliteGateState;
     footballDb: {
       configured: boolean;
-      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'BLOCKED';
       url: string | null;
       latencyMs?: number;
+      sizeMB?: number;
       error?: string;
     };
     predictionsDb: {
       configured: boolean;
-      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED';
+      status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'BLOCKED';
       url: string | null;
       latencyMs?: number;
       error?: string;
@@ -379,6 +390,15 @@ export class EngineService {
       status: string;
       mode: string;
       isDevPreview?: boolean;
+      enabled?: boolean;
+      initialized?: boolean;
+      dbExists?: boolean;
+      blockedReason?: SqliteGateState['blockedReason'];
+      dbPath?: string;
+      sizeMB?: number;
+      sizeBytes?: number;
+      journalMode?: string;
+      tableCounts?: Record<string, number>;
     };
   } | null> {
     const serverData = await this.safeJsonFetch('/api/settings/storage-status');
@@ -388,9 +408,32 @@ export class EngineService {
     return null;
   }
 
+  public static async toggleSqliteDb(enabled: boolean): Promise<{
+    success: boolean;
+    sqliteGate?: SqliteGateState;
+    stats?: any;
+    message?: string;
+    error?: string;
+  }> {
+    const serverData = await this.safeJsonFetch('/api/settings/sqlite-toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (serverData && serverData.success) {
+      await ClientCache.clearDynamicData();
+      return serverData;
+    }
+    return {
+      success: false,
+      error: serverData?.error || `Failed to switch SQLite DB ${enabled ? 'ON' : 'OFF'}.`,
+    };
+  }
+
   public static async getDriveDbStatus(accessToken?: string | null): Promise<{
     success: boolean;
     isDevPreview?: boolean;
+    sqliteGate?: SqliteGateState;
     authenticated?: boolean;
     needsReauth?: boolean;
     driveFile?: {
@@ -460,6 +503,7 @@ export class EngineService {
   ): Promise<{
     success: boolean;
     needsReauth?: boolean;
+    sqliteGate?: SqliteGateState;
     restoredFileId?: string;
     sizeBytes?: number;
     tableCounts?: Record<string, number>;
@@ -876,10 +920,16 @@ export class EngineService {
     rawFeedsCount?: number;
     upcomingCount?: number;
     predictionsCount?: number;
+    sqliteBlocked?: boolean;
+    sqliteGate?: SqliteGateState;
   }> {
     const serverData = await this.safeJsonFetch('/api/stats');
     if (serverData && serverData.success && serverData.stats) {
-      return serverData.stats;
+      return {
+        ...serverData.stats,
+        sqliteBlocked: Boolean(serverData.sqliteBlocked),
+        sqliteGate: serverData.sqliteGate,
+      };
     }
 
     return {
@@ -955,6 +1005,10 @@ export class EngineService {
       }
       if (res.ok) {
         const data = (await res.json()) as LiveFixturesResponse;
+        if (data?.sqliteBlocked) {
+          void ClientCache.clearDynamicData();
+          return data;
+        }
         if (data && data.success && Array.isArray(data.fixtures)) {
           const etag = res.headers.get('ETag') || undefined;
           void ClientCache.setCachedLiveFixtures(cacheKey, data, etag);
@@ -1011,6 +1065,8 @@ export class EngineService {
       completedWithScore: number;
       completedAwaitingScore: number;
     } | null;
+    sqliteBlocked?: boolean;
+    sqliteGate?: SqliteGateState;
   }> {
     const search = (options?.search || '').trim();
     const sortBy = options?.sortBy || 'DEFAULT';
@@ -1040,6 +1096,16 @@ export class EngineService {
       }
       if (res.ok) {
         const serverData = await res.json();
+        if (serverData?.sqliteBlocked) {
+          void ClientCache.clearDynamicData();
+          return {
+            matches: [],
+            groups: [],
+            summary: serverData.summary || null,
+            sqliteBlocked: true,
+            sqliteGate: serverData.sqliteGate,
+          };
+        }
         if (serverData && serverData.success && Array.isArray(serverData.matches)) {
           const result = {
             matches: serverData.matches,

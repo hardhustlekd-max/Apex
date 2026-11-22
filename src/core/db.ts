@@ -8,6 +8,7 @@ import { getLeagueAliases } from './leagueMapper.js';
 import {
   sqliteDb,
   initSqliteSchema,
+  isSqliteEnabled,
   compressString,
   decompressBuffer,
   getSqliteDbStats,
@@ -71,6 +72,10 @@ export class FootballDB {
   private fallbackSettings: EngineSettings = { ...DEFAULT_ENGINE_SETTINGS };
 
   async init(): Promise<void> {
+    if (!isSqliteEnabled()) {
+      this.isInitialized = false;
+      return;
+    }
     if (this.isInitialized) return;
 
     try {
@@ -151,7 +156,7 @@ export class FootballDB {
   }
 
   insertHistoricalMatches(matches: HistoricalMatch[]): number {
-    if (matches.length === 0) return 0;
+    if (!isSqliteEnabled() || matches.length === 0) return 0;
 
     try {
       const insertStmt = sqliteDb.prepare(`
@@ -216,6 +221,7 @@ export class FootballDB {
   }
 
   saveUpcomingFixturesSync(fixtures: Fixture[]): void {
+    if (!isSqliteEnabled() || fixtures.length === 0) return;
     const seen = new Set<string>();
     const unique = fixtures.filter((f) => {
       if (!f.id || seen.has(f.id)) return false;
@@ -357,7 +363,7 @@ export class FootballDB {
   }
 
   clearPredictionsOnUpcomingFixtures(fixtureIds: string[]): void {
-    if (!fixtureIds || fixtureIds.length === 0) return;
+    if (!isSqliteEnabled() || !fixtureIds || fixtureIds.length === 0) return;
     try {
       const stmt = sqliteDb.prepare(`
         UPDATE upcoming_fixtures
@@ -386,7 +392,7 @@ export class FootballDB {
   updateUpcomingFixtureStatuses(
     updates: Array<{ id: string; status: string; kickOffTime?: string; score?: { home: number; away: number } }>
   ): void {
-    if (!updates || updates.length === 0) return;
+    if (!isSqliteEnabled() || !updates || updates.length === 0) return;
     try {
       const stmt = sqliteDb.prepare(`
         UPDATE upcoming_fixtures
@@ -434,6 +440,7 @@ export class FootballDB {
   }
 
   getUpcomingFixturesCount(): number {
+    if (!isSqliteEnabled()) return 0;
     try {
       const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM upcoming_fixtures WHERE status != 'FINISHED'").get() as any;
       return row ? Number(row.count) : 0;
@@ -448,7 +455,7 @@ export class FootballDB {
     for (const d of dates) {
       counts[d] = 0;
     }
-    if (dates.length === 0) return counts;
+    if (!isSqliteEnabled() || dates.length === 0) return counts;
     try {
       const placeholders = dates.map(() => '?').join(', ');
       const rows = sqliteDb
@@ -467,6 +474,7 @@ export class FootballDB {
   }
 
   hasCyrillicUpcomingData(): boolean {
+    if (!isSqliteEnabled()) return false;
     try {
       const row = sqliteDb
         .prepare(
@@ -480,6 +488,7 @@ export class FootballDB {
   }
 
   purgeCyrillicFixtures(): number {
+    if (!isSqliteEnabled()) return 0;
     try {
       let removed = 0;
       const runClean = sqliteDb.transaction(() => {
@@ -536,7 +545,7 @@ export class FootballDB {
   }
 
   getFixtureById(id: string): Fixture | null {
-    if (!id) return null;
+    if (!isSqliteEnabled() || !id) return null;
     const cleanId = id.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '');
     
     try {
@@ -637,6 +646,7 @@ export class FootballDB {
     },
     _dateFilterLegacy?: string
   ): Fixture[] {
+    if (!isSqliteEnabled()) return [];
     try {
       let leagueFilter: string | undefined;
       let dateFilter: string | undefined;
@@ -758,7 +768,7 @@ export class FootballDB {
   }
 
   getTeamHistoricalMatches(teamName: string, limit = 20): HistoricalMatch[] {
-    if (!teamName) return [];
+    if (!isSqliteEnabled() || !teamName) return [];
     try {
       const cleanName = teamName.trim();
       const lowerName = cleanName.toLowerCase();
@@ -806,7 +816,7 @@ export class FootballDB {
   }
 
   getHistoricalMatchById(matchId: string): HistoricalMatch | null {
-    if (!matchId) return null;
+    if (!isSqliteEnabled() || !matchId) return null;
     const cleanId = cleanFixtureId(matchId);
     try {
       const row = sqliteDb
@@ -822,7 +832,7 @@ export class FootballDB {
   }
 
   getDirectH2HHistoricalMatches(homeTeam: string, awayTeam: string, limit = 15): HistoricalMatch[] {
-    if (!homeTeam || !awayTeam) return [];
+    if (!isSqliteEnabled() || !homeTeam || !awayTeam) return [];
     try {
       // Gather candidate matches for homeTeam (handles exact and club-affix variations via getTeamHistoricalMatches)
       const candidates = this.getTeamHistoricalMatches(homeTeam, 200);
@@ -837,6 +847,7 @@ export class FootballDB {
   }
 
   getAllHistoricalMatches(limit = 5000): HistoricalMatch[] {
+    if (!isSqliteEnabled()) return [];
     try {
       const rows = sqliteDb.prepare(`
         SELECT * FROM historical_matches 
@@ -872,6 +883,7 @@ export class FootballDB {
 
   saveSettings(settings: EngineSettings): void {
     this.fallbackSettings = settings;
+    if (!isSqliteEnabled()) return;
     try {
       sqliteDb.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('engine_settings', ?)").run(
         JSON.stringify(settings)
@@ -889,6 +901,7 @@ export class FootballDB {
   }
 
   clearHistoricalData(origin?: DbClearOrigin): void {
+    if (!isSqliteEnabled()) return;
     if (origin !== 'fullsync') {
       console.warn(`[FootballDB] Blocked unauthorized clearHistoricalData call (origin=${String(origin || 'none')}).`);
       return;
@@ -902,7 +915,7 @@ export class FootballDB {
   }
 
   saveFlashscoreScrapedMatches(matches: Array<any>): void {
-    if (matches.length === 0) return;
+    if (!isSqliteEnabled() || matches.length === 0) return;
 
     try {
       const stmt = sqliteDb.prepare(`
@@ -979,7 +992,7 @@ export class FootballDB {
   }
 
   getFlashscoreScrapedMatchById(matchId: string, includeJsonBlobs = true): any | null {
-    if (!matchId) return null;
+    if (!isSqliteEnabled() || !matchId) return null;
     const cleanId = cleanFixtureId(matchId);
     try {
       const cols = includeJsonBlobs
@@ -996,6 +1009,7 @@ export class FootballDB {
   }
 
   getFlashscoreScrapedMatches(limit = 1000, options?: { includeJsonBlobs?: boolean }): any[] {
+    if (!isSqliteEnabled()) return [];
     try {
       const includeJsonBlobs = options?.includeJsonBlobs ?? true;
       const cols = includeJsonBlobs
@@ -1010,7 +1024,7 @@ export class FootballDB {
   }
 
   savePredictionMeasurement(fixtureId: string, h2h: HeadToHeadMeasurement): void {
-    if (!fixtureId) return;
+    if (!isSqliteEnabled() || !fixtureId) return;
     const cleanId = fixtureId.replace(/^fs_/, '').trim();
     const versioned: HeadToHeadMeasurement = {
       ...h2h,
@@ -1035,7 +1049,7 @@ export class FootballDB {
   }
 
   savePredictionMeasurementsBatch(items: Array<{ fixtureId: string; h2h: HeadToHeadMeasurement }>): void {
-    if (!items || items.length === 0) return;
+    if (!isSqliteEnabled() || !items || items.length === 0) return;
     try {
       const stmt = sqliteDb.prepare(`
         INSERT OR REPLACE INTO prediction_measurements_cache (fixture_id, h2h_json, calculated_at)
@@ -1060,7 +1074,7 @@ export class FootballDB {
   }
 
   getPredictionMeasurement(fixtureId: string): HeadToHeadMeasurement | null {
-    if (!fixtureId) return null;
+    if (!isSqliteEnabled() || !fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
 
     try {
@@ -1093,6 +1107,7 @@ export class FootballDB {
   getAllPredictionMeasurements(): Map<string, HeadToHeadMeasurement> {
     // This method is primarily used for stats or massive bulk operations
     const measurements = new Map<string, HeadToHeadMeasurement>();
+    if (!isSqliteEnabled()) return measurements;
     try {
       const rows = sqliteDb.prepare("SELECT fixture_id, h2h_json FROM prediction_measurements_cache LIMIT 100000").all() as any[];
       for (const row of rows) {
@@ -1110,7 +1125,7 @@ export class FootballDB {
   }
 
   saveMatchOddsCache(fixtureId: string, odds: ScrapedMarketOdds): void {
-    if (!fixtureId || !odds) return;
+    if (!isSqliteEnabled() || !fixtureId || !odds) return;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
     if (!cleanId) return;
     const now = new Date().toISOString();
@@ -1144,7 +1159,7 @@ export class FootballDB {
   }
 
   saveMatchOddsBatch(items: Array<{ fixtureId: string; odds: ScrapedMarketOdds }>): void {
-    if (!items || items.length === 0) return;
+    if (!isSqliteEnabled() || !items || items.length === 0) return;
     const now = new Date().toISOString();
     try {
       const cacheStmt = sqliteDb.prepare(`
@@ -1180,7 +1195,7 @@ export class FootballDB {
   }
 
   getMatchOddsCache(fixtureId: string): ScrapedMarketOdds | null {
-    if (!fixtureId) return null;
+    if (!isSqliteEnabled() || !fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').trim();
     if (!cleanId) return null;
 
@@ -1199,6 +1214,7 @@ export class FootballDB {
 
   getAllMatchOddsCache(): Map<string, ScrapedMarketOdds> {
     const oddsMap = new Map<string, ScrapedMarketOdds>();
+    if (!isSqliteEnabled()) return oddsMap;
     try {
       const rows = sqliteDb.prepare("SELECT fixture_id, odds_json FROM match_odds_cache LIMIT 100000").all() as any[];
       for (const row of rows) {
@@ -1214,7 +1230,7 @@ export class FootballDB {
   }
 
   saveRawFeedData(fixtureId: string, feedPath: string, rawText: string): { hasChanged: boolean } {
-    if (!rawText) return { hasChanged: false };
+    if (!isSqliteEnabled() || !rawText) return { hasChanged: false };
     
     // We don't have memory hash cache anymore, but we can check if it exists in DB
     const canonicalKey = feedPath || fixtureId;
@@ -1248,7 +1264,7 @@ export class FootballDB {
   }
 
   getRawFeed(fixtureId: string, directOnly = false): { rawText: string } | null {
-    if (!fixtureId) return null;
+    if (!isSqliteEnabled() || !fixtureId) return null;
     const cleanId = fixtureId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
 
     try {
@@ -1281,6 +1297,7 @@ export class FootballDB {
 
   getRawFeedPathsSet(): Set<string> {
     const paths = new Set<string>();
+    if (!isSqliteEnabled()) return paths;
     try {
       const rows = sqliteDb.prepare("SELECT feed_path FROM raw_feed_data WHERE feed_path NOT LIKE 'f_1_%'").all() as Array<{ feed_path: string }>;
       for (const r of rows) {
@@ -1299,7 +1316,7 @@ export class FootballDB {
    * from stored raw daily feeds (`f_1_*`) for accurate GraphQL odds alignment.
    */
   getFixtureParticipantIds(matchId: string): { homeParticipantId?: string; awayParticipantId?: string } | null {
-    if (!matchId) return null;
+    if (!isSqliteEnabled() || !matchId) return null;
     const cleanId = matchId.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '').trim();
     if (!cleanId) return null;
 
@@ -1340,6 +1357,7 @@ export class FootballDB {
   }
 
   getRawFeedsCount(): number {
+    if (!isSqliteEnabled()) return 0;
     try {
       const row = sqliteDb.prepare("SELECT COUNT(*) as count FROM raw_feed_data").get() as any;
       return row ? Number(row.count) : 0;
@@ -1357,6 +1375,7 @@ export class FootballDB {
   }
 
   saveLeagueStandings(tableObjOrLeagueCode: any, leagueName?: string, country?: string, standings?: any[], source = 'FLASHSCORE_SCRAPED'): void {
+    if (!isSqliteEnabled()) return;
     let leagueCode = '';
     let name = '';
     let ctry: string | undefined;
@@ -1440,6 +1459,7 @@ export class FootballDB {
   }
 
   getLeagueStandings(leagueCode: string, leagueUrl?: string, leagueName?: string): any {
+    if (!isSqliteEnabled()) return null;
     const aliasMap: Record<string, string[]> = {
       'e0': ['england_premier_league'],
       'england_premier_league': ['e0'],
@@ -1522,6 +1542,7 @@ export class FootballDB {
   }
 
   getAllLeagueStandingsTables(): LeagueStandingTable[] {
+    if (!isSqliteEnabled()) return [];
     try {
       const rows = sqliteDb
         .prepare("SELECT * FROM league_standings WHERE standings_json IS NOT NULL")
@@ -1545,6 +1566,7 @@ export class FootballDB {
     groupCount: number;
     updatedAt: string;
   }> {
+    if (!isSqliteEnabled()) return [];
     try {
       const rows = sqliteDb
         .prepare("SELECT league_code, league_name, country, league_url, season, standings_json, groups_json, updated_at FROM league_standings")
@@ -1572,6 +1594,7 @@ export class FootballDB {
 
   getDiscoveredTournamentsFromDb(): Array<FlashscoreTournamentMeta & { leagueCode?: string }> {
     const collected: Array<FlashscoreTournamentMeta & { leagueCode?: string }> = [];
+    if (!isSqliteEnabled()) return collected;
     const seenKeys = new Set<string>();
 
     try {
@@ -1649,6 +1672,7 @@ export class FootballDB {
   }
 
   getAllBets(): SlipBet[] {
+    if (!isSqliteEnabled()) return [];
     try {
       const rows = sqliteDb.prepare("SELECT * FROM bets ORDER BY placed_at DESC").all() as any[];
       return rows.map((r) => ({
@@ -1679,6 +1703,7 @@ export class FootballDB {
   evaluateBets(
     liveScoresOverride?: Array<{ fixtureId: string; homeScore: number; awayScore: number; minute?: number; status?: string }>
   ): void {
+    if (!isSqliteEnabled()) return;
     try {
       const betsToCheck = this.getAllBets().filter(
         (b) => b.status === 'PENDING' || b.selections.some((s) => (s.status || 'PENDING') === 'PENDING')

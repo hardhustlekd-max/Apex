@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
-import { registerDbMutationListener } from '../core/sqliteClient.js';
+import { getSqliteGateState, isSqliteEnabled, registerDbMutationListener } from '../core/sqliteClient.js';
 import {
   cleanFixtureId,
   Fixture,
@@ -540,6 +540,10 @@ class FixturesWorkerService {
   public invalidate(): void {
     this.indexBuiltAt = 0;
     this.indexVersion++;
+    if (!isSqliteEnabled()) {
+      this.records = [];
+      this.byCleanId.clear();
+    }
     this.queryCache.clear();
     this.featuredTipsCache = null;
     this.standingsCatalogCache = null;
@@ -550,6 +554,13 @@ class FixturesWorkerService {
    * Ensures the warm server-side projection index is loaded and merged once from SQLite.
    */
   public async ensureIndexReady(forceRefresh = false): Promise<void> {
+    if (!isSqliteEnabled()) {
+      this.records = [];
+      this.byCleanId.clear();
+      this.indexBuiltAt = 0;
+      return;
+    }
+
     const now = Date.now();
     if (!forceRefresh && this.indexBuiltAt > 0 && now - this.indexBuiltAt < this.INDEX_TTL_MS) {
       return;
@@ -749,6 +760,21 @@ class FixturesWorkerService {
     }
 
     const scores = await this.liveScoresPromise;
+    if (isSqliteEnabled() && scores && scores.length > 0) {
+      try {
+        const updates = scores.map((s) => ({
+          id: s.fixtureId,
+          status: s.status === 'FINISHED' ? 'FINISHED' : 'LIVE',
+          kickOffTime: s.status === 'FINISHED' ? 'FT' : s.minute ? `${s.minute}'` : 'Live',
+          score: { home: s.homeScore, away: s.awayScore },
+        }));
+        db.updateUpcomingFixtureStatuses(updates);
+        db.evaluateBets(scores);
+      } catch (syncErr: any) {
+        console.warn('[FixturesWorker] Notice syncing live status to SQLite:', syncErr?.message);
+      }
+    }
+
     const signature = scores
       .map((s) => `${s.fixtureId}:${s.homeScore}-${s.awayScore}:${s.minute}:${s.status}`)
       .join('|');
@@ -778,6 +804,27 @@ class FixturesWorkerService {
   public async queryUpcomingFixtures(
     params: WorkerQueryParams = {}
   ): Promise<{ jsonPayload: string; etag: string; resolvedDateFilter: string; count: number }> {
+    if (!isSqliteEnabled()) {
+      const payloadObj = {
+        success: true,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        provider: 'FLASHSCORE',
+        count: 0,
+        totalDatabaseCount: 0,
+        resolvedDateFilter: params.dateFilter || 'ALL',
+        fixtures: [],
+        groups: [],
+      };
+      const jsonPayload = JSON.stringify(payloadObj);
+      return {
+        jsonPayload,
+        etag: makeEtag(jsonPayload),
+        resolvedDateFilter: params.dateFilter || 'ALL',
+        count: 0,
+      };
+    }
+
     if (params.forceRefresh) {
       this.invalidate();
     }
@@ -923,6 +970,19 @@ class FixturesWorkerService {
     marketFilter?: string;
     limit?: number;
   }): Promise<{ jsonPayload: string; etag: string }> {
+    if (!isSqliteEnabled()) {
+      const jsonPayload = JSON.stringify({
+        success: true,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        provider: 'FLASHSCORE',
+        count: 0,
+        fixtures: [],
+        groups: [],
+      });
+      return { jsonPayload, etag: makeEtag(jsonPayload) };
+    }
+
     await this.ensureIndexReady(false);
     const liveData = await this.getCachedLiveScores(false);
 
@@ -1028,6 +1088,18 @@ class FixturesWorkerService {
    * eliminating client-side scanning of all DB fixtures and N parallel getMatchDetail requests.
    */
   public async getFeaturedHighConfidenceTips(forceRefresh = false): Promise<{ jsonPayload: string; etag: string }> {
+    if (!isSqliteEnabled()) {
+      const jsonPayload = JSON.stringify({
+        success: true,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        count: 0,
+        totalOdds: 1.0,
+        tips: [],
+      });
+      return { jsonPayload, etag: makeEtag(jsonPayload) };
+    }
+
     if (forceRefresh) {
       this.featuredTipsCache = null;
     }
@@ -1111,6 +1183,20 @@ class FixturesWorkerService {
     limit?: number;
     forceRefresh?: boolean;
   }): Promise<{ jsonPayload: string; etag: string }> {
+    if (!isSqliteEnabled()) {
+      const jsonPayload = JSON.stringify({
+        success: true,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        provider: 'PREDICTIONS_DB',
+        count: 0,
+        matches: [],
+        groups: [],
+        summary: predictionsDb.getEvaluationSummary(),
+      });
+      return { jsonPayload, etag: makeEtag(jsonPayload) };
+    }
+
     await db.init();
     await predictionsDb.init();
     await predictionsDb.reconcileAndSyncResults({ force: Boolean(params?.forceRefresh) });
@@ -1196,16 +1282,19 @@ class FixturesWorkerService {
    * prioritized by table availability and league popularity, with ETag caching.
    */
   public async getStandingsCatalog(): Promise<{ jsonPayload: string; etag: string }> {
-    if (this.standingsCatalogCache) {
+    const sqliteActive = isSqliteEnabled();
+    if (sqliteActive && this.standingsCatalogCache) {
       return {
         jsonPayload: this.standingsCatalogCache.jsonPayload,
         etag: this.standingsCatalogCache.etag,
       };
     }
 
-    await db.init();
-    const summaries = db.getAllLeagueStandingsSummaries();
-    const discovered = db.getDiscoveredTournamentsFromDb();
+    if (sqliteActive) {
+      await db.init();
+    }
+    const summaries = sqliteActive ? db.getAllLeagueStandingsSummaries() : [];
+    const discovered = sqliteActive ? db.getDiscoveredTournamentsFromDb() : [];
 
     const items: StandingsCatalogItem[] = [];
     const byUrl = new Map<string, StandingsCatalogItem>();
@@ -1347,11 +1436,13 @@ class FixturesWorkerService {
     });
     const etag = makeEtag(jsonPayload);
 
-    this.standingsCatalogCache = {
-      jsonPayload,
-      etag,
-      timestamp: Date.now(),
-    };
+    if (sqliteActive) {
+      this.standingsCatalogCache = {
+        jsonPayload,
+        etag,
+        timestamp: Date.now(),
+      };
+    }
 
     return { jsonPayload, etag };
   }

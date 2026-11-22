@@ -1,10 +1,13 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response as ExpressResponse, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import {
   DATA_DIR,
   createConsistentSqliteSnapshot,
   getSqliteDbStats,
+  getSqliteGateState,
+  isSqliteDbFilePresent,
+  isSqliteEnabled,
   replaceSqliteDbFromFile,
 } from '../core/sqliteClient.js';
 import { db } from '../core/db.js';
@@ -28,7 +31,7 @@ export interface DriveFileMeta {
 }
 
 // Enforce strictly dev server preview usage only
-driveDbRouter.use((_req: Request, res: Response, next: NextFunction) => {
+driveDbRouter.use((_req: Request, res: ExpressResponse, next: NextFunction) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({
       success: false,
@@ -46,7 +49,7 @@ function extractBearerToken(req: Request): string | null {
   return token.length > 10 ? token : null;
 }
 
-async function parseGoogleDriveError(resp: Response, fallbackPrefix: string): Promise<{
+async function parseGoogleDriveError(resp: globalThis.Response, fallbackPrefix: string): Promise<{
   status: number;
   needsReauth: boolean;
   message: string;
@@ -119,10 +122,11 @@ async function listDriveBackupFiles(token: string): Promise<DriveFileMeta[]> {
  * GET /api/drive-db/status
  * Checks current backup file in Google Drive + local SQLite disk stats
  */
-driveDbRouter.get('/status', async (req: Request, res: Response) => {
+driveDbRouter.get('/status', async (req: Request, res: ExpressResponse) => {
   try {
     const token = extractBearerToken(req);
     const localStats = getSqliteDbStats();
+    const sqliteGate = getSqliteGateState();
 
     if (!token) {
       return res.json({
@@ -131,6 +135,7 @@ driveDbRouter.get('/status', async (req: Request, res: Response) => {
         authenticated: false,
         driveFile: null,
         localStats,
+        sqliteGate,
       });
     }
 
@@ -142,6 +147,7 @@ driveDbRouter.get('/status', async (req: Request, res: Response) => {
       driveFile: files[0] || null,
       filesCount: files.length,
       localStats,
+      sqliteGate,
     });
   } catch (err: any) {
     const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
@@ -159,13 +165,22 @@ driveDbRouter.get('/status', async (req: Request, res: Response) => {
  * POST /api/drive-db/upload
  * Creates a clean online SQLite snapshot and uploads (creates or updates) it in Google Drive via resumable upload.
  */
-driveDbRouter.post('/upload', async (req: Request, res: Response) => {
+driveDbRouter.post('/upload', async (req: Request, res: ExpressResponse) => {
   const token = extractBearerToken(req);
   if (!token) {
     return res.status(401).json({
       success: false,
       needsReauth: true,
       error: 'Missing Google Drive authorization token.',
+    });
+  }
+
+  if (!isSqliteEnabled() || !isSqliteDbFilePresent()) {
+    return res.status(409).json({
+      success: false,
+      sqliteBlocked: true,
+      sqliteGate: getSqliteGateState(),
+      error: 'SQLite database is switched off or missing. Enable SQLite DB manually before uploading to Google Drive.',
     });
   }
 
@@ -278,7 +293,7 @@ driveDbRouter.post('/upload', async (req: Request, res: Response) => {
  * POST /api/drive-db/restore
  * Downloads football_engine.db from Google Drive, validates integrity, replaces local DB, and reloads worker index.
  */
-driveDbRouter.post('/restore', async (req: Request, res: Response) => {
+driveDbRouter.post('/restore', async (req: Request, res: ExpressResponse) => {
   const token = extractBearerToken(req);
   if (!token) {
     return res.status(401).json({
@@ -343,6 +358,7 @@ driveDbRouter.post('/restore', async (req: Request, res: Response) => {
       restoredFileId: fileId,
       sizeBytes: restoreResult.sizeBytes,
       tableCounts: restoreResult.tableCounts,
+      sqliteGate: getSqliteGateState(),
     });
   } catch (err: any) {
     const status = typeof err?.status === 'number' && err.status >= 400 ? err.status : 500;
@@ -362,7 +378,7 @@ driveDbRouter.post('/restore', async (req: Request, res: Response) => {
  * DELETE /api/drive-db/file/:fileId
  * Deletes the stored SQLite backup file from Google Drive.
  */
-driveDbRouter.delete('/file/:fileId', async (req: Request, res: Response) => {
+driveDbRouter.delete('/file/:fileId', async (req: Request, res: ExpressResponse) => {
   const token = extractBearerToken(req);
   if (!token) {
     return res.status(401).json({

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Filter, ChevronDown, X, RefreshCw } from 'lucide-react';
-import { Fixture, LeagueGroupDTO, LeagueOptionDTO } from '../core/types.js';
+import { Filter, ChevronDown, X, RefreshCw, Power, Database } from 'lucide-react';
+import { Fixture, LeagueGroupDTO, LeagueOptionDTO, SqliteGateState } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import {
   getUtcDateStr,
@@ -47,6 +47,11 @@ interface FixturesListProps {
   isProcessingActive?: boolean;
   onTriggerFullSync?: () => void;
   refreshKey?: number;
+  sqliteBlocked?: boolean;
+  sqliteGate?: SqliteGateState | null;
+  onSwitchOnSqlite?: () => void;
+  isTogglingSqlite?: boolean;
+  onOpenSettings?: () => void;
 }
 
 export const FixturesList: React.FC<FixturesListProps> = ({
@@ -78,6 +83,11 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   selectedFixtureId,
   onTriggerFullSync,
   refreshKey = 0,
+  sqliteBlocked = false,
+  sqliteGate = null,
+  onSwitchOnSqlite,
+  isTogglingSqlite = false,
+  onOpenSettings,
 }) => {
   const [internalScope, setInternalScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const activeScope = propActiveScope ?? internalScope;
@@ -214,11 +224,41 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     };
   }, [activeScope, selectedLeague, debouncedHistorySearch, sortBy, marketChoiceFilter, refreshKey]);
 
+  const liveScoresMap = useMemo(() => {
+    const map = new Map<string, LiveScore>();
+    if (liveScores && liveScores.length > 0) {
+      for (const s of liveScores) {
+        if (s.fixtureId) {
+          map.set(s.fixtureId, s);
+          const clean = s.fixtureId.replace(/^fs_/, '');
+          map.set(clean, s);
+          map.set(`fs_${clean}`, s);
+        }
+      }
+    }
+    return map;
+  }, [liveScores]);
+
   const displayedFixtures = useMemo(() => {
-    if (activeScope === 'LIVE') return propLiveFixtures;
-    if (activeScope === 'HISTORY') return historyFixtures;
-    return fixtures;
-  }, [activeScope, fixtures, propLiveFixtures, historyFixtures]);
+    let baseList = fixtures;
+    if (activeScope === 'LIVE') baseList = propLiveFixtures;
+    else if (activeScope === 'HISTORY') return historyFixtures;
+
+    if (liveScoresMap.size === 0) return baseList;
+
+    return baseList.map((f) => {
+      const cleanId = (f.id || '').replace(/^fs_/, '');
+      const ls = liveScoresMap.get(f.id) || liveScoresMap.get(cleanId);
+      if (!ls) return f;
+      return {
+        ...f,
+        status: (ls.status === 'FINISHED' ? 'FINISHED' : 'LIVE') as any,
+        minute: ls.minute ?? f.minute,
+        score: { home: ls.homeScore, away: ls.awayScore },
+        kickOffTime: ls.status === 'FINISHED' ? 'FT' : ls.minute ? `${ls.minute}'` : 'Live',
+      };
+    });
+  }, [activeScope, fixtures, propLiveFixtures, historyFixtures, liveScoresMap]);
 
   const activeGroups = useMemo(() => {
     if (activeScope === 'LIVE') return liveGroups;
@@ -334,18 +374,21 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     [liveScores]
   );
 
-  const emptyTitle =
-    activeScope === 'UPCOMING'
-      ? 'No Upcoming Fixtures'
-      : activeScope === 'LIVE'
-      ? 'No Live Matches'
-      : historySummary && historySummary.completedAwaitingScore > 0
-      ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
-      : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
-      ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
-      : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
-      ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
-      : 'No Historical Predictions';
+  const emptyTitle = sqliteBlocked
+    ? sqliteGate?.blockedReason === 'MISSING_DB_ON_PREVIEW'
+      ? 'No SQLite DB on Preview (Switched Off)'
+      : 'SQLite Database Switched Off'
+    : activeScope === 'UPCOMING'
+    ? 'No Upcoming Fixtures'
+    : activeScope === 'LIVE'
+    ? 'No Live Matches'
+    : historySummary && historySummary.completedAwaitingScore > 0
+    ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
+    : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
+    ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
+    : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
+    ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
+    : 'No Historical Predictions';
 
   return (
     <div className="space-y-2.5 font-sans flex-1 flex flex-col">
@@ -557,28 +600,44 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         <LoadingState />
       ) : displayedFixtures.length === 0 ? (
         <EmptyState
-          icon={<RefreshCw className="w-5 h-5" />}
+          icon={sqliteBlocked ? <Database className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
           title={emptyTitle}
           minHeight="min-h-[156px]"
           actions={
-            <>
-              {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
-                <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Start Full Sync &amp; Update Data</span>
-                </Button>
-              )}
-              {activeFilterCount > 0 && (
-                <Button variant="subtle" size="sm" onClick={handleResetAllFilters}>
-                  Reset filters ({activeFilterCount})
-                </Button>
-              )}
-              {activeScope === 'UPCOMING' && canonicalDateFilter !== 'ALL' && (
-                <Button variant="subtle" size="sm" onClick={() => handleSelectDateFilter('ALL')}>
-                  Show all dates ({totalDatabaseCount ?? fixtures.length})
-                </Button>
-              )}
-            </>
+            sqliteBlocked ? (
+              <>
+                {onSwitchOnSqlite && (
+                  <Button variant="primary" size="sm" onClick={onSwitchOnSqlite} disabled={isTogglingSqlite}>
+                    <Power className="w-3.5 h-3.5" />
+                    <span>{isTogglingSqlite ? 'Switching On...' : 'Switch On SQLite DB'}</span>
+                  </Button>
+                )}
+                {onOpenSettings && (
+                  <Button variant="secondary" size="sm" onClick={onOpenSettings}>
+                    <span>Open Settings / Drive Restore</span>
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
+                  <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Start Full Sync &amp; Update Data</span>
+                  </Button>
+                )}
+                {activeFilterCount > 0 && (
+                  <Button variant="subtle" size="sm" onClick={handleResetAllFilters}>
+                    Reset filters ({activeFilterCount})
+                  </Button>
+                )}
+                {activeScope === 'UPCOMING' && canonicalDateFilter !== 'ALL' && (
+                  <Button variant="subtle" size="sm" onClick={() => handleSelectDateFilter('ALL')}>
+                    Show all dates ({totalDatabaseCount ?? fixtures.length})
+                  </Button>
+                )}
+              </>
+            )
           }
         />
       ) : viewMode === 'CARDS' ? (
