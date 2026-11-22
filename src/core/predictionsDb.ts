@@ -147,48 +147,17 @@ export class PredictionsDB {
 
             const pred = f.prediction;
             const bestTip = f.mostLikelyOutcome;
-            const isStandingsClose = Boolean(
-              f.standingsClose ?? pred.standingsClose ?? pred.standingsContext?.standingsClose
-            );
 
             // Determine authoritative tip key/name/prob for DB summary columns
             const hw = Number(pred.homeWinProb ?? 0);
             const dr = Number(pred.drawProb ?? 0);
             const aw = Number(pred.awayWinProb ?? 0);
-            const o25 = Number(pred.over25Prob ?? 0);
-            const u25 = Math.max(0, 1 - o25);
-            const bttsY = Number(pred.bttsProb ?? 0);
-            const bttsN = Math.max(0, 1 - bttsY);
 
             let tipKey = bestTip?.marketKey || 'HOME_WIN';
             let tipName = (bestTip as any)?.selection || bestTip?.marketKey || `${f.homeTeam} Win`;
             let tipProb = bestTip?.probability ?? hw;
 
-            if (isStandingsClose) {
-              const non1x2Markets = (f.markets || []).filter(
-                (m) => m.key !== 'HOME_WIN' && m.key !== 'DRAW' && m.key !== 'AWAY_WIN'
-              );
-              const bestNon1x2Market = non1x2Markets.sort((a, b) => b.probability - a.probability)[0];
-              if (bestTip && bestTip.marketKey !== 'HOME_WIN' && bestTip.marketKey !== 'DRAW' && bestTip.marketKey !== 'AWAY_WIN') {
-                tipKey = bestTip.marketKey;
-                tipName = (bestTip as any).selection || bestTip.marketKey;
-                tipProb = bestTip.probability;
-              } else if (bestNon1x2Market) {
-                tipKey = bestNon1x2Market.key;
-                tipName = bestNon1x2Market.name;
-                tipProb = bestNon1x2Market.probability;
-              } else {
-                const altCandidates = [
-                  { key: 'OVER_25', name: 'Over 2.5 Goals', prob: o25 },
-                  { key: 'UNDER_25', name: 'Under 2.5 Goals', prob: u25 },
-                  { key: 'BTTS_YES', name: 'Both Teams to Score', prob: bttsY },
-                  { key: 'BTTS_NO', name: 'Both Teams to Score No', prob: bttsN },
-                ].sort((a, b) => b.prob - a.prob);
-                tipKey = altCandidates[0].key as any;
-                tipName = altCandidates[0].name;
-                tipProb = altCandidates[0].prob;
-              }
-            } else if (hw > 0 || dr > 0 || aw > 0) {
+            if (hw > 0 || dr > 0 || aw > 0) {
               if (hw >= dr && hw >= aw) {
                 tipKey = 'HOME_WIN';
                 tipName = `${f.homeTeam} Win`;
@@ -1282,7 +1251,7 @@ export class PredictionsDB {
       const dr = Number(item.drawProb ?? item.draw_prob ?? item.prediction?.drawProb ?? 0);
       const aw = Number(item.awayWinProb ?? item.away_win_prob ?? item.prediction?.awayWinProb ?? 0);
 
-      // Determine predicted choice (1X2 or alternative market when standings close)
+      // Determine predicted choice
       let tipKey: string = 'HOME_WIN';
       let tipName = item.tipName || item.tip_name || '';
       let tipProb = Number(item.tipProb ?? item.tip_prob ?? 0);

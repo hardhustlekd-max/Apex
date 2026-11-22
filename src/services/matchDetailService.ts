@@ -1,7 +1,7 @@
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { isSqliteEnabled } from '../core/sqliteClient.js';
-import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, LeagueStandingTable, TeamFormMatch, TeamStatsSummary } from '../core/types.js';
+import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, TeamFormMatch, TeamStatsSummary } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { convertHistoricalMatchToFixture, flashscoreScraperService } from './flashscoreScraperService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
@@ -232,53 +232,9 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
     );
   }
 
-  // Ensure standing-close 1X2 suppression stays consistent with latest synced league standings
+  // Ensure comprehensive markets (including 1X2) and EV edges are populated on stored predictions
   if (stored.prediction) {
-    let isStandingsClose = Boolean(
-      stored.standingsClose ??
-        stored.prediction.standingsClose ??
-        stored.prediction.standingsContext?.standingsClose
-    );
-    let standingsCloseReason =
-      stored.standingsCloseReason ??
-      stored.prediction.standingsCloseReason ??
-      stored.prediction.standingsContext?.standingsCloseReason;
-
-    const standingsTable = db.getLeagueStandings(
-      stored.league,
-      stored.leagueUrl,
-      stored.leagueName
-    ) as LeagueStandingTable | null;
-    if (standingsTable) {
-      const { homeMatch, awayMatch } = ApexEngine.findMatchedStandingsPair(
-        stored.homeTeam,
-        stored.awayTeam,
-        standingsTable
-      );
-      if (homeMatch && awayMatch) {
-        const evalRes = ApexEngine.evaluateStandingsCloseStatus(
-          {
-            rank: homeMatch.entry.rank,
-            totalTeams: Math.max(homeMatch.entry.rank || 1, homeMatch.group.table.length),
-            played: homeMatch.entry.played,
-            points: homeMatch.entry.points,
-            ppg: Number((homeMatch.entry.points / Math.max(1, homeMatch.entry.played)).toFixed(2)),
-            groupName: homeMatch.group.name && homeMatch.group.name !== 'Standings' ? homeMatch.group.name : undefined,
-          },
-          {
-            rank: awayMatch.entry.rank,
-            totalTeams: Math.max(awayMatch.entry.rank || 1, awayMatch.group.table.length),
-            played: awayMatch.entry.played,
-            points: awayMatch.entry.points,
-            ppg: Number((awayMatch.entry.points / Math.max(1, awayMatch.entry.played)).toFixed(2)),
-            groupName: awayMatch.group.name && awayMatch.group.name !== 'Standings' ? awayMatch.group.name : undefined,
-          }
-        );
-        isStandingsClose = evalRes.isClose;
-        standingsCloseReason = evalRes.reason;
-      }
-    }
-
+    const has1x2Markets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'HOME_WIN');
     const hasComprehensiveMarkets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'COMBO_1X_BTTS');
     const needsEvPopulation = Boolean(
       stored.marketOdds &&
@@ -286,19 +242,11 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
         !stored.markets.some((m) => m.marketOdds !== undefined)
     );
 
-    if (
-      isStandingsClose ||
-      stored.standingsClose ||
-      stored.prediction.standingsClose ||
-      !hasComprehensiveMarkets ||
-      needsEvPopulation
-    ) {
+    if (!has1x2Markets || !hasComprehensiveMarkets || needsEvPopulation) {
       const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
       const updatedPrediction = {
         ...stored.prediction,
         marketOdds: stored.marketOdds || stored.prediction.marketOdds,
-        standingsClose: isStandingsClose,
-        standingsCloseReason: isStandingsClose ? standingsCloseReason : undefined,
       };
       const recalc = ApexEngine.calculateMarkets(
         updatedPrediction,
@@ -307,8 +255,6 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
         stored.awayTeam,
         stored.marketOdds
       );
-      stored.standingsClose = isStandingsClose;
-      stored.standingsCloseReason = isStandingsClose ? standingsCloseReason : undefined;
       stored.prediction = {
         ...updatedPrediction,
         mostLikelyOutcome: recalc.mostLikelyOutcome,

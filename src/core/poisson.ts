@@ -309,54 +309,6 @@ export class ApexEngine {
     };
   }
 
-  public static evaluateStandingsCloseStatus(
-    homeSnap?: Pick<TeamStandingsSnapshot, 'rank' | 'totalTeams' | 'played' | 'points' | 'ppg' | 'groupName'>,
-    awaySnap?: Pick<TeamStandingsSnapshot, 'rank' | 'totalTeams' | 'played' | 'points' | 'ppg' | 'groupName'>
-  ): {
-    isClose: boolean;
-    reason?: string;
-    rankDiff?: number;
-    pointsDiff?: number;
-    ppgDiff?: number;
-  } {
-    if (!homeSnap || !awaySnap) {
-      return { isClose: false };
-    }
-    if (homeSnap.rank <= 0 || awaySnap.rank <= 0 || homeSnap.played < 1 || awaySnap.played < 1) {
-      return { isClose: false };
-    }
-    if (homeSnap.groupName && awaySnap.groupName && homeSnap.groupName !== awaySnap.groupName) {
-      return { isClose: false };
-    }
-
-    const rankDiff = Math.abs(homeSnap.rank - awaySnap.rank);
-    const pointsDiff = Math.abs(homeSnap.points - awaySnap.points);
-    const homePpg = Number.isFinite(homeSnap.ppg) ? homeSnap.ppg : homeSnap.points / Math.max(1, homeSnap.played);
-    const awayPpg = Number.isFinite(awaySnap.ppg) ? awaySnap.ppg : awaySnap.points / Math.max(1, awaySnap.played);
-    const ppgDiff = Number(Math.abs(homePpg - awayPpg).toFixed(2));
-
-    const isClose = rankDiff <= 2;
-
-    if (!isClose) {
-      return { isClose: false, rankDiff, pointsDiff, ppgDiff };
-    }
-
-    const rankText =
-      rankDiff === 0
-        ? 'tied rank'
-        : `${rankDiff} ${rankDiff === 1 ? 'place' : 'places'} apart`;
-    const ptsText = pointsDiff === 0 ? 'level on pts' : `${pointsDiff} ${pointsDiff === 1 ? 'pt' : 'pts'} apart`;
-    const reason = `Standings close (#${homeSnap.rank} vs #${awaySnap.rank} · ${rankText} · ${ptsText})`;
-
-    return {
-      isClose: true,
-      reason,
-      rankDiff,
-      pointsDiff,
-      ppgDiff,
-    };
-  }
-
   private static computeGroupAvgGoalsPerGame(rows: LeagueStandingEntry[]): number {
     let totalGF = 0;
     let totalPlayed = 0;
@@ -1543,13 +1495,9 @@ export class ApexEngine {
     const awaySnap = awayStandingsMatch
       ? this.buildTeamStandingsSnapshot(awayStandingsMatch.entry, awayStandingsMatch.group, vL)
       : undefined;
-    const standingsCloseEval = this.evaluateStandingsCloseStatus(homeSnap, awaySnap);
 
     const motivation = this.computeZoneStakesMotivation(homeTeam, awayTeam, homeSnap, awaySnap);
     const tacticalNotes = [...baseTacticalContext.tacticalNotes, ...motivation.notes];
-    if (standingsCloseEval.isClose && standingsCloseEval.reason) {
-      tacticalNotes.push(`${standingsCloseEval.reason} — 1X2/Win suppressed, predicting alternative markets`);
-    }
     const tacticalContext: TacticalContextBreakdown = {
       ...baseTacticalContext,
       fatigueAdjustmentHome: Math.max(
@@ -1743,11 +1691,12 @@ export class ApexEngine {
               preStandingsAwayMu > 0
                 ? Number((((awayMu - preStandingsAwayMu) / preStandingsAwayMu) * 100).toFixed(1))
                 : undefined,
-            standingsClose: standingsCloseEval.isClose,
-            standingsCloseReason: standingsCloseEval.reason,
-            rankDiff: standingsCloseEval.rankDiff,
-            pointsDiff: standingsCloseEval.pointsDiff,
-            ppgDiff: standingsCloseEval.ppgDiff,
+            rankDiff: homeSnap && awaySnap ? Math.abs(homeSnap.rank - awaySnap.rank) : undefined,
+            pointsDiff: homeSnap && awaySnap ? Math.abs(homeSnap.points - awaySnap.points) : undefined,
+            ppgDiff:
+              homeSnap && awaySnap
+                ? Number(Math.abs((homeSnap.ppg ?? 0) - (awaySnap.ppg ?? 0)).toFixed(2))
+                : undefined,
           }
         : undefined;
 
@@ -1960,8 +1909,6 @@ export class ApexEngine {
       xgBreakdown,
       tacticalContext,
       standingsContext,
-      standingsClose: standingsCloseEval.isClose,
-      standingsCloseReason: standingsCloseEval.reason,
       dixonColesParams,
       marketOdds: marketOdds || undefined,
       volatilityContext,
@@ -1986,8 +1933,6 @@ export class ApexEngine {
   /**
    * Refactored to remove all odds-related calculations.
    * Focuses strictly on market probabilities and identifying "Banker" status.
-   * When standings are close on the league table, prevents Win / 1X2 predictions
-   * and evaluates alternative markets (Over/Under, BTTS, Double Chance) instead.
    */
   public static calculateMarkets(
     prediction: PoissonPrediction,
@@ -2001,9 +1946,6 @@ export class ApexEngine {
     bestValueBet?: ValueBetRecommendation;
   } {
     const markets: MarketOption[] = [];
-    const isStandingsClose = Boolean(
-      prediction.standingsClose ?? prediction.standingsContext?.standingsClose
-    );
 
     // Point E: Downstream Risk & Staking Filter scaled by V_L
     const vL = Math.max(
@@ -2085,12 +2027,10 @@ export class ApexEngine {
       });
     };
 
-    // 1X2 Match Outcomes — suppressed whenever standings status is close
-    if (!isStandingsClose) {
-      addMarket('HOME_WIN', `${homeTeam} to Win`, prediction.homeWinProb);
-      addMarket('DRAW', 'Draw', prediction.drawProb);
-      addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
-    }
+    // 1X2 Match Outcomes
+    addMarket('HOME_WIN', `${homeTeam} to Win`, prediction.homeWinProb);
+    addMarket('DRAW', 'Draw', prediction.drawProb);
+    addMarket('AWAY_WIN', `${awayTeam} to Win`, prediction.awayWinProb);
 
     // Double Chance
     const dc1XProb = Number(Math.min(0.99, prediction.homeWinProb + prediction.drawProb).toFixed(3));
@@ -2106,10 +2046,8 @@ export class ApexEngine {
     const dnbSum = prediction.homeWinProb + prediction.awayWinProb || 1.0;
     const dnbHomeProb = Number((prediction.homeWinProb / dnbSum).toFixed(3));
     const dnbAwayProb = Number((prediction.awayWinProb / dnbSum).toFixed(3));
-    if (!isStandingsClose) {
-      addMarket('DNB_HOME', `Draw No Bet - ${homeTeam}`, dnbHomeProb);
-      addMarket('DNB_AWAY', `Draw No Bet - ${awayTeam}`, dnbAwayProb);
-    }
+    addMarket('DNB_HOME', `Draw No Bet - ${homeTeam}`, dnbHomeProb);
+    addMarket('DNB_AWAY', `Draw No Bet - ${awayTeam}`, dnbAwayProb);
 
     // Derive exact goal & combo probabilities from Poisson probabilityMatrix
     const over15 = prediction.over15Prob ?? 0.75;
@@ -2271,23 +2209,21 @@ export class ApexEngine {
     addMarket('BTTS_NO', 'Both Teams to Score (No)', r3(1 - prediction.bttsProb));
 
     // Match Result & Goals Combos
-    if (!isStandingsClose) {
-      addMarket('COMBO_1_OVER_15', `${homeTeam} Win & Over 1.5 Goals`, r3(c1O15));
-      addMarket('COMBO_2_OVER_15', `${awayTeam} Win & Over 1.5 Goals`, r3(c2O15));
-      addMarket('COMBO_1_OVER_25', `${homeTeam} Win & Over 2.5 Goals`, r3(c1O25));
-      addMarket('COMBO_2_OVER_25', `${awayTeam} Win & Over 2.5 Goals`, r3(c2O25));
-      addMarket('COMBO_1_OVER_35', `${homeTeam} Win & Over 3.5 Goals`, r3(c1O35));
-      addMarket('COMBO_2_OVER_35', `${awayTeam} Win & Over 3.5 Goals`, r3(c2O35));
-      addMarket('COMBO_1_UNDER_25', `${homeTeam} Win & Under 2.5 Goals`, r3(c1U25));
-      addMarket('COMBO_2_UNDER_25', `${awayTeam} Win & Under 2.5 Goals`, r3(c2U25));
-      addMarket('COMBO_1_UNDER_35', `${homeTeam} Win & Under 3.5 Goals`, r3(c1U35));
-      addMarket('COMBO_2_UNDER_35', `${awayTeam} Win & Under 3.5 Goals`, r3(c2U35));
-      addMarket('COMBO_X_UNDER_25', 'Draw & Under 2.5 Goals', r3(cXU25));
-      addMarket('COMBO_X_OVER_15', 'Draw & Over 1.5 Goals', r3(cXO15));
-      addMarket('COMBO_1_BTTS', `${homeTeam} Win & BTTS Yes`, r3(c1Btts));
-      addMarket('COMBO_2_BTTS', `${awayTeam} Win & BTTS Yes`, r3(c2Btts));
-      addMarket('COMBO_X_BTTS', 'Draw & BTTS Yes', r3(cXBtts));
-    }
+    addMarket('COMBO_1_OVER_15', `${homeTeam} Win & Over 1.5 Goals`, r3(c1O15));
+    addMarket('COMBO_2_OVER_15', `${awayTeam} Win & Over 1.5 Goals`, r3(c2O15));
+    addMarket('COMBO_1_OVER_25', `${homeTeam} Win & Over 2.5 Goals`, r3(c1O25));
+    addMarket('COMBO_2_OVER_25', `${awayTeam} Win & Over 2.5 Goals`, r3(c2O25));
+    addMarket('COMBO_1_OVER_35', `${homeTeam} Win & Over 3.5 Goals`, r3(c1O35));
+    addMarket('COMBO_2_OVER_35', `${awayTeam} Win & Over 3.5 Goals`, r3(c2O35));
+    addMarket('COMBO_1_UNDER_25', `${homeTeam} Win & Under 2.5 Goals`, r3(c1U25));
+    addMarket('COMBO_2_UNDER_25', `${awayTeam} Win & Under 2.5 Goals`, r3(c2U25));
+    addMarket('COMBO_1_UNDER_35', `${homeTeam} Win & Under 3.5 Goals`, r3(c1U35));
+    addMarket('COMBO_2_UNDER_35', `${awayTeam} Win & Under 3.5 Goals`, r3(c2U35));
+    addMarket('COMBO_X_UNDER_25', 'Draw & Under 2.5 Goals', r3(cXU25));
+    addMarket('COMBO_X_OVER_15', 'Draw & Over 1.5 Goals', r3(cXO15));
+    addMarket('COMBO_1_BTTS', `${homeTeam} Win & BTTS Yes`, r3(c1Btts));
+    addMarket('COMBO_2_BTTS', `${awayTeam} Win & BTTS Yes`, r3(c2Btts));
+    addMarket('COMBO_X_BTTS', 'Draw & BTTS Yes', r3(cXBtts));
     addMarket('COMBO_1X_OVER_15', `1X & Over 1.5 Goals`, r3(c1XO15));
     addMarket('COMBO_X2_OVER_15', `X2 & Over 1.5 Goals`, r3(cX2O15));
     addMarket('COMBO_12_OVER_15', `12 & Over 1.5 Goals`, r3(c12O15));
@@ -2325,12 +2261,10 @@ export class ApexEngine {
     addMarket('HOME_CLEAN_SHEET', `${homeTeam} Clean Sheet (Yes)`, r3(homeCleanSheet));
     addMarket('AWAY_CLEAN_SHEET', `${awayTeam} Clean Sheet (Yes)`, r3(awayCleanSheet));
 
-    if (!isStandingsClose) {
-      addMarket('HOME_WIN_TO_NIL', `${homeTeam} Win to Nil`, r3(homeWinToNil));
-      addMarket('AWAY_WIN_TO_NIL', `${awayTeam} Win to Nil`, r3(awayWinToNil));
-      addMarket('HANDICAP_HOME_MINUS_1', `${homeTeam} (-1.5) Handicap`, r3(hMinus1));
-      addMarket('HANDICAP_AWAY_MINUS_1', `${awayTeam} (-1.5) Handicap`, r3(aMinus1));
-    }
+    addMarket('HOME_WIN_TO_NIL', `${homeTeam} Win to Nil`, r3(homeWinToNil));
+    addMarket('AWAY_WIN_TO_NIL', `${awayTeam} Win to Nil`, r3(awayWinToNil));
+    addMarket('HANDICAP_HOME_MINUS_1', `${homeTeam} (-1.5) Handicap`, r3(hMinus1));
+    addMarket('HANDICAP_AWAY_MINUS_1', `${awayTeam} (-1.5) Handicap`, r3(aMinus1));
 
     // Multi-Goals & Odd/Even Specials
     addMarket('MULTIGOALS_1_3', 'Multi-Goals: 1 - 3 Goals', r3(mg13));
@@ -2361,9 +2295,7 @@ export class ApexEngine {
 
     let mostLikelyOutcome: MostLikelyOutcome | undefined;
     if (mostLikelyMarket) {
-      const commentary = isStandingsClose
-        ? `1X2/Win suppressed due to close league standings; ${mostLikelyMarket.name} leads alternative markets at ${(mostLikelyMarket.probability * 100).toFixed(1)}%.`
-        : `${mostLikelyMarket.name} is the most likely outcome with a ${(mostLikelyMarket.probability * 100).toFixed(1)}% probability.`;
+      const commentary = `${mostLikelyMarket.name} is the most likely outcome with a ${(mostLikelyMarket.probability * 100).toFixed(1)}% probability.`;
 
       mostLikelyOutcome = {
         selection: mostLikelyMarket.name,

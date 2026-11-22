@@ -413,8 +413,6 @@ export class ServerEngine {
       resultDetails,
       restDaysHome,
       restDaysAway,
-      standingsClose: Boolean(prediction.standingsClose),
-      standingsCloseReason: prediction.standingsCloseReason,
       prediction: enrichedPrediction,
       markets,
       mostLikelyOutcome,

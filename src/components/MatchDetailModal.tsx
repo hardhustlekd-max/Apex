@@ -21,33 +21,6 @@ export interface MatchDetailViewProps {
 type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
 type MarketCategoryFilter = 'ALL' | '1X2_DC' | 'GOALS' | 'BTTS' | 'COMBOS' | 'TEAM' | 'SPECIALS';
 
-const WIN_BLOCKED_KEYS = new Set<string>([
-  'HOME_WIN',
-  'DRAW',
-  'AWAY_WIN',
-  'DNB_HOME',
-  'DNB_AWAY',
-  'HOME_WIN_TO_NIL',
-  'AWAY_WIN_TO_NIL',
-  'HANDICAP_HOME_MINUS_1',
-  'HANDICAP_AWAY_MINUS_1',
-  'COMBO_1_OVER_15',
-  'COMBO_2_OVER_15',
-  'COMBO_1_OVER_25',
-  'COMBO_2_OVER_25',
-  'COMBO_1_OVER_35',
-  'COMBO_2_OVER_35',
-  'COMBO_1_UNDER_25',
-  'COMBO_2_UNDER_25',
-  'COMBO_1_UNDER_35',
-  'COMBO_2_UNDER_35',
-  'COMBO_X_UNDER_25',
-  'COMBO_X_OVER_15',
-  'COMBO_X_BTTS',
-  'COMBO_1_BTTS',
-  'COMBO_2_BTTS',
-]);
-
 const MARKET_CATEGORY_TABS: Array<{ id: MarketCategoryFilter; label: string }> = [
   { id: 'ALL', label: 'All' },
   { id: '1X2_DC', label: '1X2 / DC / DNB' },
@@ -497,98 +470,44 @@ const MatchDetailModalContent: React.FC<{
     };
   }, [standingsTable, fixture.homeTeam, fixture.awayTeam]);
 
-  const { isStandingsClose, standingsCloseReason } = useMemo(() => {
-    if (homeStandingInfo && awayStandingInfo) {
-      const h = homeStandingInfo.entry;
-      const a = awayStandingInfo.entry;
-      if (
-        h.rank > 0 &&
-        a.rank > 0 &&
-        h.played >= 1 &&
-        a.played >= 1 &&
-        (!homeStandingInfo.groupName || !awayStandingInfo.groupName || homeStandingInfo.groupName === awayStandingInfo.groupName)
-      ) {
-        const rankDiff = Math.abs(h.rank - a.rank);
-        const pointsDiff = Math.abs(h.points - a.points);
-        const close = rankDiff <= 2;
-        if (close) {
-          const rankText = rankDiff === 0 ? 'tied rank' : `${rankDiff} ${rankDiff === 1 ? 'place' : 'places'} apart`;
-          const ptsText = pointsDiff === 0 ? 'level on pts' : `${pointsDiff} ${pointsDiff === 1 ? 'pt' : 'pts'} apart`;
-          return {
-            isStandingsClose: true,
-            standingsCloseReason: `Standings close (#${h.rank} vs #${a.rank} · ${rankText} · ${ptsText})`,
-          };
-        }
-        return { isStandingsClose: false, standingsCloseReason: undefined };
-      }
-    }
-
-    const explicitClose =
-      currentFixture.standingsClose ??
-      pred?.standingsClose ??
-      pred?.standingsContext?.standingsClose;
-    const explicitReason =
-      currentFixture.standingsCloseReason ??
-      pred?.standingsCloseReason ??
-      pred?.standingsContext?.standingsCloseReason;
-
-    if (typeof explicitClose === 'boolean') {
-      return { isStandingsClose: explicitClose, standingsCloseReason: explicitReason };
-    }
-
-    return { isStandingsClose: false, standingsCloseReason: undefined };
-  }, [
-    currentFixture.standingsClose,
-    currentFixture.standingsCloseReason,
-    pred?.standingsClose,
-    pred?.standingsCloseReason,
-    pred?.standingsContext?.standingsClose,
-    pred?.standingsContext?.standingsCloseReason,
-    homeStandingInfo,
-    awayStandingInfo,
-  ]);
-
   const allMarketsList = useMemo(() => {
     if (!currentFixture.markets || currentFixture.markets.length === 0) return [];
-    return currentFixture.markets
-      .filter((market) => !(isStandingsClose && WIN_BLOCKED_KEYS.has(market.key)))
-      .map((market) => {
-        let groupName = 'Other';
-        let category: MarketCategoryFilter = 'SPECIALS';
-        if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) {
-          groupName = '1X2';
-          category = '1X2_DC';
-        } else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'DOUBLE_CHANCE_12'].includes(market.key)) {
-          groupName = 'Double Chance';
-          category = '1X2_DC';
-        } else if (['DNB_HOME', 'DNB_AWAY'].includes(market.key)) {
-          groupName = 'Draw No Bet';
-          category = '1X2_DC';
-        } else if (market.key.startsWith('OVER_') || market.key.startsWith('UNDER_')) {
-          groupName = 'Goals Over/Under';
-          category = 'GOALS';
-        } else if (market.key.startsWith('BTTS_')) {
-          groupName = 'BTTS';
-          category = 'BTTS';
-        } else if (market.key.startsWith('COMBO_')) {
-          groupName = 'Match Combos';
-          category = 'COMBOS';
-        } else if (market.key.startsWith('HOME_') || market.key.startsWith('AWAY_')) {
-          groupName = 'Team Markets';
-          category = 'TEAM';
-        } else if (market.key.startsWith('HANDICAP_') || market.key.startsWith('MULTIGOALS_') || market.key.startsWith('GOALS_')) {
-          groupName = 'Handicap & Specials';
-          category = 'SPECIALS';
-        }
-        return { groupName, category, ...market };
-      });
-  }, [currentFixture.markets, isStandingsClose]);
+    return currentFixture.markets.map((market) => {
+      let groupName = 'Other';
+      let category: MarketCategoryFilter = 'SPECIALS';
+      if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) {
+        groupName = '1X2';
+        category = '1X2_DC';
+      } else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'DOUBLE_CHANCE_12'].includes(market.key)) {
+        groupName = 'Double Chance';
+        category = '1X2_DC';
+      } else if (['DNB_HOME', 'DNB_AWAY'].includes(market.key)) {
+        groupName = 'Draw No Bet';
+        category = '1X2_DC';
+      } else if (market.key.startsWith('OVER_') || market.key.startsWith('UNDER_')) {
+        groupName = 'Goals Over/Under';
+        category = 'GOALS';
+      } else if (market.key.startsWith('BTTS_')) {
+        groupName = 'BTTS';
+        category = 'BTTS';
+      } else if (market.key.startsWith('COMBO_')) {
+        groupName = 'Match Combos';
+        category = 'COMBOS';
+      } else if (market.key.startsWith('HOME_') || market.key.startsWith('AWAY_')) {
+        groupName = 'Team Markets';
+        category = 'TEAM';
+      } else if (market.key.startsWith('HANDICAP_') || market.key.startsWith('MULTIGOALS_') || market.key.startsWith('GOALS_')) {
+        groupName = 'Handicap & Specials';
+        category = 'SPECIALS';
+      }
+      return { groupName, category, ...market };
+    });
+  }, [currentFixture.markets]);
 
   const bestMarketsPerGroup = useMemo(() => {
     if (!currentFixture.markets) return [];
     const groups: Record<string, MarketOption> = {};
     currentFixture.markets.forEach((market) => {
-      if (isStandingsClose && WIN_BLOCKED_KEYS.has(market.key)) return;
       let group = '';
       if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
       else if (market.key.startsWith('DOUBLE_CHANCE')) group = 'Double Chance';
@@ -603,12 +522,11 @@ const MatchDetailModalContent: React.FC<{
       }
     });
     return Object.entries(groups).map(([groupName, market]) => ({ groupName, ...market }));
-  }, [currentFixture.markets, isStandingsClose]);
+  }, [currentFixture.markets]);
 
   const recommendedPick = useMemo(() => {
-    const auth = currentFixture.authoritativePick;
-    if (auth && !(isStandingsClose && WIN_BLOCKED_KEYS.has(auth.key))) {
-      return auth;
+    if (currentFixture.authoritativePick) {
+      return currentFixture.authoritativePick;
     }
     if (bestMarketsPerGroup.length > 0) {
       const sorted = bestMarketsPerGroup.slice().sort((a, b) => b.probability - a.probability);
@@ -623,7 +541,7 @@ const MatchDetailModalContent: React.FC<{
       };
     }
     return null;
-  }, [currentFixture.authoritativePick, bestMarketsPerGroup, isStandingsClose]);
+  }, [currentFixture.authoritativePick, bestMarketsPerGroup]);
 
   const rawH2H: HeadToHeadMeasurement = useMemo(() => (
     scrapedH2H ||
@@ -817,7 +735,7 @@ const MatchDetailModalContent: React.FC<{
                 )}
               </button>
             </div>
-            {pred && !isStandingsClose && (
+            {pred && (
               <span className="text-xs font-semibold tabular-nums text-theme-primary">
                 {homeWinPct}%
               </span>
@@ -844,11 +762,6 @@ const MatchDetailModalContent: React.FC<{
                 {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).timeStr}
               </span>
             )}
-            {isStandingsClose && (
-              <span className="text-2xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5 whitespace-nowrap">
-                Close Table · No 1X2
-              </span>
-            )}
           </div>
 
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
@@ -871,7 +784,7 @@ const MatchDetailModalContent: React.FC<{
                 )}
               </button>
             </div>
-            {pred && !isStandingsClose && (
+            {pred && (
               <span className="text-xs font-semibold tabular-nums text-sky-500 dark:text-sky-400">
                 {awayWinPct}%
               </span>
@@ -954,17 +867,6 @@ const MatchDetailModalContent: React.FC<{
                       </div>
                     )}
 
-                    {isStandingsClose && (
-                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2 bg-amber-500/10">
-                        <span className="text-amber-700 dark:text-amber-300 font-medium text-xs truncate">
-                          {standingsCloseReason || 'Close league standings — 1X2 / Win predictions disabled'}
-                        </span>
-                        <span className="text-xs font-semibold text-theme-main shrink-0">
-                          O2.5 {over25Pct}% · BTTS {bttsPct}%
-                        </span>
-                      </div>
-                    )}
-
                     {pred?.tacticalContext && (
                       <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                         <span className="text-theme-sub font-normal">Rest Days</span>
@@ -1017,11 +919,7 @@ const MatchDetailModalContent: React.FC<{
                         size="sm"
                         className="w-full"
                         action={
-                          isStandingsClose ? (
-                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                              1X2 locked (Close Table)
-                            </span>
-                          ) : enrichedFixture.marketOdds.bookmakersCount ? (
+                          enrichedFixture.marketOdds.bookmakersCount ? (
                             <span className="text-xs font-normal tabular-nums text-theme-dim">
                               {enrichedFixture.marketOdds.bookmakersCount} bookmakers
                             </span>
@@ -1031,73 +929,61 @@ const MatchDetailModalContent: React.FC<{
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
                       <div
-                        role={isStandingsClose ? undefined : 'button'}
-                        tabIndex={isStandingsClose ? -1 : 0}
-                        onClick={() => !isStandingsClose && handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
                         className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isStandingsClose
-                            ? 'opacity-45 cursor-not-allowed'
-                            : isSel('HOME_WIN')
+                          isSel('HOME_WIN')
                             ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
                             : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
                         <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
-                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
+                          {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {isStandingsClose
-                            ? 'Blocked'
-                            : enrichedFixture.marketOdds.homeImpliedProb !== undefined
+                          {enrichedFixture.marketOdds.homeImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.homeImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
                       </div>
                       <div
-                        role={isStandingsClose ? undefined : 'button'}
-                        tabIndex={isStandingsClose ? -1 : 0}
-                        onClick={() => !isStandingsClose && handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
                         className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isStandingsClose
-                            ? 'opacity-45 cursor-not-allowed'
-                            : isSel('DRAW')
+                          isSel('DRAW')
                             ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
                             : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
                         <span className="text-lg font-bold text-amber-500 block mt-0.5 tracking-[-0.015em]">
-                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
+                          {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {isStandingsClose
-                            ? 'Blocked'
-                            : enrichedFixture.marketOdds.drawImpliedProb !== undefined
+                          {enrichedFixture.marketOdds.drawImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.drawImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
                       </div>
                       <div
-                        role={isStandingsClose ? undefined : 'button'}
-                        tabIndex={isStandingsClose ? -1 : 0}
-                        onClick={() => !isStandingsClose && handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
                         className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isStandingsClose
-                            ? 'opacity-45 cursor-not-allowed'
-                            : isSel('AWAY_WIN')
+                          isSel('AWAY_WIN')
                             ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
                             : 'hover:bg-theme-card-elevated cursor-pointer'
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
                         <span className="text-lg font-bold text-sky-500 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
-                          {isStandingsClose ? '—' : enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
+                          {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
-                          {isStandingsClose
-                            ? 'Blocked'
-                            : enrichedFixture.marketOdds.awayImpliedProb !== undefined
+                          {enrichedFixture.marketOdds.awayImpliedProb !== undefined
                             ? `${(enrichedFixture.marketOdds.awayImpliedProb * 100).toFixed(1)}%`
                             : '-'}
                         </span>
@@ -1512,15 +1398,6 @@ const MatchDetailModalContent: React.FC<{
         {/* TAB 5: PREDICTIONS */}
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-2.5">
-            {isStandingsClose && (
-              <div className="px-3.5 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 flex flex-col gap-0.5">
-                <span className="font-semibold">1X2 / Win Prediction Suppressed (Close League Standings)</span>
-                <span className="opacity-90">
-                  {standingsCloseReason || 'Teams sit close on the standings table.'} Alternative markets (Goals, BTTS, Double Chance) remain predicted below.
-                </span>
-              </div>
-            )}
-
             {/* Top Model Recommendation Banner with direct Add to Bet Slip */}
             {recommendedPick && (
               <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden border border-theme-primary/30">
@@ -1528,7 +1405,7 @@ const MatchDetailModalContent: React.FC<{
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-theme-primary animate-pulse" />
                     <span className="text-2xs font-bold text-theme-primary uppercase tracking-[0.06em]">
-                      {isStandingsClose ? 'Alternative Market Recommendation' : 'Model Recommendation'}
+                      Model Recommendation
                     </span>
                   </div>
                   <span className="text-xs font-bold text-theme-primary tabular-nums">

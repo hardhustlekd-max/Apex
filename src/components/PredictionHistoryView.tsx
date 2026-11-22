@@ -292,28 +292,12 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       return { hG, aG, predictedLabel: 'N/A', topProb: 0, isCorrect: false };
     }
 
-    const isStandingsClose = Boolean(
-      f.standingsClose ?? pred.standingsClose ?? pred.standingsContext?.standingsClose
-    );
     const totalGoals = hG + aG;
 
-    // Respect non-1X2 pick when standings are close or authoritativePick is non-1X2
+    // Respect authoritativePick when explicitly set to a non-1X2 market
     const authPick = f.authoritativePick;
-    if (
-      isStandingsClose ||
-      (authPick && authPick.key !== 'HOME_WIN' && authPick.key !== 'DRAW' && authPick.key !== 'AWAY_WIN')
-    ) {
-      const mKey =
-        authPick && authPick.key !== 'HOME_WIN' && authPick.key !== 'DRAW' && authPick.key !== 'AWAY_WIN'
-          ? authPick.key
-          : f.mostLikelyOutcome &&
-            f.mostLikelyOutcome.marketKey !== 'HOME_WIN' &&
-            f.mostLikelyOutcome.marketKey !== 'DRAW' &&
-            f.mostLikelyOutcome.marketKey !== 'AWAY_WIN'
-          ? f.mostLikelyOutcome.marketKey
-          : (pred.over25Prob ?? 0) >= 0.5
-          ? 'OVER_25'
-          : 'UNDER_25';
+    if (authPick && authPick.key) {
+      const mKey = authPick.key;
 
       let predictedLabel = authPick?.label || f.mostLikelyOutcome?.selection || mKey;
       let topProb = authPick?.probability ?? f.mostLikelyOutcome?.probability ?? 0;

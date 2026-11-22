@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SlipBet } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
@@ -25,17 +25,31 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
   const [isLiveSyncing, setIsLiveSyncing] = useState<boolean>(false);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'WON' | 'LOST'>('ALL');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const hasLoadedOnceRef = useRef<boolean>(false);
+  const isFetchingRef = useRef<boolean>(false);
 
   const loadBets = useCallback(async (isSilent = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
-      if (!isSilent) setIsLoading(true);
+      const showSkeleton = !isSilent && !hasLoadedOnceRef.current;
+      if (showSkeleton) setIsLoading(true);
       else setIsLiveSyncing(true);
+
       const list = await EngineService.getBets();
       const safeList = Array.isArray(list) ? list : [];
-      setBets(safeList);
+      hasLoadedOnceRef.current = true;
+
+      setBets((prev) => {
+        if (prev.length === safeList.length && JSON.stringify(prev) === JSON.stringify(safeList)) {
+          return prev;
+        }
+        return safeList;
+      });
     } catch (err) {
       console.error('Failed to load bets:', err);
     } finally {
+      isFetchingRef.current = false;
       setIsLoading(false);
       setIsLiveSyncing(false);
     }
@@ -83,13 +97,25 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
     }
   };
 
+  // Smooth silent background polling every 10s without resetting UI state or flashing skeletons
   useEffect(() => {
-    void loadBets(false);
-    // Background polling every 12 seconds so live match scores, minutes, and slip settlement update live
+    void loadBets(hasLoadedOnceRef.current);
+
     const interval = setInterval(() => {
       void loadBets(true);
-    }, 12000);
-    return () => clearInterval(interval);
+    }, 10000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void loadBets(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [loadBets, refreshKey]);
 
   const stats = {
@@ -112,7 +138,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
           />
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isLiveSyncing ? 'animate-ping' : 'animate-pulse'}`} />
-            <span>Live Sync</span>
+            <span>Live Polling</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -127,7 +153,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
               <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
             </Button>
           )}
-          <Button variant="secondary" size="xs" onClick={() => void loadBets(false)} disabled={isLoading}>
+          <Button variant="secondary" size="xs" onClick={() => void loadBets(true)} disabled={isLoading}>
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading || isLiveSyncing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </Button>
@@ -188,6 +214,11 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
           {filteredBets.map((bet) => {
             const placedDate = new Date(bet.placedAt).toLocaleString();
             const isExpanded = expandedIds.has(bet.id);
+            const liveLegCount = bet.selections.filter((s) => s.matchStatus === 'LIVE').length;
+            const settledLegCount = bet.selections.filter(
+              (s) => (s.status || 'PENDING') !== 'PENDING' || s.matchStatus === 'FINISHED'
+            ).length;
+
             return (
               <Card
                 key={bet.id}
@@ -236,6 +267,17 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                         <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-theme-subtle text-theme-sub">
                           {bet.selections.length} {bet.selections.length === 1 ? 'Match' : 'Matches'}
                         </span>
+                        {liveLegCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span>{liveLegCount} Live</span>
+                          </span>
+                        )}
+                        {settledLegCount > 0 && settledLegCount < bet.selections.length && (
+                          <span className="text-2xs font-medium text-theme-dim tabular-nums">
+                            {settledLegCount}/{bet.selections.length} Settled
+                          </span>
+                        )}
                       </div>
                       <span className="text-2xs font-normal text-theme-dim block mt-0.5">
                         {placedDate}
@@ -300,10 +342,29 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                     <div className="divide-y divide-[var(--border-subdued)]">
                       {bet.selections.map((sel, sIdx) => {
                         const legStatus = sel.status || 'PENDING';
-                        const { dateStr, timeStr } = formatMatchDateTime(sel.matchDate, sel.kickOffTime, sel.timestamp);
+                        const hasScore = Boolean(
+                          sel.score &&
+                            typeof sel.score.home === 'number' &&
+                            typeof sel.score.away === 'number'
+                        );
+                        const isMatchFinished =
+                          sel.matchStatus === 'FINISHED' ||
+                          legStatus === 'WON' ||
+                          legStatus === 'LOST';
+                        const isMatchLive = !isMatchFinished && sel.matchStatus === 'LIVE';
+                        const isMatchVoid =
+                          sel.matchStatus === 'CANCELLED' ||
+                          sel.matchStatus === 'POSTPONED' ||
+                          legStatus === 'VOID';
+                        const { dateStr, timeStr } = formatMatchDateTime(
+                          sel.matchDate,
+                          sel.kickOffTime,
+                          sel.timestamp
+                        );
+
                         return (
                           <div
-                            key={sIdx}
+                            key={`${sel.fixtureId}_${sIdx}`}
                             className={`px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-sm tabular-nums transition-colors ${
                               legStatus === 'WON'
                                 ? 'border-l-4 border-emerald-500 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]'
@@ -311,6 +372,8 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 ? 'border-l-4 border-rose-500 bg-rose-500/[0.04] hover:bg-rose-500/[0.08]'
                                 : legStatus === 'VOID'
                                 ? 'border-l-4 border-sky-500/60 bg-sky-500/[0.04] hover:bg-sky-500/[0.08]'
+                                : isMatchLive
+                                ? 'border-l-4 border-rose-500/70 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]'
                                 : 'border-l-4 border-amber-500/40 hover:bg-theme-card-elevated'
                             }`}
                           >
@@ -319,6 +382,21 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 <span>{sel.leagueName}</span>
                                 <span aria-hidden="true" className="text-theme-dim">·</span>
                                 <span className="text-theme-dim">{dateStr} {timeStr}</span>
+                                {isMatchLive && (
+                                  <span className="inline-flex items-center gap-1 text-2xs font-bold text-rose-500 dark:text-rose-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                    <span>{sel.minute ? `${sel.minute}'` : 'LIVE'}</span>
+                                  </span>
+                                )}
+                                {!isMatchLive && sel.matchStatus === 'FINISHED' && (
+                                  <span className="text-2xs font-semibold text-theme-dim uppercase">FT</span>
+                                )}
+                                {!isMatchLive && sel.matchStatus === 'CANCELLED' && (
+                                  <span className="text-2xs font-semibold text-sky-500 uppercase">Cancelled</span>
+                                )}
+                                {!isMatchLive && sel.matchStatus === 'POSTPONED' && (
+                                  <span className="text-2xs font-semibold text-sky-500 uppercase">Postponed</span>
+                                )}
                               </div>
                               <div className="font-semibold text-theme-main truncate tracking-[-0.01em] mt-0.5">
                                 {sel.homeTeam} vs {sel.awayTeam}
@@ -337,7 +415,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                     1.00x Void
                                   </span>
                                 )}
-                                {sel.score ? (
+                                {hasScore ? (
                                   <span className={`text-xs font-semibold tabular-nums block mt-0.5 ${
                                     legStatus === 'WON'
                                       ? 'text-emerald-600 dark:text-emerald-400'
@@ -345,22 +423,36 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                       ? 'text-rose-500'
                                       : legStatus === 'VOID'
                                       ? 'text-sky-500 dark:text-sky-400'
-                                      : sel.matchStatus === 'LIVE'
+                                      : isMatchLive
                                       ? 'text-rose-500 dark:text-rose-400 font-bold'
                                       : 'text-theme-sub'
                                   }`}>
-                                    {legStatus === 'WON' || legStatus === 'LOST' || legStatus === 'VOID'
+                                    {isMatchFinished
                                       ? 'FT'
+                                      : isMatchVoid
+                                      ? sel.matchStatus === 'CANCELLED'
+                                        ? 'CANC'
+                                        : sel.matchStatus === 'POSTPONED'
+                                        ? 'POSTP'
+                                        : 'VOID'
                                       : sel.minute
                                       ? `Live ${sel.minute}'`
-                                      : sel.matchStatus === 'LIVE'
+                                      : isMatchLive
                                       ? 'Live'
                                       : 'Score'}{' '}
-                                    {sel.score.home} - {sel.score.away}
+                                    {sel.score!.home} - {sel.score!.away}
+                                  </span>
+                                ) : isMatchVoid ? (
+                                  <span className="text-2xs font-semibold text-sky-500 dark:text-sky-400 uppercase block mt-0.5">
+                                    {sel.matchStatus === 'CANCELLED' ? 'Cancelled' : sel.matchStatus === 'POSTPONED' ? 'Postponed' : 'Void'}
+                                  </span>
+                                ) : isMatchLive ? (
+                                  <span className="text-2xs font-bold text-rose-500 dark:text-rose-400 uppercase block mt-0.5">
+                                    {sel.minute ? `Live ${sel.minute}'` : 'Live'}
                                   </span>
                                 ) : (
                                   <span className="text-2xs text-theme-dim uppercase block mt-0.5">
-                                    {timeStr}
+                                    {isMatchFinished ? 'FT' : timeStr}
                                   </span>
                                 )}
                               </div>
@@ -382,7 +474,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 ) : (
                                   <Badge variant="warning" size="xs">
                                     <Clock className="w-3 h-3" />
-                                    <span>Pending</span>
+                                    <span>{isMatchLive ? 'In-Play' : 'Pending'}</span>
                                   </Badge>
                                 )}
                               </div>

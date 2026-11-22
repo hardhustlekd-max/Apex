@@ -698,6 +698,7 @@ export class FlashscoreScraperService {
     status: 'FINISHED' | 'LIVE' | 'SCHEDULED' | 'POSTPONED' | 'CANCELLED';
     homeScore?: number;
     awayScore?: number;
+    minute?: number;
   } | null> {
     if (!isScrapingEnabled()) {
       return null;
@@ -766,7 +767,27 @@ export class FlashscoreScraperService {
           status = 'POSTPONED';
         }
 
-        return { statusCode, status, homeScore, awayScore };
+        let minute: number | undefined;
+        if (status === 'LIVE') {
+          const rawMin = parseInt(kv['DD'] || kv['DM'] || '', 10);
+          if (Number.isFinite(rawMin) && rawMin > 0) {
+            minute = rawMin;
+          } else {
+            const period = kv['DC'] || '';
+            const nowSec = Math.floor(Date.now() / 1000);
+            const periodStart = parseInt(kv['DK'] || kv['AD'] || '', 10);
+            if (period === '10' || period === '19') {
+              minute = 45;
+            } else if (Number.isFinite(periodStart) && periodStart > 0) {
+              const elapsed = Math.floor((nowSec - periodStart) / 60);
+              if (period === '13') minute = Math.max(46, Math.min(90, 45 + elapsed));
+              else if (period === '14') minute = Math.max(91, Math.min(120, 90 + elapsed));
+              else minute = Math.max(1, Math.min(45, elapsed));
+            }
+          }
+        }
+
+        return { statusCode, status, homeScore, awayScore, minute };
       } catch {
         // Try next mirror
       } finally {

@@ -330,8 +330,6 @@ export interface StandingsPredictionContext {
   motivationMultiplierAway: number;
   xgDeltaPercentHome?: number;
   xgDeltaPercentAway?: number;
-  standingsClose?: boolean;
-  standingsCloseReason?: string;
   rankDiff?: number;
   pointsDiff?: number;
   ppgDiff?: number;
@@ -414,8 +412,6 @@ export interface PoissonPrediction {
   xgBreakdown?: XGBreakdown;
   tacticalContext?: TacticalContextBreakdown;
   standingsContext?: StandingsPredictionContext;
-  standingsClose?: boolean;
-  standingsCloseReason?: string;
   dixonColesParams?: DixonColesParams;
   mostLikelyOutcome?: MostLikelyOutcome;
   marketOdds?: ScrapedMarketOdds;
@@ -467,8 +463,6 @@ export interface Fixture {
   awayParticipantId?: string;
   marketOdds?: ScrapedMarketOdds;
   hasPrediction?: boolean;
-  standingsClose?: boolean;
-  standingsCloseReason?: string;
   authoritativePick?: {
     key: MarketOption['key'];
     type?: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2';
@@ -477,7 +471,6 @@ export interface Fixture {
     probability: number;
     probabilityPercent: number;
     probabilityFormatted: string;
-    isStandingsCloseFallback?: boolean;
   };
   highestPick?: {
     type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2';

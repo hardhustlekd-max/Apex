@@ -1290,7 +1290,7 @@ export class EngineService {
   }
 
   public static async getBets(): Promise<SlipBet[]> {
-    const serverData = await this.safeJsonFetch('/api/bets');
+    const serverData = await this.safeJsonFetch('/api/bets', { cache: 'no-store' });
     if (serverData && serverData.success && Array.isArray(serverData.bets)) {
       return serverData.bets;
     }
