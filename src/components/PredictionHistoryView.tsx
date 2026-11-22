@@ -297,13 +297,25 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     // Respect authoritativePick when explicitly set to a non-1X2 market
     const authPick = f.authoritativePick;
     if (authPick && authPick.key) {
-      const mKey = authPick.key;
+      const mKey = String(authPick.key || '').toUpperCase();
 
       let predictedLabel = authPick?.label || f.mostLikelyOutcome?.selection || mKey;
       let topProb = authPick?.probability ?? f.mostLikelyOutcome?.probability ?? 0;
       let isCorrect = false;
 
-      if (mKey === 'OVER_05') {
+      if (mKey === 'HOME_WIN' || mKey === 'HOME' || mKey === '1') {
+        predictedLabel = authPick?.label || `${f.homeTeam} Win`;
+        topProb = topProb || pred.homeWinProb || 0;
+        isCorrect = hG > aG;
+      } else if (mKey === 'AWAY_WIN' || mKey === 'AWAY' || mKey === '2') {
+        predictedLabel = authPick?.label || `${f.awayTeam} Win`;
+        topProb = topProb || pred.awayWinProb || 0;
+        isCorrect = aG > hG;
+      } else if (mKey === 'DRAW' || mKey === 'X') {
+        predictedLabel = authPick?.label || 'Draw';
+        topProb = topProb || pred.drawProb || 0;
+        isCorrect = hG === aG;
+      } else if (mKey === 'OVER_05') {
         predictedLabel = authPick?.label || 'Over 0.5 Goals';
         isCorrect = totalGoals >= 1;
       } else if (mKey === 'UNDER_05') {
