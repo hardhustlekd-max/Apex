@@ -6,6 +6,7 @@ import { loggerService } from '../services/loggerService.js';
 import { syncJobService } from '../services/syncJobService.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
 import { isSqliteEnabled } from '../core/sqliteClient.js';
+import { getScrapingGateState, isScrapingEnabled } from '../core/scrapingGate.js';
 
 export const providersRouter = Router();
 
@@ -15,6 +16,8 @@ providersRouter.get('/', (req, res) => {
     res.json({
       success: true,
       activeProviderId: 'FLASHSCORE',
+      scrapingBlocked: !isScrapingEnabled(),
+      scrapingGate: getScrapingGateState(),
       providers: [list],
     });
   } catch (err: any) {
@@ -24,10 +27,16 @@ providersRouter.get('/', (req, res) => {
 
 providersRouter.get('/live-scores', async (req, res) => {
   try {
-    const { scores } = await fixturesWorkerService.getCachedLiveScores(false);
+    const scrapingGate = getScrapingGateState();
+    const { scores } = scrapingGate.enabled
+      ? await fixturesWorkerService.getCachedLiveScores(false)
+      : { scores: [] };
     const payload = JSON.stringify({
       success: true,
       provider: 'FLASHSCORE',
+      scrapingBlocked: !scrapingGate.enabled,
+      scrapingEnabled: scrapingGate.enabled,
+      scrapingGate,
       scores: scores || [],
     });
     const etag = `"${crypto.createHash('md5').update(payload).digest('hex')}"`;
@@ -49,7 +58,13 @@ providersRouter.get('/live-scores', async (req, res) => {
       message: `Failed to get live scores: ${err?.message || 'Unknown error'}`,
       details: { error: err?.message, stack: err?.stack },
     });
-    res.json({ success: true, provider: 'FLASHSCORE', scores: [] });
+    res.json({
+      success: true,
+      provider: 'FLASHSCORE',
+      scrapingBlocked: !isScrapingEnabled(),
+      scrapingGate: getScrapingGateState(),
+      scores: [],
+    });
   }
 });
 
@@ -65,6 +80,14 @@ providersRouter.post('/sync/start', (req, res) => {
         success: false,
         sqliteBlocked: true,
         error: 'SQLite database is switched off. Enable SQLite DB manually before starting Full Data Sync.',
+      });
+    }
+    if (!isScrapingEnabled()) {
+      return res.status(409).json({
+        success: false,
+        scrapingBlocked: true,
+        scrapingGate: getScrapingGateState(),
+        error: 'Data scraping is switched off. Enable Data Scraping manually before starting Full Data Sync.',
       });
     }
     const resetDatabase = req.body?.resetDatabase ?? true;
@@ -110,6 +133,14 @@ providersRouter.post('/flashscore/sync-history', async (req, res) => {
         success: false,
         sqliteBlocked: true,
         error: 'SQLite database is switched off. Enable SQLite DB manually before syncing history.',
+      });
+    }
+    if (!isScrapingEnabled()) {
+      return res.status(409).json({
+        success: false,
+        scrapingBlocked: true,
+        scrapingGate: getScrapingGateState(),
+        error: 'Data scraping is switched off. Enable Data Scraping manually before syncing history.',
       });
     }
     loggerService.addLog({

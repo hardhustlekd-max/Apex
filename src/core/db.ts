@@ -1,4 +1,4 @@
-import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, LeagueStandingTable, DEFAULT_ENGINE_SETTINGS, cleanFixtureId, SlipBet, BetSelection } from './types.js';
+import { HistoricalMatch, Fixture, EngineSettings, HeadToHeadMeasurement, ScrapedMarketOdds, LeagueStandingTable, LeagueVolatilityRecord, DEFAULT_ENGINE_SETTINGS, cleanFixtureId, SlipBet, BetSelection } from './types.js';
 import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
@@ -1590,6 +1590,106 @@ export class FootballDB {
       console.error('[FootballDB] Error getting standings summaries:', err?.message);
       return [];
     }
+  }
+
+  saveLeagueVolatilitiesBatch(records: LeagueVolatilityRecord[]): void {
+    if (!isSqliteEnabled() || !records || records.length === 0) return;
+    try {
+      const stmt = sqliteDb.prepare(`
+        INSERT OR REPLACE INTO league_volatility (
+          league_id, league_name, volatility_coefficient, historical_log_loss,
+          elo_spread_iqr, matches_evaluated, temperature_alpha, is_fallback, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const now = new Date().toISOString();
+      const saveTx = sqliteDb.transaction((rows: LeagueVolatilityRecord[]) => {
+        for (const r of rows) {
+          const isFallback = r.matches_evaluated < 100 || Boolean(r.is_fallback);
+          const vl = isFallback
+            ? 1.0
+            : Math.max(0.75, Math.min(1.35, Number(r.volatility_coefficient || 1.0)));
+          stmt.run(
+            String(r.league_id),
+            String(r.league_name || r.league_id),
+            Number(vl.toFixed(3)),
+            Number((r.historical_log_loss || 0).toFixed(4)),
+            Number((r.elo_spread_iqr || 0).toFixed(1)),
+            Math.max(0, Math.round(r.matches_evaluated || 0)),
+            Number((r.temperature_alpha ?? 1.0).toFixed(3)),
+            isFallback ? 1 : 0,
+            r.updated_at || now
+          );
+        }
+      });
+      saveTx(records);
+      notifyDbMutation();
+    } catch (err: any) {
+      console.error('[FootballDB] Error saving league volatility table:', err?.message);
+    }
+  }
+
+  getAllLeagueVolatilities(): LeagueVolatilityRecord[] {
+    if (!isSqliteEnabled()) return [];
+    try {
+      const rows = sqliteDb
+        .prepare("SELECT * FROM league_volatility ORDER BY matches_evaluated DESC, league_name ASC")
+        .all() as any[];
+      return rows.map((r) => ({
+        league_id: String(r.league_id),
+        league_name: String(r.league_name),
+        volatility_coefficient: Number(r.volatility_coefficient ?? 1.0),
+        historical_log_loss: Number(r.historical_log_loss ?? 0),
+        elo_spread_iqr: Number(r.elo_spread_iqr ?? 0),
+        matches_evaluated: Number(r.matches_evaluated ?? 0),
+        temperature_alpha: r.temperature_alpha !== null && r.temperature_alpha !== undefined ? Number(r.temperature_alpha) : 1.0,
+        is_fallback: Boolean(r.is_fallback) || Number(r.matches_evaluated ?? 0) < 100,
+        updated_at: r.updated_at ? String(r.updated_at) : undefined,
+      }));
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting league volatilities:', err?.message);
+      return [];
+    }
+  }
+
+  getLeagueVolatility(leagueId?: string, leagueName?: string): LeagueVolatilityRecord | null {
+    if (!isSqliteEnabled() || (!leagueId && !leagueName)) return null;
+    try {
+      const candidates = Array.from(
+        new Set(
+          [
+            leagueId,
+            leagueName,
+            ...(leagueId ? getLeagueAliases(leagueId) : []),
+            ...(leagueName ? getLeagueAliases(leagueName) : []),
+          ]
+            .filter(Boolean)
+            .map((v) => String(v).trim())
+        )
+      );
+      for (const c of candidates) {
+        const row = sqliteDb
+          .prepare("SELECT * FROM league_volatility WHERE LOWER(league_id) = LOWER(?) OR LOWER(league_name) = LOWER(?) LIMIT 1")
+          .get(c, c) as any;
+        if (row) {
+          const matchesEvaluated = Number(row.matches_evaluated ?? 0);
+          const isFallback = Boolean(row.is_fallback) || matchesEvaluated < 100;
+          return {
+            league_id: String(row.league_id),
+            league_name: String(row.league_name),
+            volatility_coefficient: isFallback ? 1.0 : Number(row.volatility_coefficient ?? 1.0),
+            historical_log_loss: Number(row.historical_log_loss ?? 0),
+            elo_spread_iqr: Number(row.elo_spread_iqr ?? 0),
+            matches_evaluated: matchesEvaluated,
+            temperature_alpha: row.temperature_alpha !== null && row.temperature_alpha !== undefined ? Number(row.temperature_alpha) : 1.0,
+            is_fallback: isFallback,
+            updated_at: row.updated_at ? String(row.updated_at) : undefined,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.error('[FootballDB] Error getting league volatility:', err?.message);
+    }
+    return null;
   }
 
   getDiscoveredTournamentsFromDb(): Array<FlashscoreTournamentMeta & { leagueCode?: string }> {

@@ -19,7 +19,13 @@ import {
   AlertTriangle,
   Power,
 } from 'lucide-react';
-import { EngineSettings, ProviderStatus, SqliteGateState } from '../core/types.js';
+import {
+  EngineSettings,
+  ProviderStatus,
+  SqliteGateState,
+  ScrapingGateState,
+  LeagueVolatilityRecord,
+} from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import {
   initDriveAuth,
@@ -73,6 +79,9 @@ interface SettingsModalProps {
   sqliteGate?: SqliteGateState | null;
   isTogglingSqlite?: boolean;
   onToggleSqlite?: (enabled: boolean) => Promise<void> | void;
+  scrapingGate?: ScrapingGateState | null;
+  isTogglingScraping?: boolean;
+  onToggleScraping?: (enabled: boolean) => Promise<void> | void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -92,6 +101,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   sqliteGate,
   isTogglingSqlite = false,
   onToggleSqlite,
+  scrapingGate,
+  isTogglingScraping = false,
+  onToggleScraping,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('DATA');
   const [activeThemeId, setActiveThemeId] = useState<string>(
@@ -122,6 +134,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [exportToast, setExportToast] = useState<string | null>(null);
 
   const [exportSort, setExportSort] = useState<'default' | 'desc' | 'asc'>('default');
+  const [leagueVolatilities, setLeagueVolatilities] = useState<LeagueVolatilityRecord[]>([]);
+  const [isLoadingVolatility, setIsLoadingVolatility] = useState<boolean>(false);
+  const [isCalibratingVolatility, setIsCalibratingVolatility] = useState<boolean>(false);
+  const [volatilityMessage, setVolatilityMessage] = useState<string | null>(null);
 
   // Dev Preview Only: Google Drive SQLite Sync state (token strictly kept in memory)
   const isDevPreviewClient = Boolean(isViteDev) && storageStatus?.storageEngine?.isDevPreview !== false;
@@ -360,7 +376,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const fetchLeagueVolatilities = async () => {
+    setIsLoadingVolatility(true);
+    try {
+      const res = await EngineService.getLeagueVolatilities();
+      if (res.success) {
+        setLeagueVolatilities(res.leagues);
+      }
+    } finally {
+      setIsLoadingVolatility(false);
+    }
+  };
+
+  const handleCalibrateVolatility = async () => {
+    setIsCalibratingVolatility(true);
+    setVolatilityMessage(null);
+    try {
+      const res = await EngineService.calibrateLeagueVolatilities();
+      if (res.success && Array.isArray(res.leagues)) {
+        setLeagueVolatilities(res.leagues);
+        setVolatilityMessage(
+          `Calibrated ${res.calibratedCount ?? 0} leagues (>=100 matches) + ${res.fallbackCount ?? 0} fallback · LL_global=${(res.globalLogLoss ?? 0).toFixed(4)}`
+        );
+      } else {
+        setVolatilityMessage(res.error || 'Calibration failed.');
+      }
+    } finally {
+      setIsCalibratingVolatility(false);
+    }
+  };
+
   const [internalTogglingSqlite, setInternalTogglingSqlite] = useState<boolean>(false);
+  const [internalTogglingScraping, setInternalTogglingScraping] = useState<boolean>(false);
 
   const handleManualSqliteToggle = async (nextEnabled: boolean) => {
     setInternalTogglingSqlite(true);
@@ -379,6 +426,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleManualScrapingToggle = async (nextEnabled: boolean) => {
+    setInternalTogglingScraping(true);
+    try {
+      if (onToggleScraping) {
+        await onToggleScraping(nextEnabled);
+      } else {
+        await EngineService.toggleScraping(nextEnabled);
+      }
+      await Promise.all([fetchStorageStatus(), fetchScraperStatus()]);
+    } finally {
+      setInternalTogglingScraping(false);
+    }
+  };
+
   const handleRefreshMetrics = async () => {
     setIsRefreshingMetrics(true);
     try {
@@ -394,9 +455,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const isSqliteTogglingNow = Boolean(isTogglingSqlite || internalTogglingSqlite);
+  const isScrapingTogglingNow = Boolean(isTogglingScraping || internalTogglingScraping);
   const effectiveGate: SqliteGateState | null = storageStatus?.sqliteGate || sqliteGate || null;
+  const effectiveScrapingGate: ScrapingGateState | null =
+    storageStatus?.scrapingGate || scraperStatus?.scrapingGate || scrapingGate || null;
   const isSqliteActive = effectiveGate ? effectiveGate.enabled : storageStatus?.storageEngine?.enabled !== false;
-  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isSqliteTogglingNow);
+  const isScrapingActive = effectiveScrapingGate ? effectiveScrapingGate.enabled : false;
+  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isSqliteTogglingNow || isScrapingTogglingNow);
 
   useEffect(() => {
     if (!isOpen) {
@@ -410,6 +475,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       fetchStorageStatus();
       fetchScraperStatus();
       fetchFreshStats();
+      if (activeTab === 'PREDICTIONS') {
+        void fetchLeagueVolatilities();
+      }
       if (isViteDev && getDriveAccessToken()) {
         void checkDriveBackupStatus(getDriveAccessToken());
       }
@@ -572,16 +640,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="Scraper Health"
                   icon={<Cpu className="w-3.5 h-3.5" />}
                   size="sm"
                 />
-                <span className="text-xs font-normal tabular-nums text-theme-sub">
-                  Circuit Failures:{' '}
-                  <strong className="text-theme-main font-semibold">{scraperStatus?.circuit?.failureCount ?? 0}</strong>
-                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={isScrapingActive ? 'accent' : 'warning'} size="xs">
+                    {isScrapingActive ? 'ONLINE' : 'BLOCKED · OFF'}
+                  </Badge>
+                  <span className="text-xs font-normal tabular-nums text-theme-sub">
+                    Circuit Failures:{' '}
+                    <strong className="text-theme-main font-semibold">{scraperStatus?.circuit?.failureCount ?? 0}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-3.5 py-2.5 border-b border-theme-subdued space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <span className="font-semibold text-theme-main">Flashscore Data Scraping</span>
+                    <div className="text-xs text-theme-sub mt-0.5">
+                      {isScrapingActive
+                        ? 'Manually switched ON (live polling & sync active)'
+                        : 'Turned off on app initialization until switched ON manually'}
+                    </div>
+                  </div>
+                  <Button
+                    id="manual-scraping-toggle-btn"
+                    variant={isScrapingActive ? 'secondary' : 'primary'}
+                    size="xs"
+                    onClick={() => void handleManualScrapingToggle(!isScrapingActive)}
+                    disabled={isScrapingTogglingNow || Boolean(isResettingAndSyncing || isSyncingData)}
+                    title={
+                      isScrapingActive
+                        ? 'Switch data scraping OFF (blocks all Flashscore HTTP requests)'
+                        : 'Switch data scraping ON manually'
+                    }
+                  >
+                    <Power className="w-3.5 h-3.5" />
+                    <span>
+                      {isScrapingTogglingNow
+                        ? isScrapingActive
+                          ? 'Switching Off...'
+                          : 'Switching On...'
+                        : isScrapingActive
+                        ? 'Switch Scraping OFF'
+                        : 'Switch Scraping ON'}
+                    </span>
+                  </Button>
+                </div>
+
+                {!isScrapingActive && (
+                  <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <span>
+                      Remote data scraping is completely turned off on startup. Switch Scraping ON manually above to enable live scores and sync feeds.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
@@ -589,7 +707,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {scraperStatus.mirrors.map((m: any, idx: number) => (
                     <div key={idx} className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                       <span className="truncate text-theme-main font-medium">{m.name}</span>
-                      <span className="text-xs font-semibold text-theme-primary shrink-0">
+                      <span className={`text-xs font-semibold shrink-0 ${isScrapingActive ? 'text-theme-primary' : 'text-amber-500'}`}>
                         {m.status}
                       </span>
                     </div>
@@ -903,9 +1021,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 icon={<RefreshCw className="w-3.5 h-3.5" />}
               />
 
-              {!isSqliteActive && (
+              {(!isSqliteActive || !isScrapingActive) && (
                 <p className="text-xs text-theme-sub">
-                  Switch SQLite DB ON manually in Storage Status above before running Full Data Sync.
+                  {!isSqliteActive && !isScrapingActive
+                    ? 'Switch both SQLite DB and Data Scraping ON manually above before running Full Data Sync.'
+                    : !isSqliteActive
+                    ? 'Switch SQLite DB ON manually in Storage Status above before running Full Data Sync.'
+                    : 'Switch Data Scraping ON manually in Scraper Health above before running Full Data Sync.'}
                 </p>
               )}
 
@@ -916,7 +1038,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="md"
                   fullWidth
                   onClick={() => setIsConfirmingReset(true)}
-                  disabled={!isSqliteActive || isOperating}
+                  disabled={!isSqliteActive || !isScrapingActive || isOperating}
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Full Data Sync</span>
@@ -975,6 +1097,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <RefreshCw className="w-4 h-4" />
                 <span>Calculate Predictions</span>
               </Button>
+            </Card>
+
+            {/* Calibration Card: League Volatility Coefficient (V_L) */}
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+                <SectionHeader
+                  title="League Volatility Calibration (V_L)"
+                  size="sm"
+                  icon={<TrendingUp className="w-3.5 h-3.5" />}
+                />
+                <Button
+                  id="calibrate-volatility-btn"
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => void handleCalibrateVolatility()}
+                  disabled={!isSqliteActive || isCalibratingVolatility || isOperating}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCalibratingVolatility ? 'animate-spin text-theme-primary' : ''}`} />
+                  <span>{isCalibratingVolatility ? 'Calibrating...' : 'Calibrate V_L'}</span>
+                </Button>
+              </div>
+
+              <div className="px-3.5 py-2 text-xs text-theme-sub space-y-1.5">
+                <p className="leading-relaxed">
+                  Scales Elo K-rate (<span className="font-mono">K/V_L</span>), Bayesian prior shrinkage (<span className="font-mono">W·V_L</span>), temperature (<span className="font-mono">T=V_L^α</span>), and Monte Carlo variance. Leagues under 100 historical matches default to <span className="font-mono text-theme-main">1.00</span>.
+                </p>
+                {volatilityMessage && (
+                  <div className="px-2.5 py-1.5 rounded-lg bg-theme-primary-subtle border border-theme-neon text-theme-primary font-medium">
+                    {volatilityMessage}
+                  </div>
+                )}
+              </div>
+
+              {isLoadingVolatility ? (
+                <div className="px-3.5 py-3 text-xs text-theme-dim border-t border-theme-subdued">
+                  Loading volatility calibration table...
+                </div>
+              ) : leagueVolatilities.length > 0 ? (
+                <div className="border-t border-theme-subdued overflow-x-auto">
+                  <table className="w-full text-left text-xs tabular-nums">
+                    <thead className="bg-theme-subtle/70 text-2xs uppercase tracking-[0.06em] text-theme-sub">
+                      <tr>
+                        <th className="px-3 py-1.5 font-semibold">League</th>
+                        <th className="px-2 py-1.5 font-semibold text-right">Matches</th>
+                        <th className="px-2 py-1.5 font-semibold text-right">Log-Loss</th>
+                        <th className="px-2 py-1.5 font-semibold text-right">Elo IQR</th>
+                        <th className="px-3 py-1.5 font-semibold text-right">V_L</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-subdued)]">
+                      {leagueVolatilities.slice(0, 10).map((row) => (
+                        <tr key={row.league_id} className="hover:bg-theme-card-elevated">
+                          <td className="px-3 py-1.5 font-medium text-theme-main max-w-[165px] truncate">
+                            {row.league_name}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-theme-sub">{row.matches_evaluated}</td>
+                          <td className="px-2 py-1.5 text-right text-theme-sub">
+                            {row.historical_log_loss.toFixed(3)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-theme-sub">
+                            {row.elo_spread_iqr.toFixed(0)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-semibold">
+                            <span
+                              className={
+                                row.is_fallback
+                                  ? 'text-theme-dim'
+                                  : row.volatility_coefficient > 1.0
+                                  ? 'text-amber-500'
+                                  : 'text-theme-primary'
+                              }
+                            >
+                              {row.volatility_coefficient.toFixed(2)}
+                              {row.is_fallback ? '*' : ''}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="px-3.5 py-2.5 text-xs text-theme-dim border-t border-theme-subdued">
+                  {isSqliteActive
+                    ? 'No volatility records stored yet. Run Calibrate V_L to analyze historical leagues.'
+                    : 'Enable SQLite DB manually in Data Management to view or calibrate league volatility.'}
+                </div>
+              )}
             </Card>
 
             {/* Action Card: Export 1X2 Predictions to JSON */}

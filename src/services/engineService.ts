@@ -12,6 +12,8 @@ import {
   LeagueStandingTable,
   SlipBet,
   SqliteGateState,
+  ScrapingGateState,
+  LeagueVolatilityRecord,
 } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { loggerService, TerminalLogEntry } from './loggerService.js';
@@ -371,6 +373,7 @@ export class EngineService {
 
   public static async getStorageStatus(): Promise<{
     sqliteGate?: SqliteGateState;
+    scrapingGate?: ScrapingGateState;
     footballDb: {
       configured: boolean;
       status: 'CONNECTED' | 'DISCONNECTED' | 'NOT_CONFIGURED' | 'BLOCKED';
@@ -427,6 +430,27 @@ export class EngineService {
     return {
       success: false,
       error: serverData?.error || `Failed to switch SQLite DB ${enabled ? 'ON' : 'OFF'}.`,
+    };
+  }
+
+  public static async toggleScraping(enabled: boolean): Promise<{
+    success: boolean;
+    scrapingGate?: ScrapingGateState;
+    message?: string;
+    error?: string;
+  }> {
+    const serverData = await this.safeJsonFetch('/api/settings/scraping-toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (serverData && serverData.success) {
+      await ClientCache.setCachedLiveScores([]);
+      return serverData;
+    }
+    return {
+      success: false,
+      error: serverData?.error || `Failed to switch data scraping ${enabled ? 'ON' : 'OFF'}.`,
     };
   }
 
@@ -542,6 +566,8 @@ export class EngineService {
   }
 
   public static async getScraperStatus(): Promise<{
+    enabled?: boolean;
+    scrapingGate?: ScrapingGateState;
     circuit: { state: 'CLOSED' | 'HALF_OPEN' | 'OPEN'; failureCount: number };
     rawFeedsCount: number;
     mirrors: Array<{ name: string; url: string; status: string }>;
@@ -549,6 +575,8 @@ export class EngineService {
     const serverData = await this.safeJsonFetch('/api/settings/scraper-status');
     if (serverData && serverData.success) {
       return {
+        enabled: Boolean(serverData.enabled),
+        scrapingGate: serverData.scrapingGate,
         circuit: serverData.circuit || { state: 'CLOSED', failureCount: 0 },
         rawFeedsCount: serverData.rawFeedsCount || 0,
         mirrors: serverData.mirrors || [],
@@ -1034,8 +1062,12 @@ export class EngineService {
       }
       if (res.ok) {
         const data = await res.json();
+        const etag = res.headers.get('ETag') || undefined;
+        if (data?.scrapingBlocked) {
+          void ClientCache.setCachedLiveScores([], etag);
+          return [];
+        }
         if (data && data.success && Array.isArray(data.scores)) {
-          const etag = res.headers.get('ETag') || undefined;
           void ClientCache.setCachedLiveScores(data.scores, etag);
           return data.scores;
         }
@@ -1282,5 +1314,43 @@ export class EngineService {
       method: 'DELETE',
     });
     return Boolean(res && res.success);
+  }
+
+  public static async getLeagueVolatilities(): Promise<{
+    success: boolean;
+    sqliteBlocked?: boolean;
+    leagues: LeagueVolatilityRecord[];
+  }> {
+    const res = await this.safeJsonFetch('/api/settings/volatility');
+    if (res && res.success && Array.isArray(res.leagues)) {
+      return {
+        success: true,
+        sqliteBlocked: Boolean(res.sqliteBlocked),
+        leagues: res.leagues,
+      };
+    }
+    return { success: false, leagues: [] };
+  }
+
+  public static async calibrateLeagueVolatilities(): Promise<{
+    success: boolean;
+    globalLogLoss?: number;
+    totalLeagues?: number;
+    calibratedCount?: number;
+    fallbackCount?: number;
+    leagues?: LeagueVolatilityRecord[];
+    error?: string;
+  }> {
+    const res = await this.safeJsonFetch('/api/settings/volatility/calibrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (res && res.success) {
+      return res;
+    }
+    return {
+      success: false,
+      error: res?.error || 'Failed to calibrate league volatility',
+    };
   }
 }

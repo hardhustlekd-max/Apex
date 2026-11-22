@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { getSqliteGateState, isSqliteEnabled } from '../core/sqliteClient.js';
+import { getScrapingGateState, isScrapingEnabled } from '../core/scrapingGate.js';
 import { cleanFixtureId } from '../core/types.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { loggerService } from '../services/loggerService.js';
@@ -193,6 +194,14 @@ fixturesRouter.get('/predictions/export', async (req, res) => {
 
 fixturesRouter.post('/predictions/evaluate-imported', async (req, res) => {
   try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        sqliteGate: getSqliteGateState(),
+        error: 'SQLite database is switched off. Enable SQLite DB manually before evaluating imported predictions.',
+      });
+    }
     await db.init();
     await predictionsDb.init();
     const result = predictionsDb.evaluateImportedPredictions(req.body);
@@ -236,6 +245,8 @@ fixturesRouter.get('/standings/:league', async (req, res) => {
     });
     res.json({
       success: true,
+      scrapingBlocked: !isScrapingEnabled(),
+      scrapingGate: getScrapingGateState(),
       league,
       standings,
     });
@@ -277,7 +288,12 @@ fixturesRouter.get('/:id/h2h', async (req, res) => {
     ) {
       h2h = await OnDemandParser.getParsedH2H(fixtureId, homeTeam, awayTeam);
     }
-    res.json({ success: true, h2h });
+    res.json({
+      success: true,
+      scrapingBlocked: !isScrapingEnabled(),
+      scrapingGate: getScrapingGateState(),
+      h2h,
+    });
   } catch (err: any) {
     console.error('Error fetching fixture H2H:', err);
     res.status(500).json({ success: false, error: err?.message || 'Failed to fetch H2H' });

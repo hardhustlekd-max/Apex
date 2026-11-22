@@ -17,6 +17,12 @@ import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeSt
 import { OnDemandParser } from './onDemandParser.js';
 import { parseHeadToHeadFeedText, getTeamHistoricalMatches, teamMatchScore } from './feedParser.js';
 import { checkpointSqliteWal, sqliteDb } from './sqliteClient.js';
+import {
+  buildLeagueVolatilityLookup,
+  computeLeagueVolatilities,
+  LeagueVolatilityLookup,
+  resolveLeagueVolatility,
+} from './leagueVolatility.js';
 
 interface StandingsLookupIndex {
   byUrl: Map<string, LeagueStandingTable>;
@@ -269,7 +275,8 @@ export class ServerEngine {
     scrapedMap?: Map<string, any>,
     historicalContextOverride?: HistoricalMatch[],
     eloRatingsMap?: Map<string, number>,
-    standingsOverride?: LeagueStandingTable | null
+    standingsOverride?: LeagueStandingTable | null,
+    volatilityLookup?: LeagueVolatilityLookup | null
   ): Fixture {
     // Standardize date/time for the incoming fixture
     const f = {
@@ -315,6 +322,41 @@ export class ServerEngine {
         ? standingsOverride
         : ((db.getLeagueStandings(f.league, f.leagueUrl, f.leagueName) as LeagueStandingTable | null) || null);
 
+    let volCfg: {
+      leagueId?: string;
+      leagueName?: string;
+      volatilityCoefficient?: number;
+      temperatureAlpha?: number;
+      isFallback?: boolean;
+    };
+    if (volatilityLookup) {
+      const resolvedVol = resolveLeagueVolatility(volatilityLookup, f.league, f.leagueName);
+      volCfg = {
+        leagueId: resolvedVol.record?.league_id || f.league || 'DEFAULT',
+        leagueName: resolvedVol.record?.league_name || f.leagueName,
+        volatilityCoefficient: resolvedVol.volatilityCoefficient,
+        temperatureAlpha: resolvedVol.temperatureAlpha,
+        isFallback: resolvedVol.isFallback,
+      };
+    } else {
+      const singleRec = db.getLeagueVolatility(f.league, f.leagueName);
+      volCfg = singleRec
+        ? {
+            leagueId: singleRec.league_id,
+            leagueName: singleRec.league_name,
+            volatilityCoefficient: singleRec.volatility_coefficient,
+            temperatureAlpha: singleRec.temperature_alpha ?? settings?.volatilityTemperatureAlpha ?? 1.0,
+            isFallback: singleRec.is_fallback,
+          }
+        : {
+            leagueId: f.league || 'DEFAULT',
+            leagueName: f.leagueName,
+            volatilityCoefficient: 1.0,
+            temperatureAlpha: settings?.volatilityTemperatureAlpha ?? 1.0,
+            isFallback: true,
+          };
+    }
+
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       f.homeTeam,
       f.awayTeam,
@@ -325,14 +367,16 @@ export class ServerEngine {
       mergedTacticalInput,
       resolvedStandings,
       eloRatingsMap,
-      f.marketOdds
+      f.marketOdds,
+      volCfg
     );
 
-    const { markets, mostLikelyOutcome } = ApexEngine.calculateMarkets(
+    const { markets, mostLikelyOutcome, bestValueBet } = ApexEngine.calculateMarkets(
       prediction,
       settings,
       f.homeTeam,
-      f.awayTeam
+      f.awayTeam,
+      f.marketOdds
     );
 
     const sm = scrapedMap
@@ -356,6 +400,7 @@ export class ServerEngine {
     const enrichedPrediction = {
       ...prediction,
       mostLikelyOutcome,
+      bestValueBet,
     };
 
     return {
@@ -552,9 +597,25 @@ export class ServerEngine {
     const allStandingsTables = db.getAllLeagueStandingsTables();
     const standingsLookup = this.buildStandingsLookup(allStandingsTables);
 
-    // Build augmented match graph (base historical universe + cached H2H form feeds) so international & cup teams get real Elo ratings
+    // Load persisted League Volatility Coefficients (or calibrate & persist on first run)
+    let volatilityRecords = db.getAllLeagueVolatilities();
+    if (volatilityRecords.length === 0 && allMatches.length > 0) {
+      const calibrated = computeLeagueVolatilities(allMatches, {
+        temperatureAlpha: settings.volatilityTemperatureAlpha ?? 1.0,
+      });
+      volatilityRecords = calibrated.records;
+      if (volatilityRecords.length > 0) {
+        db.saveLeagueVolatilitiesBatch(volatilityRecords);
+      }
+    }
+    const volatilityLookup = buildLeagueVolatilityLookup(volatilityRecords);
+
+    // Build augmented match graph (base historical universe + cached H2H form feeds) so international & cup teams get real Elo ratings (Point A: K_eff = K / V_L)
     const eloUniverse = ApexEngine.augmentHistoricalMatchesWithH2H(allMatches, cachedH2HMap.values());
-    const eloRatingsMap = ApexEngine.computeAugmentedEloRatings(eloUniverse);
+    const eloRatingsMap = ApexEngine.computeAugmentedEloRatings(
+      eloUniverse,
+      (div, lName) => resolveLeagueVolatility(volatilityLookup, div, lName).volatilityCoefficient
+    );
     const leagueContextCache = new Map<string, HistoricalMatch[]>();
     const leagueCountCache = new Map<string, number>();
     const getLeagueContext = (league?: string, leagueName?: string): HistoricalMatch[] => {
@@ -673,7 +734,8 @@ export class ServerEngine {
               scrapedMap,
               leagueHistoricalContext,
               eloRatingsMap,
-              fixtureStandings
+              fixtureStandings,
+              volatilityLookup
             );
             if (cachedOdds) {
               enriched.marketOdds = cachedOdds;

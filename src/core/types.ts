@@ -139,6 +139,11 @@ export interface MarketOption {
   probability: number;
   isBanker: boolean;
   isMostLikely?: boolean;
+  marketOdds?: number;
+  evEdge?: number;
+  minEvThreshold?: number;
+  isPositiveEV?: boolean;
+  kellyStakeFraction?: number;
 }
 
 export interface CorrectScoreProb {
@@ -332,6 +337,58 @@ export interface StandingsPredictionContext {
   ppgDiff?: number;
 }
 
+export interface LeagueVolatilityRecord {
+  league_id: string;
+  league_name: string;
+  volatility_coefficient: number;
+  historical_log_loss: number;
+  elo_spread_iqr: number;
+  matches_evaluated: number;
+  temperature_alpha?: number;
+  is_fallback?: boolean;
+  updated_at?: string;
+}
+
+export interface VolatilityCalibrationContext {
+  leagueId: string;
+  leagueName?: string;
+  volatilityCoefficient: number;
+  temperatureAlpha: number;
+  temperature: number;
+  effectiveEloKs: number[];
+  effectivePriorWeight: number;
+  monteCarloSigma: number;
+  minEvThreshold: number;
+  kellyFraction: number;
+  isFallback: boolean;
+}
+
+export interface MonteCarloSimulationSummary {
+  iterations: number;
+  sigmaEffective: number;
+  homeWinProb: number;
+  drawProb: number;
+  awayWinProb: number;
+  over25Prob: number;
+  bttsProb: number;
+  homeGoalsP10: number;
+  homeGoalsP50: number;
+  homeGoalsP90: number;
+  awayGoalsP10: number;
+  awayGoalsP50: number;
+  awayGoalsP90: number;
+}
+
+export interface ValueBetRecommendation {
+  key: MarketKey;
+  name: string;
+  probability: number;
+  marketOdds: number;
+  evEdge: number;
+  minEvRequired: number;
+  kellyFraction: number;
+}
+
 export interface PoissonPrediction {
   homeXG: number;
   awayXG: number;
@@ -362,6 +419,9 @@ export interface PoissonPrediction {
   dixonColesParams?: DixonColesParams;
   mostLikelyOutcome?: MostLikelyOutcome;
   marketOdds?: ScrapedMarketOdds;
+  volatilityContext?: VolatilityCalibrationContext;
+  monteCarlo?: MonteCarloSimulationSummary;
+  bestValueBet?: ValueBetRecommendation;
 }
 
 export interface Fixture {
@@ -462,6 +522,11 @@ export interface SqliteGateState {
   blockedReason: 'NOT_STARTED_MANUALLY' | 'MISSING_DB_ON_PREVIEW' | null;
 }
 
+export interface ScrapingGateState {
+  enabled: boolean;
+  blockedReason: 'NOT_STARTED_MANUALLY' | null;
+}
+
 export interface FixturesQueryResponse {
   success: boolean;
   sqliteBlocked?: boolean;
@@ -526,6 +591,10 @@ export interface EngineSettings {
   formDecayRate: number; // 0.85
   autoSyncDaily: boolean;
   colorTheme?: 'opta-emerald' | 'champions-crimson' | 'ballon-gold' | 'volt-lime';
+  volatilityTemperatureAlpha?: number; // T = V_L ^ alpha (default 1.0, [0.5, 1.5])
+  minEvBase?: number; // Baseline EV threshold before V_L scaling (default 0.03)
+  kellyBaseFraction?: number; // Baseline fractional Kelly before 1/V_L scaling (default 0.25)
+  monteCarloSigmaBase?: number; // Baseline xG shock std dev before * V_L (default 0.22)
 }
 
 export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
@@ -534,6 +603,10 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   homeAdvantageFactor: 1.12,
   formDecayRate: 0.85,
   autoSyncDaily: true,
+  volatilityTemperatureAlpha: 1.0,
+  minEvBase: 0.03,
+  kellyBaseFraction: 0.25,
+  monteCarloSigmaBase: 0.22,
 };
 
 export function cleanFixtureId(id?: string): string {

@@ -1,5 +1,6 @@
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
+import { isSqliteEnabled } from '../core/sqliteClient.js';
 import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, LeagueStandingTable, TeamFormMatch, TeamStatsSummary } from '../core/types.js';
 import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { convertHistoricalMatchToFixture, flashscoreScraperService } from './flashscoreScraperService.js';
@@ -34,6 +35,9 @@ function buildFallbackTeamStats(teamName: string, recentMatches: TeamFormMatch[]
  * indexed scraped/historical rows, H2H measurements, odds, and fallback team stats.
  */
 export async function getMatchDetailById(fixtureId: string): Promise<Fixture | null> {
+  if (!isSqliteEnabled()) {
+    return null;
+  }
   await db.init();
   await predictionsDb.init();
 
@@ -276,11 +280,23 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
     }
 
     const hasComprehensiveMarkets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'COMBO_1X_BTTS');
+    const needsEvPopulation = Boolean(
+      stored.marketOdds &&
+        stored.markets &&
+        !stored.markets.some((m) => m.marketOdds !== undefined)
+    );
 
-    if (isStandingsClose || stored.standingsClose || stored.prediction.standingsClose || !hasComprehensiveMarkets) {
+    if (
+      isStandingsClose ||
+      stored.standingsClose ||
+      stored.prediction.standingsClose ||
+      !hasComprehensiveMarkets ||
+      needsEvPopulation
+    ) {
       const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
       const updatedPrediction = {
         ...stored.prediction,
+        marketOdds: stored.marketOdds || stored.prediction.marketOdds,
         standingsClose: isStandingsClose,
         standingsCloseReason: isStandingsClose ? standingsCloseReason : undefined,
       };
@@ -288,13 +304,15 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
         updatedPrediction,
         settings,
         stored.homeTeam,
-        stored.awayTeam
+        stored.awayTeam,
+        stored.marketOdds
       );
       stored.standingsClose = isStandingsClose;
       stored.standingsCloseReason = isStandingsClose ? standingsCloseReason : undefined;
       stored.prediction = {
         ...updatedPrediction,
         mostLikelyOutcome: recalc.mostLikelyOutcome,
+        bestValueBet: recalc.bestValueBet,
       };
       stored.markets = recalc.markets;
       stored.mostLikelyOutcome = recalc.mostLikelyOutcome;

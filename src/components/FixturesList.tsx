@@ -51,6 +51,9 @@ interface FixturesListProps {
   sqliteGate?: SqliteGateState | null;
   onSwitchOnSqlite?: () => void;
   isTogglingSqlite?: boolean;
+  scrapingBlocked?: boolean;
+  onSwitchOnScraping?: () => void;
+  isTogglingScraping?: boolean;
   onOpenSettings?: () => void;
 }
 
@@ -87,6 +90,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   sqliteGate = null,
   onSwitchOnSqlite,
   isTogglingSqlite = false,
+  scrapingBlocked = true,
+  onSwitchOnScraping,
+  isTogglingScraping = false,
   onOpenSettings,
 }) => {
   const [internalScope, setInternalScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
@@ -381,7 +387,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     : activeScope === 'UPCOMING'
     ? 'No Upcoming Fixtures'
     : activeScope === 'LIVE'
-    ? 'No Live Matches'
+    ? scrapingBlocked
+      ? 'Live Data Scraping Switched Off'
+      : 'No Live Matches'
     : historySummary && historySummary.completedAwaitingScore > 0
     ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
     : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
@@ -620,7 +628,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               </>
             ) : (
               <>
-                {onTriggerFullSync && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
+                {activeScope === 'LIVE' && scrapingBlocked && onSwitchOnScraping && (
+                  <Button variant="primary" size="sm" onClick={onSwitchOnScraping} disabled={isTogglingScraping}>
+                    <Power className="w-3.5 h-3.5" />
+                    <span>{isTogglingScraping ? 'Switching On...' : 'Switch Scraping ON'}</span>
+                  </Button>
+                )}
+                {onTriggerFullSync && !scrapingBlocked && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
                   <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Start Full Sync &amp; Update Data</span>

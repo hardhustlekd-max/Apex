@@ -2,6 +2,7 @@ import { cleanFixtureId, Fixture } from './types.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
 import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
 import { sqliteDb, notifyDbMutation, isSqliteEnabled } from './sqliteClient.js';
+import { isScrapingEnabled } from './scrapingGate.js';
 import { loggerService } from '../services/loggerService.js';
 
 export interface PredictionEvaluationSummary {
@@ -864,6 +865,11 @@ export class PredictionsDB {
 
       // 1. Always attempt local SQLite reconciliation first
       await this.reconcileStaleMatches();
+
+      // Do not hit remote Flashscore feeds/headers when data scraping is switched off
+      if (!isScrapingEnabled()) {
+        return;
+      }
 
       // 2. Find remaining predictions whose kickoff/date has passed and lack confirmed final scores
       const candidates = sqliteDb.prepare(`

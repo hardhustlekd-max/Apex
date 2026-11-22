@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
 import { getSqliteGateState, isSqliteEnabled, registerDbMutationListener } from '../core/sqliteClient.js';
+import { getScrapingGateState, isScrapingEnabled } from '../core/scrapingGate.js';
 import {
   cleanFixtureId,
   Fixture,
@@ -550,6 +551,13 @@ class FixturesWorkerService {
     this.liveQueryCache.clear();
   }
 
+  public clearLiveCache(): void {
+    this.liveScoresCache = null;
+    this.liveScoresPromise = null;
+    this.liveQueryCache.clear();
+    this.queryCache.clear();
+  }
+
   /**
    * Ensures the warm server-side projection index is loaded and merged once from SQLite.
    */
@@ -580,8 +588,10 @@ class FixturesWorkerService {
         const oddsMap = db.getAllMatchOddsCache();
         const standingsLookup = buildWorkerStandingsLookup(db.getAllLeagueStandingsTables());
 
-        // Run multi-day coverage sync in background asynchronously without blocking index boot
-        void flashscoreScraperService.ensureUpcomingMultiDayCoverage().catch(() => {});
+        // Run multi-day coverage sync asynchronously only when remote data scraping is enabled
+        if (isScrapingEnabled()) {
+          void flashscoreScraperService.ensureUpcomingMultiDayCoverage().catch(() => {});
+        }
 
         const predMap = new Map<string, Fixture>();
         for (const p of predictionsList) {
@@ -733,6 +743,15 @@ class FixturesWorkerService {
     liveIdSet: Set<string>;
     signature: string;
   }> {
+    if (!isScrapingEnabled()) {
+      this.liveScoresCache = null;
+      return {
+        scores: [],
+        liveIdSet: new Set<string>(),
+        signature: 'SCRAPING_OFF',
+      };
+    }
+
     const now = Date.now();
     if (!forceRefresh && this.liveScoresCache && now - this.liveScoresCache.fetchedAt < this.LIVE_SCORES_TTL_MS) {
       const liveIdSet = new Set<string>();
@@ -1062,6 +1081,8 @@ class FixturesWorkerService {
 
     const payloadObj = {
       success: true,
+      scrapingBlocked: !isScrapingEnabled(),
+      scrapingGate: getScrapingGateState(),
       provider: 'FLASHSCORE',
       count: sorted.length,
       fixtures: sorted,

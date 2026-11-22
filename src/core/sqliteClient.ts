@@ -109,6 +109,7 @@ const RECOVERY_TABLES = [
   'raw_feed_data',
   'flashscore_scraped_matches',
   'league_standings',
+  'league_volatility',
   'bets',
 ];
 
@@ -714,6 +715,19 @@ function initSqliteSchemaInternal(targetDb: Database.Database): void {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS league_volatility (
+      league_id TEXT PRIMARY KEY,
+      league_name TEXT NOT NULL,
+      volatility_coefficient REAL NOT NULL DEFAULT 1.0,
+      historical_log_loss REAL NOT NULL DEFAULT 0.0,
+      elo_spread_iqr REAL NOT NULL DEFAULT 0.0,
+      matches_evaluated INTEGER NOT NULL DEFAULT 0,
+      temperature_alpha REAL NOT NULL DEFAULT 1.0,
+      is_fallback INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_league_vol_name ON league_volatility(league_name);
+
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -899,6 +913,7 @@ export function getSqliteDbStats(): {
     'raw_feed_data',
     'flashscore_scraped_matches',
     'league_standings',
+    'league_volatility',
   ];
 
   if (sqliteManualEnabled && dbExists) {

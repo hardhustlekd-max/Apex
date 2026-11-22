@@ -22,6 +22,9 @@ import {
   DixonColesParams,
   MatchTacticalContextInput,
   ScrapedMarketOdds,
+  VolatilityCalibrationContext,
+  MonteCarloSimulationSummary,
+  ValueBetRecommendation,
 } from './types.js';
 import { getCurrentSeason, normalizeDateStr } from './dateUtils.js';
 import { resolveTeamSide, resolveFixtureAlignment, teamMatchScore, getTeamHistoricalMatches } from './feedParser.js';
@@ -369,11 +372,14 @@ export class ApexEngine {
 
   private static buildTeamStandingsSnapshot(
     entry: LeagueStandingEntry,
-    group: LeagueStandingGroup
+    group: LeagueStandingGroup,
+    volatilityCoefficient = 1.0
   ): TeamStandingsSnapshot {
     const played = Math.max(1, entry.played);
     const totalTeams = Math.max(entry.rank || 1, group.table.length);
-    const reliabilityWeight = Number((played / (played + 6)).toFixed(3));
+    const vL = Math.max(0.75, Math.min(1.35, volatilityCoefficient || 1.0));
+    const priorWeight = 6 * vL;
+    const reliabilityWeight = Number((played / (played + priorWeight)).toFixed(3));
     return {
       rank: entry.rank,
       totalTeams,
@@ -509,7 +515,8 @@ export class ApexEngine {
     decayRate = 0.90,
     scrapedRecent?: TeamFormMatch[],
     eloRatings?: Map<string, number>,
-    preResolvedRecent?: TeamFormMatch[]
+    preResolvedRecent?: TeamFormMatch[],
+    volatilityCoefficient = 1.0
   ): {
     strengthRating: number;
     formDominance: number;
@@ -518,6 +525,7 @@ export class ApexEngine {
     venueModifier: number;
     recentMatches: TeamFormMatch[];
   } {
+    const vL = Math.max(0.75, Math.min(1.35, volatilityCoefficient || 1.0));
     const recentMatchesList =
       preResolvedRecent ??
       this.resolveSeasonRecentMatches(teamName, allMatches, windowSize, scrapedRecent);
@@ -553,12 +561,17 @@ export class ApexEngine {
       formWeightTotal += baseWeight;
     }
 
+    // Point B: Early-Season Prior Shrinkage — scale Bayesian prior weight by V_L:
+    // Metric_adj = (n * Metric_curr + W_prior * V_L * Metric_prior) / (n + W_prior * V_L)
     const n = recentMatchesList.length;
-    const sampleShrink = n / (n + 5);
+    const effectiveFormPrior = 5 * vL;
     const rawFormDominance = formWeightTotal > 0 ? (weightedFormSum / formWeightTotal) : 50.0;
-    const formDominance = Number((50.0 + (rawFormDominance - 50.0) * sampleShrink).toFixed(1));
+    const formDominance = Number(
+      (((n * rawFormDominance) + (effectiveFormPrior * 50.0)) / (n + effectiveFormPrior)).toFixed(1)
+    );
+    const sampleShrink = n / (n + effectiveFormPrior);
 
-    // 2. League Standings & Table Momentum (group-scoped & sample-size weighted)
+    // 2. League Standings & Table Momentum (group-scoped & V_L-adjusted sample-size weighted)
     let hasStandingsEntry = false;
     let standingsReliability = 0;
     let tableMomentum = formDominance;
@@ -566,7 +579,7 @@ export class ApexEngine {
     const matched = this.findTeamStandingsEntry(teamName, groups);
 
     if (matched) {
-      const snap = this.buildTeamStandingsSnapshot(matched.entry, matched.group);
+      const snap = this.buildTeamStandingsSnapshot(matched.entry, matched.group, vL);
       hasStandingsEntry = true;
       standingsReliability = snap.reliabilityWeight;
 
@@ -583,13 +596,13 @@ export class ApexEngine {
           ? (0.35 * ppgScore) + (0.30 * rankScore) + (0.20 * gdScore) + (0.15 * tableFormScore)
           : (0.42 * ppgScore) + (0.33 * rankScore) + (0.25 * gdScore);
 
-      // Smoothly shrink early-season table momentum toward actual match form dominance
+      // Smoothly shrink early-season table momentum toward match form prior with W_prior * V_L
       tableMomentum = Number(
         (formDominance + (rawMomentum - formDominance) * standingsReliability).toFixed(1)
       );
     }
 
-    // 3. Attacking & Defensive Shot Efficiency (shrunk toward 50 when sample is small)
+    // 3. Attacking & Defensive Shot Efficiency (shrunk toward 50 with prior W_prior * V_L)
     let totalSotFor = 0;
     let totalGoalsFor = 0;
     let totalSotAgainst = 0;
@@ -622,8 +635,8 @@ export class ApexEngine {
       shotEfficiency = Number((50.0 + (rawEff - 50.0) * sampleShrink).toFixed(1));
     }
 
-    // 4. Symmetric, Shrunk Venue Modifier around 1.00 (base home advantage is modeled separately)
-    const venueShrink = venueMatchesCount / (venueMatchesCount + 6);
+    // 4. Symmetric, Shrunk Venue Modifier around 1.00 (prior scaled by V_L)
+    const venueShrink = venueMatchesCount / (venueMatchesCount + 6 * vL);
     let venueModifier = 1.0;
     if (isHomeVenue) {
       const homeRate = venueMatchesCount > 0 ? (venueSuccessCount / venueMatchesCount) : 0.45;
@@ -780,9 +793,14 @@ export class ApexEngine {
   }
 
   /**
-   * Multi-pass recency-weighted Augmented Elo ratings across the full match graph
+   * Multi-pass recency-weighted Augmented Elo ratings across the full match graph.
+   * Point A: Scales post-match learning rate inversely by League Volatility Coefficient:
+   *   K_effective = K_base / V_L
    */
-  public static computeAugmentedEloRatings(allMatches: HistoricalMatch[]): Map<string, number> {
+  public static computeAugmentedEloRatings(
+    allMatches: HistoricalMatch[],
+    getVolatility?: (div?: string, leagueName?: string) => number
+  ): Map<string, number> {
     const ratings = new Map<string, number>();
     const sorted = [...allMatches].sort(
       (a, b) => this.getDateMs(a.matchDate) - this.getDateMs(b.matchDate)
@@ -797,12 +815,15 @@ export class ApexEngine {
       const dateMs = this.getDateMs(m.matchDate);
       const ageDays = dateMs > 0 ? Math.max(0, (now - dateMs) / 86400000) : 180;
       const recency = ageDays > 730 ? 0.35 : Math.exp(-ageDays / 450);
+      const rawVl = getVolatility ? getVolatility(m.div, m.leagueName) : 1.0;
+      const volatility = Math.max(0.75, Math.min(1.35, Number.isFinite(rawVl) ? rawVl : 1.0));
       return {
         hKey: m.homeTeam.toLowerCase().trim(),
         aKey: m.awayTeam.toLowerCase().trim(),
         actualHome: m.ftr === 'H' ? 1.0 : m.ftr === 'D' ? 0.5 : 0.0,
         marginMult,
         recency,
+        volatility,
       };
     });
 
@@ -812,8 +833,9 @@ export class ApexEngine {
         const hElo = ratings.get(item.hKey) ?? 1500;
         const aElo = ratings.get(item.aKey) ?? 1500;
 
+        const effectiveK = baseK / item.volatility;
         const expHome = 1 / (1 + Math.pow(10, (aElo - (hElo + 55)) / 400));
-        const delta = baseK * item.marginMult * item.recency * (item.actualHome - expHome);
+        const delta = effectiveK * item.marginMult * item.recency * (item.actualHome - expHome);
 
         ratings.set(item.hKey, Math.round(hElo + delta));
         ratings.set(item.aKey, Math.round(aElo - delta));
@@ -1069,15 +1091,280 @@ export class ApexEngine {
   }
 
   // =========================================================================
+  // VOLATILITY CALIBRATION HELPERS (POINTS C & D)
+  // =========================================================================
+
+  /**
+   * Point C: Post-Processing Probability Calibration (Temperature Scaling)
+   * P_calibrated_i = exp(log(P_raw_i) / T) / sum_j exp(log(P_raw_j) / T), where T = V_L ^ alpha
+   */
+  public static applyTemperatureScaling(
+    homeWinRaw: number,
+    drawRaw: number,
+    awayWinRaw: number,
+    volatilityCoefficient = 1.0,
+    alpha = 1.0
+  ): {
+    homeWinProb: number;
+    drawProb: number;
+    awayWinProb: number;
+    temperature: number;
+  } {
+    const vL = Math.max(0.75, Math.min(1.35, Number.isFinite(volatilityCoefficient) ? volatilityCoefficient : 1.0));
+    const safeAlpha = Math.max(0.5, Math.min(1.5, Number.isFinite(alpha) ? alpha : 1.0));
+    const temperature = Math.pow(vL, safeAlpha);
+
+    const eps = 1e-6;
+    const raw = [
+      Math.max(eps, homeWinRaw),
+      Math.max(eps, drawRaw),
+      Math.max(eps, awayWinRaw),
+    ];
+    const scaledLogits = raw.map((p) => Math.log(p) / temperature);
+    const maxLogit = Math.max(scaledLogits[0], scaledLogits[1], scaledLogits[2]);
+    const exps = scaledLogits.map((l) => Math.exp(l - maxLogit));
+    const sumExp = exps[0] + exps[1] + exps[2] || 1.0;
+
+    return {
+      homeWinProb: exps[0] / sumExp,
+      drawProb: exps[1] / sumExp,
+      awayWinProb: exps[2] / sumExp,
+      temperature: Number(temperature.toFixed(4)),
+    };
+  }
+
+  private static createSeededRng(seedStr: string): () => number {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      h ^= seedStr.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return () => {
+      h += 0x6d2b79f5;
+      let t = Math.imul(h ^ (h >>> 15), 1 | h);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  private static sampleStandardNormal(rng: () => number): number {
+    const u1 = Math.max(1e-9, rng());
+    const u2 = rng();
+    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+  }
+
+  /**
+   * Marsaglia-Tsang Gamma(shape, scale) sampler with mean = mu and std = sigma
+   */
+  private static sampleGammaMeanStd(mu: number, sigma: number, rng: () => number): number {
+    const safeMu = Math.max(0.05, mu);
+    if (sigma <= 1e-4) return safeMu;
+    const variance = sigma * sigma;
+    const shape = (safeMu * safeMu) / variance;
+    const scale = variance / safeMu;
+
+    if (shape < 1) {
+      const u = Math.max(1e-9, rng());
+      return this.sampleGammaMeanStd(safeMu * (shape + 1) / shape, sigma, rng) * Math.pow(u, 1 / shape);
+    }
+
+    const d = shape - 1 / 3;
+    const c = 1 / Math.sqrt(9 * d);
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const x = this.sampleStandardNormal(rng);
+      const vBase = 1 + c * x;
+      if (vBase <= 0) continue;
+      const v = vBase * vBase * vBase;
+      const u = Math.max(1e-9, rng());
+      if (u < 1 - 0.0331 * x * x * x * x) return Math.max(0.05, d * v * scale);
+      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return Math.max(0.05, d * v * scale);
+    }
+    return safeMu;
+  }
+
+  private static samplePoisson(lambda: number, rng: () => number): number {
+    const l = Math.max(0.01, Math.min(12.0, lambda));
+    const L = Math.exp(-l);
+    let k = 0;
+    let p = 1.0;
+    do {
+      k++;
+      p *= Math.max(1e-12, rng());
+    } while (p > L && k < 15);
+    return k - 1;
+  }
+
+  /**
+   * Point D: Competition-variance Monte Carlo Match Simulation.
+   * Samples λ_sim ~ Gamma(μ = λ_pred, σ = σ_base * V_L) before Poisson scoreline realization.
+   */
+  public static simulateMatchMonteCarlo(
+    homeLambda: number,
+    awayMu: number,
+    volatilityCoefficient = 1.0,
+    options?: {
+      iterations?: number;
+      sigmaBase?: number;
+      seedKey?: string;
+    }
+  ): MonteCarloSimulationSummary {
+    const vL = Math.max(0.75, Math.min(1.35, volatilityCoefficient || 1.0));
+    const sigmaBase = Math.max(0.05, Math.min(0.6, options?.sigmaBase ?? 0.22));
+    const sigmaEffective = Number((sigmaBase * vL).toFixed(4));
+    const iterations = Math.max(50, Math.min(10000, Math.round(options?.iterations ?? 400)));
+    const rng = this.createSeededRng(
+      options?.seedKey || `${homeLambda.toFixed(3)}_${awayMu.toFixed(3)}_${vL.toFixed(3)}`
+    );
+
+    let homeWins = 0;
+    let draws = 0;
+    let awayWins = 0;
+    let over25 = 0;
+    let btts = 0;
+    const hLambdas = new Array<number>(iterations);
+    const aMus = new Array<number>(iterations);
+
+    for (let i = 0; i < iterations; i++) {
+      const hSimLambda = this.sampleGammaMeanStd(homeLambda, sigmaEffective, rng);
+      const aSimMu = this.sampleGammaMeanStd(awayMu, sigmaEffective, rng);
+      hLambdas[i] = hSimLambda;
+      aMus[i] = aSimMu;
+
+      const hg = this.samplePoisson(hSimLambda, rng);
+      const ag = this.samplePoisson(aSimMu, rng);
+      if (hg > ag) homeWins++;
+      else if (hg === ag) draws++;
+      else awayWins++;
+      if (hg + ag >= 3) over25++;
+      if (hg > 0 && ag > 0) btts++;
+    }
+
+    hLambdas.sort((a, b) => a - b);
+    aMus.sort((a, b) => a - b);
+    const pct = (arr: number[], q: number) =>
+      Number(arr[Math.min(arr.length - 1, Math.max(0, Math.floor((arr.length - 1) * q)))].toFixed(2));
+
+    return {
+      iterations,
+      sigmaEffective,
+      homeWinProb: Number((homeWins / iterations).toFixed(3)),
+      drawProb: Number((draws / iterations).toFixed(3)),
+      awayWinProb: Number((awayWins / iterations).toFixed(3)),
+      over25Prob: Number((over25 / iterations).toFixed(3)),
+      bttsProb: Number((btts / iterations).toFixed(3)),
+      homeGoalsP10: pct(hLambdas, 0.1),
+      homeGoalsP50: pct(hLambdas, 0.5),
+      homeGoalsP90: pct(hLambdas, 0.9),
+      awayGoalsP10: pct(aMus, 0.1),
+      awayGoalsP50: pct(aMus, 0.5),
+      awayGoalsP90: pct(aMus, 0.9),
+    };
+  }
+
+  /**
+   * Point D: Monte Carlo Season Simulator using σ_effective = σ_base * V_L match variance shocks.
+   */
+  public static simulateSeasonMonteCarlo(
+    scheduledFixtures: Array<{ homeTeam: string; awayTeam: string; homeLambda: number; awayMu: number }>,
+    volatilityCoefficient = 1.0,
+    options?: {
+      simulations?: number;
+      sigmaBase?: number;
+      seedKey?: string;
+    }
+  ): Array<{
+    team: string;
+    avgPoints: number;
+    pointsStdDev: number;
+    titleWinProb: number;
+    top4Prob: number;
+    bottom3Prob: number;
+  }> {
+    const vL = Math.max(0.75, Math.min(1.35, volatilityCoefficient || 1.0));
+    const sigmaBase = Math.max(0.05, Math.min(0.6, options?.sigmaBase ?? 0.22));
+    const sigmaEff = sigmaBase * vL;
+    const sims = Math.max(20, Math.min(2000, Math.round(options?.simulations ?? 250)));
+    const rng = this.createSeededRng(options?.seedKey || `season_${vL.toFixed(3)}_${scheduledFixtures.length}`);
+
+    const teamNamesSet = new Set<string>();
+    for (const f of scheduledFixtures) {
+      teamNamesSet.add(f.homeTeam);
+      teamNamesSet.add(f.awayTeam);
+    }
+    const teams = Array.from(teamNamesSet);
+    if (teams.length === 0) return [];
+
+    const ptsSamples = new Map<string, number[]>(teams.map((t) => [t, []]));
+    const titleCounts = new Map<string, number>(teams.map((t) => [t, 0]));
+    const top4Counts = new Map<string, number>(teams.map((t) => [t, 0]));
+    const bottom3Counts = new Map<string, number>(teams.map((t) => [t, 0]));
+
+    for (let s = 0; s < sims; s++) {
+      const tablePts = new Map<string, number>(teams.map((t) => [t, 0]));
+      const tableGd = new Map<string, number>(teams.map((t) => [t, 0]));
+
+      for (const f of scheduledFixtures) {
+        const hLam = this.sampleGammaMeanStd(f.homeLambda, sigmaEff, rng);
+        const aMu = this.sampleGammaMeanStd(f.awayMu, sigmaEff, rng);
+        const hg = this.samplePoisson(hLam, rng);
+        const ag = this.samplePoisson(aMu, rng);
+
+        tableGd.set(f.homeTeam, (tableGd.get(f.homeTeam) || 0) + (hg - ag));
+        tableGd.set(f.awayTeam, (tableGd.get(f.awayTeam) || 0) + (ag - hg));
+        if (hg > ag) {
+          tablePts.set(f.homeTeam, (tablePts.get(f.homeTeam) || 0) + 3);
+        } else if (ag > hg) {
+          tablePts.set(f.awayTeam, (tablePts.get(f.awayTeam) || 0) + 3);
+        } else {
+          tablePts.set(f.homeTeam, (tablePts.get(f.homeTeam) || 0) + 1);
+          tablePts.set(f.awayTeam, (tablePts.get(f.awayTeam) || 0) + 1);
+        }
+      }
+
+      const ranked = [...teams].sort((a, b) => {
+        const pDiff = (tablePts.get(b) || 0) - (tablePts.get(a) || 0);
+        if (pDiff !== 0) return pDiff;
+        return (tableGd.get(b) || 0) - (tableGd.get(a) || 0);
+      });
+
+      ranked.forEach((team, idx) => {
+        ptsSamples.get(team)!.push(tablePts.get(team) || 0);
+        if (idx === 0) titleCounts.set(team, (titleCounts.get(team) || 0) + 1);
+        if (idx < 4) top4Counts.set(team, (top4Counts.get(team) || 0) + 1);
+        if (idx >= Math.max(0, ranked.length - 3)) bottom3Counts.set(team, (bottom3Counts.get(team) || 0) + 1);
+      });
+    }
+
+    return teams
+      .map((team) => {
+        const arr = ptsSamples.get(team)!;
+        const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+        const variance = arr.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / arr.length;
+        return {
+          team,
+          avgPoints: Number(mean.toFixed(1)),
+          pointsStdDev: Number(Math.sqrt(variance).toFixed(2)),
+          titleWinProb: Number(((titleCounts.get(team) || 0) / sims).toFixed(3)),
+          top4Prob: Number(((top4Counts.get(team) || 0) / sims).toFixed(3)),
+          bottom3Prob: Number(((bottom3Counts.get(team) || 0) / sims).toFixed(3)),
+        };
+      })
+      .sort((a, b) => b.avgPoints - a.avgPoints);
+  }
+
+  // =========================================================================
   // PILLAR 4: BIVARIATE DIXON-COLES GOAL MODEL & PROBABILITY CALCULATION
   // =========================================================================
 
   /**
    * Generates a complete match probability prediction using the full Evidence-Based framework:
    * - Opponent-adjusted xG created/conceded over 5-10 matches
-   * - Augmented Elo Ratings with home field advantage
+   * - Augmented Elo Ratings dampened by League Volatility Coefficient (K / V_L)
+   * - Early-season prior shrinkage scaled by V_L
    * - Tactical context & rest day adjustments
    * - Bivariate Dixon-Coles goal model with low-scoring correlation correction (ρ = -0.11)
+   * - Post-processing Temperature Scaling (T = V_L ^ α)
+   * - Monte Carlo variance simulation (σ = σ_base * V_L)
    */
   public static predictMatch(
     homeTeam: string,
@@ -1089,14 +1376,33 @@ export class ApexEngine {
     tacticalInput?: MatchTacticalContextInput,
     standings?: LeagueStandingTable | null,
     eloRatingsMapOverride?: Map<string, number>,
-    marketOdds?: ScrapedMarketOdds | null
+    marketOdds?: ScrapedMarketOdds | null,
+    volatilityConfig?: {
+      leagueId?: string;
+      leagueName?: string;
+      volatilityCoefficient?: number;
+      temperatureAlpha?: number;
+      isFallback?: boolean;
+    }
   ): { prediction: PoissonPrediction; homeStats: TeamStatsSummary; awayStats: TeamStatsSummary } {
     const historicalUniverse = allHistoricalMatches && allHistoricalMatches.length > 0
       ? allHistoricalMatches
       : leagueHistoricalMatches;
 
+    const vL = Math.max(
+      0.75,
+      Math.min(1.35, Number.isFinite(volatilityConfig?.volatilityCoefficient) ? volatilityConfig!.volatilityCoefficient! : 1.0)
+    );
+    const alpha = Math.max(
+      0.5,
+      Math.min(1.5, Number.isFinite(volatilityConfig?.temperatureAlpha ?? settings?.volatilityTemperatureAlpha)
+        ? (volatilityConfig?.temperatureAlpha ?? settings?.volatilityTemperatureAlpha ?? 1.0)
+        : 1.0)
+    );
+
     // 1. Augmented Elo Ratings (augment with realScrapedH2H if override lacks either team)
-    let eloRatingsMap = eloRatingsMapOverride || this.computeAugmentedEloRatings(historicalUniverse);
+    let eloRatingsMap =
+      eloRatingsMapOverride || this.computeAugmentedEloRatings(historicalUniverse, () => vL);
     let homeElo = this.getTeamElo(homeTeam, eloRatingsMap);
     let awayElo = this.getTeamElo(awayTeam, eloRatingsMap);
     if (
@@ -1108,7 +1414,7 @@ export class ApexEngine {
       const augmented = this.augmentHistoricalMatchesWithH2H(historicalUniverse, [
         { ...realScrapedH2H, homeClub: realScrapedH2H.homeClub || homeTeam, awayClub: realScrapedH2H.awayClub || awayTeam },
       ]);
-      eloRatingsMap = this.computeAugmentedEloRatings(augmented);
+      eloRatingsMap = this.computeAugmentedEloRatings(augmented, () => vL);
       homeElo = this.getTeamElo(homeTeam, eloRatingsMap);
       awayElo = this.getTeamElo(awayTeam, eloRatingsMap);
     }
@@ -1142,7 +1448,8 @@ export class ApexEngine {
       formDecay,
       realScrapedH2H?.homeRecentMatches,
       eloRatingsMap,
-      homeSeasonRecent
+      homeSeasonRecent,
+      vL
     );
 
     const awayCSF = this.computeTeamStrengthProfile(
@@ -1154,7 +1461,8 @@ export class ApexEngine {
       formDecay,
       realScrapedH2H?.awayRecentMatches,
       eloRatingsMap,
-      awaySeasonRecent
+      awaySeasonRecent,
+      vL
     );
 
     const csfExpectancy = this.getTeamStrengthExpectancy(
@@ -1230,10 +1538,10 @@ export class ApexEngine {
       standings
     );
     const homeSnap = homeStandingsMatch
-      ? this.buildTeamStandingsSnapshot(homeStandingsMatch.entry, homeStandingsMatch.group)
+      ? this.buildTeamStandingsSnapshot(homeStandingsMatch.entry, homeStandingsMatch.group, vL)
       : undefined;
     const awaySnap = awayStandingsMatch
-      ? this.buildTeamStandingsSnapshot(awayStandingsMatch.entry, awayStandingsMatch.group)
+      ? this.buildTeamStandingsSnapshot(awayStandingsMatch.entry, awayStandingsMatch.group, vL)
       : undefined;
     const standingsCloseEval = this.evaluateStandingsCloseStatus(homeSnap, awaySnap);
 
@@ -1318,9 +1626,10 @@ export class ApexEngine {
       leagueAwayAvg = Math.max(0.90, Math.min(1.80, avgs.awayAvg));
     }
 
-    // 5. Dixon-Coles Expected Goals (λ and μ) with Bayesian small-sample shrinkage
-    const hShrink = homeXGProfile.rollingMatchesCount / (homeXGProfile.rollingMatchesCount + 10);
-    const aShrink = awayXGProfile.rollingMatchesCount / (awayXGProfile.rollingMatchesCount + 10);
+    // 5. Dixon-Coles Expected Goals (λ and μ) with V_L-scaled Bayesian small-sample prior shrinkage
+    const effectiveGoalPriorWeight = 10 * vL;
+    const hShrink = homeXGProfile.rollingMatchesCount / (homeXGProfile.rollingMatchesCount + effectiveGoalPriorWeight);
+    const aShrink = awayXGProfile.rollingMatchesCount / (awayXGProfile.rollingMatchesCount + effectiveGoalPriorWeight);
 
     let homeAttackPower = homeXGProfile.rollingMatchesCount > 0
       ? 1.0 + ((homeXGProfile.adjustedXG / leagueHomeAvg) - 1.0) * hShrink
@@ -1562,6 +1871,36 @@ export class ApexEngine {
     finalDraw /= sum1X2;
     finalAwayWin /= sum1X2;
 
+    // Point C: Post-Processing Probability Calibration (Temperature Scaling T = V_L ^ alpha)
+    const calibrated1X2 = this.applyTemperatureScaling(finalHomeWin, finalDraw, finalAwayWin, vL, alpha);
+    finalHomeWin = calibrated1X2.homeWinProb;
+    finalDraw = calibrated1X2.drawProb;
+    finalAwayWin = calibrated1X2.awayWinProb;
+
+    // Point D: Competition-variance Monte Carlo Match Simulation (sigma = sigma_base * V_L)
+    const sigmaBase = settings?.monteCarloSigmaBase ?? 0.22;
+    const monteCarlo = this.simulateMatchMonteCarlo(homeLambda, awayMu, vL, {
+      iterations: 350,
+      sigmaBase,
+      seedKey: `${homeTeam}_${awayTeam}_${volatilityConfig?.leagueId || ''}`,
+    });
+
+    const minEvBase = settings?.minEvBase ?? 0.03;
+    const kellyBase = settings?.kellyBaseFraction ?? 0.25;
+    const volatilityContext: VolatilityCalibrationContext = {
+      leagueId: volatilityConfig?.leagueId || standings?.leagueCode || 'DEFAULT',
+      leagueName: volatilityConfig?.leagueName || standings?.leagueName,
+      volatilityCoefficient: Number(vL.toFixed(3)),
+      temperatureAlpha: Number(alpha.toFixed(3)),
+      temperature: calibrated1X2.temperature,
+      effectiveEloKs: [32, 24, 16].map((k) => Number((k / vL).toFixed(2))),
+      effectivePriorWeight: Number(effectiveGoalPriorWeight.toFixed(2)),
+      monteCarloSigma: monteCarlo.sigmaEffective,
+      minEvThreshold: Number((minEvBase * vL).toFixed(4)),
+      kellyFraction: Number((kellyBase / vL).toFixed(4)),
+      isFallback: volatilityConfig?.isFallback ?? (vL === 1.0 && !volatilityConfig?.leagueId),
+    };
+
     const dixonColesParams: DixonColesParams = {
       rho: RHO,
       homeLambda: Number(homeLambda.toFixed(2)),
@@ -1624,6 +1963,9 @@ export class ApexEngine {
       standingsClose: standingsCloseEval.isClose,
       standingsCloseReason: standingsCloseEval.reason,
       dixonColesParams,
+      marketOdds: marketOdds || undefined,
+      volatilityContext,
+      monteCarlo,
     };
 
     return { prediction, homeStats, awayStats };
@@ -1651,15 +1993,51 @@ export class ApexEngine {
     prediction: PoissonPrediction,
     settings: EngineSettings,
     homeTeam: string,
-    awayTeam: string
+    awayTeam: string,
+    marketOddsOverride?: ScrapedMarketOdds | null
   ): {
     markets: MarketOption[];
     mostLikelyOutcome?: MostLikelyOutcome;
+    bestValueBet?: ValueBetRecommendation;
   } {
     const markets: MarketOption[] = [];
     const isStandingsClose = Boolean(
       prediction.standingsClose ?? prediction.standingsContext?.standingsClose
     );
+
+    // Point E: Downstream Risk & Staking Filter scaled by V_L
+    const vL = Math.max(
+      0.75,
+      Math.min(1.35, prediction.volatilityContext?.volatilityCoefficient ?? 1.0)
+    );
+    const minEvBase = settings?.minEvBase ?? 0.03;
+    const kellyBase = settings?.kellyBaseFraction ?? 0.25;
+    const minEvEffective = Number((minEvBase * vL).toFixed(4));
+    const kellyFractionEffective = Number((kellyBase / vL).toFixed(4));
+
+    const oddsObj = marketOddsOverride || prediction.marketOdds;
+    const lookupMarketDecimalOdds = (key: MarketOption['key']): number | undefined => {
+      if (!oddsObj) return undefined;
+      switch (key) {
+        case 'HOME_WIN': return oddsObj.homeOdds;
+        case 'DRAW': return oddsObj.drawOdds;
+        case 'AWAY_WIN': return oddsObj.awayOdds;
+        case 'DOUBLE_CHANCE_1X': return oddsObj.dc1XOdds;
+        case 'DOUBLE_CHANCE_12': return oddsObj.dc12Odds;
+        case 'DOUBLE_CHANCE_X2': return oddsObj.dcX2Odds;
+        case 'OVER_15': return oddsObj.over15Odds;
+        case 'UNDER_15': return oddsObj.under15Odds;
+        case 'OVER_25': return oddsObj.over25Odds;
+        case 'UNDER_25': return oddsObj.under25Odds;
+        case 'OVER_35': return oddsObj.over35Odds;
+        case 'UNDER_35': return oddsObj.under35Odds;
+        case 'BTTS_YES': return oddsObj.bttsYesOdds;
+        case 'BTTS_NO': return oddsObj.bttsNoOdds;
+        default: return undefined;
+      }
+    };
+
+    let bestValueBet: ValueBetRecommendation | undefined;
 
     const addMarket = (
       key: MarketOption['key'],
@@ -1667,12 +2045,43 @@ export class ApexEngine {
       prob: number
     ) => {
       const isBanker = prob >= (settings.safeWinThreshold || 0.70);
+      const decOdds = lookupMarketDecimalOdds(key);
+      let evEdge: number | undefined;
+      let isPositiveEV: boolean | undefined;
+      let kellyStakeFraction: number | undefined;
+
+      if (decOdds && decOdds > 1.01) {
+        evEdge = Number((prob * decOdds - 1).toFixed(4));
+        isPositiveEV = evEdge >= minEvEffective;
+        const b = decOdds - 1;
+        const fullKelly = Math.max(0, (prob * b - (1 - prob)) / b);
+        kellyStakeFraction = isPositiveEV
+          ? Number(Math.min(0.25, fullKelly * kellyFractionEffective).toFixed(4))
+          : 0;
+
+        if (isPositiveEV && (!bestValueBet || evEdge > bestValueBet.evEdge)) {
+          bestValueBet = {
+            key,
+            name,
+            probability: prob,
+            marketOdds: decOdds,
+            evEdge,
+            minEvRequired: minEvEffective,
+            kellyFraction: kellyStakeFraction,
+          };
+        }
+      }
 
       markets.push({
         key,
         name,
         probability: prob,
         isBanker,
+        marketOdds: decOdds && decOdds > 1.01 ? decOdds : undefined,
+        evEdge,
+        minEvThreshold: decOdds && decOdds > 1.01 ? minEvEffective : undefined,
+        isPositiveEV,
+        kellyStakeFraction,
       });
     };
 
@@ -1969,6 +2378,7 @@ export class ApexEngine {
     return {
       markets,
       mostLikelyOutcome,
+      bestValueBet,
     };
   }
 

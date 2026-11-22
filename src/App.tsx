@@ -24,6 +24,7 @@ import {
   ProviderStatus,
   BetSelection,
   SqliteGateState,
+  ScrapingGateState,
   cleanFixtureId,
 } from './core/types.js';
 import { LiveScore } from './providers/types.js';
@@ -112,6 +113,8 @@ export default function App() {
   const [dataRefreshVersion, setDataRefreshVersion] = useState<number>(0);
   const [sqliteGate, setSqliteGate] = useState<SqliteGateState | null>(null);
   const [isTogglingSqlite, setIsTogglingSqlite] = useState<boolean>(false);
+  const [scrapingGate, setScrapingGate] = useState<ScrapingGateState | null>(null);
+  const [isTogglingScraping, setIsTogglingScraping] = useState<boolean>(false);
 
   const hasInitializedDateFilterRef = useRef<boolean>(false);
   const skipNextDateFilterFetchRef = useRef<boolean>(false);
@@ -536,6 +539,9 @@ export default function App() {
       if (nextGate) {
         setSqliteGate(nextGate);
       }
+      if (storageData?.scrapingGate) {
+        setScrapingGate(storageData.scrapingGate);
+      }
     } catch (e) {
       console.error('Failed to fetch settings/providers/stats:', e);
     }
@@ -608,19 +614,28 @@ export default function App() {
     fetchLivePredictions,
   ]);
 
-  // One-time mount initialization (settings, catalog, badge live-score polling, error logs, sync job resume)
+  // Poll live scores only after Data Scraping is manually switched ON
+  useEffect(() => {
+    if (!scrapingGate?.enabled) {
+      setLiveScores([]);
+      return;
+    }
+    void fetchLiveScores();
+    const liveInterval = setInterval(() => {
+      void fetchLiveScores();
+    }, 15000);
+    return () => clearInterval(liveInterval);
+  }, [scrapingGate?.enabled, fetchLiveScores]);
+
+  // One-time mount initialization (settings, catalog, error logs, sync job resume; ZERO live scraping on boot)
   useEffect(() => {
     applyColorTheme(getActiveColorThemeId());
     void fetchSettingsAndProviders();
     void EngineService.getLeaguesCatalog().then((catalog) => {
       if (Array.isArray(catalog)) setLeaguesCatalog(catalog);
     });
-    void fetchLiveScores();
     void checkForNewErrorLogs();
 
-    const liveInterval = setInterval(() => {
-      void fetchLiveScores();
-    }, 15000);
     const errInterval = setInterval(() => {
       void checkForNewErrorLogs();
     }, 10000);
@@ -715,7 +730,6 @@ export default function App() {
     return () => {
       upcomingAbortRef.current?.abort();
       resumeController.abort();
-      clearInterval(liveInterval);
       clearInterval(errInterval);
       window.removeEventListener('error', handleWindowError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -737,7 +751,7 @@ export default function App() {
     await Promise.all([
       fetchSettingsAndProviders(),
       fetchFixtures({ forceRefresh: true }),
-      fetchLiveScores(),
+      scrapingGate?.enabled ? fetchLiveScores() : Promise.resolve(),
       activeScope === 'LIVE' ? fetchLivePredictions() : Promise.resolve(),
     ]);
   };
@@ -776,7 +790,40 @@ export default function App() {
     }
   };
 
+  const handleToggleScraping = async (enabled: boolean) => {
+    if (isTogglingScraping) return;
+    setIsTogglingScraping(true);
+    try {
+      const res = await EngineService.toggleScraping(enabled);
+      if (res.scrapingGate) {
+        setScrapingGate(res.scrapingGate);
+      }
+      if (!res.success) {
+        showNotification(res.error || `Failed to switch data scraping ${enabled ? 'ON' : 'OFF'}.`, 'info');
+        return;
+      }
+
+      if (enabled) {
+        await Promise.all([fetchSettingsAndProviders(), fetchLiveScores()]);
+        if (activeScope === 'LIVE') {
+          await fetchLivePredictions();
+        }
+        showNotification(res.message || 'Data scraping switched ON.', 'success');
+      } else {
+        setLiveScores([]);
+        await fetchSettingsAndProviders();
+        if (activeScope === 'LIVE') {
+          await fetchLivePredictions();
+        }
+        showNotification(res.message || 'Data scraping switched OFF.', 'info');
+      }
+    } finally {
+      setIsTogglingScraping(false);
+    }
+  };
+
   const isSqliteBlocked = Boolean(sqliteGate && !sqliteGate.enabled);
+  const isScrapingBlocked = !scrapingGate?.enabled;
 
   const isProcessingActive = Boolean(
     isSyncingData ||
@@ -861,7 +908,7 @@ export default function App() {
                 />
               )}
 
-              {/* Manual SQLite Gate Banner when DB initialization is blocked */}
+              {/* Manual SQLite & Data Scraping Gate Banner when blocked on initialization */}
               {isSqliteBlocked && (
                 <Card surface="elevated" padding="sm" radius="2xl" className="border-amber-500/35 bg-amber-500/5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -872,11 +919,11 @@ export default function App() {
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-theme-main">
                           {sqliteGate?.blockedReason === 'MISSING_DB_ON_PREVIEW'
-                            ? 'SQLite Blocked — No Database File Found on Preview'
-                            : 'SQLite Blocked on Startup — Switched Off'}
+                            ? `SQLite${isScrapingBlocked ? ' & Data Scraping' : ''} Blocked — No DB on Preview`
+                            : `SQLite${isScrapingBlocked ? ' & Data Scraping' : ''} Blocked on Startup — Switched Off`}
                         </div>
                         <p className="text-xs text-theme-sub leading-relaxed mt-0.5">
-                          Automatic SQLite initialization is disabled. Switch SQLite ON manually to open or create{' '}
+                          Automatic SQLite initialization{isScrapingBlocked ? ' and Flashscore data scraping are' : ' is'} turned off on startup. Switch ON manually to load or create{' '}
                           <span className="font-mono text-theme-main">football_engine.db</span>, or restore your backup from Google Drive in Settings.
                         </p>
                       </div>
@@ -892,6 +939,18 @@ export default function App() {
                         <Power className="w-3.5 h-3.5" />
                         <span>{isTogglingSqlite ? 'Switching On...' : 'Switch SQLite ON'}</span>
                       </Button>
+                      {isScrapingBlocked && (
+                        <Button
+                          id="banner-switch-on-scraping-btn"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void handleToggleScraping(true)}
+                          disabled={isTogglingScraping || isProcessingActive}
+                        >
+                          <Power className="w-3.5 h-3.5" />
+                          <span>{isTogglingScraping ? 'Switching On...' : 'Switch Scraping ON'}</span>
+                        </Button>
+                      )}
                       <Button
                         variant="secondary"
                         size="sm"
@@ -943,6 +1002,9 @@ export default function App() {
                       sqliteGate={sqliteGate}
                       onSwitchOnSqlite={() => void handleToggleSqlite(true)}
                       isTogglingSqlite={isTogglingSqlite}
+                      scrapingBlocked={isScrapingBlocked}
+                      onSwitchOnScraping={() => void handleToggleScraping(true)}
+                      isTogglingScraping={isTogglingScraping}
                       onOpenSettings={() => setIsSettingsOpen(true)}
                     />
                   </div>
@@ -1076,6 +1138,9 @@ export default function App() {
         sqliteGate={sqliteGate}
         isTogglingSqlite={isTogglingSqlite}
         onToggleSqlite={handleToggleSqlite}
+        scrapingGate={scrapingGate}
+        isTogglingScraping={isTogglingScraping}
+        onToggleScraping={handleToggleScraping}
       />
 
       {/* Floating Bottom Navigation Dock (Mobile Only) */}

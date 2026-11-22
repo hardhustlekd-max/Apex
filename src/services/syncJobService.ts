@@ -1,5 +1,7 @@
 import { db } from '../core/db.js';
 import { predictionsDb } from '../core/predictionsDb.js';
+import { isSqliteEnabled } from '../core/sqliteClient.js';
+import { isScrapingEnabled } from '../core/scrapingGate.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { ServerEngine } from '../core/serverEngine.js';
 import { loggerService } from './loggerService.js';
@@ -219,6 +221,12 @@ export class SyncJobService {
   }
 
   public startJob(options?: { resetDatabase?: boolean; resetRawFeeds?: boolean }): SyncJobState {
+    if (!isSqliteEnabled()) {
+      throw new Error('SQLite database is switched off. Enable SQLite DB manually before starting Full Data Sync.');
+    }
+    if (!isScrapingEnabled()) {
+      throw new Error('Data scraping is switched off. Enable Data Scraping manually before starting Full Data Sync.');
+    }
     const opts = { resetDatabase: false, resetRawFeeds: false, ...options };
     const existing = this.getActiveJob();
     if (existing) {
@@ -262,6 +270,9 @@ export class SyncJobService {
   }
 
   public startPredictionJob(): SyncJobState {
+    if (!isSqliteEnabled()) {
+      throw new Error('SQLite database is switched off. Enable SQLite DB manually before calculating predictions.');
+    }
     const existing = this.getActiveJob();
     if (existing) {
       if (existing.jobType === 'PREDICTIONS') {

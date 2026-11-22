@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../core/db.js';
 import { getSqliteGateState, isSqliteEnabled } from '../core/sqliteClient.js';
+import { isScrapingEnabled } from '../core/scrapingGate.js';
 import { cleanFixtureId } from '../core/types.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
@@ -36,7 +37,7 @@ router.get('/', async (req: Request, res: Response) => {
       status?: string;
     }> = [];
 
-    if (pendingLegs.length > 0) {
+    if (pendingLegs.length > 0 && isScrapingEnabled()) {
       try {
         const liveData = await fixturesWorkerService.getCachedLiveScores(forceLive);
         liveScores = liveData.scores || [];

@@ -11,9 +11,18 @@ import {
   getSqliteGateState,
   isSqliteEnabled,
 } from '../core/sqliteClient.js';
+import {
+  disableScrapingManually,
+  enableScrapingManually,
+  getScrapingGateState,
+  isScrapingEnabled,
+} from '../core/scrapingGate.js';
+import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { syncJobService } from '../services/syncJobService.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
 import { loggerService } from '../services/loggerService.js';
+import { ServerEngine } from '../core/serverEngine.js';
+import { computeLeagueVolatilities } from '../core/leagueVolatility.js';
 
 export const settingsRouter = Router();
 
@@ -32,9 +41,11 @@ settingsRouter.get('/', (req, res) => {
 const getStorageStatusHandler = (_req: any, res: any) => {
   const stats = getSqliteDbStats();
   const gate = getSqliteGateState();
+  const scrapingGate = getScrapingGateState();
   res.json({
     success: true,
     sqliteGate: gate,
+    scrapingGate,
     storageEngine: {
       status: gate.enabled ? (gate.initialized ? 'ONLINE' : 'STANDBY') : 'BLOCKED',
       mode: gate.enabled ? 'LOCAL_SQLITE_WAL' : 'MANUAL_SWITCH_REQUIRED',
@@ -143,20 +154,79 @@ settingsRouter.get('/scraper-status', (req, res) => {
   try {
     const circuitStatus = scraperCircuitBreaker ? scraperCircuitBreaker.getStatus() : { state: 'CLOSED', failureCount: 0 };
     const rawFeedsCount = db.getRawFeedsCount();
+    const scrapingGate = getScrapingGateState();
+    const mirrorStatus = scrapingGate.enabled ? 'ONLINE' : 'BLOCKED · OFF';
     res.json({
       success: true,
+      enabled: scrapingGate.enabled,
+      scrapingGate,
       circuit: circuitStatus,
       rawFeedsCount,
       mirrors: [
-        { name: 'Primary Flashscore Feed', url: 'https://www.flashscore.com/x/feed', status: 'ONLINE' },
-        { name: 'Ninja CDN English Primary', url: 'https://2.flashscore.ninja/2/x/feed', status: 'ONLINE' },
-        { name: 'Ninja CDN English Mirror 1', url: 'https://1.flashscore.ninja/2/x/feed', status: 'ONLINE' },
-        { name: 'Flashscore UK Mirror', url: 'https://www.flashscore.co.uk/x/feed', status: 'ONLINE' },
-        { name: 'Flashscore Global Mirror', url: 'https://www.flashscore.in/x/feed', status: 'ONLINE' },
+        { name: 'Primary Flashscore Feed', url: 'https://www.flashscore.com/x/feed', status: mirrorStatus },
+        { name: 'Ninja CDN English Primary', url: 'https://2.flashscore.ninja/2/x/feed', status: mirrorStatus },
+        { name: 'Ninja CDN English Mirror 1', url: 'https://1.flashscore.ninja/2/x/feed', status: mirrorStatus },
+        { name: 'Flashscore UK Mirror', url: 'https://www.flashscore.co.uk/x/feed', status: mirrorStatus },
+        { name: 'Flashscore Global Mirror', url: 'https://www.flashscore.in/x/feed', status: mirrorStatus },
       ],
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to get scraper status' });
+  }
+});
+
+settingsRouter.post('/scraping-toggle', (req, res) => {
+  try {
+    const requestedEnabled = Boolean(req.body?.enabled);
+
+    if (requestedEnabled) {
+      const gate = enableScrapingManually();
+      flashscoreScraperService.clearCaches();
+      fixturesWorkerService.clearLiveCache();
+
+      loggerService.addLog({
+        level: 'SUCCESS',
+        category: 'SCRAPER',
+        source: 'ScrapingGate',
+        message: 'Data scraping manually switched ON.',
+      });
+
+      return res.json({
+        success: true,
+        scrapingGate: gate,
+        message: 'Data scraping switched ON manually.',
+      });
+    } else {
+      const activeJob = syncJobService.getActiveJob();
+      if (activeJob && activeJob.jobType === 'FULL' && (activeJob.status === 'RUNNING' || activeJob.status === 'PENDING')) {
+        return res.status(409).json({
+          success: false,
+          error: 'Cannot switch off data scraping while Full Data Sync is running.',
+        });
+      }
+
+      const gate = disableScrapingManually();
+      flashscoreScraperService.clearCaches();
+      fixturesWorkerService.clearLiveCache();
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'SCRAPER',
+        source: 'ScrapingGate',
+        message: 'Data scraping manually switched OFF (all remote scraping blocked).',
+      });
+
+      return res.json({
+        success: true,
+        scrapingGate: gate,
+        message: 'Data scraping switched OFF and blocked.',
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to toggle data scraping state',
+    });
   }
 });
 
@@ -202,5 +272,75 @@ settingsRouter.post('/update-predictions', async (req, res) => {
     console.error('Error updating predictions:', err);
     const status = err?.message?.includes('currently running') ? 409 : 500;
     res.status(status).json({ success: false, error: err?.message || 'Failed to update upcoming predictions' });
+  }
+});
+
+settingsRouter.get('/volatility', async (_req, res) => {
+  try {
+    if (!isSqliteEnabled()) {
+      return res.json({
+        success: true,
+        sqliteBlocked: true,
+        leagues: [],
+      });
+    }
+    await db.init();
+    const leagues = db.getAllLeagueVolatilities();
+    return res.json({
+      success: true,
+      sqliteBlocked: false,
+      leagues,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to retrieve league volatility calibration metrics',
+    });
+  }
+});
+
+settingsRouter.post('/volatility/calibrate', async (_req, res) => {
+  try {
+    if (!isSqliteEnabled()) {
+      return res.status(409).json({
+        success: false,
+        sqliteBlocked: true,
+        error: 'SQLite database is switched off. Enable SQLite DB manually before calibrating league volatility.',
+      });
+    }
+    await db.init();
+    const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
+    const matches = ServerEngine.getUnifiedHistoricalUniverse();
+    const { records, globalLogLoss } = computeLeagueVolatilities(matches, {
+      temperatureAlpha: settings.volatilityTemperatureAlpha ?? 1.0,
+    });
+
+    if (records.length > 0) {
+      db.saveLeagueVolatilitiesBatch(records);
+    }
+    const saved = db.getAllLeagueVolatilities();
+    const calibratedCount = saved.filter((r) => !r.is_fallback).length;
+    const fallbackCount = saved.filter((r) => r.is_fallback).length;
+
+    loggerService.addLog({
+      level: 'SUCCESS',
+      category: 'PREDICTION',
+      source: 'VolatilityCalibrator',
+      message: `Calibrated League Volatility (V_L) across ${saved.length} competitions (${calibratedCount} calibrated >=100 matches, ${fallbackCount} neutral fallback V_L=1.00, LL_global=${globalLogLoss.toFixed(4)})`,
+    });
+
+    return res.json({
+      success: true,
+      globalLogLoss,
+      totalLeagues: saved.length,
+      calibratedCount,
+      fallbackCount,
+      leagues: saved,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to calibrate league volatility coefficients',
+    });
   }
 });

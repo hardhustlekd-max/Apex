@@ -1,6 +1,7 @@
 import { cleanFixtureId, Fixture, HistoricalMatch, LeagueCode, HeadToHeadMeasurement, LeagueStandingTable, ProviderStatus, ScrapedMarketOdds } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
+import { isScrapingEnabled } from '../core/scrapingGate.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
 
 export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
@@ -137,6 +138,9 @@ export class FlashscoreScraperService {
    * Fetch raw feed string from Flashscore feed endpoint
    */
   private async fetchFlashscoreFeed(path: string): Promise<string | null> {
+    if (!isScrapingEnabled()) {
+      return null;
+    }
     const urls = [
       `${FLASHSCORE_FEED_BASE}/${path}`,
       `${FLASHSCORE_NINJA_BASE}/${path}`,
@@ -410,6 +414,9 @@ export class FlashscoreScraperService {
   }
 
   public async ensureUpcomingMultiDayCoverage(): Promise<void> {
+    if (!isScrapingEnabled()) {
+      return;
+    }
     if (this.hasMultiDayUpcomingCoverage()) {
       return;
     }
@@ -429,6 +436,10 @@ export class FlashscoreScraperService {
   async getUpcomingFixtures(dateFilter?: string, forceRefresh = false): Promise<Fixture[]> {
     const filterUpper = (dateFilter || '').trim().toUpperCase();
     const isSingleDayFilter = Boolean(dateFilter) && !['ALL', 'NEXT_3_DAYS', 'THIS_WEEK'].includes(filterUpper);
+
+    if (!isScrapingEnabled()) {
+      return db.getUpcomingFixtures(undefined, dateFilter);
+    }
 
     // 1. Primary lookup: Return cached SQLite fixtures only if multi-day coverage exists (or requested single day is populated)
     if (!forceRefresh) {
@@ -586,6 +597,9 @@ export class FlashscoreScraperService {
    * Scrapes live in-play scores from Flashscore
    */
   async getLiveScores(): Promise<LiveScore[]> {
+    if (!isScrapingEnabled()) {
+      return [];
+    }
     const feedPath = 'f_1_0_0_en_1';
     const feedText = await this.fetchAndPersistRawFeed(feedPath);
     if (!feedText) {
@@ -666,6 +680,9 @@ export class FlashscoreScraperService {
    * Refreshes and persists daily UTC Flashscore feed (t=0) for a given day offset (-7..1)
    */
   public async syncDailyFeedForOffset(offsetDays: number): Promise<boolean> {
+    if (!isScrapingEnabled()) {
+      return false;
+    }
     const clampedOffset = Math.max(-7, Math.min(1, Math.trunc(offsetDays)));
     const feedPath = `f_1_${clampedOffset}_0_en_1`;
     const rawText = await this.fetchAndPersistRawFeed(feedPath);
@@ -682,6 +699,9 @@ export class FlashscoreScraperService {
     homeScore?: number;
     awayScore?: number;
   } | null> {
+    if (!isScrapingEnabled()) {
+      return null;
+    }
     const cleanId = String(matchId || '')
       .replace(/^fs_hist_/, '')
       .replace(/^fs_/, '')
@@ -772,6 +792,9 @@ export class FlashscoreScraperService {
    * Playwright headless browser fallback when direct HTTP feed requests fail or hit Cloudflare/403/429
    */
   private async runPlaywrightScraperFallback(seasonUrl: string): Promise<HistoricalMatch[]> {
+    if (!isScrapingEnabled()) {
+      return [];
+    }
     loggerService.addLog({
       level: 'INFO',
       category: 'SCRAPER',
@@ -883,6 +906,9 @@ export class FlashscoreScraperService {
     maxSeasons = 2,
     allowPlaywrightFallback = false
   ): Promise<HistoricalMatch[]> {
+    if (!isScrapingEnabled()) {
+      return [];
+    }
     const historicalMatches: HistoricalMatch[] = [];
     const seenMatchIds = new Set<string>();
 
@@ -1024,6 +1050,13 @@ export class FlashscoreScraperService {
     _shouldClear = false,
     options?: { skipUpcomingRefresh?: boolean; skipStandings?: boolean }
   ): Promise<{ success: boolean; matchesCount: number; message: string }> {
+    if (!isScrapingEnabled()) {
+      return {
+        success: false,
+        matchesCount: 0,
+        message: 'Data scraping is switched off until enabled manually.',
+      };
+    }
     loggerService.addLog({
       level: 'INFO',
       category: 'SCRAPER',
@@ -1189,6 +1222,10 @@ export class FlashscoreScraperService {
       if (cached && cached.homeOdds && cached.awayOdds) {
         return cached;
       }
+    }
+
+    if (!isScrapingEnabled()) {
+      return null;
     }
 
     const avg = (arr: number[]): number | undefined => {
@@ -1596,6 +1633,7 @@ export class FlashscoreScraperService {
    * Prefetches and persists H2H raw feeds for upcoming matches during full sync
    */
   async prefetchH2HForUpcomingFixtures(upcoming: Fixture[], limit = 30): Promise<number> {
+    if (!isScrapingEnabled()) return 0;
     let count = 0;
     const targetFixtures = upcoming.slice(0, limit);
     const batchSize = 5;
@@ -1625,7 +1663,7 @@ export class FlashscoreScraperService {
     limit = 200,
     concurrency = 10
   ): Promise<number> {
-    if (!upcoming || upcoming.length === 0) return 0;
+    if (!isScrapingEnabled() || !upcoming || upcoming.length === 0) return 0;
 
     const existingOddsMap = db.getAllMatchOddsCache();
 
@@ -1778,7 +1816,7 @@ export class FlashscoreScraperService {
     tournamentId: string,
     tournamentStageId: string
   ): Promise<string | null> {
-    if (!tournamentId || !tournamentStageId) return null;
+    if (!isScrapingEnabled() || !tournamentId || !tournamentStageId) return null;
     const path = `to_${tournamentId.trim()}_${tournamentStageId.trim()}_1`;
     const urls = [
       `${FLASHSCORE_NINJA_BASE}/${path}`,
@@ -1836,6 +1874,7 @@ export class FlashscoreScraperService {
     tournamentStageId?: string;
     initialFeed?: string;
   } | null> {
+    if (!isScrapingEnabled()) return null;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
       const cleanPath = standingsPath.endsWith('/standings/')
@@ -1898,6 +1937,7 @@ export class FlashscoreScraperService {
           tournamentStageId?: string;
         }
   ): Promise<LeagueStandingTable | null> {
+    if (!isScrapingEnabled()) return null;
     const rawCode = typeof targetInput === 'string' ? targetInput : targetInput.leagueCode;
     const cleanCode = String(rawCode || '')
       .toLowerCase()
@@ -2015,6 +2055,9 @@ export class FlashscoreScraperService {
   async syncAllCatalogStandings(
     onProgress?: (processed: number, total: number, saved: number) => void
   ): Promise<{ totalAttempted: number; savedCount: number }> {
+    if (!isScrapingEnabled()) {
+      return { totalAttempted: 0, savedCount: 0 };
+    }
     type CatalogTarget = {
       leagueCode: string;
       leagueName: string;
@@ -2276,7 +2319,7 @@ export class FlashscoreScraperService {
       id: 'FLASHSCORE',
       name: 'Flashscore Live Scraper',
       type: 'SCRAPER',
-      status: 'ONLINE',
+      status: isScrapingEnabled() ? 'ONLINE' : 'STANDBY',
       latencyMs: 0,
       description: 'Direct FlashscoreScraping engine extracting live match results, in-play statistics, worldwide fixtures, and results directly from Flashscore.',
       features: ['Direct Flashscore Feed Scraper', 'Real-Time In-Play Scores', '50+ Worldwide Leagues & Cups', 'Live Statistics & Results', 'Instant SQLite Sync'],

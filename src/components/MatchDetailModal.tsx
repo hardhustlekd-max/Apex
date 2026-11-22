@@ -975,6 +975,37 @@ const MatchDetailModalContent: React.FC<{
                         </div>
                       </div>
                     )}
+
+                    {pred?.volatilityContext && (
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                        <span className="text-theme-sub font-normal">League Volatility (V_L / T)</span>
+                        <div className="font-semibold text-theme-main shrink-0">
+                          <span className="text-theme-primary">
+                            V_L {pred.volatilityContext.volatilityCoefficient.toFixed(2)}
+                          </span>
+                          <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">·</span>
+                          <span>T {pred.volatilityContext.temperature.toFixed(2)}</span>
+                          {pred.volatilityContext.isFallback && (
+                            <span className="text-theme-dim font-normal text-xs pl-1.5">(Fallback)</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {pred?.monteCarlo && (
+                      <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                        <span className="text-theme-sub font-normal">Monte Carlo xG (P10–P90)</span>
+                        <div className="font-semibold text-theme-main shrink-0">
+                          <span className="text-theme-primary">
+                            {pred.monteCarlo.homeGoalsP10.toFixed(2)}–{pred.monteCarlo.homeGoalsP90.toFixed(2)}
+                          </span>
+                          <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
+                          <span className="text-sky-500 dark:text-sky-400">
+                            {pred.monteCarlo.awayGoalsP10.toFixed(2)}–{pred.monteCarlo.awayGoalsP90.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
 
@@ -1667,6 +1698,19 @@ const MatchDetailModalContent: React.FC<{
                               </span>
                               <span className="text-xs font-normal text-theme-dim block mt-0.5">
                                 {isFlashscore ? `FS ${betOdds.toFixed(2)}` : `Model ${betOdds.toFixed(2)}`}
+                                {market.evEdge !== undefined && (
+                                  <span
+                                    className={`ml-1.5 font-medium ${
+                                      market.isPositiveEV ? 'text-emerald-500 dark:text-emerald-400' : 'text-theme-dim'
+                                    }`}
+                                  >
+                                    · {market.evEdge >= 0 ? '+' : ''}
+                                    {(market.evEdge * 100).toFixed(1)}% EV
+                                    {market.isPositiveEV && (market.kellyStakeFraction ?? 0) > 0
+                                      ? ` · K ${((market.kellyStakeFraction || 0) * 100).toFixed(1)}%`
+                                      : ''}
+                                  </span>
+                                )}
                               </span>
                             </div>
                             {onAddSelection && (
