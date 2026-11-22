@@ -134,6 +134,7 @@ fixturesRouter.get('/history', async (req, res) => {
     const search = req.query.search as string | undefined;
     const sortBy = req.query.sortBy as string | undefined;
     const marketFilter = req.query.marketFilter as string | undefined;
+    const dateFilter = req.query.dateFilter as string | undefined;
     const limit = parseInt((req.query.limit as string) || '300', 10);
     const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
 
@@ -142,6 +143,7 @@ fixturesRouter.get('/history', async (req, res) => {
       search,
       sortBy,
       marketFilter,
+      dateFilter,
       limit,
       forceRefresh,
     });

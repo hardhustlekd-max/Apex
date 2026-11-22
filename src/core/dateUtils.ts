@@ -401,6 +401,60 @@ export function resolveDateFilter(
     };
   }
 
+  if (upper === 'YESTERDAY') {
+    return {
+      kind: 'SINGLE',
+      canonicalKey: 'YESTERDAY',
+      targetDate: getUtcDateStr(-1, baseDate),
+      dayIndex: -1,
+    };
+  }
+
+  if (upper === 'LAST_3_DAYS') {
+    return {
+      kind: 'RANGE',
+      canonicalKey: 'LAST_3_DAYS',
+      startDate: getUtcDateStr(-2, baseDate),
+      endDate: getUtcDateStr(0, baseDate),
+    };
+  }
+
+  if (upper === 'LAST_7_DAYS' || upper === 'PAST_7_DAYS') {
+    return {
+      kind: 'RANGE',
+      canonicalKey: 'LAST_7_DAYS',
+      startDate: getUtcDateStr(-6, baseDate),
+      endDate: getUtcDateStr(0, baseDate),
+    };
+  }
+
+  if (upper === 'LAST_14_DAYS') {
+    return {
+      kind: 'RANGE',
+      canonicalKey: 'LAST_14_DAYS',
+      startDate: getUtcDateStr(-13, baseDate),
+      endDate: getUtcDateStr(0, baseDate),
+    };
+  }
+
+  if (upper === 'LAST_30_DAYS' || upper === 'PAST_MONTH') {
+    return {
+      kind: 'RANGE',
+      canonicalKey: 'LAST_30_DAYS',
+      startDate: getUtcDateStr(-29, baseDate),
+      endDate: getUtcDateStr(0, baseDate),
+    };
+  }
+
+  if (upper === 'LAST_90_DAYS' || upper === 'PAST_3_MONTHS') {
+    return {
+      kind: 'RANGE',
+      canonicalKey: 'LAST_90_DAYS',
+      startDate: getUtcDateStr(-89, baseDate),
+      endDate: getUtcDateStr(0, baseDate),
+    };
+  }
+
   if (upper === 'NEXT_3_DAYS') {
     return {
       kind: 'RANGE',
@@ -485,6 +539,22 @@ export function getDateFilterOptions(baseDate: Date = new Date()): DateFilterOpt
     { key: 'NEXT_3_DAYS', label: 'Next 3 Days' },
     { key: 'THIS_WEEK', label: 'This Week (7 Days)' },
     { key: 'ALL', label: 'All Dates' },
+  ];
+}
+
+/**
+ * Generates date filter options optimized for historical match evaluation.
+ */
+export function getHistoryDateFilterOptions(): DateFilterOption[] {
+  return [
+    { key: 'ALL', label: 'All Historical Dates' },
+    { key: 'TODAY', label: 'Today' },
+    { key: 'YESTERDAY', label: 'Yesterday' },
+    { key: 'LAST_3_DAYS', label: 'Last 3 Days' },
+    { key: 'LAST_7_DAYS', label: 'Last 7 Days' },
+    { key: 'LAST_14_DAYS', label: 'Last 14 Days' },
+    { key: 'LAST_30_DAYS', label: 'Last 30 Days' },
+    { key: 'LAST_90_DAYS', label: 'Last 90 Days' },
   ];
 }
 
