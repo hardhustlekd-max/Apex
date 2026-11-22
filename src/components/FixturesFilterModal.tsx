@@ -1,7 +1,7 @@
 import React from 'react';
-import { Filter, Search } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { getDateFilterDisplayLabel, resolveDateFilter } from '../core/dateUtils.js';
-import { Button, Input, Modal, Select } from './ui/index.js';
+import { Button, Modal, Select } from './ui/index.js';
 
 interface FixturesFilterModalProps {
   isOpen: boolean;
@@ -12,8 +12,6 @@ interface FixturesFilterModalProps {
   setDateFilter: (d: string) => void;
   marketChoiceFilter: string;
   setMarketChoiceFilter: (m: string) => void;
-  searchQuery: string;
-  setSearchQuery: (s: string) => void;
   viewMode?: string;
   sortBy?: string;
   onSelectSortBy?: (s: string) => void;
@@ -35,8 +33,6 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
   setDateFilter,
   marketChoiceFilter,
   setMarketChoiceFilter,
-  searchQuery,
-  setSearchQuery,
   sortBy,
   onSelectSortBy,
   setIsLeagueModalOpen,
@@ -174,18 +170,6 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             </option>
           ))}
         </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">Search Team</label>
-        <Input
-          type="text"
-          placeholder="Find team (e.g., Arsenal, Real Madrid)..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onClear={() => setSearchQuery('')}
-          leftIcon={<Search className="w-4 h-4" />}
-        />
       </div>
     </Modal>
   );

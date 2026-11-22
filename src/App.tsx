@@ -840,6 +840,8 @@ export default function App() {
       <Header
         activeTab={activeTab}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
 
       {/* Main Workspace with Desktop Sidebar & Viewport */}

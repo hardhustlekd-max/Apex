@@ -1299,7 +1299,7 @@ export class PredictionsDB {
       let finalAwayScore: number | null = null;
       let matchStatus = String(item.status || 'SCHEDULED').toUpperCase();
 
-      // Priority 1: Was a valid finished score already present in the uploaded file?
+      // Priority 1: Was a valid score already present in the uploaded file?
       const itemHomeScore = item.homeScore !== undefined ? item.homeScore : item.home_score;
       const itemAwayScore = item.awayScore !== undefined ? item.awayScore : item.away_score;
       if (
@@ -1307,7 +1307,8 @@ export class PredictionsDB {
         itemHomeScore !== undefined &&
         itemAwayScore !== null &&
         itemAwayScore !== undefined &&
-        (matchStatus === 'FINISHED' || item.matchState === 'completed' || item.kickOffTime === 'FT')
+        !isNaN(Number(itemHomeScore)) &&
+        !isNaN(Number(itemAwayScore))
       ) {
         finalHomeScore = Number(itemHomeScore);
         finalAwayScore = Number(itemAwayScore);

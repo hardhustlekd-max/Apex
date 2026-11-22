@@ -1,9 +1,11 @@
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Search, X } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS';
   onOpenSettings: () => void;
+  searchQuery?: string;
+  setSearchQuery?: (s: string) => void;
 }
 
 const TAB_TITLES: Record<HeaderProps['activeTab'], string> = {
@@ -17,27 +19,52 @@ const TAB_TITLES: Record<HeaderProps['activeTab'], string> = {
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onOpenSettings,
+  searchQuery = '',
+  setSearchQuery,
 }) => {
   return (
-    <header className="sticky top-0 z-30 h-[36px] bg-theme-glass border-b border-theme transition-colors shadow-theme-sm font-sans">
-      <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-4 flex items-center justify-between gap-2.5">
+    <header className="sticky top-0 z-30 h-[42px] bg-theme-glass border-b border-theme transition-colors shadow-theme-sm font-sans">
+      <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
         {/* Zone 1: Brand Title */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 shrink-0">
           <div className="w-[22px] h-[22px] rounded-lg bg-theme-primary text-theme-primary-text flex items-center justify-center font-bold text-sm shrink-0 shadow-theme-glow">
             A
           </div>
-          <span className="font-bold text-lg tracking-[-0.015em] text-theme-main whitespace-nowrap truncate">
+          <span className="font-bold text-base tracking-[-0.015em] text-theme-main whitespace-nowrap truncate hidden sm:inline">
             Apex Live Score
           </span>
         </div>
 
-        {/* Zone 2: Center Context Title */}
-        <div className="hidden sm:flex items-center font-medium text-base text-theme-sub select-none whitespace-nowrap">
-          <span>{TAB_TITLES[activeTab]}</span>
+        {/* Zone 2: Search Input in Top Navbar */}
+        <div className="flex-1 max-w-[260px] sm:max-w-[340px] mx-2">
+          <div className="relative flex items-center">
+            <Search className="absolute left-2.5 w-3.5 h-3.5 text-theme-sub pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search team (e.g. Arsenal)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery?.(e.target.value)}
+              className="w-full h-[30px] pl-8 pr-7 bg-theme-card border border-theme rounded-xl text-xs text-theme-main placeholder-theme-sub focus:outline-none focus:ring-2 focus:ring-theme-accent transition-all shadow-theme-sm"
+            />
+            {searchQuery && searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery?.('')}
+                className="absolute right-2 w-4 h-4 rounded-md text-theme-sub hover:text-theme-main flex items-center justify-center cursor-pointer"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Zone 3: Primary Action (Settings) */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs font-medium text-theme-sub hidden md:inline truncate max-w-[120px]">
+            {TAB_TITLES[activeTab]}
+          </span>
           <button
             id="open-settings-modal-btn"
             type="button"

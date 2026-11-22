@@ -417,20 +417,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               onClick={() => handleSelectDateFilter(cd.filterKey)}
               aria-pressed={isSelected || isInRange}
               title={cd.fullLabel}
-              className={`w-full max-w-[40px] h-[38px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl ${
-                isSelected
-                  ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
-                  : isInRange
-                  ? 'bg-theme-primary-subtle text-theme-primary'
-                  : 'text-theme-main hover:bg-theme-card hover:text-theme-primary'
-              }`}
+              className={`w-full max-w-[40px] h-[38px] flex flex-col items-center justify-center transition-all duration-150 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent rounded-xl bg-transparent hover:bg-theme-card/50`}
             >
               <span
                 className={`text-base font-semibold tabular-nums leading-none tracking-[-0.01em] ${
-                  isSelected
-                    ? 'text-theme-primary-text'
-                    : isInRange
-                    ? 'text-theme-primary'
+                  isSelected || isInRange
+                    ? 'text-theme-primary font-bold'
                     : 'text-theme-main'
                 }`}
               >
@@ -438,10 +430,8 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               </span>
               <span
                 className={`text-2xs font-medium leading-none mt-1 ${
-                  isSelected
-                    ? 'text-theme-primary-text'
-                    : isInRange
-                    ? 'text-theme-primary'
+                  isSelected || isInRange
+                    ? 'text-theme-primary font-semibold'
                     : 'text-theme-sub'
                 }`}
               >
@@ -496,8 +486,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           setDateFilter={handleSelectDateFilter}
           marketChoiceFilter={marketChoiceFilter}
           setMarketChoiceFilter={setMarketChoiceFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
           viewMode={viewMode}
           sortBy={sortBy}
           onSelectSortBy={onSelectSortBy}
