@@ -629,8 +629,12 @@ export class ApexEngine {
   } {
     const venueHome = homeProfile.strengthRating * (homeProfile.venueModifier || 1.0);
     const venueAway = awayProfile.strengthRating * (awayProfile.venueModifier || 1.0);
-    const homeBonus = (homeAdvantageSetting - 1.0) * 32; // ~+3.8 pts for 1.12 home advantage
-    const strengthDifference = Number((venueHome + homeBonus - venueAway).toFixed(1));
+    const rawDiff = homeProfile.strengthRating - awayProfile.strengthRating;
+    const dynamicHomeBonus = Math.max(
+      0.8,
+      Math.min(5.0, (homeAdvantageSetting - 1.0) * 32 * (1 / (1 + Math.exp(-(rawDiff + 8) / 16))))
+    );
+    const strengthDifference = Number((venueHome + dynamicHomeBonus - venueAway).toFixed(1));
 
     // Empirical football draw parity curve peaked at parity (27.5%)
     const drawExpectancy = Number((0.275 * Math.exp(-Math.pow(strengthDifference / 42, 2))).toFixed(4));
@@ -1371,7 +1375,11 @@ export class ApexEngine {
       awayElo = this.getTeamElo(awayTeam, eloRatingsMap);
     }
 
-    const homeAdvantageElo = 55;
+    const eloDiffRaw = homeElo - awayElo;
+    // Dynamic Home Advantage scaled by Elo gap:
+    // When homeElo < awayElo (e.g. visiting top-flight favorite), home advantage dampens down towards 15
+    // When homeElo >= awayElo, home advantage is full (up to 60)
+    const homeAdvantageElo = Math.max(15, Math.min(60, Math.round(50 + eloDiffRaw * 0.08)));
     const eloExpectancy = this.getEloWinExpectancy(homeElo, awayElo, homeAdvantageElo);
 
     const rollingWindow = settings?.rollingMatchWindow || 15;
@@ -1523,9 +1531,9 @@ export class ApexEngine {
       ? realScrapedH2H!
       : this.computeHeadToHead(homeTeam, awayTeam, historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches);
 
-    // Compute recency-weighted H2H multipliers so 20-year-old games don't dilute recent domination
-    let h2hMultiplierHome = h2h.h2hMultiplierHome ?? 1.0;
-    let h2hMultiplierAway = h2h.h2hMultiplierAway ?? 1.0;
+    // Compute recency-weighted H2H multipliers capped strictly at [0.94, 1.06] (±6% max)
+    let h2hMultiplierHome = Math.max(0.94, Math.min(1.06, h2h.h2hMultiplierHome ?? 1.0));
+    let h2hMultiplierAway = Math.max(0.94, Math.min(1.06, h2h.h2hMultiplierAway ?? 1.0));
     if (h2h.recentH2H && h2h.recentH2H.length > 0) {
       const nowMs = Date.now();
       let wDiff = 0;
@@ -1549,9 +1557,10 @@ export class ApexEngine {
         wTot += wt;
       }
       if (wTot > 0) {
-        const swing = (wDiff / wTot) * 0.14 + (wGoals / wTot) * 0.05;
-        h2hMultiplierHome = Number(Math.max(0.80, Math.min(1.25, 1.0 + swing)).toFixed(3));
-        h2hMultiplierAway = Number(Math.max(0.80, Math.min(1.25, 1.0 - swing)).toFixed(3));
+        // Capped to ±6% max swing to prevent historical anomalies from overpowering current team quality
+        const swing = (wDiff / wTot) * 0.04 + (wGoals / wTot) * 0.02;
+        h2hMultiplierHome = Number(Math.max(0.94, Math.min(1.06, 1.0 + swing)).toFixed(3));
+        h2hMultiplierAway = Number(Math.max(0.94, Math.min(1.06, 1.0 - swing)).toFixed(3));
         if (h2hMultiplierHome !== h2h.h2hMultiplierHome || h2hMultiplierAway !== h2h.h2hMultiplierAway) {
           h2h = { ...h2h, h2hMultiplierHome, h2hMultiplierAway };
         }
@@ -1597,11 +1606,13 @@ export class ApexEngine {
     const eloMultiplierHome = Math.max(0.65, Math.min(1.55, Math.pow(10, eloPureDiff / 1300)));
     const eloMultiplierAway = Math.max(0.65, Math.min(1.55, Math.pow(10, -eloPureDiff / 1300)));
 
-    // Single, non-compounded home advantage & subtle venue modifier
+    // Dynamic venue scaling based on Elo differential
     const baseHomeAdvantage = settings?.homeAdvantageFactor || 1.12;
     const venueRatio = Math.sqrt((homeCSF.venueModifier || 1.0) / Math.max(0.85, awayCSF.venueModifier || 1.0));
-    const effectiveHomeAdvantage = Number(Math.max(1.03, Math.min(1.22, baseHomeAdvantage * venueRatio)).toFixed(3));
-    const effectiveAwayBaseline = 0.96;
+    const eloAdvantageScale = 1.0 / (1.0 + Math.exp(-(eloPureDiff + 50) / 120));
+    const dynamicHomeAdvantageFactor = 1.01 + (baseHomeAdvantage - 0.99) * Math.max(0.18, Math.min(1.15, eloAdvantageScale * 1.35));
+    const effectiveHomeAdvantage = Number(Math.max(1.02, Math.min(1.22, dynamicHomeAdvantageFactor * venueRatio)).toFixed(3));
+    const effectiveAwayBaseline = Number(Math.max(0.94, Math.min(1.04, 0.96 + (awayElo > homeElo ? Math.min(0.06, (awayElo - homeElo) / 2000) : 0))).toFixed(3));
 
     const preStandingsHomeLambda =
       leagueHomeAvg *
@@ -1630,7 +1641,7 @@ export class ApexEngine {
     if (homeSnap && homeGroupAvg > 0) {
       attackAnchorHome = Number(Math.max(0.55, Math.min(1.85, homeSnap.gfPerGame / homeGroupAvg)).toFixed(3));
       defenseAnchorHome = Number(Math.max(0.55, Math.min(1.85, homeSnap.gaPerGame / homeGroupAvg)).toFixed(3));
-      const hTableBlend = 0.32 * homeSnap.reliabilityWeight;
+      const hTableBlend = 0.55 * homeSnap.reliabilityWeight;
       homeAttackPower = (1 - hTableBlend) * homeAttackPower + hTableBlend * attackAnchorHome;
       homeDefensePower = (1 - hTableBlend) * homeDefensePower + hTableBlend * defenseAnchorHome;
     }
@@ -1638,7 +1649,7 @@ export class ApexEngine {
     if (awaySnap && awayGroupAvg > 0) {
       attackAnchorAway = Number(Math.max(0.55, Math.min(1.85, awaySnap.gfPerGame / awayGroupAvg)).toFixed(3));
       defenseAnchorAway = Number(Math.max(0.55, Math.min(1.85, awaySnap.gaPerGame / awayGroupAvg)).toFixed(3));
-      const aTableBlend = 0.32 * awaySnap.reliabilityWeight;
+      const aTableBlend = 0.55 * awaySnap.reliabilityWeight;
       awayAttackPower = (1 - aTableBlend) * awayAttackPower + aTableBlend * attackAnchorAway;
       awayDefensePower = (1 - aTableBlend) * awayDefensePower + aTableBlend * defenseAnchorAway;
     }
@@ -1801,12 +1812,13 @@ export class ApexEngine {
     // Coherent blend: Dixon-Coles primary + Elo + CSF (raises CSF/Standings share when both teams have reliable table samples)
     const avgStandingsRel =
       homeSnap && awaySnap ? (homeSnap.reliabilityWeight + awaySnap.reliabilityWeight) / 2 : 0;
-    const csfWeight = avgStandingsRel >= 0.4 ? 0.10 : 0.06;
-    const dcWeight = 1.0 - 0.12 - csfWeight;
+    const csfWeight = avgStandingsRel >= 0.4 ? 0.18 : 0.10;
+    const eloWeight = 0.14;
+    const dcWeight = 1.0 - eloWeight - csfWeight;
 
-    let finalHomeWin = (dcWeight * homeWinProbRaw) + (0.12 * eloExpectancy.homeWinProb) + (csfWeight * csfExpectancy.homeWinExpectancy);
-    let finalDraw = (dcWeight * drawProbRaw) + (0.12 * eloExpectancy.drawProb) + (csfWeight * csfExpectancy.drawExpectancy);
-    let finalAwayWin = (dcWeight * awayWinProbRaw) + (0.12 * eloExpectancy.awayWinProb) + (csfWeight * csfExpectancy.awayWinExpectancy);
+    let finalHomeWin = (dcWeight * homeWinProbRaw) + (eloWeight * eloExpectancy.homeWinProb) + (csfWeight * csfExpectancy.homeWinExpectancy);
+    let finalDraw = (dcWeight * drawProbRaw) + (eloWeight * eloExpectancy.drawProb) + (csfWeight * csfExpectancy.drawExpectancy);
+    let finalAwayWin = (dcWeight * awayWinProbRaw) + (eloWeight * eloExpectancy.awayWinProb) + (csfWeight * csfExpectancy.awayWinExpectancy);
 
     if (marketOddsWeight > 0) {
       const probBlend = marketOddsWeight * 0.5;
@@ -1825,6 +1837,36 @@ export class ApexEngine {
     finalHomeWin = calibrated1X2.homeWinProb;
     finalDraw = calibrated1X2.drawProb;
     finalAwayWin = calibrated1X2.awayWinProb;
+
+    // Structural Favorite Preservation Safeguard:
+    // Prevent venue or volatility calibration from inverting clear structural favorites (Elo difference > 150 or PPG gap > 0.50)
+    if ((awayElo - homeElo > 150) || (awaySnap && homeSnap && (awaySnap.ppg ?? 0) - (homeSnap.ppg ?? 0) > 0.50)) {
+      if (finalHomeWin >= finalAwayWin) {
+        const minGap = 0.05;
+        const adjustedAway = Math.max(finalAwayWin, finalHomeWin + minGap);
+        const diff = adjustedAway - finalAwayWin;
+        finalAwayWin = adjustedAway;
+        finalHomeWin = Math.max(0.12, finalHomeWin - diff * 0.7);
+        finalDraw = Math.max(0.18, finalDraw - diff * 0.3);
+        const norm = finalHomeWin + finalDraw + finalAwayWin;
+        finalHomeWin /= norm;
+        finalDraw /= norm;
+        finalAwayWin /= norm;
+      }
+    } else if ((homeElo - awayElo > 150) || (homeSnap && awaySnap && (homeSnap.ppg ?? 0) - (awaySnap.ppg ?? 0) > 0.50)) {
+      if (finalAwayWin >= finalHomeWin) {
+        const minGap = 0.05;
+        const adjustedHome = Math.max(finalHomeWin, finalAwayWin + minGap);
+        const diff = adjustedHome - finalHomeWin;
+        finalHomeWin = adjustedHome;
+        finalAwayWin = Math.max(0.12, finalAwayWin - diff * 0.7);
+        finalDraw = Math.max(0.18, finalDraw - diff * 0.3);
+        const norm = finalHomeWin + finalDraw + finalAwayWin;
+        finalHomeWin /= norm;
+        finalDraw /= norm;
+        finalAwayWin /= norm;
+      }
+    }
 
     // Point D: Competition-variance Monte Carlo Match Simulation (sigma = sigma_base * V_L)
     const sigmaBase = settings?.monteCarloSigmaBase ?? 0.22;
@@ -2502,9 +2544,9 @@ export class ApexEngine {
     let h2hMultiplierAway = 1.0;
 
     if (matchesCount > 0 && weightTotal > 0) {
-      const swing = (weightedWinDiff / weightTotal) * 0.14 + (weightedGoalDiff / weightTotal) * 0.05;
-      h2hMultiplierHome = Number(Math.max(0.80, Math.min(1.25, 1.0 + swing)).toFixed(3));
-      h2hMultiplierAway = Number(Math.max(0.80, Math.min(1.25, 1.0 - swing)).toFixed(3));
+      const swing = (weightedWinDiff / weightTotal) * 0.04 + (weightedGoalDiff / weightTotal) * 0.02;
+      h2hMultiplierHome = Number(Math.max(0.94, Math.min(1.06, 1.0 + swing)).toFixed(3));
+      h2hMultiplierAway = Number(Math.max(0.94, Math.min(1.06, 1.0 - swing)).toFixed(3));
     }
 
     return {
