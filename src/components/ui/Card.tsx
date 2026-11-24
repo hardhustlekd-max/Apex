@@ -18,9 +18,9 @@ const SURFACE_CLASSES: Record<CardSurface, string> = {
   elevated: 'bg-theme-card-elevated border border-theme shadow-theme-sm',
   subtle: 'bg-theme-subtle border border-theme-subdued',
   interactive:
-    'bg-theme-card border border-theme shadow-theme-sm hover:bg-theme-card-elevated hover:border-theme-accent hover:shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
+    'bg-theme-card border border-theme shadow-theme-sm hover:-translate-y-0.5 hover:bg-theme-card-elevated hover:border-theme-accent hover:shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:translate-y-0 transition-all duration-200 ease-out',
   selected:
-    'bg-theme-card-elevated border border-theme-accent shadow-theme-glow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent',
+    'bg-theme-card-elevated border border-theme-accent shadow-theme-glow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all duration-200 ease-out',
 };
 
 const PADDING_CLASSES: Record<CardPadding, string> = {
