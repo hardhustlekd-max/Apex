@@ -163,7 +163,7 @@ export function getCodeForSlug(slug: string): string {
 }
 
 import { GLOBAL_LEAGUES_DATASET } from './globalLeaguesDataset.js';
-import { isKnownVolatileLeague } from './volatileLeagues.js';
+import { isKnownVolatileLeague } from './volatileLeagues';
 import { isSimulationLeague } from './simulationLeagues.js';
 
 export { isSimulationLeague };
