@@ -352,10 +352,6 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                           legStatus === 'WON' ||
                           legStatus === 'LOST';
                         const isMatchLive = !isMatchFinished && sel.matchStatus === 'LIVE';
-                        const isMatchVoid =
-                          sel.matchStatus === 'CANCELLED' ||
-                          sel.matchStatus === 'POSTPONED' ||
-                          legStatus === 'VOID';
                         const { dateStr, timeStr } = formatMatchDateTime(
                           sel.matchDate,
                           sel.kickOffTime,
@@ -370,8 +366,6 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 ? 'border-l-4 border-emerald-500 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]'
                                 : legStatus === 'LOST'
                                 ? 'border-l-4 border-rose-500 bg-rose-500/[0.04] hover:bg-rose-500/[0.08]'
-                                : legStatus === 'VOID'
-                                ? 'border-l-4 border-sky-500/60 bg-sky-500/[0.04] hover:bg-sky-500/[0.08]'
                                 : isMatchLive
                                 ? 'border-l-4 border-rose-500/70 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]'
                                 : 'border-l-4 border-amber-500/40 hover:bg-theme-card-elevated'
@@ -392,10 +386,10 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                   <span className="text-2xs font-semibold text-theme-dim uppercase">FT</span>
                                 )}
                                 {!isMatchLive && sel.matchStatus === 'CANCELLED' && (
-                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase">Cancelled</span>
+                                  <span className="text-2xs font-semibold text-amber-700 dark:text-amber-400 uppercase">Cancelled</span>
                                 )}
                                 {!isMatchLive && sel.matchStatus === 'POSTPONED' && (
-                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase">Postponed</span>
+                                  <span className="text-2xs font-semibold text-amber-700 dark:text-amber-400 uppercase">Postponed</span>
                                 )}
                               </div>
                               <div className="font-semibold text-theme-main truncate tracking-[-0.01em] mt-0.5">
@@ -407,44 +401,27 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                             </div>
                             <div className="shrink-0 flex items-center gap-3">
                               <div className="text-right">
-                                <span className={`font-bold text-base block ${legStatus === 'VOID' ? 'line-through text-theme-dim' : 'text-theme-main'}`}>
+                                <span className="font-bold text-base block text-theme-main">
                                   {sel.odds.toFixed(2)}
                                 </span>
-                                {legStatus === 'VOID' && (
-                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 block">
-                                    1.00x Void
-                                  </span>
-                                )}
                                 {hasScore ? (
                                   <span className={`text-xs font-semibold tabular-nums block mt-0.5 ${
                                     legStatus === 'WON'
                                       ? 'text-emerald-700 dark:text-emerald-400'
                                       : legStatus === 'LOST'
                                       ? 'text-rose-700 dark:text-rose-400'
-                                      : legStatus === 'VOID'
-                                      ? 'text-sky-700 dark:text-sky-400'
                                       : isMatchLive
                                       ? 'text-rose-700 dark:text-rose-400 font-bold'
                                       : 'text-theme-sub'
                                   }`}>
                                     {isMatchFinished
                                       ? 'FT'
-                                      : isMatchVoid
-                                      ? sel.matchStatus === 'CANCELLED'
-                                        ? 'CANC'
-                                        : sel.matchStatus === 'POSTPONED'
-                                        ? 'POSTP'
-                                        : 'VOID'
                                       : sel.minute
                                       ? `Live ${sel.minute}'`
                                       : isMatchLive
                                       ? 'Live'
                                       : 'Score'}{' '}
                                     {sel.score!.home} - {sel.score!.away}
-                                  </span>
-                                ) : isMatchVoid ? (
-                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase block mt-0.5">
-                                    {sel.matchStatus === 'CANCELLED' ? 'Cancelled' : sel.matchStatus === 'POSTPONED' ? 'Postponed' : 'Void'}
                                   </span>
                                 ) : isMatchLive ? (
                                   <span className="text-2xs font-bold text-rose-700 dark:text-rose-400 uppercase block mt-0.5">
@@ -466,10 +443,6 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                   <Badge variant="danger" size="xs">
                                     <XCircle className="w-3 h-3" />
                                     <span>Lost</span>
-                                  </Badge>
-                                ) : legStatus === 'VOID' ? (
-                                  <Badge variant="info" size="xs">
-                                    <span>Void</span>
                                   </Badge>
                                 ) : (
                                   <Badge variant="warning" size="xs">

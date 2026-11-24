@@ -258,8 +258,9 @@ export default function App() {
     }
   }, [liveScores, selectedDetailFixture?.id, selectedDetailFixture?.homeTeam, selectedDetailFixture?.awayTeam]);
 
-  const handleResetAndSyncData = async () => {
+  const handleResetAndSyncData = async (resetData?: boolean) => {
     if (isSyncingData || isCalculatingPredictions) return;
+    const shouldReset = resetData === true;
     syncAbortControllerRef.current?.abort();
     const controller = new AbortController();
     syncAbortControllerRef.current = controller;
@@ -271,7 +272,9 @@ export default function App() {
         status: 'RUNNING',
         jobType: 'FULL',
         progress: 5,
-        currentStep: 'Initializing Full Data Sync worker...',
+        currentStep: shouldReset
+          ? 'Resetting existing data & initializing Full Data Sync worker...'
+          : 'Initializing Full Data Sync worker...',
         stepIndex: 1,
         totalSteps: 8,
         matchesCount: 0,
@@ -282,13 +285,20 @@ export default function App() {
         startTime: Date.now(),
         lastUpdatedAt: Date.now(),
       });
-      showNotification('Starting Full Data Sync...', 'info');
+      showNotification(
+        shouldReset ? 'Resetting existing data and starting Full Data Sync...' : 'Starting Full Data Sync...',
+        'info'
+      );
 
-      const res = await EngineService.resetAndSyncDatabase((job) => {
-        if (!controller.signal.aborted) {
-          setActiveSyncJob(job);
-        }
-      }, controller.signal);
+      const res = await EngineService.resetAndSyncDatabase(
+        (job) => {
+          if (!controller.signal.aborted) {
+            setActiveSyncJob(job);
+          }
+        },
+        controller.signal,
+        { resetData: shouldReset }
+      );
 
       if (controller.signal.aborted || res.cancelled) {
         showNotification('Full Data Sync cancelled.', 'info');
@@ -333,8 +343,9 @@ export default function App() {
     }
   };
 
-  const handleCalculatePredictions = async () => {
+  const handleCalculatePredictions = async (resetData?: boolean) => {
     if (isSyncingData || isCalculatingPredictions) return;
+    const shouldReset = resetData === true;
     syncAbortControllerRef.current?.abort();
     const controller = new AbortController();
     syncAbortControllerRef.current = controller;
@@ -346,25 +357,34 @@ export default function App() {
         status: 'RUNNING',
         jobType: 'PREDICTIONS',
         progress: 10,
-        currentStep: 'Querying upcoming fixtures from SQLite database...',
+        currentStep: shouldReset
+          ? 'Clearing existing prediction data & querying upcoming fixtures...'
+          : 'Querying upcoming fixtures from SQLite database...',
         stepIndex: 1,
         totalSteps: 3,
         matchesCount: 0,
         skippedCount: 0,
         upcomingCount: (stats as any)?.upcomingCount ?? fixtures.length ?? 0,
-        predictionsCount: (stats as any)?.predictionsCount ?? 0,
+        predictionsCount: shouldReset ? 0 : (stats as any)?.predictionsCount ?? 0,
         historicalPredictionsCount: 0,
         livePredictionsCount: 0,
         startTime: Date.now(),
         lastUpdatedAt: Date.now(),
       });
-      showNotification('Starting Calculate Predictions...', 'info');
+      showNotification(
+        shouldReset ? 'Resetting prediction data and starting Calculate Predictions...' : 'Starting Calculate Predictions...',
+        'info'
+      );
 
-      const res = await EngineService.updateUpcomingPredictions((job) => {
-        if (!controller.signal.aborted) {
-          setActiveSyncJob(job);
-        }
-      }, controller.signal);
+      const res = await EngineService.updateUpcomingPredictions(
+        (job) => {
+          if (!controller.signal.aborted) {
+            setActiveSyncJob(job);
+          }
+        },
+        controller.signal,
+        { resetData: shouldReset }
+      );
 
       if (controller.signal.aborted || res.cancelled) {
         showNotification('Calculate Predictions cancelled.', 'info');

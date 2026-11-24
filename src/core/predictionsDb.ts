@@ -416,9 +416,9 @@ export class PredictionsDB {
 
   async clearPredictions(
     state: 'upcoming' | 'completed' | 'all' = 'upcoming',
-    origin?: 'fullsync' | 'update_predictions'
+    origin?: 'fullsync' | 'update_predictions' | 'reset_predictions'
   ): Promise<void> {
-    if (origin !== 'fullsync' && origin !== 'update_predictions') {
+    if (origin !== 'fullsync' && origin !== 'update_predictions' && origin !== 'reset_predictions') {
       console.warn(`[PredictionsDB] Blocked unauthorized clearPredictions call (state=${state}, origin=${String(origin || 'none')}).`);
       loggerService.addLog({
         level: 'WARN',
@@ -429,7 +429,7 @@ export class PredictionsDB {
       return;
     }
 
-    // Update Predictions must only recalculate upcoming predictions and never wipe completed historical records
+    // Update Predictions (without explicit reset) must only recalculate upcoming predictions and preserve completed records
     const effectiveState = origin === 'update_predictions' && state === 'all' ? 'upcoming' : state;
 
     try {
@@ -462,9 +462,12 @@ export class PredictionsDB {
     }
   }
 
-  async clearAll(origin?: 'fullsync' | 'update_predictions'): Promise<void> {
+  async clearAll(origin?: 'fullsync' | 'update_predictions' | 'reset_predictions'): Promise<void> {
     if (origin === 'fullsync') {
       return this.clearPredictions('all', 'fullsync');
+    }
+    if (origin === 'reset_predictions') {
+      return this.clearPredictions('all', 'reset_predictions');
     }
     if (origin === 'update_predictions') {
       return this.clearPredictions('upcoming', 'update_predictions');

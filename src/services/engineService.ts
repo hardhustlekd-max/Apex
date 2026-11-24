@@ -721,7 +721,8 @@ export class EngineService {
 
   public static async updateUpcomingPredictions(
     onProgress?: (job: any) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { resetData?: boolean }
   ): Promise<{
     success: boolean;
     count?: number;
@@ -733,12 +734,17 @@ export class EngineService {
     error?: string;
     cancelled?: boolean;
   }> {
+    const resetData = Boolean(options?.resetData);
+
     // Purge browser LocalStorage prediction cache as the first step
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('apex_cached_todays_fixtures');
         localStorage.removeItem('apex_cached_predictions');
         localStorage.removeItem('apex_cached_live_scores');
+      }
+      if (resetData) {
+        await ClientCache.clearDynamicData().catch(() => {});
       }
     } catch (cacheErr) {
       console.warn('[EngineService] Note clearing local browser cache before prediction update:', cacheErr);
@@ -747,6 +753,7 @@ export class EngineService {
     const startRes = await this.safeJsonFetch('/api/settings/update-predictions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resetData }),
       signal,
     });
 
@@ -854,7 +861,8 @@ export class EngineService {
 
   public static async resetAndSyncDatabase(
     onProgress?: (job: any) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { resetData?: boolean }
   ): Promise<{
     success: boolean;
     message: string;
@@ -866,11 +874,20 @@ export class EngineService {
     stats?: any;
     cancelled?: boolean;
   }> {
-    // 0. Purge local browser storage & IndexedDB
-    await this.clearClientStorage().catch(() => {});
+    const resetData = Boolean(options?.resetData);
 
-    // 1. Initiate async background sync job with merge & retain mode (resetDatabase: false, resetRawFeeds: false)
-    const startRes = await this.startSyncJob({ resetDatabase: false, resetRawFeeds: false }, signal);
+    // 0. Purge full client storage on explicit reset, or only dynamic query cache on merge sync
+    if (resetData) {
+      await this.clearClientStorage().catch(() => {});
+    } else {
+      await ClientCache.clearDynamicData().catch(() => {});
+    }
+
+    // 1. Initiate async background sync job respecting resetData choice
+    const startRes = await this.startSyncJob(
+      { resetDatabase: resetData, resetRawFeeds: resetData },
+      signal
+    );
 
     if (!startRes.success || !startRes.jobId) {
       return {

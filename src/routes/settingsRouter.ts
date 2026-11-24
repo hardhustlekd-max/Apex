@@ -262,7 +262,8 @@ settingsRouter.post('/update-predictions', async (req, res) => {
         error: 'SQLite database is switched off. Enable SQLite DB manually before calculating predictions.',
       });
     }
-    const job = syncJobService.startPredictionJob();
+    const resetData = Boolean(req.body?.resetData);
+    const job = syncJobService.startPredictionJob({ resetData });
     res.status(202).json({
       success: true,
       jobId: job.id,

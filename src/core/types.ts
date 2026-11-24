@@ -671,7 +671,7 @@ export interface BetSelection {
   matchDate?: string;
   kickOffTime?: string;
   timestamp?: number;
-  status?: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  status?: 'PENDING' | 'WON' | 'LOST';
   matchStatus?: 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'CANCELLED' | 'POSTPONED';
   minute?: number;
   score?: { home: number; away: number };

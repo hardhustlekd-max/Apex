@@ -396,6 +396,36 @@ export class FootballDB {
     }
   }
 
+  clearAllPredictionData(): void {
+    if (!isSqliteEnabled()) return;
+    try {
+      const clearTx = sqliteDb.transaction(() => {
+        sqliteDb.exec(`
+          UPDATE upcoming_fixtures
+          SET prediction_json = NULL,
+              markets_json = NULL,
+              best_value_market_json = NULL,
+              home_stats_json = NULL,
+              away_stats_json = NULL,
+              measurements_json = NULL
+        `);
+        sqliteDb.exec('DELETE FROM prediction_measurements_cache;');
+      });
+      clearTx();
+      checkpointSqliteWal('PASSIVE');
+      notifyDbMutation();
+
+      loggerService.addLog({
+        level: 'INFO',
+        category: 'DATABASE',
+        source: 'FootballDB',
+        message: 'Cleared existing upcoming prediction payloads and measurement cache prior to recalculation',
+      });
+    } catch (err: any) {
+      console.warn('[FootballDB] Notice clearing all prediction data:', err?.message);
+    }
+  }
+
   updateUpcomingFixtureStatuses(
     updates: Array<{ id: string; status: string; kickOffTime?: string; score?: { home: number; away: number } }>
   ): void {
@@ -2012,7 +2042,6 @@ export class FootballDB {
         home?: number;
         away?: number;
         isFinished: boolean;
-        isVoided?: boolean;
         matchStatus: 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'CANCELLED' | 'POSTPONED';
         minute?: number;
       };
@@ -2051,7 +2080,7 @@ export class FootballDB {
           for (const candidateKey of [k, clean, clean ? `fs_${clean}` : '']) {
             if (!candidateKey) continue;
             const prev = scoreMap.get(candidateKey);
-            if (!prev || (!prev.isFinished && (entry.isFinished || entry.isVoided || entry.matchStatus === 'LIVE')) || entry.isFinished) {
+            if (!prev || (!prev.isFinished && (entry.isFinished || entry.matchStatus === 'LIVE')) || entry.isFinished) {
               scoreMap.set(candidateKey, entry);
             }
           }
@@ -2070,7 +2099,7 @@ export class FootballDB {
           const existingIdx = bucket.findIndex((b) => Math.abs(b.dateMs - dateMs) <= 86_400_000);
           if (existingIdx >= 0) {
             const prev = bucket[existingIdx].entry;
-            if (!prev.isFinished && (entry.isFinished || entry.isVoided || entry.matchStatus === 'LIVE') || entry.isFinished) {
+            if (!prev.isFinished && (entry.isFinished || entry.matchStatus === 'LIVE') || entry.isFinished) {
               bucket[existingIdx] = { dateMs: dateMs || bucket[existingIdx].dateMs, entry };
             }
           } else {
@@ -2118,7 +2147,6 @@ export class FootballDB {
             home: hasScore ? Number(parsedScore!.home) : undefined,
             away: hasScore ? Number(parsedScore!.away) : undefined,
             isFinished: isFin,
-            isVoided: isCanc || isPostp,
             matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
           },
           r.home_team,
@@ -2158,7 +2186,6 @@ export class FootballDB {
             home: hasScore ? hScore : undefined,
             away: hasScore ? aScore : undefined,
             isFinished: isFin,
-            isVoided: isCanc || isPostp,
             matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
           },
           r.home_team,
@@ -2186,7 +2213,6 @@ export class FootballDB {
             home: hasScore ? Number(r.home_score) : undefined,
             away: hasScore ? Number(r.away_score) : undefined,
             isFinished: isFin,
-            isVoided: isCanc || isPostp,
             matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : isLive ? 'LIVE' : 'SCHEDULED',
           },
           r.home_name,
@@ -2214,7 +2240,6 @@ export class FootballDB {
                 home: hasScore ? Number(ls.homeScore) : existing?.home,
                 away: hasScore ? Number(ls.awayScore) : existing?.away,
                 isFinished: isFin,
-                isVoided: isCanc || isPostp,
                 matchStatus: isFin ? 'FINISHED' : isCanc ? 'CANCELLED' : isPostp ? 'POSTPONED' : 'LIVE',
                 minute: !isFin && !isCanc && !isPostp && typeof ls.minute === 'number' ? ls.minute : undefined,
               },
@@ -2260,7 +2285,7 @@ export class FootballDB {
         "UPDATE bets SET status = ?, total_odds = ?, potential_win = ?, selections_json = ?, evaluated_at = ? WHERE id = ?"
       );
 
-      const evaluateSelection = (sel: BetSelection, hs: number, as: number): 'WON' | 'LOST' | 'VOID' | null => {
+      const evaluateSelection = (sel: BetSelection, hs: number, as: number): 'WON' | 'LOST' | null => {
         if (isNaN(hs) || isNaN(as)) return null;
         const key = (sel.marketKey || '').toUpperCase().trim();
         const tot = hs + as;
@@ -2275,8 +2300,8 @@ export class FootballDB {
           case 'DOUBLE_CHANCE_1X': return hs >= as ? 'WON' : 'LOST';
           case 'DOUBLE_CHANCE_X2': return as >= hs ? 'WON' : 'LOST';
           case 'DOUBLE_CHANCE_12': return hs !== as ? 'WON' : 'LOST';
-          case 'DNB_HOME': return hs > as ? 'WON' : hs === as ? 'VOID' : 'LOST';
-          case 'DNB_AWAY': return as > hs ? 'WON' : hs === as ? 'VOID' : 'LOST';
+          case 'DNB_HOME': return hs > as ? 'WON' : 'LOST';
+          case 'DNB_AWAY': return as > hs ? 'WON' : 'LOST';
           case 'OVER_05': return tot >= 1 ? 'WON' : 'LOST';
           case 'UNDER_05': return tot === 0 ? 'WON' : 'LOST';
           case 'OVER_15': return tot >= 2 ? 'WON' : 'LOST';
@@ -2379,9 +2404,7 @@ export class FootballDB {
               } else if (sel.status === 'LOST') {
                 anyLost = true;
               }
-              if (sel.status !== 'VOID') {
-                effectiveTotalOdds *= Number(sel.odds) || 1;
-              }
+              effectiveTotalOdds *= Number(sel.odds) || 1;
               continue;
             }
 
@@ -2391,11 +2414,6 @@ export class FootballDB {
               sel.score = { home: scoreInfo.home, away: scoreInfo.away };
             }
 
-            if (scoreInfo.isVoided) {
-              sel.status = 'VOID';
-              continue;
-            }
-
             if (!scoreInfo.isFinished || typeof scoreInfo.home !== 'number' || typeof scoreInfo.away !== 'number') {
               if (!sel.status || sel.status === 'PENDING') {
                 sel.status = 'PENDING';
@@ -2403,9 +2421,7 @@ export class FootballDB {
               } else if (sel.status === 'LOST') {
                 anyLost = true;
               }
-              if (sel.status !== 'VOID') {
-                effectiveTotalOdds *= Number(sel.odds) || 1;
-              }
+              effectiveTotalOdds *= Number(sel.odds) || 1;
               continue;
             }
 
@@ -2417,16 +2433,11 @@ export class FootballDB {
               } else if (sel.status === 'LOST') {
                 anyLost = true;
               }
-              if (sel.status !== 'VOID') {
-                effectiveTotalOdds *= Number(sel.odds) || 1;
-              }
+              effectiveTotalOdds *= Number(sel.odds) || 1;
             } else if (res === 'LOST') {
               sel.status = 'LOST';
               anyLost = true;
               effectiveTotalOdds *= Number(sel.odds) || 1;
-            } else if (res === 'VOID') {
-              sel.status = 'VOID';
-              // Void leg settles at 1.00x multiplier
             } else {
               sel.status = 'WON';
               effectiveTotalOdds *= Number(sel.odds) || 1;

@@ -64,10 +64,10 @@ interface SettingsModalProps {
   settings: EngineSettings | null;
   providers: ProviderStatus[];
   onSaveSettings: (newSettings: Partial<EngineSettings>) => void;
-  onResetAndSync?: () => void | Promise<void>;
+  onResetAndSync?: (resetData?: boolean) => void | Promise<void>;
   isResettingAndSyncing?: boolean;
   isSyncingData?: boolean;
-  onCalculatePredictions?: () => void | Promise<void>;
+  onCalculatePredictions?: (resetData?: boolean) => void | Promise<void>;
   stats?: {
     totalMatches: number;
     totalTeams: number;
@@ -129,6 +129,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [resetFullSyncData, setResetFullSyncData] = useState<boolean>(false);
+  const [isConfirmingCalc, setIsConfirmingCalc] = useState(false);
+  const [resetCalcData, setResetCalcData] = useState<boolean>(false);
   const [storageStatus, setStorageStatus] = useState<any>(null);
   const [scraperStatus, setScraperStatus] = useState<any>(null);
   const [localStats, setLocalStats] = useState<any>(stats);
@@ -483,6 +486,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setIsConfirmingReset(false);
+      setResetFullSyncData(false);
+      setIsConfirmingCalc(false);
+      setResetCalcData(false);
       setPendingDriveConfirm(null);
     }
   }, [isOpen]);
@@ -504,17 +510,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen || !settings) return null;
 
   const handleExecuteResetAndSync = () => {
+    const shouldReset = resetFullSyncData;
     setIsConfirmingReset(false);
     onClose();
     if (onResetAndSync) {
-      onResetAndSync();
+      onResetAndSync(shouldReset);
     }
   };
 
   const handleCalculatePredictions = () => {
+    const shouldReset = resetCalcData;
+    setIsConfirmingCalc(false);
     onClose();
     if (onCalculatePredictions) {
-      onCalculatePredictions();
+      onCalculatePredictions(shouldReset);
     }
   };
 
@@ -1038,11 +1047,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Full Data Sync Card (no nested card) */}
             <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
-              <SectionHeader
-                title="Full Data Sync"
-                size="sm"
-                icon={<RefreshCw className="w-3.5 h-3.5" />}
-              />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <SectionHeader
+                  title="Full Data Sync"
+                  size="sm"
+                  icon={<RefreshCw className="w-3.5 h-3.5" />}
+                />
+                <Badge variant={resetFullSyncData ? 'warning' : 'default'} size="xs">
+                  {resetFullSyncData ? 'RESET & SYNC' : 'MERGE & RETAIN'}
+                </Badge>
+              </div>
 
               {(!isSqliteActive || !isScrapingActive) && (
                 <p className="text-xs text-theme-sub">
@@ -1054,6 +1068,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </p>
               )}
 
+              <label
+                htmlFor="full-sync-reset-data-checkbox"
+                className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer select-none ${
+                  resetFullSyncData
+                    ? 'bg-amber-500/10 border-amber-500/35'
+                    : 'bg-theme-card border-theme-subdued hover:border-theme'
+                } ${!isSqliteActive || !isScrapingActive || isOperating ? 'opacity-60 pointer-events-none' : ''}`}
+              >
+                <input
+                  id="full-sync-reset-data-checkbox"
+                  type="checkbox"
+                  checked={resetFullSyncData}
+                  onChange={(e) => setResetFullSyncData(e.target.checked)}
+                  disabled={!isSqliteActive || !isScrapingActive || isOperating}
+                  className="mt-0.5 h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
+                />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-semibold text-theme-main">
+                      Reset existing data before sync
+                    </span>
+                    {resetFullSyncData && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3 h-3" />
+                        Wipes DB &amp; cache
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xs text-theme-sub leading-relaxed">
+                    {resetFullSyncData
+                      ? 'Clears all synced matches, upcoming fixtures, standings, raw feeds, stored predictions, and browser cache before fetching fresh data.'
+                      : 'Retains existing historical matches, completed predictions, and cached feeds while merging newly scraped fixtures and results.'}
+                  </p>
+                </div>
+              </label>
+
               {!isConfirmingReset ? (
                 <Button
                   id="full-data-sync-btn"
@@ -1064,13 +1114,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   disabled={!isSqliteActive || !isScrapingActive || isOperating}
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>Full Data Sync</span>
+                  <span>{resetFullSyncData ? 'Reset & Full Data Sync' : 'Full Data Sync'}</span>
                 </Button>
               ) : (
                 <div className="pt-1 space-y-2">
                   <p className="text-sm font-semibold text-theme-main flex items-center gap-1.5">
-                    <RefreshCw className="w-3.5 h-3.5 text-theme-primary shrink-0" />
-                    <span>Confirm Full Data Sync?</span>
+                    {resetFullSyncData ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5 text-theme-primary shrink-0" />
+                    )}
+                    <span>
+                      {resetFullSyncData ? 'Confirm Reset & Full Data Sync?' : 'Confirm Full Data Sync?'}
+                    </span>
                   </p>
 
                   <div className="flex items-center gap-2">
@@ -1082,7 +1138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       disabled={isOperating}
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Confirm &amp; Start Sync</span>
+                      <span>{resetFullSyncData ? 'Reset & Start Sync' : 'Confirm & Start Sync'}</span>
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => setIsConfirmingReset(false)}>
                       Cancel
@@ -1097,29 +1153,103 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {activeTab === 'PREDICTIONS' && (
           <div className="space-y-3">
             {/* Action Card: Calculate Predictions */}
-            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-3">
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="Calculate Predictions"
                   size="sm"
                   icon={<TrendingUp className="w-3.5 h-3.5" />}
                 />
-                <span className="text-xs font-normal tabular-nums text-theme-sub">
-                  {storedPredictionsCount} stored · {localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'} upcoming
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-normal tabular-nums text-theme-sub">
+                    {storedPredictionsCount} stored · {localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'} upcoming
+                  </span>
+                  <Badge variant={resetCalcData ? 'warning' : 'default'} size="xs">
+                    {resetCalcData ? 'RESET & RECALC' : 'UPCOMING ONLY'}
+                  </Badge>
+                </div>
               </div>
 
-              <Button
-                id="update-upcoming-predictions-btn"
-                variant="primary"
-                size="md"
-                fullWidth
-                onClick={handleCalculatePredictions}
-                disabled={!isSqliteActive || isOperating}
+              <label
+                htmlFor="calc-predictions-reset-data-checkbox"
+                className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer select-none ${
+                  resetCalcData
+                    ? 'bg-amber-500/10 border-amber-500/35'
+                    : 'bg-theme-card border-theme-subdued hover:border-theme'
+                } ${!isSqliteActive || isOperating ? 'opacity-60 pointer-events-none' : ''}`}
               >
-                <RefreshCw className="w-4 h-4" />
-                <span>Calculate Predictions</span>
-              </Button>
+                <input
+                  id="calc-predictions-reset-data-checkbox"
+                  type="checkbox"
+                  checked={resetCalcData}
+                  onChange={(e) => setResetCalcData(e.target.checked)}
+                  disabled={!isSqliteActive || isOperating}
+                  className="mt-0.5 h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
+                />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-semibold text-theme-main">
+                      Reset existing prediction data
+                    </span>
+                    {resetCalcData && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3 h-3" />
+                        Clears stored predictions
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xs text-theme-sub leading-relaxed">
+                    {resetCalcData
+                      ? 'Wipes all stored upcoming and historical predictions, fixture market/stats caches, and H2H measurement matrices before recalculating.'
+                      : 'Preserves evaluated historical predictions and cached H2H measurements while recalculating upcoming fixtures.'}
+                  </p>
+                </div>
+              </label>
+
+              {!isConfirmingCalc ? (
+                <Button
+                  id="update-upcoming-predictions-btn"
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  onClick={() => setIsConfirmingCalc(true)}
+                  disabled={!isSqliteActive || isOperating}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>{resetCalcData ? 'Reset & Calculate Predictions' : 'Calculate Predictions'}</span>
+                </Button>
+              ) : (
+                <div className="pt-1 space-y-2">
+                  <p className="text-sm font-semibold text-theme-main flex items-center gap-1.5">
+                    {resetCalcData ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    ) : (
+                      <TrendingUp className="w-3.5 h-3.5 text-theme-primary shrink-0" />
+                    )}
+                    <span>
+                      {resetCalcData
+                        ? 'Confirm Reset & Calculate Predictions?'
+                        : 'Confirm Calculate Predictions?'}
+                    </span>
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={handleCalculatePredictions}
+                      disabled={!isSqliteActive || isOperating}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>{resetCalcData ? 'Reset & Calculate' : 'Confirm & Calculate'}</span>
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setIsConfirmingCalc(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
 
             {/* Dedicated Card: Volatile Competitions & High Parity Exclusions */}

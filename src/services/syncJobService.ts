@@ -274,7 +274,7 @@ export class SyncJobService {
     return job;
   }
 
-  public startPredictionJob(): SyncJobState {
+  public startPredictionJob(options?: { resetData?: boolean }): SyncJobState {
     if (!isSqliteEnabled()) {
       throw new Error('SQLite database is switched off. Enable SQLite DB manually before calculating predictions.');
     }
@@ -286,13 +286,16 @@ export class SyncJobService {
       throw new Error(`Another background process (${existing.jobType}) is currently running. Wait for completion or cancel it first.`);
     }
 
+    const opts = { resetData: Boolean(options?.resetData) };
     const now = Date.now();
     const jobId = `pred_${now}_${Math.random().toString(36).substring(2, 7)}`;
     const job: SyncJobState = {
       id: jobId,
       status: 'RUNNING',
       progress: 5,
-      currentStep: 'Querying upcoming fixtures from SQLite database...',
+      currentStep: opts.resetData
+        ? 'Resetting existing prediction data and querying upcoming fixtures...'
+        : 'Querying upcoming fixtures from SQLite database...',
       stepIndex: 1,
       totalSteps: 3,
       matchesCount: 0,
@@ -311,7 +314,7 @@ export class SyncJobService {
     this.cleanOldJobs();
 
     setTimeout(() => {
-      this.executePredictionJob(jobId).catch((err) => {
+      this.executePredictionJob(jobId, opts).catch((err) => {
         console.error(`[SyncJobService] Uncaught error in prediction job ${jobId}:`, err);
       });
     }, 10);
@@ -683,7 +686,7 @@ export class SyncJobService {
     }
   }
 
-  private async executePredictionJob(jobId: string): Promise<void> {
+  private async executePredictionJob(jobId: string, options: { resetData: boolean } = { resetData: false }): Promise<void> {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
@@ -691,7 +694,7 @@ export class SyncJobService {
       level: 'INFO',
       category: 'PREDICTION',
       source: 'SyncJobService',
-      message: `Initiating pure database prediction update job ${jobId} (zero external scraper calls)`,
+      message: `Initiating pure database prediction update job ${jobId} (resetData=${options.resetData}, zero external scraper calls)`,
     });
 
     try {
@@ -709,6 +712,10 @@ export class SyncJobService {
       const totalCount = upcoming.length;
 
       if (totalCount === 0) {
+        if (options.resetData) {
+          await predictionsDb.clearPredictions('all', 'reset_predictions');
+          db.clearAllPredictionData();
+        }
         this.updateProgress(jobId, {
           status: 'COMPLETED',
           progress: 100,
@@ -717,7 +724,9 @@ export class SyncJobService {
           skippedCount: 0,
           upcomingCount: 0,
           predictionsCount: predictionsDb.count('all'),
-          message: 'No upcoming fixtures found in database to update.',
+          message: options.resetData
+            ? 'Existing prediction data reset; no upcoming fixtures found in database.'
+            : 'No upcoming fixtures found in database to update.',
           endTime: Date.now(),
         });
         return;
@@ -725,7 +734,7 @@ export class SyncJobService {
 
       if (this.isTerminated(jobId)) return;
 
-      // Step 2: Purge existing upcoming predictions (preserving completed historical predictions)
+      // Step 2: Either reset all prediction data & measurement caches or refresh upcoming predictions only
       this.updateProgress(jobId, {
         progress: 15,
         stepIndex: 2,
@@ -733,11 +742,23 @@ export class SyncJobService {
         upcomingCount: totalCount,
         matchesCount: 0,
         skippedCount: 0,
-        currentStep: `Refreshing ${totalCount} upcoming predictions in SQLite database...`,
+        currentStep: options.resetData
+          ? `Resetting all existing prediction data and caches before calculating ${totalCount} matches...`
+          : `Refreshing ${totalCount} upcoming predictions in SQLite database...`,
       });
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      await this.runStepWithTimeout(jobId, 'Purging upcoming predictions', 90_000, () =>
-        predictionsDb.clearPredictions('upcoming', 'update_predictions')
+      await this.runStepWithTimeout(
+        jobId,
+        options.resetData ? 'Resetting existing prediction data' : 'Purging upcoming predictions',
+        90_000,
+        async () => {
+          if (options.resetData) {
+            await predictionsDb.clearPredictions('all', 'reset_predictions');
+            db.clearAllPredictionData();
+          } else {
+            await predictionsDb.clearPredictions('upcoming', 'update_predictions');
+          }
+        }
       );
 
       if (this.isTerminated(jobId)) return;
