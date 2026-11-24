@@ -79,7 +79,7 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
               </span>
               <span>
                 Skipped (&lt;90% data):{' '}
-                <strong className="text-amber-500 font-semibold">{job?.skippedCount ?? 0}</strong>
+                <strong className="text-amber-700 dark:text-amber-400 font-semibold">{job?.skippedCount ?? 0}</strong>
               </span>
             </div>
           )}
@@ -91,7 +91,7 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
               variant="secondary"
               size="sm"
               onClick={() => onCancel(job?.id || '')}
-              className="hover:border-rose-500/40 hover:text-rose-500"
+              className="hover:border-rose-500/40 hover:text-rose-700 dark:hover:text-rose-400"
             >
               <XCircle className="w-3.5 h-3.5" />
               <span>Cancel Job</span>

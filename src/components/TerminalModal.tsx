@@ -142,7 +142,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
           <button
             type="button"
             onClick={handleClear}
-            className="w-[30px] h-[30px] rounded-full hover:bg-rose-500/15 hover:text-rose-500 text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[30px] h-[30px] rounded-full hover:bg-rose-500/15 hover:text-rose-600 dark:hover:text-rose-400 text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Clear Terminal"
             aria-label="Clear terminal logs"
           >
@@ -165,7 +165,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
         <div
           role="tablist"
           aria-label="Log category filter"
-          className="flex items-center gap-0.5 h-[30px] min-h-[30px] p-[3px] rounded-xl bg-theme-card border border-theme overflow-x-auto no-scrollbar max-w-full"
+          className="flex items-center gap-0.5 h-[30px] min-h-[30px] p-[3px] rounded-full bg-theme-card border border-theme overflow-x-auto no-scrollbar max-w-full"
         >
           {['ALL', 'DATABASE', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
             <button
@@ -174,7 +174,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
               role="tab"
               aria-selected={selectedCategory === cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`h-full px-2.5 rounded-lg text-sm transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+              className={`h-full px-3 rounded-full text-sm transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                 selectedCategory === cat
                   ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
                   : 'text-theme-sub font-medium hover:text-theme-main hover:bg-theme-subtle'
@@ -237,10 +237,10 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
             Success <strong className="text-theme-success font-semibold">{stats.successes}</strong>
           </span>
           <span>
-            Warnings <strong className="text-amber-500 font-semibold">{stats.warnings}</strong>
+            Warnings <strong className="text-theme-warning font-semibold">{stats.warnings}</strong>
           </span>
           <span>
-            Errors <strong className={`font-semibold ${stats.errors > 0 ? 'text-rose-500' : 'text-theme-sub'}`}>{stats.errors}</strong>
+            Errors <strong className={`font-semibold ${stats.errors > 0 ? 'text-theme-danger' : 'text-theme-sub'}`}>{stats.errors}</strong>
           </span>
         </div>
         <label className="h-[24px] inline-flex items-center gap-1.5 cursor-pointer text-theme-sub hover:text-theme-main select-none font-medium">
@@ -257,7 +257,8 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       {/* Terminal Console Output */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto divide-y divide-white/[0.06] bg-[#060a10] select-text min-h-[195px] max-h-[46vh]"
+        data-theme="dark"
+        className="dark flex-1 overflow-y-auto divide-y divide-white/[0.06] bg-[#060a10] select-text min-h-[195px] max-h-[46vh]"
       >
         {filteredLogs.length === 0 ? (
           <div className="py-10 text-center text-zinc-500 text-sm">

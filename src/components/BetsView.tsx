@@ -136,7 +136,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
             icon={<Ticket className="w-4 h-4" />}
             size="md"
           />
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
             <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isLiveSyncing ? 'animate-ping' : 'animate-pulse'}`} />
             <span>Live Polling</span>
           </span>
@@ -168,11 +168,11 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
         </div>
         <div className="bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm flex flex-col justify-between">
           <span className="text-2xs font-medium uppercase tracking-[0.06em] text-theme-sub">Pending</span>
-          <span className="text-xl font-bold text-amber-500 tabular-nums mt-1">{stats.pending}</span>
+          <span className="text-xl font-bold text-amber-700 dark:text-amber-400 tabular-nums mt-1">{stats.pending}</span>
         </div>
         <div className="bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm flex flex-col justify-between">
           <span className="text-2xs font-medium uppercase tracking-[0.06em] text-theme-sub">Won</span>
-          <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-1">{stats.won}</span>
+          <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400 tabular-nums mt-1">{stats.won}</span>
         </div>
         <div className="bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm flex flex-col justify-between">
           <span className="text-2xs font-medium uppercase tracking-[0.06em] text-theme-sub">Total Staked</span>
@@ -184,13 +184,13 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-theme-subtle border border-theme-subdued rounded-xl w-fit">
+      <div className="flex items-center gap-1 p-[3px] bg-theme-subtle border border-theme-subdued rounded-full w-fit">
         {(['ALL', 'PENDING', 'WON', 'LOST'] as const).map((st) => (
           <button
             key={st}
             type="button"
             onClick={() => setFilterStatus(st)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors cursor-pointer whitespace-nowrap ${
               filterStatus === st
                 ? 'bg-theme-primary text-theme-primary-text border border-theme-neon shadow-theme-glow'
                 : 'text-theme-sub hover:text-theme-main'
@@ -264,11 +264,11 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                         <span className="text-xs font-mono font-bold text-theme-main">
                           #{bet.id.slice(-6).toUpperCase()}
                         </span>
-                        <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-theme-subtle text-theme-sub">
+                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-theme-subtle text-theme-sub">
                           {bet.selections.length} {bet.selections.length === 1 ? 'Match' : 'Matches'}
                         </span>
                         {liveLegCount > 0 && (
-                          <span className="inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                          <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                             <span>{liveLegCount} Live</span>
                           </span>
@@ -297,7 +297,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                     </div>
                     <div className="text-right">
                       <span className="text-2xs text-theme-dim uppercase block">Potential Win</span>
-                      <span className={`font-bold ${bet.status === 'WON' ? 'text-emerald-600 dark:text-emerald-400' : 'text-theme-main'}`}>
+                      <span className={`font-bold ${bet.status === 'WON' ? 'text-emerald-700 dark:text-emerald-400' : 'text-theme-main'}`}>
                         {bet.potentialWin.toFixed(2)} {bet.currency}
                       </span>
                     </div>
@@ -327,7 +327,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                         e.stopPropagation();
                         void handleDeleteBet(bet.id);
                       }}
-                      className="w-[28px] h-[28px] rounded-lg text-theme-dim hover:text-rose-500 hover:bg-theme-subtle flex items-center justify-center transition-colors cursor-pointer"
+                      className="w-[28px] h-[28px] rounded-full text-theme-dim hover:text-rose-600 dark:hover:text-rose-400 hover:bg-theme-subtle flex items-center justify-center transition-colors cursor-pointer"
                       title="Delete bet slip"
                       aria-label="Delete bet slip"
                     >
@@ -383,7 +383,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                 <span aria-hidden="true" className="text-theme-dim">·</span>
                                 <span className="text-theme-dim">{dateStr} {timeStr}</span>
                                 {isMatchLive && (
-                                  <span className="inline-flex items-center gap-1 text-2xs font-bold text-rose-500 dark:text-rose-400">
+                                  <span className="inline-flex items-center gap-1 text-2xs font-bold text-rose-700 dark:text-rose-400">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                     <span>{sel.minute ? `${sel.minute}'` : 'LIVE'}</span>
                                   </span>
@@ -392,10 +392,10 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                   <span className="text-2xs font-semibold text-theme-dim uppercase">FT</span>
                                 )}
                                 {!isMatchLive && sel.matchStatus === 'CANCELLED' && (
-                                  <span className="text-2xs font-semibold text-sky-500 uppercase">Cancelled</span>
+                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase">Cancelled</span>
                                 )}
                                 {!isMatchLive && sel.matchStatus === 'POSTPONED' && (
-                                  <span className="text-2xs font-semibold text-sky-500 uppercase">Postponed</span>
+                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase">Postponed</span>
                                 )}
                               </div>
                               <div className="font-semibold text-theme-main truncate tracking-[-0.01em] mt-0.5">
@@ -411,20 +411,20 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                   {sel.odds.toFixed(2)}
                                 </span>
                                 {legStatus === 'VOID' && (
-                                  <span className="text-2xs font-semibold text-sky-500 dark:text-sky-400 block">
+                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 block">
                                     1.00x Void
                                   </span>
                                 )}
                                 {hasScore ? (
                                   <span className={`text-xs font-semibold tabular-nums block mt-0.5 ${
                                     legStatus === 'WON'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      ? 'text-emerald-700 dark:text-emerald-400'
                                       : legStatus === 'LOST'
-                                      ? 'text-rose-500'
+                                      ? 'text-rose-700 dark:text-rose-400'
                                       : legStatus === 'VOID'
-                                      ? 'text-sky-500 dark:text-sky-400'
+                                      ? 'text-sky-700 dark:text-sky-400'
                                       : isMatchLive
-                                      ? 'text-rose-500 dark:text-rose-400 font-bold'
+                                      ? 'text-rose-700 dark:text-rose-400 font-bold'
                                       : 'text-theme-sub'
                                   }`}>
                                     {isMatchFinished
@@ -443,11 +443,11 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                                     {sel.score!.home} - {sel.score!.away}
                                   </span>
                                 ) : isMatchVoid ? (
-                                  <span className="text-2xs font-semibold text-sky-500 dark:text-sky-400 uppercase block mt-0.5">
+                                  <span className="text-2xs font-semibold text-sky-700 dark:text-sky-400 uppercase block mt-0.5">
                                     {sel.matchStatus === 'CANCELLED' ? 'Cancelled' : sel.matchStatus === 'POSTPONED' ? 'Postponed' : 'Void'}
                                   </span>
                                 ) : isMatchLive ? (
-                                  <span className="text-2xs font-bold text-rose-500 dark:text-rose-400 uppercase block mt-0.5">
+                                  <span className="text-2xs font-bold text-rose-700 dark:text-rose-400 uppercase block mt-0.5">
                                     {sel.minute ? `Live ${sel.minute}'` : 'Live'}
                                   </span>
                                 ) : (
@@ -503,7 +503,7 @@ export const BetsView: React.FC<BetsViewProps> = ({ refreshKey = 0 }) => {
                         <span
                           className={`font-bold text-base ${
                             bet.status === 'WON'
-                              ? 'text-emerald-600 dark:text-emerald-400'
+                              ? 'text-emerald-700 dark:text-emerald-400'
                               : 'text-theme-main'
                           }`}
                         >

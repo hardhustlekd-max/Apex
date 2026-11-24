@@ -21,9 +21,9 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
   return (
     <nav
       aria-label="Mobile navigation"
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)+8px)] left-2.5 right-2.5 z-40 lg:hidden bg-theme-glass border border-theme rounded-xl shadow-theme-md p-[3px] transition-all font-sans"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+8px)] left-2.5 right-2.5 z-40 lg:hidden bg-theme-glass border border-theme rounded-full shadow-theme-md p-1 transition-all font-sans"
     >
-      <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 w-full">
+      <div className="max-w-md mx-auto grid grid-cols-5 gap-1 w-full">
         {NAV_ITEMS.map(({ id, label, ariaLabel, icon: Icon }) => {
           const isActive = activeTab === id;
           return (
@@ -33,7 +33,7 @@ export const BottomNavDock: React.FC<BottomNavDockProps> = ({
               onClick={() => onSelectTab(id)}
               aria-current={isActive ? 'page' : undefined}
               aria-label={ariaLabel}
-              className={`h-[38px] rounded-lg flex flex-col items-center justify-center gap-0.5 px-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
+              className={`h-[38px] rounded-full flex flex-col items-center justify-center gap-0.5 px-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 ${
                 isActive
                   ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow font-semibold'
                   : 'text-theme-sub hover:text-theme-main font-medium'

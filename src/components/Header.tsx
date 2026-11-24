@@ -44,13 +44,13 @@ export const Header: React.FC<HeaderProps> = ({
               placeholder="Search team (e.g. Arsenal)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery?.(e.target.value)}
-              className="w-full h-[30px] pl-8 pr-7 bg-theme-card border border-theme rounded-xl text-xs text-theme-main placeholder-theme-sub focus:outline-none focus:ring-2 focus:ring-theme-accent transition-all shadow-theme-sm"
+              className="w-full h-[30px] pl-8 pr-7 bg-theme-card border border-theme rounded-xl text-xs text-theme-main placeholder:text-theme-dim focus:outline-none focus:ring-2 focus:ring-theme-accent transition-all shadow-theme-sm"
             />
             {searchQuery && searchQuery.length > 0 && (
               <button
                 type="button"
                 onClick={() => setSearchQuery?.('')}
-                className="absolute right-2 w-4 h-4 rounded-md text-theme-sub hover:text-theme-main flex items-center justify-center cursor-pointer"
+                className="absolute right-2 w-4 h-4 rounded-full text-theme-sub hover:text-theme-main flex items-center justify-center cursor-pointer"
                 title="Clear search"
                 aria-label="Clear search"
               >

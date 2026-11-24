@@ -584,6 +584,7 @@ export interface EngineSettings {
   formDecayRate: number; // 0.85
   autoSyncDaily: boolean;
   colorTheme?: 'opta-emerald' | 'champions-crimson' | 'ballon-gold' | 'volt-lime';
+  excludeVolatileLeagues?: boolean; // When true, filters out high-parity/chaotic leagues (E1, D2, Serie B, etc.)
   volatilityTemperatureAlpha?: number; // T = V_L ^ alpha (default 1.0, [0.5, 1.5])
   minEvBase?: number; // Baseline EV threshold before V_L scaling (default 0.03)
   kellyBaseFraction?: number; // Baseline fractional Kelly before 1/V_L scaling (default 0.25)
@@ -596,6 +597,7 @@ export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
   homeAdvantageFactor: 1.12,
   formDecayRate: 0.85,
   autoSyncDaily: true,
+  excludeVolatileLeagues: true,
   volatilityTemperatureAlpha: 1.0,
   minEvBase: 0.03,
   kellyBaseFraction: 0.25,

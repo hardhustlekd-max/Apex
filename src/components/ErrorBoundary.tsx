@@ -59,7 +59,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
             <div className="p-3.5 space-y-3">
               <div className="bg-theme-subtle rounded-xl p-3 text-sm text-theme-sub overflow-auto max-h-32 tabular-nums">
-                <p className="text-rose-500 dark:text-rose-400 font-medium mb-1">
+                <p className="text-rose-700 dark:text-rose-400 font-medium mb-1">
                   {this.state.error?.name || 'Error'}: {this.state.error?.message || 'Unknown render error'}
                 </p>
                 {this.state.errorInfo?.componentStack && (

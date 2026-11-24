@@ -60,7 +60,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onResetFilters}
-            className="h-[30px] inline-flex items-center text-xs font-medium text-rose-500 hover:bg-rose-500/10 cursor-pointer px-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="h-[30px] inline-flex items-center text-xs font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 cursor-pointer px-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Reset All
           </button>
@@ -84,7 +84,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
               setIsLeagueModalOpen(true);
               onClose();
             }}
-            className="text-xs font-medium text-theme-primary hover:underline cursor-pointer rounded-lg px-1.5 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="text-xs font-medium text-theme-primary hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Browse All Leagues...
           </button>
@@ -152,7 +152,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             <button
               type="button"
               onClick={() => onSelectSortBy?.('DEFAULT')}
-              className="text-xs font-medium text-rose-500 hover:underline cursor-pointer rounded-lg px-1.5 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="text-xs font-medium text-rose-700 dark:text-rose-400 hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               Reset Sort
             </button>

@@ -45,7 +45,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const radiusCls = pill || size === 'icon' ? 'rounded-full' : 'rounded-xl';
+  const radiusCls = 'rounded-full';
 
   return (
     <button

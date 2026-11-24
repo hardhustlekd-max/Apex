@@ -66,7 +66,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
   return (
     <aside
       aria-label="Bet slip builder tray"
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)+54px)] lg:bottom-4 right-3 lg:right-4 z-50 w-[calc(100vw-24px)] max-w-sm bg-theme-card border border-theme rounded-2xl shadow-theme-md overflow-hidden font-sans animate-in slide-in-from-bottom-4 duration-200"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+60px)] lg:bottom-4 right-3 lg:right-4 z-50 w-[calc(100vw-24px)] max-w-sm bg-theme-card border border-theme rounded-2xl shadow-theme-md overflow-hidden font-sans animate-in slide-in-from-bottom-4 duration-200"
     >
       {/* Header Bar */}
       <div
@@ -86,7 +86,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
           <span className="font-semibold text-sm text-theme-main">
             Bet Slip ({selections.length})
           </span>
-          <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-md bg-theme-primary/15 text-theme-primary">
+          <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-theme-primary/15 text-theme-primary">
             {selections.length > 1 ? `Combo (${selections.length}-Fold)` : 'Single'}
           </span>
         </div>
@@ -115,7 +115,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                       e.stopPropagation();
                       onRemoveSelection(sel.fixtureId);
                     }}
-                    className="text-theme-dim hover:text-rose-500 transition-colors p-1 cursor-pointer"
+                    className="text-theme-dim hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-1 cursor-pointer"
                     aria-label="Remove selection"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -147,7 +147,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   key={preset}
                   type="button"
                   onClick={() => setStake(String(preset))}
-                  className={`h-[26px] rounded-lg text-2xs font-semibold transition-colors cursor-pointer ${
+                  className={`h-[26px] rounded-full text-2xs font-semibold transition-colors cursor-pointer ${
                     numericStake === preset
                       ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
                       : 'bg-theme-subtle text-theme-sub hover:text-theme-main border border-theme-subdued'
@@ -160,7 +160,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
 
             <div className="flex items-center justify-between text-xs tabular-nums">
               <span className="text-theme-sub font-medium">Potential Payout:</span>
-              <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+              <span className="font-bold text-base text-emerald-700 dark:text-emerald-400">
                 {potentialWin.toFixed(2)} Birr
               </span>
             </div>

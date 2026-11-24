@@ -54,12 +54,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             </span>
             <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
             {fixture.status === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap shrink-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                 <span>{fixture.minute ? `${fixture.minute}'` : 'LIVE'}</span>
               </span>
             ) : fixture.status === 'FINISHED' ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap shrink-0">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap shrink-0">
                 FT
               </span>
             ) : (

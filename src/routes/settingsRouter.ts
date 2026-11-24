@@ -241,6 +241,7 @@ settingsRouter.put('/', (req, res) => {
     };
 
     db.saveSettings(newSettings);
+    fixturesWorkerService.invalidate();
 
     res.json({
       success: true,

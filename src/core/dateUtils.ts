@@ -300,7 +300,19 @@ export interface DateFilterOption {
 export type ResolvedDateFilter =
   | { kind: 'ALL'; canonicalKey: 'ALL' }
   | { kind: 'SINGLE'; canonicalKey: string; targetDate: string; dayIndex: number | null }
-  | { kind: 'RANGE'; canonicalKey: 'NEXT_3_DAYS' | 'THIS_WEEK'; startDate: string; endDate: string };
+  | {
+      kind: 'RANGE';
+      canonicalKey:
+        | 'NEXT_3_DAYS'
+        | 'THIS_WEEK'
+        | 'LAST_3_DAYS'
+        | 'LAST_7_DAYS'
+        | 'LAST_14_DAYS'
+        | 'LAST_30_DAYS'
+        | 'LAST_90_DAYS';
+      startDate: string;
+      endDate: string;
+    };
 
 const DAY_TWO_LETTER_MAP: Record<string, string> = {
   Sun: 'Su',

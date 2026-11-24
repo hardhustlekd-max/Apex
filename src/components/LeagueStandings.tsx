@@ -212,14 +212,14 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       return 'bg-theme-primary text-theme-primary-text shadow-theme-glow';
     }
     if (z.startsWith('p')) {
-      return 'bg-amber-500/15 text-amber-600 dark:text-amber-400';
+      return 'bg-amber-500/15 text-amber-800 dark:text-amber-300';
     }
     if (z.startsWith('r')) {
-      return 'bg-rose-500/15 text-rose-500 dark:text-rose-400';
+      return 'bg-rose-500/15 text-rose-700 dark:text-rose-400';
     }
     if (!zoneCode && totalRows >= 10) {
       if (rank <= 4) return 'bg-theme-primary text-theme-primary-text shadow-theme-glow';
-      if (rank > totalRows - 3) return 'bg-rose-500/15 text-rose-500 dark:text-rose-400';
+      if (rank > totalRows - 3) return 'bg-rose-500/15 text-rose-700 dark:text-rose-400';
     }
     return 'text-theme-sub font-medium';
   };
@@ -270,7 +270,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                   <td className="py-1 pl-2.5 pr-1 text-center tabular-nums text-xs">
                     <span
                       title={row.zoneLabel || undefined}
-                      className={`inline-flex items-center justify-center w-[20px] h-[20px] rounded-md text-2xs font-bold ${badgeCls}`}
+                      className={`inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-2xs font-bold ${badgeCls}`}
                     >
                       {row.rank}
                     </span>
@@ -287,7 +287,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                           className={`text-2xs font-bold shrink-0 ${
                             highlightRole === 'HOME'
                               ? 'text-theme-primary'
-                              : 'text-sky-500 dark:text-sky-400'
+                              : 'text-sky-700 dark:text-sky-400'
                           }`}
                         >
                           {highlightRole === 'HOME' ? 'H' : 'A'}
@@ -316,12 +316,12 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                           <span
                             key={idx}
                             aria-label={res === 'W' ? 'Win' : res === 'D' ? 'Draw' : 'Loss'}
-                            className={`w-[17px] h-[17px] rounded-[4px] inline-flex items-center justify-center text-2xs leading-none font-bold ${
+                            className={`w-[17px] h-[17px] rounded-full inline-flex items-center justify-center text-2xs leading-none font-bold ${
                               res === 'W'
                                 ? 'bg-theme-primary text-theme-primary-text'
                                 : res === 'D'
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-rose-500 text-white'
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-rose-600 text-white'
                             }`}
                           >
                             {res}

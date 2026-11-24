@@ -7,7 +7,7 @@ import { FixturesList } from './components/FixturesList.js';
 import { DailyFeaturedTip } from './components/DailyFeaturedTip.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
 import { PredictionHistoryView } from './components/PredictionHistoryView.js';
-import { MatchDetailModal, MatchDetailView } from './components/MatchDetailModal.js';
+import { MatchDetailDrawer, MatchDetailView } from './components/MatchDetailDrawer.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { TerminalModal } from './components/TerminalModal.js';
 import { ErrorLogModal } from './components/ErrorLogModal.js';
@@ -915,7 +915,7 @@ export default function App() {
                 <Card surface="elevated" padding="sm" radius="2xl" className="border-amber-500/35 bg-amber-500/5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="flex items-start gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
                         <Database className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
@@ -1067,10 +1067,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Match Detail Drawer Modal (only visible on mobile screens) */}
+      {/* Fullscreen Match Detail Page Drawer (mobile & tablet viewports) */}
       {isMobileDetailOpen && selectedDetailFixture && (
         <div className="lg:hidden">
-          <MatchDetailModal
+          <MatchDetailDrawer
             fixture={selectedDetailFixture}
             onClose={() => setIsMobileDetailOpen(false)}
             onAddSelection={handleToggleSelection}

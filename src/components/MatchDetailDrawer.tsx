@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { X, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
+import { motion } from 'motion/react';
+import { ArrowLeft, X, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -18,7 +19,7 @@ export interface MatchDetailViewProps {
   selectedSelections?: BetSelection[];
 }
 
-type ModalTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
+type DetailTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
 type MarketCategoryFilter = 'ALL' | '1X2_DC' | 'GOALS' | 'BTTS' | 'COMBOS' | 'TEAM' | 'SPECIALS';
 
 const MARKET_CATEGORY_TABS: Array<{ id: MarketCategoryFilter; label: string }> = [
@@ -56,7 +57,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   }
 
   return (
-    <MatchDetailModalContent
+    <MatchDetailDrawerContent
       fixture={safeFixture}
       onClose={onClose}
       isPanel={isPanel}
@@ -66,7 +67,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   );
 };
 
-export const MatchDetailModal: React.FC<{
+export const MatchDetailDrawer: React.FC<{
   fixture: Fixture | null;
   onClose: () => void;
   onAddSelection?: (selection: BetSelection) => void;
@@ -84,42 +85,43 @@ export const MatchDetailModal: React.FC<{
 
   useEffect(() => {
     if (!fixture) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [fixture, onClose]);
 
   const displayFixture = fixture || lastFixtureRef.current;
   if (!displayFixture) return null;
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-label={`${displayFixture.homeTeam} vs ${displayFixture.awayTeam} details`}
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-3 bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-200"
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed inset-0 z-[100] w-full h-[100dvh] bg-theme-card flex flex-col overflow-hidden pointer-events-auto"
     >
-      <div
-        className="absolute inset-0 cursor-pointer"
-        onClick={onClose}
-        aria-hidden="true"
+      <MatchDetailView
+        fixture={displayFixture}
+        onClose={onClose}
+        isPanel={false}
+        onAddSelection={onAddSelection}
+        selectedSelections={selectedSelections}
       />
-      <div className="relative w-full max-w-2xl h-[86vh] sm:h-[80vh] max-h-[680px] min-h-0 flex flex-col pointer-events-auto z-10 my-auto shadow-theme-md animate-in slide-in-from-bottom-4 duration-300">
-        <MatchDetailView
-          fixture={displayFixture}
-          onClose={onClose}
-          isPanel={false}
-          onAddSelection={onAddSelection}
-          selectedSelections={selectedSelections}
-        />
-      </div>
-    </div>
+    </motion.div>
   );
 };
 
-const MatchDetailModalContent: React.FC<{
+const MatchDetailDrawerContent: React.FC<{
   fixture: Fixture;
   onClose?: () => void;
   isPanel?: boolean;
@@ -151,7 +153,7 @@ const MatchDetailModalContent: React.FC<{
 
   const isSel = (marketKey: string) =>
     selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === marketKey);
-  const [activeTab, setActiveTab] = useState<ModalTab>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<DetailTab>('OVERVIEW');
   const [statFilterGroup] = useState<StatCategoryGroup>('ALL');
   const [predictionViewFilter, setPredictionViewFilter] = useState<'BEST' | 'COMBOS' | 'ALL'>('BEST');
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<MarketCategoryFilter>('ALL');
@@ -643,41 +645,50 @@ const MatchDetailModalContent: React.FC<{
   const bttsPct = pred ? getProbValue(pred.bttsProb, 1) : 0;
 
   const tabItems = [
-    { id: 'OVERVIEW' as ModalTab, label: 'Overview' },
-    { id: 'H2H' as ModalTab, label: 'H2H', count: h2h.matchesCount > 0 ? h2h.matchesCount : undefined },
+    { id: 'OVERVIEW' as DetailTab, label: 'Overview' },
+    { id: 'H2H' as DetailTab, label: 'H2H', count: h2h.matchesCount > 0 ? h2h.matchesCount : undefined },
     {
-      id: 'TEAMS' as ModalTab,
+      id: 'TEAMS' as DetailTab,
       label: 'Teams',
       count:
         homeRecentMatchesList.length + awayRecentMatchesList.length > 0
           ? homeRecentMatchesList.length + awayRecentMatchesList.length
           : undefined,
     },
-    { id: 'STANDINGS' as ModalTab, label: 'Table' },
+    { id: 'STANDINGS' as DetailTab, label: 'Table' },
     {
-      id: 'PREDICTIONS' as ModalTab,
+      id: 'PREDICTIONS' as DetailTab,
       label: 'Preds',
       count: bestMarketsPerGroup.length > 0 ? bestMarketsPerGroup.length : undefined,
     },
-    { id: 'TACTICS' as ModalTab, label: 'Tactics' },
+    { id: 'TACTICS' as DetailTab, label: 'Tactics' },
   ];
 
   const panelContainer = (
     <div
-      className={`bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full font-sans ${
-        isPanel ? '' : 'rounded-t-2xl sm:rounded-2xl border border-theme shadow-theme-md'
-      }`}
+      className="bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full font-sans"
       style={{ scrollbarGutter: 'stable' }}
     >
-      {/* Mobile Drag Handle Affordance */}
-      {!isPanel && (
-        <div className="w-8 h-1 bg-theme-dim/40 rounded-full mx-auto mt-1.5 mb-0.5 sm:hidden shrink-0 opacity-70" />
-      )}
-
       {/* Neon Gradient Header Band */}
-      <div className="bg-theme-header-grad border-b border-theme px-3 pt-1.5 pb-2 shrink-0">
-        <div className="min-h-[30px] flex items-center justify-between gap-2 min-w-0">
+      <div
+        className={`bg-theme-header-grad border-b border-theme px-3 sm:px-4 pb-2 shrink-0 ${
+          isPanel ? 'pt-1.5' : 'pt-[calc(env(safe-area-inset-top)+8px)]'
+        }`}
+      >
+        <div className={!isPanel ? 'max-w-4xl mx-auto w-full' : ''}>
+        <div className="min-h-[32px] flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-theme-sub">
+            {!isPanel && onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-[30px] h-[30px] -ml-1 rounded-full hover:bg-theme-subtle text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                aria-label="Back to matches"
+                title="Back"
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[2.25]" />
+              </button>
+            )}
             <span className="font-medium text-theme-main truncate whitespace-nowrap">
               {fixture.stage || fixture.leagueName}
             </span>
@@ -695,7 +706,7 @@ const MatchDetailModalContent: React.FC<{
               className="w-[28px] h-[28px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               {copiedKey === 'MATCHUP' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[2.25]" />
+                <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}
@@ -726,10 +737,10 @@ const MatchDetailModalContent: React.FC<{
                 onClick={() => void handleCopyText(fixture.homeTeam, 'HOME')}
                 title={`Copy ${fixture.homeTeam}`}
                 aria-label={`Copy ${fixture.homeTeam}`}
-                className="w-[20px] h-[20px] rounded-md text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[20px] h-[20px] rounded-full text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
                 {copiedKey === 'HOME' ? (
-                  <Check className="w-3 h-3 text-emerald-500 stroke-[2.25]" />
+                  <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
                 ) : (
                   <Copy className="w-3 h-3" />
                 )}
@@ -749,12 +760,12 @@ const MatchDetailModalContent: React.FC<{
               {(currentFixture.score || fixture.score) ? `${(currentFixture.score || fixture.score)!.home} - ${(currentFixture.score || fixture.score)!.away}` : 'VS'}
             </span>
             {(currentFixture.status || fixture.status) === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 mt-1 tabular-nums whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20 mt-1 tabular-nums whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                 <span>{(currentFixture.minute ?? fixture.minute) ? `${currentFixture.minute ?? fixture.minute}'` : 'LIVE'}</span>
               </span>
             ) : (currentFixture.status || fixture.status) === 'FINISHED' ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mt-1 tabular-nums whitespace-nowrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 mt-1 tabular-nums whitespace-nowrap">
                 FT
               </span>
             ) : (
@@ -775,17 +786,17 @@ const MatchDetailModalContent: React.FC<{
                 onClick={() => void handleCopyText(fixture.awayTeam, 'AWAY')}
                 title={`Copy ${fixture.awayTeam}`}
                 aria-label={`Copy ${fixture.awayTeam}`}
-                className="w-[20px] h-[20px] rounded-md text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-[20px] h-[20px] rounded-full text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
                 {copiedKey === 'AWAY' ? (
-                  <Check className="w-3 h-3 text-emerald-500 stroke-[2.25]" />
+                  <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
                 ) : (
                   <Copy className="w-3 h-3" />
                 )}
               </button>
             </div>
             {pred && (
-              <span className="text-xs font-semibold tabular-nums text-sky-500 dark:text-sky-400">
+              <span className="text-xs font-semibold tabular-nums text-sky-700 dark:text-sky-400">
                 {awayWinPct}%
               </span>
             )}
@@ -793,7 +804,7 @@ const MatchDetailModalContent: React.FC<{
         </div>
 
         <div className="mt-1.5">
-          <SegmentedTabs<ModalTab>
+          <SegmentedTabs<DetailTab>
             items={tabItems}
             value={activeTab}
             onChange={(val) => setActiveTab(val)}
@@ -803,10 +814,16 @@ const MatchDetailModalContent: React.FC<{
             ariaLabel="Match inspection tabs"
           />
         </div>
+        </div>
       </div>
 
       {/* Scrollable Content Body */}
-      <div className="p-3 overflow-y-auto overscroll-contain space-y-2.5 flex-1 min-h-0 min-w-0">
+      <div
+        className={`overflow-y-auto overscroll-contain flex-1 min-h-0 min-w-0 ${
+          isPanel ? 'p-3' : 'p-3 sm:p-4 pb-[calc(env(safe-area-inset-bottom)+20px)]'
+        }`}
+      >
+        <div className={!isPanel ? 'max-w-4xl mx-auto w-full space-y-2.5' : 'space-y-2.5'}>
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'OVERVIEW' && (
           <div className="space-y-2.5">
@@ -822,7 +839,7 @@ const MatchDetailModalContent: React.FC<{
                       <div className="font-semibold text-theme-main">
                         <span className="text-theme-primary">{pred?.homeXG ?? '-'}</span>
                         <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                        <span className="text-sky-500 dark:text-sky-400">{pred?.awayXG ?? '-'}</span>
+                        <span className="text-sky-700 dark:text-sky-400">{pred?.awayXG ?? '-'}</span>
                       </div>
                     </div>
 
@@ -832,7 +849,7 @@ const MatchDetailModalContent: React.FC<{
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.teamStrength.homeStrengthRating}</span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-500 dark:text-sky-400">{pred.teamStrength.awayStrengthRating}</span>
+                          <span className="text-sky-700 dark:text-sky-400">{pred.teamStrength.awayStrengthRating}</span>
                         </div>
                       </div>
                     ) : pred?.eloRatings ? (
@@ -841,7 +858,7 @@ const MatchDetailModalContent: React.FC<{
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.eloRatings.homeElo}</span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-500 dark:text-sky-400">{pred.eloRatings.awayElo}</span>
+                          <span className="text-sky-700 dark:text-sky-400">{pred.eloRatings.awayElo}</span>
                         </div>
                       </div>
                     ) : null}
@@ -858,7 +875,7 @@ const MatchDetailModalContent: React.FC<{
                               : '-'}
                           </span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-500 dark:text-sky-400">
+                          <span className="text-sky-700 dark:text-sky-400">
                             {pred.standingsContext.away
                               ? `#${pred.standingsContext.away.rank}/${pred.standingsContext.away.totalTeams} (${pred.standingsContext.away.ppg.toFixed(2)})`
                               : '-'}
@@ -902,7 +919,7 @@ const MatchDetailModalContent: React.FC<{
                             {pred.monteCarlo.homeGoalsP10.toFixed(2)}–{pred.monteCarlo.homeGoalsP90.toFixed(2)}
                           </span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-500 dark:text-sky-400">
+                          <span className="text-sky-700 dark:text-sky-400">
                             {pred.monteCarlo.awayGoalsP10.toFixed(2)}–{pred.monteCarlo.awayGoalsP90.toFixed(2)}
                           </span>
                         </div>
@@ -959,7 +976,7 @@ const MatchDetailModalContent: React.FC<{
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
-                        <span className="text-lg font-bold text-amber-500 block mt-0.5 tracking-[-0.015em]">
+                        <span className="text-lg font-bold text-amber-700 dark:text-amber-400 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
@@ -979,7 +996,7 @@ const MatchDetailModalContent: React.FC<{
                         }`}
                       >
                         <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
-                        <span className="text-lg font-bold text-sky-500 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
+                        <span className="text-lg font-bold text-sky-700 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
                           {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
                         </span>
                         <span className="text-xs font-normal text-theme-dim block">
@@ -1094,8 +1111,8 @@ const MatchDetailModalContent: React.FC<{
                       key: 'AWAY',
                       teamName: fixture.awayTeam,
                       info: awayStandingInfo,
-                      accentClass: 'text-sky-500 dark:text-sky-400',
-                      winBgClass: 'bg-sky-500 text-white',
+                      accentClass: 'text-sky-700 dark:text-sky-400',
+                      winBgClass: 'bg-sky-600 text-white',
                     },
                   ].map((side) => (
                     <div key={side.key} className="p-2.5 space-y-1.5 min-w-0">
@@ -1136,12 +1153,12 @@ const MatchDetailModalContent: React.FC<{
                                 {side.info.entry.form.slice(0, 5).map((r, idx) => (
                                   <span
                                     key={idx}
-                                    className={`w-[16px] h-[16px] rounded-[4px] inline-flex items-center justify-center text-2xs leading-none font-bold ${
+                                    className={`w-[16px] h-[16px] rounded-full inline-flex items-center justify-center text-2xs leading-none font-bold ${
                                       r === 'W'
                                         ? side.winBgClass
                                         : r === 'D'
-                                        ? 'bg-amber-500 text-white'
-                                        : 'bg-rose-500 text-white'
+                                        ? 'bg-amber-400 text-slate-950'
+                                        : 'bg-rose-600 text-white'
                                     }`}
                                   >
                                     {r}
@@ -1249,12 +1266,12 @@ const MatchDetailModalContent: React.FC<{
 
                         <div className="shrink-0">
                           <span
-                            className={`min-w-[38px] h-[21px] inline-flex items-center justify-center px-2 rounded-md text-xs font-bold leading-none ${
+                            className={`min-w-[38px] h-[21px] inline-flex items-center justify-center px-2 rounded-full text-xs font-bold leading-none ${
                               isHomeWinner
                                 ? 'bg-theme-primary-subtle text-theme-primary'
                                 : isAwayWinner
-                                ? 'bg-sky-500/15 text-sky-500 dark:text-sky-400'
-                                : 'bg-amber-500/15 text-amber-500 dark:text-amber-400'
+                                ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400'
+                                : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'
                             }`}
                           >
                             {enc.score}
@@ -1299,7 +1316,7 @@ const MatchDetailModalContent: React.FC<{
                 goalsConceded: awayGoalsConceded,
                 hasStats: Boolean(awayStats),
                 tone: 'info' as const,
-                winBgClass: 'bg-sky-500 text-white',
+                winBgClass: 'bg-sky-600 text-white',
               },
             ].map((side) => (
               <Card key={side.sideLabel} surface="elevated" padding="none" radius="2xl" className="overflow-hidden min-w-0">
@@ -1320,12 +1337,12 @@ const MatchDetailModalContent: React.FC<{
                       {side.recentForm.slice(0, 10).map((r, i) => (
                         <span
                           key={i}
-                          className={`w-[19px] h-[19px] rounded-md text-2xs leading-none font-bold flex items-center justify-center shrink-0 ${
+                          className={`w-[19px] h-[19px] rounded-full text-2xs leading-none font-bold flex items-center justify-center shrink-0 ${
                             r === 'W'
                               ? side.winBgClass
                               : r === 'D'
-                              ? 'bg-amber-500 text-white'
-                              : 'bg-rose-500 text-white'
+                              ? 'bg-amber-400 text-slate-950'
+                              : 'bg-rose-600 text-white'
                           }`}
                         >
                           {r}
@@ -1374,12 +1391,12 @@ const MatchDetailModalContent: React.FC<{
                               {m.goalsFor}-{m.goalsAgainst}
                             </span>
                             <span
-                              className={`w-[18px] h-[18px] rounded-md flex items-center justify-center text-2xs leading-none font-bold shrink-0 ${
+                              className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-2xs leading-none font-bold shrink-0 ${
                                 m.result === 'W'
                                   ? side.winBgClass
                                   : m.result === 'D'
-                                  ? 'bg-amber-500 text-white'
-                                  : 'bg-rose-500 text-white'
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : 'bg-rose-600 text-white'
                               }`}
                             >
                               {m.result}
@@ -1435,7 +1452,7 @@ const MatchDetailModalContent: React.FC<{
                             authOdds
                           )
                         }
-                        className={`h-[32px] px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent shrink-0 active:scale-95 ${
+                        className={`h-[32px] px-3.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent shrink-0 active:scale-95 ${
                           isAuthSelected
                             ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
                             : 'bg-theme-primary text-theme-primary-text hover:opacity-90 shadow-theme-sm'
@@ -1468,11 +1485,11 @@ const MatchDetailModalContent: React.FC<{
                 {allMarketsList.length > 0 && (() => {
                   const comboMarketsCount = allMarketsList.filter((m) => m.category === 'COMBOS').length;
                   return (
-                    <div className="flex items-center gap-1 p-0.5 bg-theme-subtle rounded-lg border border-theme-subdued text-xs font-medium">
+                    <div className="flex items-center gap-0.5 p-[3px] bg-theme-subtle rounded-full border border-theme-subdued text-xs font-medium">
                       <button
                         type="button"
                         onClick={() => setPredictionViewFilter('BEST')}
-                        className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
                           predictionViewFilter === 'BEST'
                             ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
                             : 'text-theme-sub hover:text-theme-main'
@@ -1484,7 +1501,7 @@ const MatchDetailModalContent: React.FC<{
                         <button
                           type="button"
                           onClick={() => setPredictionViewFilter('COMBOS')}
-                          className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
                             predictionViewFilter === 'COMBOS'
                               ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
                               : 'text-theme-sub hover:text-theme-main'
@@ -1496,7 +1513,7 @@ const MatchDetailModalContent: React.FC<{
                       <button
                         type="button"
                         onClick={() => setPredictionViewFilter('ALL')}
-                        className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
                           predictionViewFilter === 'ALL'
                             ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
                             : 'text-theme-sub hover:text-theme-main'
@@ -1522,7 +1539,7 @@ const MatchDetailModalContent: React.FC<{
                         key={cat.id}
                         type="button"
                         onClick={() => setMarketCategoryFilter(cat.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                           active
                             ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
                             : 'bg-theme-subtle text-theme-sub hover:text-theme-main'
@@ -1578,7 +1595,7 @@ const MatchDetailModalContent: React.FC<{
                                 {market.evEdge !== undefined && (
                                   <span
                                     className={`ml-1.5 font-medium ${
-                                      market.isPositiveEV ? 'text-emerald-500 dark:text-emerald-400' : 'text-theme-dim'
+                                      market.isPositiveEV ? 'text-emerald-700 dark:text-emerald-400' : 'text-theme-dim'
                                     }`}
                                   >
                                     · {market.evEdge >= 0 ? '+' : ''}
@@ -1600,7 +1617,7 @@ const MatchDetailModalContent: React.FC<{
                                     betOdds
                                   )
                                 }
-                                className={`h-[30px] px-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 shrink-0 ${
+                                className={`h-[30px] px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 shrink-0 ${
                                   isSelected
                                     ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
                                     : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'
@@ -1713,6 +1730,7 @@ const MatchDetailModalContent: React.FC<{
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   );

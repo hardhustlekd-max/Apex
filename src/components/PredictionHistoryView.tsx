@@ -15,8 +15,17 @@ import {
   Clock,
   X,
   AlertTriangle,
+  Calendar,
+  Percent,
+  Filter,
+  RotateCcw,
 } from 'lucide-react';
-import { normalizeDateStr, normalizeTimeStr } from '../core/dateUtils.js';
+import {
+  normalizeDateStr,
+  normalizeTimeStr,
+  getHistoryDateFilterOptions,
+  matchesDateFilter,
+} from '../core/dateUtils.js';
 import {
   Badge,
   Button,
@@ -149,6 +158,24 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
   </div>
 );
 
+export const PROB_RANGE_OPTIONS = [
+  { value: 'ALL', label: 'All Probabilities' },
+  { value: '75_PLUS', label: '≥ 75% High Confidence' },
+  { value: '65_75', label: '65% – 75% Moderate-High' },
+  { value: '55_65', label: '55% – 65% Balanced' },
+  { value: 'UNDER_55', label: '< 55% Low / Toss-up' },
+];
+
+export function matchesProbabilityRange(prob: number, range: string): boolean {
+  if (range === 'ALL') return true;
+  const normalized = prob > 1.0 ? prob / 100 : prob;
+  if (range === '75_PLUS') return normalized >= 0.75;
+  if (range === '65_75') return normalized >= 0.65 && normalized < 0.75;
+  if (range === '55_65') return normalized >= 0.55 && normalized < 0.65;
+  if (range === 'UNDER_55') return normalized < 0.55;
+  return true;
+}
+
 export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   isProcessingActive = false,
   onTriggerFullSync,
@@ -169,6 +196,10 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const [isSyncingHistory, setIsSyncingHistory] = useState<boolean>(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
   const [limit, setLimit] = useState<number>(50);
+
+  // Date and Probability Range filter states
+  const [dateFilter, setDateFilter] = useState<string>('ALL');
+  const [probFilter, setProbFilter] = useState<string>('ALL');
 
   // Import and evaluation states
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -469,15 +500,34 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     };
   };
 
-  const totalEvaluated = history.length;
-  const correctCount = history.reduce((acc, f) => acc + (evaluatePrediction(f).isCorrect ? 1 : 0), 0);
+  const filteredHistory = history.filter((f) => {
+    if (dateFilter !== 'ALL' && !matchesDateFilter(f, dateFilter)) return false;
+    const evalResult = evaluatePrediction(f);
+    if (probFilter !== 'ALL' && !matchesProbabilityRange(evalResult.topProb, probFilter)) return false;
+    return true;
+  });
+
+  const totalEvaluated = filteredHistory.length;
+  const correctCount = filteredHistory.reduce((acc, f) => acc + (evaluatePrediction(f).isCorrect ? 1 : 0), 0);
   const accuracyPct = totalEvaluated > 0 ? ((correctCount / totalEvaluated) * 100).toFixed(1) : '0.0';
 
   const filteredImportedMatches = importedEvaluation
     ? importedEvaluation.evaluated
         .filter((item) => {
-          if (importedFilter === 'ALL') return true;
-          return item.evaluationState === importedFilter;
+          if (importedFilter !== 'ALL' && item.evaluationState !== importedFilter) return false;
+          if (
+            dateFilter !== 'ALL' &&
+            !matchesDateFilter(
+              { matchDate: item.matchDate, kickOffTime: item.kickOffTime },
+              dateFilter
+            )
+          ) {
+            return false;
+          }
+          if (probFilter !== 'ALL' && !matchesProbabilityRange(item.tipProb, probFilter)) {
+            return false;
+          }
+          return true;
         })
         .sort((a, b) => {
           if (sortMode === 'PROB_DESC') {
@@ -489,6 +539,19 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           return b.matchDate.localeCompare(a.matchDate);
         })
     : [];
+
+  const importedEvaluatedCount = filteredImportedMatches.filter(
+    (i) => i.evaluationState === 'WON' || i.evaluationState === 'LOST'
+  ).length;
+  const importedWonCount = filteredImportedMatches.filter((i) => i.evaluationState === 'WON').length;
+  const importedLostCount = filteredImportedMatches.filter((i) => i.evaluationState === 'LOST').length;
+  const importedPendingCount = filteredImportedMatches.filter(
+    (i) => i.evaluationState === 'PENDING'
+  ).length;
+  const importedAccuracy =
+    importedEvaluatedCount > 0
+      ? ((importedWonCount / importedEvaluatedCount) * 100).toFixed(1)
+      : '0.0';
 
   if (isLoading && !importedEvaluation) {
     return <LoadingState label="Loading..." minHeight="min-h-[156px]" />;
@@ -525,16 +588,16 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       {importError && (
         <div
           role="alert"
-          className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/35 text-rose-600 dark:text-rose-400 text-sm font-medium flex items-center justify-between gap-2 shadow-theme-sm"
+          className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/35 text-rose-700 dark:text-rose-400 text-sm font-medium flex items-center justify-between gap-2 shadow-theme-sm"
         >
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
             <span>{importError}</span>
           </div>
           <button
             type="button"
             onClick={() => setImportError(null)}
-            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             aria-label="Dismiss error"
           >
             <X className="w-3.5 h-3.5" />
@@ -587,33 +650,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 <span>{isImporting ? 'Evaluating File...' : 'Import & Evaluate'}</span>
               </Button>
 
-              <Select
-                aria-label="History match limit"
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                surface="subtle"
-                selectSize="sm"
-                options={[
-                  { value: 30, label: '30 Matches' },
-                  { value: 50, label: '50 Matches' },
-                  { value: 100, label: '100 Matches' },
-                  { value: 200, label: '200 Matches' },
-                ]}
-              />
-
-              <Select
-                aria-label="Sort predictions"
-                value={sortMode}
-                onChange={(e) => setSortMode(e.target.value as any)}
-                surface="subtle"
-                selectSize="sm"
-                options={[
-                  { value: 'DATE_DESC', label: 'Sort: Newest Date' },
-                  { value: 'PROB_DESC', label: 'Sort: Highest Probability %' },
-                  { value: 'PROB_ASC', label: 'Sort: Lowest Probability %' },
-                ]}
-              />
-
               <Button
                 variant="secondary"
                 size="sm"
@@ -639,6 +675,137 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         </div>
       </div>
 
+      {/* Unified Evaluation Filters Strip (Date, Percentage Range, Sort Order, Limits) */}
+      <Card surface="elevated" padding="sm" radius="2xl" className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-theme-main">
+            <Filter className="w-3.5 h-3.5 text-theme-primary" />
+            <span>Evaluation Filters</span>
+            <span className="text-2xs font-normal tabular-nums text-theme-sub">
+              ({totalEvaluated} {importedEvaluation ? 'imported' : 'historical'} matches evaluated)
+            </span>
+          </div>
+
+          {(dateFilter !== 'ALL' || probFilter !== 'ALL') && (
+            <div className="flex items-center gap-2">
+              <span className="text-2xs font-normal tabular-nums text-theme-sub">
+                Filtered: <strong className="text-theme-main font-semibold">{totalEvaluated}</strong> /{' '}
+                {importedEvaluation ? importedEvaluation.evaluated.length : history.length}
+              </span>
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={() => {
+                  setDateFilter('ALL');
+                  setProbFilter('ALL');
+                }}
+                title="Reset date and percentage range filters to default"
+              >
+                <RotateCcw className="w-3 h-3 text-theme-primary" />
+                <span>Reset Filters</span>
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+          {/* Date Filter */}
+          <div className="space-y-1">
+            <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-theme-primary" />
+              <span>Date Filter</span>
+            </label>
+            <Select
+              aria-label="Filter predictions by date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              surface="subtle"
+              selectSize="sm"
+              options={getHistoryDateFilterOptions().map((opt) => ({
+                value: opt.key,
+                label: opt.label,
+              }))}
+            />
+          </div>
+
+          {/* Percentage Range Filter */}
+          <div className="space-y-1">
+            <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1">
+              <Percent className="w-3 h-3 text-theme-primary" />
+              <span>Percentage Range</span>
+            </label>
+            <Select
+              aria-label="Filter predictions by probability percentage range"
+              value={probFilter}
+              onChange={(e) => setProbFilter(e.target.value)}
+              surface="subtle"
+              selectSize="sm"
+              options={PROB_RANGE_OPTIONS}
+            />
+          </div>
+
+          {/* Sort Order */}
+          <div className="space-y-1">
+            <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] block">
+              Sort Order
+            </label>
+            <Select
+              aria-label="Sort predictions"
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as any)}
+              surface="subtle"
+              selectSize="sm"
+              options={[
+                { value: 'DATE_DESC', label: 'Newest Date First' },
+                { value: 'PROB_DESC', label: 'Highest Probability %' },
+                { value: 'PROB_ASC', label: 'Lowest Probability %' },
+              ]}
+            />
+          </div>
+
+          {/* Match Limit (DB) or Outcome (Imported) */}
+          {!importedEvaluation ? (
+            <div className="space-y-1">
+              <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] block">
+                Database Limit
+              </label>
+              <Select
+                aria-label="History match limit"
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                surface="subtle"
+                selectSize="sm"
+                options={[
+                  { value: 30, label: '30 Matches' },
+                  { value: 50, label: '50 Matches' },
+                  { value: 100, label: '100 Matches' },
+                  { value: 200, label: '200 Matches' },
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] block">
+                Result Status
+              </label>
+              <Select
+                aria-label="Imported result status filter"
+                value={importedFilter}
+                onChange={(e) => setImportedFilter(e.target.value as any)}
+                surface="subtle"
+                selectSize="sm"
+                options={[
+                  { value: 'ALL', label: `All Outcomes (${importedEvaluation.summary.totalImported})` },
+                  { value: 'WON', label: `Won Picks (${importedEvaluation.summary.wonCount})` },
+                  { value: 'LOST', label: `Lost Picks (${importedEvaluation.summary.lostCount})` },
+                  { value: 'PENDING', label: `Pending FT (${importedEvaluation.summary.pendingCount})` },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* IMPORTED EVALUATION VIEW */}
       {importedEvaluation ? (
         <div className="space-y-3">
@@ -651,7 +818,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     {importedEvaluation.fileName}
                   </span>
                   <span className="text-xs font-normal tabular-nums text-theme-sub">
-                    {importedEvaluation.summary.totalImported} predictions evaluated
+                    {filteredImportedMatches.length} matches showing ({importedEvaluation.summary.totalImported} total in file)
                   </span>
                 </div>
               </div>
@@ -692,7 +859,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <StatTile
               label="Evaluated Matches"
-              value={`${importedEvaluation.summary.evaluatedCount} / ${importedEvaluation.summary.totalImported}`}
+              value={`${importedEvaluatedCount} / ${filteredImportedMatches.length}`}
               icon={<Layers className="w-4 h-4" />}
               tone="default"
               surface="card"
@@ -700,17 +867,17 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
             <StatTile
               label="Model Accuracy"
-              value={`${importedEvaluation.summary.accuracy}%`}
+              value={`${importedAccuracy}%`}
               icon={<ShieldCheck className="w-4 h-4" />}
               tone="accent"
               surface="card"
-              progress={Number(importedEvaluation.summary.accuracy)}
+              progress={Number(importedAccuracy)}
             />
 
             <StatTile
               label="Won Picks"
-              value={importedEvaluation.summary.wonCount}
-              subValue={`Lost: ${importedEvaluation.summary.lostCount}`}
+              value={importedWonCount}
+              subValue={`Lost: ${importedLostCount}`}
               icon={<Target className="w-4 h-4" />}
               tone="accent"
               surface="card"
@@ -718,7 +885,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
             <StatTile
               label="Pending Matches"
-              value={importedEvaluation.summary.pendingCount}
+              value={importedPendingCount}
               subValue="Awaiting FT"
               icon={<Clock className="w-4 h-4" />}
               tone="warning"
@@ -746,7 +913,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                         Final Score: <strong className="text-theme-main font-semibold">{item.homeScore} - {item.awayScore}</strong>
                       </>
                     ) : (
-                      <span className="text-amber-500 font-medium">
+                      <span className="text-amber-700 dark:text-amber-400 font-medium">
                         Score: {item.status === 'LIVE' ? 'In Play' : 'Awaiting Final Result'}
                       </span>
                     )
@@ -891,9 +1058,28 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 />
               );
             })()
+          ) : filteredHistory.length === 0 ? (
+            <EmptyState
+              icon={<Filter className="w-6 h-6 text-theme-primary" />}
+              title="No Predictions Match Selected Filters"
+              description={`0 of ${history.length} evaluated matches match Date: "${dateFilter}" and Probability: "${probFilter}".`}
+              actions={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setDateFilter('ALL');
+                    setProbFilter('ALL');
+                  }}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
+                </Button>
+              }
+            />
           ) : (
             <Card surface="default" padding="none" radius="2xl" className="overflow-hidden divide-y divide-[var(--border-subdued)]">
-              {history.map((f) => {
+              {filteredHistory.map((f) => {
                 const evalResult = evaluatePrediction(f);
 
                 return (
@@ -920,7 +1106,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                           </>
                         ) : (
                           <>
-                            <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                            <XCircle className="w-3.5 h-3.5 text-current" />
                             <span>Missed</span>
                           </>
                         )}

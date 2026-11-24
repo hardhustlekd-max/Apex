@@ -57,7 +57,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Error Log"
-      icon={<AlertCircle className="w-4 h-4 text-rose-500 stroke-[2.25]" />}
+      icon={<AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 stroke-[2.25]" />}
       maxWidth="max-w-2xl"
       closeLabel="Close error log"
       bodyClassName="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto flex-1 min-h-0"
@@ -85,7 +85,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
             title="Copy error log"
             aria-label="Copy error log"
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-emerald-700 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
         </>
       }
@@ -100,7 +100,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
             )}
             {onClearErrors && errors.length > 0 && (
               <Button variant="subtle" size="sm" onClick={onClearErrors}>
-                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                 <span>Clear Logs</span>
               </Button>
             )}
@@ -113,7 +113,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
     >
       {hasDatabaseError && (
         <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-rose-500 dark:text-rose-400">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-rose-700 dark:text-rose-400">
             <Database className="w-3.5 h-3.5 shrink-0" />
             <span>Database / SQLite Error Detected</span>
           </div>
@@ -155,7 +155,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
                   )}
                 </div>
 
-                <p className="text-sm font-medium text-rose-500 dark:text-rose-400 break-words leading-relaxed">
+                <p className="text-sm font-medium text-rose-700 dark:text-rose-400 break-words leading-relaxed">
                   {err.message}
                 </p>
 

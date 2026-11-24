@@ -14,7 +14,6 @@ export const GLOBAL_LEAGUES_DATASET: GlobalLeagueReference[] = [
   { reep_id: 'reep_l5ffc4aa2', name: 'UEFA Champions League', country: 'Europe', code: 'UCL' },
   { reep_id: 'reep_l74c9a055', name: 'UEFA Europa League', country: 'Europe', code: 'UEL' },
   { reep_id: 'reep_l764c2adf', name: 'UEFA Conference League', country: 'Europe', code: 'UCOL' },
-  { reep_id: 'reep_l5bdd9936', name: 'EFL Championship', country: 'England', code: 'E1' },
   { reep_id: 'reep_lfe2d9011', name: 'Eredivisie', country: 'Netherlands', code: 'NL1' },
   { reep_id: 'reep_l2e7b8b73', name: 'Primeira Liga', country: 'Portugal', code: 'PO1' },
   { reep_id: 'reep_l07e8fd55', name: 'Saudi Pro League', country: 'Saudi Arabia', code: 'SA1' },

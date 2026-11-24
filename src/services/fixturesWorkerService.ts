@@ -16,6 +16,7 @@ import {
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
 import { cleanStr, getLeagueAliases, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
+import { isKnownVolatileLeague } from '../core/volatileLeagues.js';
 import {
   getFixtureSortableDateTime,
   getLeaguePopularityScore,
@@ -664,6 +665,7 @@ class FixturesWorkerService {
     const sortBy = (params.sortBy || 'DEFAULT').toUpperCase();
     const marketFilter = (params.marketFilter || 'MOST_LIKELY').toUpperCase();
 
+    const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
     const cacheKey = JSON.stringify({
       v: this.indexVersion,
       liveSig: liveData.signature,
@@ -675,6 +677,7 @@ class FixturesWorkerService {
       search,
       sortBy,
       marketFilter,
+      excludeVolatile,
     });
 
     const cached = this.queryCache.get(cacheKey);
@@ -735,6 +738,10 @@ class FixturesWorkerService {
       }
 
       if (checkLeague && !matchesLeague(f.league, f.leagueName, league)) {
+        continue;
+      }
+
+      if (!checkLeague && excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) {
         continue;
       }
 
@@ -815,6 +822,7 @@ class FixturesWorkerService {
     const marketFilter = (params?.marketFilter || 'MOST_LIKELY').toUpperCase();
     const limit = params?.limit && params.limit > 0 ? params.limit : 200;
 
+    const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
     const cacheKey = JSON.stringify({
       v: this.indexVersion,
       liveSig: liveData.signature,
@@ -823,6 +831,7 @@ class FixturesWorkerService {
       sortBy,
       marketFilter,
       limit,
+      excludeVolatile,
     });
 
     const cached = this.liveQueryCache.get(cacheKey);
@@ -873,6 +882,7 @@ class FixturesWorkerService {
 
     const filtered = rawLive.filter((f) => {
       if (league !== 'ALL' && !matchesLeague(f.league, f.leagueName, league)) return false;
+      if (league === 'ALL' && excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) return false;
       if (search.length > 0) {
         const blob = `${f.homeTeam || ''} ${f.awayTeam || ''} ${f.leagueName || ''}`.toLowerCase();
         if (!blob.includes(search)) return false;
@@ -942,9 +952,12 @@ class FixturesWorkerService {
     const seenIds = new Set<string>();
     const todayResolved = resolveDateFilter('TODAY');
 
+    const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
+
     for (const rec of this.records) {
       const f = rec.slimFixture;
       if (!f.hasPrediction || !rec.fullMarkets || rec.fullMarkets.length === 0) continue;
+      if (excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) continue;
 
       if (!matchesResolvedDateFilter(f, todayResolved)) continue;
       if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') continue;
@@ -999,6 +1012,7 @@ class FixturesWorkerService {
     search?: string;
     sortBy?: string;
     marketFilter?: string;
+    dateFilter?: string;
     limit?: number;
     forceRefresh?: boolean;
   }): Promise<{ jsonPayload: string; etag: string }> {
@@ -1029,10 +1043,12 @@ class FixturesWorkerService {
     const search = (params?.search || '').trim().toLowerCase();
     const sortBy = (params?.sortBy || 'DEFAULT').toUpperCase();
     const marketFilter = (params?.marketFilter || 'MOST_LIKELY').toUpperCase();
+    const resolvedDate = params?.dateFilter && params.dateFilter !== 'ALL' ? resolveDateFilter(params.dateFilter) : null;
 
     const slimmed: Fixture[] = [];
     for (const m of rawMatches) {
       if (!m.prediction) continue;
+      if (resolvedDate && !matchesResolvedDateFilter(m, resolvedDate)) continue;
       if (search.length > 0) {
         const blob = `${m.homeTeam || ''} ${m.awayTeam || ''} ${m.leagueName || ''}`.toLowerCase();
         if (!blob.includes(search)) continue;

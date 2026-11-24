@@ -617,8 +617,8 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                   defenseAnchor: standingsCtx.defenseAnchorAway,
                   motivation: standingsCtx.motivationMultiplierAway,
                   xgDelta: standingsCtx.xgDeltaPercentAway,
-                  accentClass: 'text-sky-500 dark:text-sky-400',
-                  winBgClass: 'bg-sky-500 text-white',
+                  accentClass: 'text-sky-700 dark:text-sky-400',
+                  winBgClass: 'bg-sky-600 text-white',
                 },
               ].map((side) => (
                 <div key={side.key} className="p-3 space-y-2 min-w-0">
@@ -667,9 +667,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                             <span
                               className={`text-xs font-semibold ${
                                 side.xgDelta > 0
-                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  ? 'text-emerald-700 dark:text-emerald-400'
                                   : side.xgDelta < 0
-                                  ? 'text-rose-500 dark:text-rose-400'
+                                  ? 'text-rose-700 dark:text-rose-400'
                                   : 'text-theme-main'
                               }`}
                             >
@@ -690,12 +690,12 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                             {side.snap.form.slice(0, 5).map((r, idx) => (
                               <span
                                 key={idx}
-                                className={`w-[17px] h-[17px] rounded text-2xs leading-none font-bold flex items-center justify-center ${
+                                className={`w-[17px] h-[17px] rounded-full text-2xs leading-none font-bold flex items-center justify-center ${
                                   r === 'W'
                                     ? side.winBgClass
                                     : r === 'D'
-                                    ? 'bg-amber-500 text-white'
-                                    : 'bg-rose-500 text-white'
+                                    ? 'bg-amber-400 text-slate-950'
+                                    : 'bg-rose-600 text-white'
                                 }`}
                               >
                                 {r}
@@ -826,13 +826,13 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
               </div>
 
               <div className="space-y-1.5 text-sm">
-                <div className="flex items-start gap-2 text-emerald-600 dark:text-emerald-400">
+                <div className="flex items-start gap-2 text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="text-theme-sub font-normal tabular-nums">
                     <strong className="text-theme-main font-semibold">Strength:</strong> {side.profile.keyStrength}
                   </span>
                 </div>
-                <div className="flex items-start gap-2 text-rose-500 dark:text-rose-400">
+                <div className="flex items-start gap-2 text-rose-700 dark:text-rose-400">
                   <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="text-theme-sub font-normal tabular-nums">
                     <strong className="text-theme-main font-semibold">Vulnerability:</strong> {side.profile.vulnerability}

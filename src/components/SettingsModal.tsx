@@ -18,6 +18,8 @@ import {
   LogOut,
   AlertTriangle,
   Power,
+  Search,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   EngineSettings,
@@ -26,6 +28,7 @@ import {
   ScrapingGateState,
   LeagueVolatilityRecord,
 } from '../core/types.js';
+import { KNOWN_VOLATILE_LEAGUES } from '../core/volatileLeagues.js';
 import { EngineService } from '../services/engineService.js';
 import {
   initDriveAuth,
@@ -43,6 +46,7 @@ import {
   Badge,
   Button,
   Card,
+  Input,
   Modal,
   SectionHeader,
   SegmentedTabs,
@@ -138,6 +142,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLoadingVolatility, setIsLoadingVolatility] = useState<boolean>(false);
   const [isCalibratingVolatility, setIsCalibratingVolatility] = useState<boolean>(false);
   const [volatilityMessage, setVolatilityMessage] = useState<string | null>(null);
+
+  const [excludeVolatileLeaguesLocal, setExcludeVolatileLeaguesLocal] = useState<boolean>(
+    settings?.excludeVolatileLeagues !== false
+  );
+  const [volatilitySearch, setVolatilitySearch] = useState<string>('');
+  const [volatilityTierFilter, setVolatilityTierFilter] = useState<'ALL' | 'HIGH' | 'STANDARD'>('ALL');
+  const [volatileLeaguesSearch, setVolatileLeaguesSearch] = useState<string>('');
+
+  useEffect(() => {
+    if (settings?.excludeVolatileLeagues !== undefined) {
+      setExcludeVolatileLeaguesLocal(settings.excludeVolatileLeagues);
+    }
+  }, [settings?.excludeVolatileLeagues]);
 
   // Dev Preview Only: Google Drive SQLite Sync state (token strictly kept in memory)
   const isDevPreviewClient = Boolean(isViteDev) && storageStatus?.storageEngine?.isDevPreview !== false;
@@ -501,12 +518,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleToggleExcludeVolatile = (enabled: boolean) => {
+    setExcludeVolatileLeaguesLocal(enabled);
+    onSaveSettings({ excludeVolatileLeagues: enabled });
+  };
+
   const handleSave = () => {
     onSaveSettings({
       rollingMatchWindow: 15,
       safeWinThreshold: 0.72,
       homeAdvantageFactor: 1.12,
       formDecayRate: 0.85,
+      excludeVolatileLeagues: excludeVolatileLeaguesLocal,
     });
     setShowSavedToast(true);
     setTimeout(() => setShowSavedToast(false), 2000);
@@ -694,7 +717,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {!isScrapingActive && (
                   <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                     <span>
                       Remote data scraping is completely turned off on startup. Switch Scraping ON manually above to enable live scores and sync feeds.
                     </span>
@@ -707,7 +730,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {scraperStatus.mirrors.map((m: any, idx: number) => (
                     <div key={idx} className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
                       <span className="truncate text-theme-main font-medium">{m.name}</span>
-                      <span className={`text-xs font-semibold shrink-0 ${isScrapingActive ? 'text-theme-primary' : 'text-amber-500'}`}>
+                      <span className={`text-xs font-semibold shrink-0 ${isScrapingActive ? 'text-theme-primary' : 'text-amber-700 dark:text-amber-400'}`}>
                         {m.status}
                       </span>
                     </div>
@@ -784,7 +807,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {!isSqliteActive && (
                   <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                     <span>
                       SQLite initialization is blocked on app startup and when{' '}
                       <span className="font-mono">football_engine.db</span> is missing on preview. Switch ON manually above or restore a backup from Google Drive below.
@@ -808,7 +831,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </span>
                 </div>
                 {(storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error) && (
-                  <p className="text-xs text-rose-500 dark:text-rose-400 truncate font-medium">
+                  <p className="text-xs text-rose-700 dark:text-rose-400 truncate font-medium">
                     Err: {storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error}
                   </p>
                 )}
@@ -838,8 +861,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div
                       className={`px-2.5 py-2 rounded-xl text-xs font-medium flex items-start gap-2 border ${
                         driveNotice.type === 'success'
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
                       }`}
                     >
                       {driveNotice.type === 'success' ? (
@@ -861,7 +884,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="button"
                           onClick={() => void handleDriveSignIn('FIREBASE')}
                           disabled={isDriveLoggingIn}
-                          className="inline-flex items-center justify-center gap-2.5 h-[38px] px-4 rounded-xl bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm shadow-xs transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                          className="inline-flex items-center justify-center gap-2.5 h-[38px] px-4 rounded-full bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm shadow-xs transition-colors cursor-pointer disabled:opacity-60 shrink-0"
                         >
                           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
@@ -928,7 +951,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {pendingDriveConfirm ? (
                         <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                           <p className="text-xs font-semibold text-theme-main flex items-start gap-1.5">
-                            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                             <span>
                               {pendingDriveConfirm === 'UPLOAD'
                                 ? driveFileMeta
@@ -1001,8 +1024,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               disabled={isDriveMutating || isOperating}
                               title="Delete backup file from Google Drive"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                              <span className="text-rose-500">Delete</span>
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                              <span className="text-rose-700 dark:text-rose-400">Delete</span>
                             </Button>
                           )}
                         </div>
@@ -1099,7 +1122,93 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </Button>
             </Card>
 
-            {/* Calibration Card: League Volatility Coefficient (V_L) */}
+            {/* Dedicated Card: Volatile Competitions & High Parity Exclusions */}
+            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+                <SectionHeader
+                  title="Volatile Leagues Filter & Exclusions"
+                  size="sm"
+                  icon={<ShieldAlert className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />}
+                />
+                <div className="flex items-center gap-2">
+                  <Badge variant={excludeVolatileLeaguesLocal ? 'accent' : 'warning'} size="xs">
+                    {excludeVolatileLeaguesLocal ? 'EXCLUSIONS ACTIVE' : 'EXCLUSIONS OFF'}
+                  </Badge>
+                  <Button
+                    id="toggle-exclude-volatile-btn"
+                    variant={excludeVolatileLeaguesLocal ? 'secondary' : 'primary'}
+                    size="xs"
+                    onClick={() => handleToggleExcludeVolatile(!excludeVolatileLeaguesLocal)}
+                    title="Toggle whether high-volatility/parity leagues are excluded from default feeds and predictions"
+                  >
+                    <Power className="w-3.5 h-3.5" />
+                    <span>{excludeVolatileLeaguesLocal ? 'Turn Off Filter' : 'Exclude Volatile Leagues'}</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-3.5 space-y-2.5 text-xs text-theme-sub">
+                <p className="leading-relaxed">
+                  Competitions with elevated upset variance (<span className="font-mono">V_L &gt; 1.10</span>), high draw skew (~30%+), or compressed squad parity (EFL Championship, 2. Bundesliga, Serie B, MLS, Süper Lig, etc.) are automatically excluded from the main prediction feed and accumulator selections when enabled.
+                </p>
+
+                <div className="pt-1">
+                  <Input
+                    placeholder="Search 10 known volatile leagues by name, country, or code..."
+                    value={volatileLeaguesSearch}
+                    onChange={(e) => setVolatileLeaguesSearch(e.target.value)}
+                    leftIcon={<Search className="w-3.5 h-3.5" />}
+                    onClear={() => setVolatileLeaguesSearch('')}
+                    inputSize="sm"
+                    surface="subtle"
+                  />
+                </div>
+
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 divide-y divide-[var(--border-subdued)]">
+                  {KNOWN_VOLATILE_LEAGUES.filter((l) => {
+                    if (!volatileLeaguesSearch.trim()) return true;
+                    const q = volatileLeaguesSearch.trim().toLowerCase();
+                    return (
+                      l.name.toLowerCase().includes(q) ||
+                      l.country.toLowerCase().includes(q) ||
+                      l.code.toLowerCase().includes(q) ||
+                      l.reason.toLowerCase().includes(q)
+                    );
+                  }).map((l) => (
+                    <div key={l.id} className="pt-1.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-theme-main text-sm">{l.name}</span>
+                          <span className="text-2xs font-normal text-theme-sub">({l.country})</span>
+                          <Badge variant="default" size="xs">
+                            {l.code}
+                          </Badge>
+                          <Badge variant="warning" size="xs">
+                            V_L ~ {l.typicalVl.toFixed(2)}x
+                          </Badge>
+                        </div>
+                        <p className="text-2xs text-theme-dim mt-0.5 line-clamp-2 leading-relaxed">
+                          {l.reason}
+                        </p>
+                      </div>
+                      <div className="shrink-0">
+                        <span
+                          className={`text-2xs font-semibold px-2.5 py-0.5 rounded-full ${
+                            excludeVolatileLeaguesLocal
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25'
+                          }`}
+                        >
+                          {excludeVolatileLeaguesLocal ? 'EXCLUDED FROM FEED' : 'INCLUDED'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+
+            {/* Calibration Card: League Volatility Coefficient (V_L) - ALL LEAGUES LISTED */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
               <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
@@ -1119,15 +1228,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </Button>
               </div>
 
-              <div className="px-3.5 py-2 text-xs text-theme-sub space-y-1.5">
+              <div className="px-3.5 py-2 text-xs text-theme-sub space-y-2">
                 <p className="leading-relaxed">
-                  Scales Elo K-rate (<span className="font-mono">K/V_L</span>), Bayesian prior shrinkage (<span className="font-mono">W·V_L</span>), temperature (<span className="font-mono">T=V_L^α</span>), and Monte Carlo variance. Leagues under 100 historical matches default to <span className="font-mono text-theme-main">1.00</span>.
+                  Scales Elo K-rate (<span className="font-mono">K/V_L</span>), Bayesian prior shrinkage (<span className="font-mono">W·V_L</span>), temperature (<span className="font-mono">T=V_L^α</span>), and Monte Carlo variance.
                 </p>
                 {volatilityMessage && (
                   <div className="px-2.5 py-1.5 rounded-lg bg-theme-primary-subtle border border-theme-neon text-theme-primary font-medium">
                     {volatilityMessage}
                   </div>
                 )}
+
+                {/* Filter and Search Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Search all calibrated leagues..."
+                      value={volatilitySearch}
+                      onChange={(e) => setVolatilitySearch(e.target.value)}
+                      leftIcon={<Search className="w-3.5 h-3.5" />}
+                      onClear={() => setVolatilitySearch('')}
+                      inputSize="sm"
+                      surface="subtle"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant={volatilityTierFilter === 'ALL' ? 'primary' : 'subtle'}
+                      size="xs"
+                      onClick={() => setVolatilityTierFilter('ALL')}
+                    >
+                      All ({leagueVolatilities.length})
+                    </Button>
+                    <Button
+                      variant={volatilityTierFilter === 'HIGH' ? 'primary' : 'subtle'}
+                      size="xs"
+                      onClick={() => setVolatilityTierFilter('HIGH')}
+                    >
+                      High (V_L &gt; 1.05)
+                    </Button>
+                    <Button
+                      variant={volatilityTierFilter === 'STANDARD' ? 'primary' : 'subtle'}
+                      size="xs"
+                      onClick={() => setVolatilityTierFilter('STANDARD')}
+                    >
+                      Standard
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {isLoadingVolatility ? (
@@ -1135,49 +1282,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Loading volatility calibration table...
                 </div>
               ) : leagueVolatilities.length > 0 ? (
-                <div className="border-t border-theme-subdued overflow-x-auto">
-                  <table className="w-full text-left text-xs tabular-nums">
-                    <thead className="bg-theme-subtle/70 text-2xs uppercase tracking-[0.06em] text-theme-sub">
-                      <tr>
-                        <th className="px-3 py-1.5 font-semibold">League</th>
-                        <th className="px-2 py-1.5 font-semibold text-right">Matches</th>
-                        <th className="px-2 py-1.5 font-semibold text-right">Log-Loss</th>
-                        <th className="px-2 py-1.5 font-semibold text-right">Elo IQR</th>
-                        <th className="px-3 py-1.5 font-semibold text-right">V_L</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subdued)]">
-                      {leagueVolatilities.slice(0, 10).map((row) => (
-                        <tr key={row.league_id} className="hover:bg-theme-card-elevated">
-                          <td className="px-3 py-1.5 font-medium text-theme-main max-w-[165px] truncate">
-                            {row.league_name}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-theme-sub">{row.matches_evaluated}</td>
-                          <td className="px-2 py-1.5 text-right text-theme-sub">
-                            {row.historical_log_loss.toFixed(3)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-theme-sub">
-                            {row.elo_spread_iqr.toFixed(0)}
-                          </td>
-                          <td className="px-3 py-1.5 text-right font-semibold">
-                            <span
-                              className={
-                                row.is_fallback
-                                  ? 'text-theme-dim'
-                                  : row.volatility_coefficient > 1.0
-                                  ? 'text-amber-500'
-                                  : 'text-theme-primary'
-                              }
-                            >
-                              {row.volatility_coefficient.toFixed(2)}
-                              {row.is_fallback ? '*' : ''}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                (() => {
+                  const filtered = leagueVolatilities.filter((r) => {
+                    if (volatilityTierFilter === 'HIGH' && r.volatility_coefficient <= 1.05) return false;
+                    if (volatilityTierFilter === 'STANDARD' && r.volatility_coefficient > 1.05) return false;
+                    if (volatilitySearch.trim()) {
+                      const q = volatilitySearch.trim().toLowerCase();
+                      return r.league_name.toLowerCase().includes(q) || r.league_id.toLowerCase().includes(q);
+                    }
+                    return true;
+                  });
+
+                  return (
+                    <div className="border-t border-theme-subdued">
+                      <div className="max-h-72 overflow-y-auto">
+                        <table className="w-full text-left text-xs tabular-nums">
+                          <thead className="sticky top-0 bg-theme-subtle/95 backdrop-blur-xs text-2xs uppercase tracking-[0.06em] text-theme-sub z-10 border-b border-theme-subdued">
+                            <tr>
+                              <th className="px-3 py-1.5 font-semibold">League</th>
+                              <th className="px-2 py-1.5 font-semibold text-right">Matches</th>
+                              <th className="px-2 py-1.5 font-semibold text-right">Log-Loss</th>
+                              <th className="px-2 py-1.5 font-semibold text-right">Elo IQR</th>
+                              <th className="px-3 py-1.5 font-semibold text-right">V_L</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border-subdued)]">
+                            {filtered.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-4 text-center text-xs text-theme-dim">
+                                  No leagues matched search &quot;{volatilitySearch}&quot;
+                                </td>
+                              </tr>
+                            ) : (
+                              filtered.map((row) => (
+                                <tr key={row.league_id} className="hover:bg-theme-card-elevated">
+                                  <td className="px-3 py-1.5 font-medium text-theme-main max-w-[190px] truncate">
+                                    {row.league_name}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-theme-sub">{row.matches_evaluated}</td>
+                                  <td className="px-2 py-1.5 text-right text-theme-sub">
+                                    {row.historical_log_loss.toFixed(3)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-theme-sub">
+                                    {row.elo_spread_iqr.toFixed(0)}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right font-semibold">
+                                    <span
+                                      className={
+                                        row.is_fallback
+                                          ? 'text-theme-dim'
+                                          : row.volatility_coefficient > 1.05
+                                          ? 'text-amber-700 dark:text-amber-400'
+                                          : 'text-theme-primary'
+                                      }
+                                    >
+                                      {row.volatility_coefficient.toFixed(2)}
+                                      {row.is_fallback ? '*' : ''}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="px-3 py-1.5 bg-theme-subtle/50 border-t border-theme-subdued text-2xs text-theme-dim flex items-center justify-between">
+                        <span>Showing {filtered.length} of {leagueVolatilities.length} leagues in database</span>
+                        <span>* Fallback (N &lt; 100)</span>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="px-3.5 py-2.5 text-xs text-theme-dim border-t border-theme-subdued">
                   {isSqliteActive
@@ -1277,14 +1452,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => theme !== 'light' && onToggleTheme()}
-                  className={`h-[34px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3.5 rounded-full border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'light'
                       ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
                       : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                    <Sun className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
                     <span className="text-base text-theme-main">Light</span>
                   </div>
                   {theme === 'light' && <Check className="w-4 h-4 text-theme-primary stroke-[2.5]" />}
@@ -1293,7 +1468,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => theme !== 'dark' && onToggleTheme()}
-                  className={`h-[34px] px-3 rounded-xl border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3.5 rounded-full border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'dark'
                       ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
                       : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'

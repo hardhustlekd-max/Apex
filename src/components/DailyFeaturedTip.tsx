@@ -188,7 +188,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                       }))
                     )
                   }
-                  className={`h-[28px] px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                  className={`h-[28px] px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                     allInSlip
                       ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
                       : 'bg-theme-primary/15 text-theme-primary border border-theme-primary/30 hover:bg-theme-primary hover:text-theme-primary-text'
@@ -261,7 +261,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                           score: fixture.score,
                         });
                       }}
-                      className={`h-[28px] px-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      className={`h-[28px] px-2.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                         selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === market.key)
                           ? 'bg-theme-primary text-theme-primary-text'
                           : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'

@@ -29,10 +29,12 @@ export function SegmentedTabs<T extends string = string>({
   className = '',
   ariaLabel = 'Tabs',
 }: SegmentedTabsProps<T>) {
+  const isPill = variant === 'pill';
+
   const containerBg =
     variant === 'card'
-      ? 'bg-theme-card border border-theme shadow-theme-sm p-[3px] rounded-xl'
-      : 'bg-theme-subtle border border-theme-subdued p-[3px] rounded-xl';
+      ? 'bg-theme-card border border-theme shadow-theme-sm p-[3px] rounded-full'
+      : 'bg-theme-subtle border border-theme-subdued p-[3px] rounded-full';
 
   const containerSize =
     size === 'xs'
@@ -43,10 +45,12 @@ export function SegmentedTabs<T extends string = string>({
 
   const btnHeight =
     size === 'xs'
-      ? 'h-full px-2 text-sm'
+      ? 'h-full px-2.5 text-sm'
       : size === 'md'
-      ? 'h-full px-2.5 sm:px-3 text-base'
-      : 'h-full px-2 sm:px-2.5 text-sm';
+      ? 'h-full px-3 sm:px-3.5 text-base'
+      : 'h-full px-2.5 sm:px-3 text-sm';
+
+  const tabRadiusCls = 'rounded-full';
 
   return (
     <div
@@ -68,7 +72,7 @@ export function SegmentedTabs<T extends string = string>({
             onClick={() => onChange(item.id)}
             className={`${
               fullWidth ? 'flex-1 min-w-0' : 'shrink-0'
-            } ${btnHeight} rounded-lg transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            } ${btnHeight} ${tabRadiusCls} transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               isActive
                 ? 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow'
                 : 'text-theme-sub hover:text-theme-main border border-transparent font-medium'
@@ -78,7 +82,7 @@ export function SegmentedTabs<T extends string = string>({
             <span className="whitespace-nowrap">{item.label}</span>
             {item.count !== undefined && (
               <span
-                className={`h-[18px] min-w-[18px] px-1 rounded-md inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold ${
+                className={`h-[18px] min-w-[18px] px-1.5 rounded-full inline-flex items-center justify-center text-2xs leading-none tabular-nums font-semibold ${
                   isActive
                     ? 'bg-black/20 text-theme-primary-text'
                     : 'bg-theme-card text-theme-main'
