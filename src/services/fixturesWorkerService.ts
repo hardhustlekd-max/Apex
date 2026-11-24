@@ -16,7 +16,7 @@ import {
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
 import { cleanStr, getLeagueAliases, isSimulationLeague, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
-import { isKnownVolatileLeague } from '../core/volatileLeagues.ts';
+import { isKnownVolatileLeague } from '../core/volatileLeagues';
 import {
   getFixtureSortableDateTime,
   getLeaguePopularityScore,

@@ -28,7 +28,7 @@ import {
   ScrapingGateState,
   LeagueVolatilityRecord,
 } from '../core/types.js';
-import { KNOWN_VOLATILE_LEAGUES } from '../core/volatileLeagues.ts';
+import { KNOWN_VOLATILE_LEAGUES } from '../core/volatileLeagues';
 import { EngineService } from '../services/engineService.js';
 import {
   initDriveAuth,
