@@ -1,5 +1,6 @@
 import { cleanFixtureId, Fixture } from './types.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
+import { isSimulationLeague } from './leagueMapper.js';
 import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
 import { sqliteDb, notifyDbMutation, isSqliteEnabled } from './sqliteClient.js';
 import { isScrapingEnabled } from './scrapingGate.js';
@@ -144,6 +145,9 @@ export class PredictionsDB {
           try {
             // STRICT VALIDATION: Never save a prediction record if the prediction object itself is missing
             if (!f.prediction) continue;
+            if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) {
+              continue;
+            }
 
             const pred = f.prediction;
             const bestTip = f.mostLikelyOutcome;
@@ -278,7 +282,9 @@ export class PredictionsDB {
       }
 
       const rows = sqliteDb.prepare(query).all(...params) as any[];
-      let fixtures: Fixture[] = rows.map((r) => this.hydrateFixtureFromRow(r));
+      let fixtures: Fixture[] = rows
+        .map((r) => this.hydrateFixtureFromRow(r))
+        .filter((f) => !isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam));
 
       if (filters?.unstartedOnly) {
         fixtures = fixtures.filter((f) => !isMatchStarted(f));
@@ -321,7 +327,11 @@ export class PredictionsDB {
       ) as any;
 
       if (row && row.full_fixture_json) {
-        return this.hydrateFixtureFromRow(row);
+        const hydrated = this.hydrateFixtureFromRow(row);
+        if (isSimulationLeague(hydrated.league, hydrated.leagueName, undefined, hydrated.leagueUrl, hydrated.stage, hydrated.homeTeam, hydrated.awayTeam)) {
+          return null;
+        }
+        return hydrated;
       }
     } catch (err: any) {
       console.error('[PredictionsDB] Error getting prediction by ID:', err?.message);
@@ -364,6 +374,9 @@ export class PredictionsDB {
         for (const row of rows) {
           if (!row?.full_fixture_json) continue;
           const hydrated = this.hydrateFixtureFromRow(row);
+          if (isSimulationLeague(hydrated.league, hydrated.leagueName, undefined, hydrated.leagueUrl, hydrated.stage, hydrated.homeTeam, hydrated.awayTeam)) {
+            continue;
+          }
           const key = String(row.fixture_id);
           const cKey = cleanFixtureId(key);
           result.set(key, hydrated);
@@ -1015,7 +1028,9 @@ export class PredictionsDB {
         ${orderClause}
       `).all() as any[];
 
-      const predictions = rows.map((r) => {
+      const predictions = rows
+        .filter((r) => !isSimulationLeague(r.league, r.league_name, undefined, undefined, r.stage, r.home_team, r.away_team))
+        .map((r) => {
         const hw = Number(r.home_win_prob ?? 0);
         const dr = Number(r.draw_prob ?? 0);
         const aw = Number(r.away_win_prob ?? 0);
@@ -1245,6 +1260,10 @@ export class PredictionsDB {
       const kickOffTime = String(item.kickOffTime || item.kick_off_time || 'TBD').trim();
       const league = String(item.league || 'ALL');
       const leagueName = String(item.leagueName || item.league_name || league);
+
+      if (isSimulationLeague(league, leagueName, undefined, item.leagueUrl, item.stage, homeTeam, awayTeam)) {
+        continue;
+      }
 
       // Probabilities
       const hw = Number(item.homeWinProb ?? item.home_win_prob ?? item.prediction?.homeWinProb ?? 0);

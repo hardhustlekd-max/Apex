@@ -7,6 +7,7 @@ import { ServerEngine } from '../core/serverEngine.js';
 import { loggerService } from './loggerService.js';
 import { cleanFixtureId, Fixture } from '../core/types.js';
 import { getRelativeDateStr, isMatchStarted } from '../core/dateUtils.js';
+import { isSimulationLeague } from '../core/leagueMapper.js';
 import { LiveScore } from '../providers/types.js';
 
 export async function collectEngineStatsSummary() {
@@ -31,10 +32,14 @@ export async function collectEngineStatsSummary() {
 
 function attachPredictionsToLiveScores(liveScores: LiveScore[]): Fixture[] {
   if (!liveScores || liveScores.length === 0) return [];
+  const filteredScores = liveScores.filter(
+    (s) => !isSimulationLeague(s.league, s.leagueName, undefined, undefined, undefined, s.homeTeam, s.awayTeam)
+  );
+  if (filteredScores.length === 0) return [];
   const todayStr = getRelativeDateStr(0);
-  const predMap = predictionsDb.getPredictionsByIds(liveScores.map((s) => s.fixtureId));
+  const predMap = predictionsDb.getPredictionsByIds(filteredScores.map((s) => s.fixtureId));
 
-  return liveScores.map((s) => {
+  return filteredScores.map((s) => {
     const lf: Fixture = {
       id: s.fixtureId,
       providerId: 'FLASHSCORE',

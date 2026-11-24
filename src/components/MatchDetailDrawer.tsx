@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, X, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
+import { ArrowLeft, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -100,7 +101,7 @@ export const MatchDetailDrawer: React.FC<{
   const displayFixture = fixture || lastFixtureRef.current;
   if (!displayFixture) return null;
 
-  return (
+  const drawerNode = (
     <motion.div
       role="dialog"
       aria-modal="true"
@@ -108,7 +109,7 @@ export const MatchDetailDrawer: React.FC<{
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed inset-0 z-[100] w-full h-[100dvh] bg-theme-card flex flex-col overflow-hidden pointer-events-auto"
+      className="fixed inset-0 z-[100] lg:hidden w-full h-full rounded-none bg-theme-card flex flex-col overflow-hidden pointer-events-auto"
     >
       <MatchDetailView
         fixture={displayFixture}
@@ -119,6 +120,11 @@ export const MatchDetailDrawer: React.FC<{
       />
     </motion.div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(drawerNode, document.body);
+  }
+  return drawerNode;
 };
 
 const MatchDetailDrawerContent: React.FC<{
@@ -666,36 +672,38 @@ const MatchDetailDrawerContent: React.FC<{
 
   const panelContainer = (
     <div
-      className="bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full font-sans"
+      className="bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full rounded-none font-sans"
       style={{ scrollbarGutter: 'stable' }}
     >
       {/* Neon Gradient Header Band */}
       <div
         className={`bg-theme-header-grad border-b border-theme px-3 sm:px-4 pb-2 shrink-0 ${
-          isPanel ? 'pt-1.5' : 'pt-[calc(env(safe-area-inset-top)+8px)]'
+          isPanel ? 'pt-1.5' : 'pt-[calc(env(safe-area-inset-top)+6px)]'
         }`}
       >
         <div className={!isPanel ? 'max-w-4xl mx-auto w-full' : ''}>
-        <div className="min-h-[32px] flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-theme-sub">
-            {!isPanel && onClose && (
+        <div className="min-h-[36px] flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="w-[30px] h-[30px] -ml-1 rounded-full hover:bg-theme-subtle text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="w-9 h-9 -ml-1.5 rounded-full hover:bg-theme-subtle text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                 aria-label="Back to matches"
                 title="Back"
               >
-                <ArrowLeft className="w-4 h-4 stroke-[2.25]" />
+                <ArrowLeft className="w-[18px] h-[18px] stroke-[2.25]" />
               </button>
             )}
-            <span className="font-medium text-theme-main truncate whitespace-nowrap">
-              {fixture.stage || fixture.leagueName}
-            </span>
-            <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
-            <span className="tabular-nums font-normal text-theme-sub shrink-0">
-              {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-theme-sub">
+              <span className="font-medium text-theme-main truncate whitespace-nowrap">
+                {fixture.stage || fixture.leagueName}
+              </span>
+              <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
+              <span className="tabular-nums font-normal text-theme-sub shrink-0">
+                {formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp).dateStr}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -703,7 +711,7 @@ const MatchDetailDrawerContent: React.FC<{
               onClick={() => void handleCopyText(`${fixture.homeTeam} vs ${fixture.awayTeam}`, 'MATCHUP')}
               title={`Copy "${fixture.homeTeam} vs ${fixture.awayTeam}"`}
               aria-label="Copy both team names"
-              className="w-[28px] h-[28px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="w-8 h-8 rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               {copiedKey === 'MATCHUP' ? (
                 <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
@@ -711,16 +719,6 @@ const MatchDetailDrawerContent: React.FC<{
                 <Copy className="w-3.5 h-3.5" />
               )}
             </button>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-[30px] h-[30px] rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-                aria-label="Close match details"
-              >
-                <X className="w-4 h-4 stroke-[2.25]" />
-              </button>
-            )}
           </div>
         </div>
 

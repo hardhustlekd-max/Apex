@@ -1012,7 +1012,7 @@ export default function App() {
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[47px] h-[calc(100vh-58px)] rounded-2xl bg-theme-card border border-theme shadow-theme-md overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[47px] h-[calc(100vh-58px)] rounded-none bg-theme-card border border-theme shadow-theme-md overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}

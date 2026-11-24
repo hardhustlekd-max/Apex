@@ -3,7 +3,7 @@ import { normalizeDateStr, resolveDateFilter } from './dateUtils.js';
 import { loggerService } from '../services/loggerService.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
 import { extractTournamentMetadataFromFeed, FlashscoreTournamentMeta, resolveFixtureAlignment, teamMatchScore } from './feedParser.js';
-import { isExcludedLeague } from './leagueMapper.js';
+import { isExcludedLeague, isSimulationLeague } from './leagueMapper.js';
 import { getLeagueAliases } from './leagueMapper.js';
 import {
   sqliteDb,
@@ -92,6 +92,9 @@ export class FootballDB {
       // Remove any stale Russian/Cyrillic rows previously ingested from /46/ mirrors
       this.purgeCyrillicFixtures();
 
+      // Unconditionally purge any simulation/virtual/esports leagues from SQLite
+      this.purgeSimulationLeagues();
+
       // Evaluate pending bets against latest SQLite match results on startup
       this.evaluateBets();
 
@@ -157,6 +160,10 @@ export class FootballDB {
 
   insertHistoricalMatches(matches: HistoricalMatch[]): number {
     if (!isSqliteEnabled() || matches.length === 0) return 0;
+    const validMatches = matches.filter(
+      (m) => !isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam)
+    );
+    if (validMatches.length === 0) return 0;
 
     try {
       const insertStmt = sqliteDb.prepare(`
@@ -199,11 +206,11 @@ export class FootballDB {
         }
       });
 
-      insertMany(matches);
-      if (matches.length >= 20) {
+      insertMany(validMatches);
+      if (validMatches.length >= 20) {
         checkpointSqliteWal('PASSIVE');
       }
-      return matches.length;
+      return validMatches.length;
     } catch (err: any) {
       console.error('[FootballDB] Error inserting historical matches into SQLite:', err?.message);
       loggerService.addLog({
@@ -225,7 +232,7 @@ export class FootballDB {
     const seen = new Set<string>();
     const unique = fixtures.filter((f) => {
       if (!f.id || seen.has(f.id)) return false;
-      if (isExcludedLeague(f.league, f.leagueName, undefined, f.leagueUrl)) return false;
+      if (isExcludedLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) return false;
       seen.add(f.id);
       return true;
     });
@@ -544,6 +551,96 @@ export class FootballDB {
     }
   }
 
+  purgeSimulationLeagues(): number {
+    if (!isSqliteEnabled()) return 0;
+    try {
+      let removed = 0;
+      const runClean = sqliteDb.transaction(() => {
+        const upRows = sqliteDb
+          .prepare('SELECT id, league, league_name, league_url, stage, home_team, away_team FROM upcoming_fixtures')
+          .all() as any[];
+        const delUp = sqliteDb.prepare('DELETE FROM upcoming_fixtures WHERE id = ?');
+        for (const r of upRows) {
+          if (isSimulationLeague(r.league, r.league_name, undefined, r.league_url, r.stage, r.home_team, r.away_team)) {
+            delUp.run(r.id);
+            removed++;
+          }
+        }
+
+        const predRows = sqliteDb
+          .prepare('SELECT fixture_id, league, league_name, stage, home_team, away_team FROM predictions')
+          .all() as any[];
+        const delPred = sqliteDb.prepare('DELETE FROM predictions WHERE fixture_id = ?');
+        for (const r of predRows) {
+          if (isSimulationLeague(r.league, r.league_name, undefined, undefined, r.stage, r.home_team, r.away_team)) {
+            delPred.run(r.fixture_id);
+            removed++;
+          }
+        }
+
+        const histRows = sqliteDb
+          .prepare('SELECT id, div, home_team, away_team FROM historical_matches')
+          .all() as any[];
+        const delHist = sqliteDb.prepare('DELETE FROM historical_matches WHERE id = ?');
+        for (const r of histRows) {
+          if (isSimulationLeague(r.div, r.div, undefined, undefined, undefined, r.home_team, r.away_team)) {
+            delHist.run(r.id);
+            removed++;
+          }
+        }
+
+        const scrapedRows = sqliteDb
+          .prepare('SELECT match_id, league_name, country, stage, home_name, away_name FROM flashscore_scraped_matches')
+          .all() as any[];
+        const delScraped = sqliteDb.prepare('DELETE FROM flashscore_scraped_matches WHERE match_id = ?');
+        for (const r of scrapedRows) {
+          if (isSimulationLeague(undefined, r.league_name || r.stage, r.country, undefined, r.stage, r.home_name, r.away_name)) {
+            delScraped.run(r.match_id);
+            removed++;
+          }
+        }
+
+        const standingRows = sqliteDb
+          .prepare('SELECT league_code, league_name, country, league_url FROM league_standings')
+          .all() as any[];
+        const delStanding = sqliteDb.prepare('DELETE FROM league_standings WHERE league_code = ?');
+        for (const r of standingRows) {
+          if (isSimulationLeague(r.league_code, r.league_name, r.country, r.league_url)) {
+            delStanding.run(r.league_code);
+            removed++;
+          }
+        }
+
+        const volRows = sqliteDb
+          .prepare('SELECT league_id, league_name FROM league_volatility')
+          .all() as any[];
+        const delVol = sqliteDb.prepare('DELETE FROM league_volatility WHERE league_id = ?');
+        for (const r of volRows) {
+          if (isSimulationLeague(r.league_id, r.league_name)) {
+            delVol.run(r.league_id);
+            removed++;
+          }
+        }
+      });
+
+      runClean();
+      if (removed > 0) {
+        checkpointSqliteWal('PASSIVE');
+        notifyDbMutation();
+        loggerService.addLog({
+          level: 'INFO',
+          category: 'DATABASE',
+          source: 'FootballDB',
+          message: `Purged ${removed} simulation/virtual/esports league records from SQLite`,
+        });
+      }
+      return removed;
+    } catch (err: any) {
+      console.error('[FootballDB] Error purging simulation leagues:', err?.message);
+      return 0;
+    }
+  }
+
   getFixtureById(id: string): Fixture | null {
     if (!isSqliteEnabled() || !id) return null;
     const cleanId = id.replace(/^fs_/, '').replace(/^hist_/, '').replace(/^scraped_/, '');
@@ -552,6 +649,9 @@ export class FootballDB {
       // 1. Check upcoming_fixtures
       const row = sqliteDb.prepare("SELECT * FROM upcoming_fixtures WHERE id = ? OR id = ? OR id = ?").get(id, cleanId, `fs_${cleanId}`) as any;
       if (row) {
+        if (isSimulationLeague(row.league, row.league_name, undefined, row.league_url, row.stage, row.home_team, row.away_team)) {
+          return null;
+        }
         return {
           id: String(row.id),
           providerId: (row.provider_id as any) || 'FLASHSCORE',
@@ -588,6 +688,9 @@ export class FootballDB {
       ).get(id, cleanId, `fs_hist_${cleanId}`, `hist_${cleanId}`) as any;
 
       if (histRow) {
+        if (isSimulationLeague(histRow.div, histRow.div, undefined, undefined, undefined, histRow.home_team, histRow.away_team)) {
+          return null;
+        }
         const fthg = Number(histRow.fthg) || 0;
         const ftag = Number(histRow.ftag) || 0;
         const homeShots = histRow.hs !== null && histRow.hs !== undefined ? Number(histRow.hs) : undefined;
@@ -704,15 +807,24 @@ export class FootballDB {
       params.push(rowLimit);
 
       const rows = sqliteDb.prepare(query).all(...params) as any[];
-      const fixtures: Fixture[] = new Array(rows.length);
+      const fixtures: Fixture[] = [];
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+        const rowLeague = String(row.league || '');
+        const rowLeagueName = String(row.league_name || row.league || '');
+        const rowLeagueUrl = row.league_url ? String(row.league_url) : undefined;
+        const rowStage = row.stage ? String(row.stage) : undefined;
+        const rowHome = String(row.home_team || '');
+        const rowAway = String(row.away_team || '');
+        if (isSimulationLeague(rowLeague, rowLeagueName, undefined, rowLeagueUrl, rowStage, rowHome, rowAway)) {
+          continue;
+        }
         const f: Fixture & { _hasExistingPrediction?: boolean } = {
           id: String(row.id),
           providerId: (row.provider_id as any) || 'FLASHSCORE',
-          league: String(row.league || ''),
-          leagueName: String(row.league_name || row.league || ''),
-          leagueUrl: row.league_url ? String(row.league_url) : undefined,
+          league: rowLeague,
+          leagueName: rowLeagueName,
+          leagueUrl: rowLeagueUrl,
           matchDate: String(row.match_date || ''),
           kickOffTime: String(row.kick_off_time || ''),
           timestamp: row.timestamp
@@ -720,11 +832,11 @@ export class FootballDB {
             : (row.match_date && row.kick_off_time && String(row.kick_off_time).includes(':')
                 ? Math.floor(new Date(`${row.match_date}T${row.kick_off_time}:00.000Z`).getTime() / 1000)
                 : undefined),
-          homeTeam: String(row.home_team || ''),
-          awayTeam: String(row.away_team || ''),
+          homeTeam: rowHome,
+          awayTeam: rowAway,
           homeBadge: row.home_badge ? String(row.home_badge) : undefined,
           awayBadge: row.away_badge ? String(row.away_badge) : undefined,
-          stage: row.stage ? String(row.stage) : undefined,
+          stage: rowStage,
           restDaysHome: row.rest_days_home !== null && row.rest_days_home !== undefined ? Number(row.rest_days_home) : undefined,
           restDaysAway: row.rest_days_away !== null && row.rest_days_away !== undefined ? Number(row.rest_days_away) : undefined,
           status: (row.status as any) || 'SCHEDULED',
@@ -743,7 +855,7 @@ export class FootballDB {
         if (skipPredictionBlobs && row.has_prediction) {
           f._hasExistingPrediction = true;
         }
-        fixtures[i] = f;
+        fixtures.push(f);
       }
       if (!skipSort) {
         sortFixturesByPopularityInPlace(fixtures);
@@ -808,7 +920,9 @@ export class FootballDB {
         }
       }
 
-      return rows.map(mapHistoricalMatchRow);
+      return rows
+        .map(mapHistoricalMatchRow)
+        .filter((m) => !isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam));
     } catch (err: any) {
       console.error('[FootballDB] Error getting team historical matches:', err?.message);
       return [];
@@ -824,7 +938,12 @@ export class FootballDB {
           'SELECT * FROM historical_matches WHERE id IN (?, ?, ?, ?) LIMIT 1'
         )
         .get(matchId, cleanId, `fs_hist_${cleanId}`, `hist_${cleanId}`) as any;
-      return row ? mapHistoricalMatchRow(row) : null;
+      if (!row) return null;
+      const mapped = mapHistoricalMatchRow(row);
+      if (isSimulationLeague(mapped.div, mapped.leagueName, undefined, undefined, undefined, mapped.homeTeam, mapped.awayTeam)) {
+        return null;
+      }
+      return mapped;
     } catch (err: any) {
       console.error('[FootballDB] Error getting historical match by ID:', err?.message);
       return null;
@@ -854,7 +973,9 @@ export class FootballDB {
         ORDER BY match_date DESC LIMIT ?
       `).all(limit) as any[];
 
-      return rows.map(mapHistoricalMatchRow);
+      return rows
+        .map(mapHistoricalMatchRow)
+        .filter((m) => !isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam));
     } catch (err: any) {
       console.error('[FootballDB] Error getting all historical matches:', err?.message);
       return [];
@@ -916,6 +1037,19 @@ export class FootballDB {
 
   saveFlashscoreScrapedMatches(matches: Array<any>): void {
     if (!isSqliteEnabled() || matches.length === 0) return;
+    const filteredMatches = matches.filter(
+      (m) =>
+        !isSimulationLeague(
+          undefined,
+          m.leagueName || m.stage,
+          m.country,
+          undefined,
+          m.stage,
+          m.home?.name || m.homeTeam,
+          m.away?.name || m.awayTeam
+        )
+    );
+    if (filteredMatches.length === 0) return;
 
     try {
       const stmt = sqliteDb.prepare(`
@@ -976,8 +1110,8 @@ export class FootballDB {
           );
         }
       });
-      insertMany(matches);
-      if (matches.length >= 20) {
+      insertMany(filteredMatches);
+      if (filteredMatches.length >= 20) {
         checkpointSqliteWal('PASSIVE');
       }
     } catch (err: any) {
@@ -1001,7 +1135,22 @@ export class FootballDB {
       const row = sqliteDb
         .prepare(`SELECT ${cols} FROM flashscore_scraped_matches WHERE match_id IN (?, ?) LIMIT 1`)
         .get(matchId, cleanId) as any;
-      return row ? mapScrapedMatchRow(row, includeJsonBlobs) : null;
+      if (!row) return null;
+      const mapped = mapScrapedMatchRow(row, includeJsonBlobs);
+      if (
+        isSimulationLeague(
+          undefined,
+          mapped.leagueName || mapped.stage,
+          mapped.country,
+          undefined,
+          mapped.stage,
+          mapped.home?.name,
+          mapped.away?.name
+        )
+      ) {
+        return null;
+      }
+      return mapped;
     } catch (err: any) {
       console.error('[FootballDB] Error getting scraped match by ID:', err?.message);
       return null;
@@ -1016,7 +1165,20 @@ export class FootballDB {
         ? '*'
         : 'match_id, stage, status, match_date, country, league_name, home_name, home_image, away_name, away_image, home_score, away_score, regulation_time, penalties, scraped_at';
       const rows = sqliteDb.prepare(`SELECT ${cols} FROM flashscore_scraped_matches ORDER BY scraped_at DESC LIMIT ?`).all(limit) as any[];
-      return rows.map((row) => mapScrapedMatchRow(row, includeJsonBlobs));
+      return rows
+        .map((row) => mapScrapedMatchRow(row, includeJsonBlobs))
+        .filter(
+          (m) =>
+            !isSimulationLeague(
+              undefined,
+              m.leagueName || m.stage,
+              m.country,
+              undefined,
+              m.stage,
+              m.home?.name,
+              m.away?.name
+            )
+        );
     } catch (err: any) {
       console.error('[FootballDB] Error getting scraped matches:', err?.message);
       return [];
@@ -1404,7 +1566,7 @@ export class FootballDB {
       tableData = standings || [];
     }
 
-    if (!leagueCode) return;
+    if (!leagueCode || isSimulationLeague(leagueCode, name, ctry, leagueUrl)) return;
 
     try {
       sqliteDb.prepare(`
@@ -1460,6 +1622,7 @@ export class FootballDB {
 
   getLeagueStandings(leagueCode: string, leagueUrl?: string, leagueName?: string): any {
     if (!isSqliteEnabled()) return null;
+    if (isSimulationLeague(leagueCode, leagueName, undefined, leagueUrl)) return null;
     const aliasMap: Record<string, string[]> = {
       'e0': ['england_premier_league'],
       'england_premier_league': ['e0'],
@@ -1503,6 +1666,7 @@ export class FootballDB {
         for (const row of urlRows) {
           const rowUrl = String(row.league_url || '').trim().replace(/\/+$/, '').toLowerCase();
           if (rowUrl && rowUrl === cleanUrl && row.standings_json) {
+            if (isSimulationLeague(row.league_code, row.league_name, row.country, row.league_url)) return null;
             return this.mapLeagueStandingsRow(row);
           }
         }
@@ -1531,6 +1695,7 @@ export class FootballDB {
           .prepare("SELECT * FROM league_standings WHERE LOWER(league_code) = LOWER(?) LIMIT 1")
           .get(code) as any;
         if (row && row.standings_json) {
+          if (isSimulationLeague(row.league_code, row.league_name, row.country, row.league_url)) return null;
           return this.mapLeagueStandingsRow(row);
         }
       }
@@ -1548,6 +1713,7 @@ export class FootballDB {
         .prepare("SELECT * FROM league_standings WHERE standings_json IS NOT NULL")
         .all() as any[];
       return rows
+        .filter((row) => !isSimulationLeague(row.league_code, row.league_name, row.country, row.league_url))
         .map((row) => this.mapLeagueStandingsRow(row))
         .filter((t) => Array.isArray(t.table) && t.table.length > 0);
     } catch (err: any) {
@@ -1572,20 +1738,22 @@ export class FootballDB {
         .prepare("SELECT league_code, league_name, country, league_url, season, standings_json, groups_json, updated_at FROM league_standings")
         .all() as any[];
 
-      return rows.map((row) => {
-        const parsedTable = safeJsonParse<any[]>(row.standings_json, []);
-        const parsedGroups = row.groups_json ? safeJsonParse<any[]>(row.groups_json, []) : [];
-        return {
-          leagueCode: String(row.league_code),
-          leagueName: String(row.league_name || row.league_code),
-          country: String(row.country || 'International'),
-          leagueUrl: row.league_url ? String(row.league_url) : undefined,
-          season: row.season ? String(row.season) : undefined,
-          teamCount: Array.isArray(parsedTable) ? parsedTable.length : 0,
-          groupCount: Array.isArray(parsedGroups) && parsedGroups.length > 0 ? parsedGroups.length : (Array.isArray(parsedTable) && parsedTable.length > 0 ? 1 : 0),
-          updatedAt: String(row.updated_at || ''),
-        };
-      });
+      return rows
+        .filter((row) => !isSimulationLeague(row.league_code, row.league_name, row.country, row.league_url))
+        .map((row) => {
+          const parsedTable = safeJsonParse<any[]>(row.standings_json, []);
+          const parsedGroups = row.groups_json ? safeJsonParse<any[]>(row.groups_json, []) : [];
+          return {
+            leagueCode: String(row.league_code),
+            leagueName: String(row.league_name || row.league_code),
+            country: String(row.country || 'International'),
+            leagueUrl: row.league_url ? String(row.league_url) : undefined,
+            season: row.season ? String(row.season) : undefined,
+            teamCount: Array.isArray(parsedTable) ? parsedTable.length : 0,
+            groupCount: Array.isArray(parsedGroups) && parsedGroups.length > 0 ? parsedGroups.length : (Array.isArray(parsedTable) && parsedTable.length > 0 ? 1 : 0),
+            updatedAt: String(row.updated_at || ''),
+          };
+        });
     } catch (err: any) {
       console.error('[FootballDB] Error getting standings summaries:', err?.message);
       return [];
@@ -1594,6 +1762,8 @@ export class FootballDB {
 
   saveLeagueVolatilitiesBatch(records: LeagueVolatilityRecord[]): void {
     if (!isSqliteEnabled() || !records || records.length === 0) return;
+    const validRecords = records.filter((r) => !isSimulationLeague(r.league_id, r.league_name));
+    if (validRecords.length === 0) return;
     try {
       const stmt = sqliteDb.prepare(`
         INSERT OR REPLACE INTO league_volatility (
@@ -1621,7 +1791,7 @@ export class FootballDB {
           );
         }
       });
-      saveTx(records);
+      saveTx(validRecords);
       notifyDbMutation();
     } catch (err: any) {
       console.error('[FootballDB] Error saving league volatility table:', err?.message);
@@ -1634,17 +1804,19 @@ export class FootballDB {
       const rows = sqliteDb
         .prepare("SELECT * FROM league_volatility ORDER BY matches_evaluated DESC, league_name ASC")
         .all() as any[];
-      return rows.map((r) => ({
-        league_id: String(r.league_id),
-        league_name: String(r.league_name),
-        volatility_coefficient: Number(r.volatility_coefficient ?? 1.0),
-        historical_log_loss: Number(r.historical_log_loss ?? 0),
-        elo_spread_iqr: Number(r.elo_spread_iqr ?? 0),
-        matches_evaluated: Number(r.matches_evaluated ?? 0),
-        temperature_alpha: r.temperature_alpha !== null && r.temperature_alpha !== undefined ? Number(r.temperature_alpha) : 1.0,
-        is_fallback: Boolean(r.is_fallback) || Number(r.matches_evaluated ?? 0) < 100,
-        updated_at: r.updated_at ? String(r.updated_at) : undefined,
-      }));
+      return rows
+        .filter((r) => !isSimulationLeague(r.league_id, r.league_name))
+        .map((r) => ({
+          league_id: String(r.league_id),
+          league_name: String(r.league_name),
+          volatility_coefficient: Number(r.volatility_coefficient ?? 1.0),
+          historical_log_loss: Number(r.historical_log_loss ?? 0),
+          elo_spread_iqr: Number(r.elo_spread_iqr ?? 0),
+          matches_evaluated: Number(r.matches_evaluated ?? 0),
+          temperature_alpha: r.temperature_alpha !== null && r.temperature_alpha !== undefined ? Number(r.temperature_alpha) : 1.0,
+          is_fallback: Boolean(r.is_fallback) || Number(r.matches_evaluated ?? 0) < 100,
+          updated_at: r.updated_at ? String(r.updated_at) : undefined,
+        }));
     } catch (err: any) {
       console.error('[FootballDB] Error getting league volatilities:', err?.message);
       return [];
@@ -1653,6 +1825,7 @@ export class FootballDB {
 
   getLeagueVolatility(leagueId?: string, leagueName?: string): LeagueVolatilityRecord | null {
     if (!isSqliteEnabled() || (!leagueId && !leagueName)) return null;
+    if (isSimulationLeague(leagueId, leagueName)) return null;
     try {
       const candidates = Array.from(
         new Set(
@@ -1671,6 +1844,7 @@ export class FootballDB {
           .prepare("SELECT * FROM league_volatility WHERE LOWER(league_id) = LOWER(?) OR LOWER(league_name) = LOWER(?) LIMIT 1")
           .get(c, c) as any;
         if (row) {
+          if (isSimulationLeague(row.league_id, row.league_name)) return null;
           const matchesEvaluated = Number(row.matches_evaluated ?? 0);
           const isFallback = Boolean(row.is_fallback) || matchesEvaluated < 100;
           return {

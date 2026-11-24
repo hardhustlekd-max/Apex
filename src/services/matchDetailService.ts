@@ -6,6 +6,7 @@ import { getRelativeDateStr, normalizeDateStr } from '../core/dateUtils.js';
 import { convertHistoricalMatchToFixture, flashscoreScraperService } from './flashscoreScraperService.js';
 import { OnDemandParser } from '../core/onDemandParser.js';
 import { ApexEngine } from '../core/poisson.js';
+import { isSimulationLeague } from '../core/leagueMapper.js';
 import { loggerService } from './loggerService.js';
 
 function buildFallbackTeamStats(teamName: string, recentMatches: TeamFormMatch[]): TeamStatsSummary {
@@ -123,7 +124,7 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
     }
   }
 
-  if (!stored) {
+  if (!stored || isSimulationLeague(stored.league, stored.leagueName, undefined, stored.leagueUrl, stored.stage, stored.homeTeam, stored.awayTeam)) {
     loggerService.addLog({
       level: 'WARN',
       category: 'DATA_FETCH',

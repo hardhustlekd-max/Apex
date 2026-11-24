@@ -164,6 +164,9 @@ export function getCodeForSlug(slug: string): string {
 
 import { GLOBAL_LEAGUES_DATASET } from './globalLeaguesDataset.js';
 import { isKnownVolatileLeague } from './volatileLeagues.js';
+import { isSimulationLeague } from './simulationLeagues.js';
+
+export { isSimulationLeague };
 
 // Pre-index global leagues for fast O(1) lookup
 const DATASET_BY_CODE = new Map<string, typeof GLOBAL_LEAGUES_DATASET[0]>();
@@ -275,14 +278,21 @@ export function matchesLeague(
 }
 
 /**
- * Checks whether a league/tournament belongs to an excluded competition (USA MLS, or known volatile leagues).
+ * Checks whether a league/tournament belongs to an excluded competition (simulation/virtual/esports, USA MLS, or known volatile leagues).
  */
 export function isExcludedLeague(
   league?: string,
   leagueName?: string,
   country?: string,
-  leagueUrl?: string
+  leagueUrl?: string,
+  stage?: string,
+  homeTeam?: string,
+  awayTeam?: string
 ): boolean {
+  if (isSimulationLeague(league, leagueName, country, leagueUrl, stage, homeTeam, awayTeam)) {
+    return true;
+  }
+
   if (isKnownVolatileLeague(league) || isKnownVolatileLeague(leagueName)) {
     return true;
   }

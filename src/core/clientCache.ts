@@ -8,7 +8,7 @@ import {
 import { LiveScore } from '../providers/types.js';
 
 const DB_NAME = 'football_engine_client_cache';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'cache_store';
 
 export interface CacheEntry<T> {
@@ -33,6 +33,20 @@ function openDatabase(): Promise<IDBDatabase | null> {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME);
+        } else if ((event.oldVersion || 0) < 3) {
+          const tx = (event.target as IDBOpenDBRequest).transaction;
+          const store = tx?.objectStore(STORE_NAME);
+          if (store) {
+            const cursorReq = store.openCursor();
+            cursorReq.onsuccess = (ev) => {
+              const cursor = (ev.target as IDBRequest<IDBCursorWithValue | null>).result;
+              if (!cursor) return;
+              if (String(cursor.key) !== 'engine_settings') {
+                cursor.delete();
+              }
+              cursor.continue();
+            };
+          }
         }
       };
 

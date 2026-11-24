@@ -14,7 +14,7 @@ import {
   StandingsCatalogItem,
 } from '../core/types.js';
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
-import { cleanStr, getLeagueAliases, matchesLeague } from '../core/leagueMapper.js';
+import { cleanStr, getLeagueAliases, isSimulationLeague, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
 import { isKnownVolatileLeague } from '../core/volatileLeagues.js';
 import {
@@ -428,6 +428,9 @@ class FixturesWorkerService {
 
         if (upcomingList.length > 0) {
           for (const f of upcomingList) {
+            if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) {
+              continue;
+            }
             const cleanId = cleanFixtureId(f.id);
             const p = predMap.get(f.id) || predMap.get(cleanId);
             const resolvedOdds =
@@ -469,6 +472,9 @@ class FixturesWorkerService {
 
           for (const p of predictionsList) {
             if ((p as any).match_state === 'completed' || p.status === 'FINISHED') continue;
+            if (isSimulationLeague(p.league, p.leagueName, undefined, p.leagueUrl, p.stage, p.homeTeam, p.awayTeam)) {
+              continue;
+            }
             const cleanId = cleanFixtureId(p.id);
             if (!mergedMap.has(cleanId)) {
               const pTimestamp =
@@ -493,6 +499,9 @@ class FixturesWorkerService {
           }
         } else {
           for (const p of predictionsList) {
+            if (isSimulationLeague(p.league, p.leagueName, undefined, p.leagueUrl, p.stage, p.homeTeam, p.awayTeam)) {
+              continue;
+            }
             const cleanId = cleanFixtureId(p.id);
             const resolvedOdds =
               p.marketOdds || p.prediction?.marketOdds || oddsMap.get(cleanId) || oddsMap.get(p.id);
@@ -729,6 +738,10 @@ class FixturesWorkerService {
     for (const r of nonLiveRecords) {
       const f = r.slimFixture;
 
+      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) {
+        continue;
+      }
+
       if (activeSingleDateObj) {
         if (!matchesResolvedDateFilter(f, activeSingleDateObj)) continue;
       } else if (hasDateRange) {
@@ -881,6 +894,7 @@ class FixturesWorkerService {
     }
 
     const filtered = rawLive.filter((f) => {
+      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) return false;
       if (league !== 'ALL' && !matchesLeague(f.league, f.leagueName, league)) return false;
       if (league === 'ALL' && excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) return false;
       if (search.length > 0) {
@@ -957,6 +971,7 @@ class FixturesWorkerService {
     for (const rec of this.records) {
       const f = rec.slimFixture;
       if (!f.hasPrediction || !rec.fullMarkets || rec.fullMarkets.length === 0) continue;
+      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) continue;
       if (excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) continue;
 
       if (!matchesResolvedDateFilter(f, todayResolved)) continue;
@@ -1048,6 +1063,7 @@ class FixturesWorkerService {
     const slimmed: Fixture[] = [];
     for (const m of rawMatches) {
       if (!m.prediction) continue;
+      if (isSimulationLeague(m.league, m.leagueName, undefined, m.leagueUrl, m.stage, m.homeTeam, m.awayTeam)) continue;
       if (resolvedDate && !matchesResolvedDateFilter(m, resolvedDate)) continue;
       if (search.length > 0) {
         const blob = `${m.homeTeam || ''} ${m.awayTeam || ''} ${m.leagueName || ''}`.toLowerCase();
@@ -1083,7 +1099,9 @@ class FixturesWorkerService {
       };
     }
 
-    const sorted: LeagueOptionDTO[] = GLOBAL_LEAGUES_DATASET.slice()
+    const sorted: LeagueOptionDTO[] = GLOBAL_LEAGUES_DATASET.filter(
+      (l) => !isSimulationLeague(l.code, l.name, l.country)
+    )
       .sort((a, b) => {
         const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
         const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
@@ -1181,6 +1199,7 @@ class FixturesWorkerService {
     for (const s of summaries) {
       const country = (s.country || 'International').trim();
       const name = cleanDisplayName(s.leagueName, country);
+      if (isSimulationLeague(s.leagueCode, name, country, s.leagueUrl)) continue;
       const existing = findExisting(s.leagueCode, name, country, s.leagueUrl);
       if (existing) {
         if (!existing.hasStandings && s.teamCount > 0) {
@@ -1216,6 +1235,7 @@ class FixturesWorkerService {
       const name = cleanDisplayName(d.tournament, country);
       const fallbackCode = cleanStr(`${country}_${name}`) || cleanStr(name);
       const code = (d.leagueCode || fallbackCode).toLowerCase();
+      if (isSimulationLeague(code, name, country, d.leagueUrl, d.tournament)) continue;
       const existing = findExisting(code, name, country, d.leagueUrl);
       if (existing) {
         if (!existing.leagueUrl && d.leagueUrl) {
@@ -1240,6 +1260,7 @@ class FixturesWorkerService {
     // 3. Merge Global Leagues Dataset entries if not already present
     for (const g of GLOBAL_LEAGUES_DATASET) {
       const country = (g.country || 'International').trim();
+      if (isSimulationLeague(g.code, g.name, country)) continue;
       const existing = findExisting(g.code, g.name, country);
       if (existing) continue;
 

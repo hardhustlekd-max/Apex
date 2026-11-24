@@ -7,6 +7,7 @@ import {
   ScrapedRawMatch,
 } from './feedParser.js';
 import { cleanFixtureId, HeadToHeadMeasurement } from './types.js';
+import { isSimulationLeague } from './leagueMapper.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 
@@ -30,7 +31,7 @@ export class OnDemandParser {
     if (rawData && rawData.rawText) {
       const matches = parseFeedText(rawData.rawText);
       const found = matches.find((m) => m.matchId === cleanId) || null;
-      if (found) {
+      if (found && !isSimulationLeague(undefined, found.tournament, found.country, found.leagueUrl, found.tournament, found.homeTeam, found.awayTeam)) {
         loggerService.addLog({
           level: 'SUCCESS',
           category: 'DATABASE',
@@ -44,7 +45,18 @@ export class OnDemandParser {
     // 2. Secondary lookup: Local SQLite scraped matches table (indexed single-row lookup)
     const existingScraped = db.getFlashscoreScrapedMatchById(fixtureId);
 
-    if (existingScraped) {
+    if (
+      existingScraped &&
+      !isSimulationLeague(
+        undefined,
+        existingScraped.leagueName || existingScraped.stage,
+        existingScraped.country,
+        undefined,
+        existingScraped.stage,
+        existingScraped.home?.name,
+        existingScraped.away?.name
+      )
+    ) {
       const homeScore = existingScraped.result?.home !== undefined ? parseInt(existingScraped.result.home, 10) : undefined;
       const awayScore = existingScraped.result?.away !== undefined ? parseInt(existingScraped.result.away, 10) : undefined;
       return {
@@ -63,7 +75,7 @@ export class OnDemandParser {
 
     // 3. Tertiary lookup: Local SQLite upcoming or historical fixtures table
     const fixture = db.getFixtureById(fixtureId) || db.getFixtureById(cleanId);
-    if (fixture) {
+    if (fixture && !isSimulationLeague(fixture.league, fixture.leagueName, undefined, fixture.leagueUrl, fixture.stage, fixture.homeTeam, fixture.awayTeam)) {
       return {
         matchId: cleanId,
         timestamp: fixture.timestamp || Math.floor(Date.now() / 1000),

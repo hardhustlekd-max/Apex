@@ -12,7 +12,7 @@ import {
 import { ApexEngine } from './poisson.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
-import { matchesLeague, getLeagueAliases, cleanStr } from './leagueMapper.js';
+import { matchesLeague, getLeagueAliases, cleanStr, isSimulationLeague } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr, parseDateMsNoon } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
 import { parseHeadToHeadFeedText, getTeamHistoricalMatches, teamMatchScore } from './feedParser.js';
@@ -75,6 +75,9 @@ export class ServerEngine {
     const twoYearsAgoMs = Date.now() - 2 * 365 * 24 * 60 * 60 * 1000;
 
     const filteredUniverse = universe.filter((m) => {
+      if (isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam)) {
+        return false;
+      }
       const s = m.season;
       if (s && (s === currentSeason || s === prevSeason)) return true;
       if (m.matchDate) {
@@ -569,6 +572,9 @@ export class ServerEngine {
     for (let i = 0; i < upcomingFixtures.length; i++) {
       const f = upcomingFixtures[i];
       if (!f?.id || seenIds.has(f.id)) continue;
+      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) {
+        continue;
+      }
       seenIds.add(f.id);
       validFixtures.push(f);
     }

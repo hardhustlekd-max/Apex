@@ -3,6 +3,7 @@ import { LiveScore } from '../providers/types.js';
 import { db } from '../core/db.js';
 import { isScrapingEnabled } from '../core/scrapingGate.js';
 import { getLeaguePriority } from '../core/leaguePriority.js';
+import { isSimulationLeague } from '../core/leagueMapper.js';
 
 export function convertHistoricalMatchToFixture(m: HistoricalMatch): Fixture {
   const homeScore = m.fthg ?? 0;
@@ -253,6 +254,9 @@ export class FlashscoreScraperService {
             const kickOffTime = `${hours}:${minutes}`;
 
             const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
+            if (isSimulationLeague(code, name, m.country, m.leagueUrl, m.tournament, m.homeTeam, m.awayTeam)) {
+              continue;
+            }
             const isLive = m.statusCode === '2';
             const isFinished = ['3', '10', '11', '47', '48', '49'].includes(m.statusCode || '');
             const isCancelledOrPostponed = ['4', '5', '6', '36', '37', '38'].includes(m.statusCode || '');
@@ -499,6 +503,9 @@ export class FlashscoreScraperService {
           const kickOffTime = `${hours}:${minutes}`;
 
           const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
+          if (isSimulationLeague(code, name, m.country, m.leagueUrl, m.tournament, m.homeTeam, m.awayTeam)) {
+            continue;
+          }
 
           const isLive = m.statusCode === '2';
           const fixture: Fixture = {
@@ -616,7 +623,13 @@ export class FlashscoreScraperService {
       return true;
     });
 
-    const liveScores: LiveScore[] = liveMatches.map((m) => {
+    const liveScores: LiveScore[] = [];
+    for (const m of liveMatches) {
+      const { code, name } = this.mapToLeagueCode(m.tournament || '', m.country || '');
+      if (isSimulationLeague(code, name, m.country, m.leagueUrl, m.tournament, m.homeTeam, m.awayTeam)) {
+        continue;
+      }
+
       let computedMinute = 45;
       let status: LiveScore['status'] = 'FIRST_HALF';
 
@@ -656,9 +669,8 @@ export class FlashscoreScraperService {
       }
 
       const finalMinute = (m.minute && m.minute > 0) ? m.minute : computedMinute;
-      const { code, name } = this.mapToLeagueCode(m.tournament || '', m.country || '');
 
-      return {
+      liveScores.push({
         fixtureId: `fs_${m.matchId}`,
         league: code,
         leagueName: name,
@@ -669,8 +681,8 @@ export class FlashscoreScraperService {
         minute: finalMinute,
         status,
         events: [],
-      };
-    });
+      });
+    }
 
     return liveScores;
   }
@@ -927,7 +939,7 @@ export class FlashscoreScraperService {
     maxSeasons = 2,
     allowPlaywrightFallback = false
   ): Promise<HistoricalMatch[]> {
-    if (!isScrapingEnabled()) {
+    if (!isScrapingEnabled() || isSimulationLeague(leagueCode, undefined, undefined, baseLeaguePath)) {
       return [];
     }
     const historicalMatches: HistoricalMatch[] = [];
@@ -1109,8 +1121,11 @@ export class FlashscoreScraperService {
 
       for (const m of finished) {
         if (seenHistIds.has(m.matchId)) continue;
+        const { code, name } = this.mapToLeagueCode(m.tournament, m.country);
+        if (isSimulationLeague(code, name, m.country, m.leagueUrl, m.tournament, m.homeTeam, m.awayTeam)) {
+          continue;
+        }
         seenHistIds.add(m.matchId);
-        const { code } = this.mapToLeagueCode(m.tournament, m.country);
         const matchDateObj = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
         const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
 
@@ -1996,6 +2011,10 @@ export class FlashscoreScraperService {
       this.normalizeLeagueBasePath(typeof targetInput === 'object' ? targetInput.leagueUrl : undefined) ||
       mappedUrlInfo?.path;
 
+    if (isSimulationLeague(cleanCode, resolvedName, resolvedCountry, baseLeagueUrl)) {
+      return null;
+    }
+
     if (!baseLeagueUrl) {
       const countrySlug = resolvedCountry
         .toLowerCase()
@@ -2094,6 +2113,9 @@ export class FlashscoreScraperService {
     const mergeTarget = (candidate: CatalogTarget) => {
       const normUrl = this.normalizeLeagueBasePath(candidate.leagueUrl);
       const normCode = candidate.leagueCode.toLowerCase().trim();
+      if (isSimulationLeague(normCode, candidate.leagueName, candidate.country, normUrl)) {
+        return;
+      }
       const tidKey =
         candidate.tournamentId && candidate.tournamentStageId
           ? `tid:${candidate.tournamentId}_${candidate.tournamentStageId}`
@@ -2246,6 +2268,18 @@ export class FlashscoreScraperService {
   ): Promise<LeagueStandingTable> {
     const cleanCode = (leagueCode || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const ctx = typeof slugOrContext === 'object' && slugOrContext !== null ? slugOrContext : undefined;
+    if (isSimulationLeague(cleanCode, ctx?.leagueName, undefined, ctx?.leagueUrl, undefined, ctx?.homeTeam, ctx?.awayTeam)) {
+      return {
+        leagueCode: cleanCode,
+        leagueName: ctx?.leagueName || cleanCode.replace(/_/g, ' ').toUpperCase(),
+        country: cleanCode.split('_')[0]?.toUpperCase() || 'LEAGUE',
+        season: getCurrentSeason(),
+        updatedAt: new Date().toISOString(),
+        source: 'FLASHSCORE_SCRAPED',
+        table: [],
+        groups: [],
+      };
+    }
     const homeTarget = ctx?.homeTeam?.trim() || '';
     const awayTarget = ctx?.awayTeam?.trim() || '';
 

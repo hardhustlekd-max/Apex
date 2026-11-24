@@ -7,7 +7,7 @@ import {
   TeamFormMatch,
 } from './types.js';
 import { getStandardDateStr, normalizeDateStr } from './dateUtils.js';
-import { isExcludedLeague } from './leagueMapper.js';
+import { isExcludedLeague, isSimulationLeague } from './leagueMapper.js';
 
 export const H2H_PARSER_VERSION = 3;
 
@@ -452,7 +452,15 @@ export function parseFeedText(feedText: string): ScrapedRawMatch[] {
         matchData.matchId &&
         matchData.homeTeam &&
         matchData.awayTeam &&
-        !isExcludedLeague(undefined, matchData.tournament, matchData.country, matchData.leagueUrl)
+        !isExcludedLeague(
+          undefined,
+          matchData.tournament,
+          matchData.country,
+          matchData.leagueUrl,
+          matchData.tournament,
+          matchData.homeTeam,
+          matchData.awayTeam
+        )
       ) {
         matches.push(matchData as ScrapedRawMatch);
       }
@@ -616,6 +624,9 @@ export function parseHeadToHeadFeedText(
       const matchDateObj = timestamp > 0 ? new Date(timestamp * 1000) : new Date();
       const dateStr = normalizeDateStr(getStandardDateStr(matchDateObj));
       const competition = d['KF'] || 'League';
+      if (isSimulationLeague(undefined, competition, undefined, undefined, undefined, rawHome, rawAway)) {
+        continue;
+      }
       const dedupKey = matchIdField || `${dateStr}__${rawHome.toLowerCase()}__${rawAway.toLowerCase()}`;
 
       if (currentSection === 'HOME_RECENT') {
@@ -811,6 +822,9 @@ function mapTeamRecentFromHistorical(teamName: string, matches: HistoricalMatch[
 
   const out: TeamFormMatch[] = [];
   for (const m of sorted) {
+    if (isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam)) {
+      continue;
+    }
     const side = resolveTeamSide(teamName, m.homeTeam, m.awayTeam);
     if (!side) continue;
     const isH = side === 'HOME';
@@ -846,7 +860,11 @@ export function buildFallbackH2HFromHistoricalDb(
   const awayRecentMatches = mapTeamRecentFromHistorical(awayTeam, awayHist);
 
   const sortedH2H = directH2H
-    .filter((m) => resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam).matched)
+    .filter(
+      (m) =>
+        !isSimulationLeague(m.div, m.leagueName, undefined, undefined, undefined, m.homeTeam, m.awayTeam) &&
+        resolveFixtureAlignment(homeTeam, awayTeam, m.homeTeam, m.awayTeam).matched
+    )
     .sort((a, b) => normalizeDateStr(b.matchDate).localeCompare(normalizeDateStr(a.matchDate)))
     .slice(0, 15);
 
