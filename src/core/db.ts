@@ -223,6 +223,22 @@ export class FootballDB {
     }
   }
 
+  public getAllUpcomingLeagues(): Array<{ league: string; leagueName: string; stage?: string; country?: string }> {
+    if (!isSqliteEnabled()) return [];
+    try {
+      const rows = sqliteDb
+        .prepare('SELECT DISTINCT league, league_name, stage FROM upcoming_fixtures WHERE league IS NOT NULL AND league_name IS NOT NULL')
+        .all() as any[];
+      return rows.map((r) => ({
+        league: r.league,
+        leagueName: r.league_name,
+        stage: r.stage,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async saveUpcomingFixtures(fixtures: Fixture[]): Promise<void> {
     this.saveUpcomingFixturesSync(fixtures);
   }

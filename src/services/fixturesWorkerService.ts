@@ -1392,20 +1392,64 @@ class FixturesWorkerService {
       };
     }
 
-    const sorted: LeagueOptionDTO[] = GLOBAL_LEAGUES_DATASET.filter(
-      (l) => !isSimulationLeague(l.code, l.name, l.country)
-    )
-      .sort((a, b) => {
-        const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
-        const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
-        if (scoreA !== scoreB) return scoreB - scoreA;
-        return a.name.localeCompare(b.name);
-      })
-      .map((l) => ({
-        code: l.code,
-        name: l.name,
-        country: l.country,
-      }));
+    const map = new Map<string, { code: string; name: string; country?: string }>();
+    for (const l of GLOBAL_LEAGUES_DATASET) {
+      if (!isSimulationLeague(l.code, l.name, l.country)) {
+        map.set(l.code.toLowerCase(), {
+          code: l.code,
+          name: l.name,
+          country: l.country,
+        });
+      }
+    }
+
+    if (isSqliteEnabled()) {
+      try {
+        db.init();
+        const dbLeagues = db.getAllUpcomingLeagues ? db.getAllUpcomingLeagues() : [];
+        for (const dl of dbLeagues) {
+          if (dl.league && dl.leagueName) {
+            const code = String(dl.league).trim();
+            const name = String(dl.leagueName).trim();
+            const key = code.toLowerCase();
+            if (!map.has(key) && !isSimulationLeague(code, name, undefined, undefined, dl.stage)) {
+              map.set(key, {
+                code,
+                name,
+                country: dl.stage || dl.country || 'Global',
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[FixturesWorker] Error loading db leagues catalog:', e);
+      }
+    }
+
+    if (this.records.length > 0) {
+      for (const r of this.records) {
+        const f = r.slimFixture;
+        if (f.league && f.leagueName) {
+          const code = String(f.league).trim();
+          const name = String(f.leagueName).trim();
+          const key = code.toLowerCase();
+          if (!map.has(key) && !isSimulationLeague(code, name, undefined, f.leagueUrl, f.stage)) {
+            map.set(key, {
+              code,
+              name,
+              country: f.stage || 'Global',
+            });
+          }
+        }
+      }
+    }
+
+    const sorted: LeagueOptionDTO[] = Array.from(map.values()).sort((a, b) => {
+      const scoreA = getLeaguePopularityScore(a.code, a.name, a.country ? `${a.country}: ${a.name}` : a.name);
+      const scoreB = getLeaguePopularityScore(b.code, b.name, b.country ? `${b.country}: ${b.name}` : b.name);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return a.name.localeCompare(b.name);
+    });
 
     const jsonPayload = JSON.stringify({
       success: true,
