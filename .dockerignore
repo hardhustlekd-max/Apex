@@ -1,6 +1,14 @@
 node_modules
 dist
 .git
+.aistudio
+public/assets/aistudio
+bun.lock
+api
+vercel.json
+DESIGN_SYSTEM.md
+README.md
+*.tsbuildinfo
 .env
 .env.*
 !.env.example

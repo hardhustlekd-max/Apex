@@ -21,7 +21,8 @@ export function notifyDbMutation(): void {
   }
 }
 
-export const DATA_DIR = process.env.DB_DIR || path.join(process.cwd(), 'data');
+export const DATA_DIR =
+  process.env.DB_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(), 'data');
 export const DB_PATH = path.join(DATA_DIR, 'football_engine.db');
 
 export class SqliteBlockedError extends Error {

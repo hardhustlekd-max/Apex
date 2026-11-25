@@ -2,15 +2,20 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
+ENV NODE_ENV=development
+
 # Native build toolchain for better-sqlite3 fallback compilation
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json* ./
-RUN npm install --include=dev || npm ci --include=dev || npm install
+COPY package.json package-lock.json ./
+RUN npm_config_engine_strict=false npm ci --include=dev
 
 COPY . .
-RUN mkdir -p data && npm run build && npm prune --omit=dev
+RUN mkdir -p data \
+  && npm run lint \
+  && NODE_OPTIONS="--max-old-space-size=1536" npm run build \
+  && npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runner
 

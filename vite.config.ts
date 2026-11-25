@@ -14,6 +14,16 @@ export default defineConfig(() => {
     build: {
       rollupOptions: {
         external: ['playwright'],
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('firebase')) return 'vendor-firebase';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('motion') || id.includes('framer-motion')) return 'vendor-motion';
+            if (id.includes('html-to-image')) return 'vendor-image-export';
+            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
+          },
+        },
       },
     },
     server: {
