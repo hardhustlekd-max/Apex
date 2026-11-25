@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { BetSelection, SlipBet } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import { Button } from './ui/index.js';
-import { Ticket, Trash2, X, ChevronUp, ChevronDown, CheckCircle2, Coins, Download, Sparkles } from 'lucide-react';
+import { Ticket, Trash2, X, ChevronUp, ChevronDown, CheckCircle2, Coins, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface BetSlipDrawerProps {
@@ -66,21 +66,128 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
     }
   };
 
+  const formatShortPick = (marketKey: string, marketName: string): string => {
+    const key = (marketKey || '').toUpperCase().trim();
+    switch (key) {
+      case 'HOME_WIN': return '1';
+      case 'DRAW': return 'X';
+      case 'AWAY_WIN': return '2';
+      case 'DOUBLE_CHANCE_1X': return '1X';
+      case 'DOUBLE_CHANCE_X2': return 'X2';
+      case 'DOUBLE_CHANCE_12': return '12';
+      case 'DNB_HOME': return '1 DNB';
+      case 'DNB_AWAY': return '2 DNB';
+      case 'OVER_05': return 'Over 0.5';
+      case 'UNDER_05': return 'Under 0.5';
+      case 'OVER_15': return 'Over 1.5';
+      case 'UNDER_15': return 'Under 1.5';
+      case 'OVER_25': return 'Over 2.5';
+      case 'UNDER_25': return 'Under 2.5';
+      case 'OVER_35': return 'Over 3.5';
+      case 'UNDER_35': return 'Under 3.5';
+      case 'OVER_45': return 'Over 4.5';
+      case 'UNDER_45': return 'Under 4.5';
+      case 'BTTS_YES': return 'GG';
+      case 'BTTS_NO': return 'NG';
+      case 'COMBO_1_OVER_15': return '1 & O1.5';
+      case 'COMBO_2_OVER_15': return '2 & O1.5';
+      case 'COMBO_1_OVER_25': return '1 & O2.5';
+      case 'COMBO_2_OVER_25': return '2 & O2.5';
+      case 'COMBO_1_OVER_35': return '1 & O3.5';
+      case 'COMBO_2_OVER_35': return '2 & O3.5';
+      case 'COMBO_1_UNDER_25': return '1 & U2.5';
+      case 'COMBO_2_UNDER_25': return '2 & U2.5';
+      case 'COMBO_1_UNDER_35': return '1 & U3.5';
+      case 'COMBO_2_UNDER_35': return '2 & U3.5';
+      case 'COMBO_X_UNDER_25': return 'X & U2.5';
+      case 'COMBO_X_OVER_15': return 'X & O1.5';
+      case 'COMBO_1_BTTS': return '1 & GG';
+      case 'COMBO_2_BTTS': return '2 & GG';
+      case 'COMBO_X_BTTS': return 'X & GG';
+      case 'COMBO_1X_OVER_15': return '1X & O1.5';
+      case 'COMBO_X2_OVER_15': return 'X2 & O1.5';
+      case 'COMBO_12_OVER_15': return '12 & O1.5';
+      case 'COMBO_1X_OVER_25': return '1X & O2.5';
+      case 'COMBO_X2_OVER_25': return 'X2 & O2.5';
+      case 'COMBO_12_OVER_25': return '12 & O2.5';
+      case 'COMBO_1X_UNDER_25': return '1X & U2.5';
+      case 'COMBO_X2_UNDER_25': return 'X2 & U2.5';
+      case 'COMBO_1X_UNDER_35': return '1X & U3.5';
+      case 'COMBO_X2_UNDER_35': return 'X2 & U3.5';
+      case 'COMBO_12_UNDER_35': return '12 & U3.5';
+      case 'COMBO_1X_BTTS': return '1X & GG';
+      case 'COMBO_X2_BTTS': return 'X2 & GG';
+      case 'COMBO_12_BTTS': return '12 & GG';
+      case 'COMBO_BTTS_OVER_25': return 'GG & O2.5';
+      case 'COMBO_BTTS_OVER_35': return 'GG & O3.5';
+      case 'COMBO_BTTS_UNDER_35': return 'GG & U3.5';
+      case 'COMBO_BTTS_NO_UNDER_25': return 'NG & U2.5';
+      case 'HOME_OVER_05': return 'H O0.5';
+      case 'HOME_UNDER_05': return 'H U0.5';
+      case 'HOME_OVER_15': return 'H O1.5';
+      case 'HOME_UNDER_15': return 'H U1.5';
+      case 'HOME_OVER_25': return 'H O2.5';
+      case 'HOME_UNDER_25': return 'H U2.5';
+      case 'AWAY_OVER_05': return 'A O0.5';
+      case 'AWAY_UNDER_05': return 'A U0.5';
+      case 'AWAY_OVER_15': return 'A O1.5';
+      case 'AWAY_UNDER_15': return 'A U1.5';
+      case 'AWAY_OVER_25': return 'A O2.5';
+      case 'AWAY_UNDER_25': return 'A U2.5';
+      case 'HOME_CLEAN_SHEET': return 'H CS';
+      case 'AWAY_CLEAN_SHEET': return 'A CS';
+      case 'HOME_WIN_TO_NIL': return '1 & NG';
+      case 'AWAY_WIN_TO_NIL': return '2 & NG';
+      case 'HANDICAP_HOME_MINUS_1': return 'H (-1.5)';
+      case 'HANDICAP_AWAY_MINUS_1': return 'A (-1.5)';
+      case 'MULTIGOALS_1_3': return 'MG 1-3';
+      case 'MULTIGOALS_2_4': return 'MG 2-4';
+      case 'MULTIGOALS_2_5': return 'MG 2-5';
+      case 'GOALS_ODD': return 'Odd';
+      case 'GOALS_EVEN': return 'Even';
+      default: {
+        const csMatch = /^CORRECT_SCORE_(\d+)_(\d+)$/.exec(key);
+        if (csMatch) return `CS ${csMatch[1]}-${csMatch[2]}`;
+        break;
+      }
+    }
+
+    const raw = (marketName || '').trim();
+    const low = raw.toLowerCase();
+    if (low === 'home win' || low === '1 (home win)' || low === 'home' || low === '1') return '1';
+    if (low === 'away win' || low === '2 (away win)' || low === 'away' || low === '2') return '2';
+    if (low === 'draw' || low === 'x (draw)' || low === 'x') return 'X';
+    if (low.includes('(1x)') || low.startsWith('1x ') || low.includes('home or draw') || low.includes('home/draw')) return '1X';
+    if (low.includes('(x2)') || low.startsWith('x2 ') || low.includes('draw or away') || low.includes('draw/away')) return 'X2';
+    if (low.includes('(12)') || low.startsWith('12 ') || low.includes('home or away') || low.includes('home/away')) return '12';
+    if (low === 'gg' || low.includes('btts yes') || low.includes('both teams to score (yes)') || low === 'both teams to score') return 'GG';
+    if (low === 'ng' || low.includes('btts no') || low.includes('both teams to score (no)')) return 'NG';
+    const ouMatch = raw.match(/(Over|Under)\s+(\d+(?:\.\d+)?)/i);
+    if (ouMatch) {
+      const side = ouMatch[1].charAt(0).toUpperCase() + ouMatch[1].slice(1).toLowerCase();
+      return `${side} ${ouMatch[2]}`;
+    }
+    return raw.replace(/\s*Goals$/i, '').trim() || 'Pick';
+  };
+
   const handleDownloadPoster = async () => {
     if (!posterRef.current || isGeneratingPoster) return;
     setIsGeneratingPoster(true);
     try {
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 120));
+      const exportHeight = Math.max(1372, posterRef.current.scrollHeight || 1372);
       const dataUrl = await toPng(posterRef.current, {
         cacheBust: true,
-        quality: 0.98,
-        pixelRatio: 2,
+        quality: 1.0,
+        pixelRatio: 1,
+        width: 747,
+        height: exportHeight,
       });
       const link = document.createElement('a');
-      link.download = `vip-accumulator-slip-${Date.now()}.png`;
+      link.download = `todays-top-${selections.length}-predictions-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
-      showToast('VIP Bet Slip poster downloaded successfully!', 'success');
+      showToast('Bet slip poster (747×1372) downloaded!', 'success');
     } catch (err: any) {
       console.error('Failed to generate poster:', err);
       showToast('Failed to generate poster image', 'info');
@@ -88,6 +195,10 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
       setIsGeneratingPoster(false);
     }
   };
+
+  const rowCount = selections.length;
+  const rowHeightPx = rowCount <= 5 ? 104 : rowCount <= 8 ? 96 : 89;
+  const rowGapPx = rowCount <= 6 ? 10 : 7;
 
   return (
     <>
@@ -219,10 +330,10 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   fullWidth
                   onClick={() => void handleDownloadPoster()}
                   disabled={isGeneratingPoster || selections.length === 0}
-                  className="bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-indigo-500/15 border-amber-500/30 hover:border-amber-500/60 font-semibold cursor-pointer"
+                  className="bg-gradient-to-r from-cyan-500/15 via-emerald-500/15 to-sky-500/15 border-cyan-500/35 hover:border-cyan-400/70 font-semibold cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>{isGeneratingPoster ? 'Generating Poster...' : 'Download Social Poster 📷'}</span>
+                  <Download className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                  <span>{isGeneratingPoster ? 'Generating Poster...' : 'Download Social Poster'}</span>
                 </Button>
               </div>
             </div>
@@ -230,87 +341,612 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
         )}
       </aside>
 
-      {/* Hidden High-End Social Media Poster Template for PNG export */}
-      <div className="fixed -left-[9999px] top-0 pointer-events-none select-none">
+      {/* Hidden 747x1372 Stadium Floodlight Social Poster Template for PNG export */}
+      <div className="fixed -left-[9999px] top-0 pointer-events-none select-none" aria-hidden="true">
         <div
           ref={posterRef}
-          style={{ width: '540px' }}
-          className="bg-gradient-to-br from-slate-950 via-zinc-900 to-indigo-950 text-slate-100 p-7 rounded-3xl shadow-2xl border border-amber-500/30 font-sans relative overflow-hidden"
+          style={{
+            width: '747px',
+            minHeight: '1372px',
+            boxSizing: 'border-box',
+            position: 'relative',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            background:
+              'linear-gradient(180deg, #040d18 0%, #081c30 28%, #0b2d42 48%, #102e24 62%, #1d431b 74%, #0f2511 88%, #040b06 100%)',
+            fontFamily: "'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', Arial, sans-serif",
+            color: '#ffffff',
+          }}
         >
-          {/* Ambient Glow Effects */}
-          <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+          {/* Stadium Night Sky, Floodlight Beams, Crowd Horizon & Pitch Markings SVG */}
+          <svg
+            viewBox="0 0 747 1372"
+            width="747"
+            height="1372"
+            preserveAspectRatio="xMidYMid slice"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+            }}
+          >
+            <defs>
+              <radialGradient id="poster-sky-glow" cx="50%" cy="22%" r="55%">
+                <stop offset="0%" stopColor="#1e6b8a" stopOpacity="0.45" />
+                <stop offset="55%" stopColor="#0a2840" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="#040d18" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="poster-flood-left" cx="4%" cy="38%" r="36%">
+                <stop offset="0%" stopColor="#e0faff" stopOpacity="0.95" />
+                <stop offset="18%" stopColor="#5efce8" stopOpacity="0.55" />
+                <stop offset="55%" stopColor="#0ea5e9" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="poster-flood-right" cx="96%" cy="38%" r="36%">
+                <stop offset="0%" stopColor="#e0faff" stopOpacity="0.95" />
+                <stop offset="18%" stopColor="#5efce8" stopOpacity="0.55" />
+                <stop offset="55%" stopColor="#0ea5e9" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+              </radialGradient>
+              <linearGradient id="poster-beam-l" x1="0%" y1="36%" x2="65%" y2="55%">
+                <stop offset="0%" stopColor="#67f8e4" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#67f8e4" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="poster-beam-r" x1="100%" y1="36%" x2="35%" y2="55%">
+                <stop offset="0%" stopColor="#67f8e4" stopOpacity="0.32" />
+                <stop offset="100%" stopColor="#67f8e4" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="poster-turf-wash" x1="0%" y1="54%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#091a24" stopOpacity="0.88" />
+                <stop offset="28%" stopColor="#2b5f24" stopOpacity="0.62" />
+                <stop offset="68%" stopColor="#143214" stopOpacity="0.82" />
+                <stop offset="100%" stopColor="#030804" stopOpacity="0.98" />
+              </linearGradient>
+              <radialGradient id="poster-center-turf" cx="50%" cy="68%" r="48%">
+                <stop offset="0%" stopColor="#4c8c38" stopOpacity="0.48" />
+                <stop offset="60%" stopColor="#1e4419" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#050d07" stopOpacity="0" />
+              </radialGradient>
+            </defs>
 
-          {/* Poster Header */}
-          <div className="relative z-10 flex items-center justify-between border-b border-white/10 pb-4 mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30 text-slate-950 font-black text-lg">
-                ⚡
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Verified VIP Tipster</span>
-                </div>
-                <h1 className="text-lg font-black tracking-tight text-white mt-0.5">
-                  EXPERT ACCUMULATOR SLIP
-                </h1>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400 block font-medium">Total Odds</span>
-              <span className="text-xl font-black text-amber-400 tabular-nums">
-                {totalOdds.toFixed(2)}x
+            {/* Atmospheric Sky Glow */}
+            <rect x="0" y="0" width="747" height="750" fill="url(#poster-sky-glow)" />
+
+            {/* Subtle Night Stars / Bokeh */}
+            <circle cx="92" cy="78" r="1.4" fill="#a5f3fc" opacity="0.55" />
+            <circle cx="195" cy="42" r="1.1" fill="#ffffff" opacity="0.45" />
+            <circle cx="628" cy="64" r="1.6" fill="#a5f3fc" opacity="0.6" />
+            <circle cx="690" cy="145" r="1.2" fill="#ffffff" opacity="0.4" />
+            <circle cx="48" cy="195" r="1.3" fill="#67e8f9" opacity="0.5" />
+            <circle cx="712" cy="240" r="1.5" fill="#a5f3fc" opacity="0.55" />
+
+            {/* Stadium Tier & Advertising Board Silhouette */}
+            <path d="M0 540 L747 540 L747 740 L0 740 Z" fill="#06131c" opacity="0.82" />
+            <rect x="0" y="728" width="747" height="24" fill="#0a1622" opacity="0.92" />
+            <rect x="0" y="728" width="747" height="3" fill="#22d3ee" opacity="0.35" />
+
+            {/* Crowd Bokeh Lights */}
+            <g opacity="0.35">
+              <circle cx="24" cy="648" r="3" fill="#e2e8f0" />
+              <circle cx="42" cy="662" r="2.5" fill="#fb7185" />
+              <circle cx="58" cy="638" r="3.2" fill="#38bdf8" />
+              <circle cx="18" cy="692" r="2.8" fill="#facc15" />
+              <circle cx="688" cy="650" r="3" fill="#e2e8f0" />
+              <circle cx="708" cy="666" r="2.6" fill="#38bdf8" />
+              <circle cx="725" cy="642" r="3.2" fill="#fb7185" />
+              <circle cx="696" cy="692" r="2.5" fill="#5efce8" />
+            </g>
+
+            {/* Turf & Center Pitch Lighting */}
+            <rect x="0" y="746" width="747" height="626" fill="url(#poster-turf-wash)" />
+            <rect x="0" y="746" width="747" height="626" fill="url(#poster-center-turf)" />
+
+            {/* Subtle Perspective Pitch Lines */}
+            <g stroke="#d9f99d" strokeOpacity="0.22" strokeWidth="2" fill="none">
+              <line x1="0" y1="785" x2="747" y2="785" />
+              <line x1="0" y1="845" x2="747" y2="845" strokeOpacity="0.11" />
+              <line x1="0" y1="920" x2="747" y2="920" strokeOpacity="0.09" />
+              <line x1="373.5" y1="746" x2="373.5" y2="1372" strokeOpacity="0.14" />
+              <ellipse cx="373.5" cy="905" rx="185" ry="52" strokeOpacity="0.14" />
+            </g>
+
+            {/* Left & Right Stadium Floodlight Beams */}
+            <polygon points="0,420 500,660 440,760 0,565" fill="url(#poster-beam-l)" />
+            <polygon points="747,420 247,660 307,760 747,565" fill="url(#poster-beam-r)" />
+            <rect x="0" y="250" width="380" height="520" fill="url(#poster-flood-left)" />
+            <rect x="367" y="250" width="380" height="520" fill="url(#poster-flood-right)" />
+
+            {/* Vertical Cyan Laser Edge Lines flanking Card */}
+            <line x1="42" y1="360" x2="42" y2="1120" stroke="#67f8e4" strokeWidth="2" strokeOpacity="0.55" />
+            <line x1="705" y1="360" x2="705" y2="1120" stroke="#67f8e4" strokeWidth="2" strokeOpacity="0.55" />
+          </svg>
+
+          {/* Top-Left Metallic Shield Emblem */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '24px',
+              left: '24px',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+          >
+            <svg width="58" height="66" viewBox="0 0 64 72" fill="none">
+              <defs>
+                <linearGradient id="shield-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#94a3b8" />
+                  <stop offset="50%" stopColor="#38bdf8" />
+                  <stop offset="100%" stopColor="#1e3a5f" />
+                </linearGradient>
+                <linearGradient id="shield-body" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#1e3a5f" />
+                  <stop offset="100%" stopColor="#071324" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M32 4 L58 14 V34 C58 50 46 62 32 68 C18 62 6 50 6 34 V14 L32 4 Z"
+                fill="url(#shield-body)"
+                stroke="url(#shield-rim)"
+                strokeWidth="3.5"
+              />
+              <path
+                d="M15 44 L49 18"
+                stroke="#7dd3fc"
+                strokeWidth="4.5"
+                strokeLinecap="round"
+                opacity="0.85"
+              />
+              <path
+                d="M19 52 L50 28"
+                stroke="#cbd5e1"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                opacity="0.55"
+              />
+              <circle cx="56" cy="15" r="5" fill="#67f8e4" opacity="0.65" />
+              <path d="M56 5 L57.5 13.5 L64 15 L57.5 16.5 L56 25 L54.5 16.5 L48 15 L54.5 13.5 Z" fill="#e0faff" />
+            </svg>
+          </div>
+
+          {/* Hero Title Block (cleared 96px left/right so shield never overlaps) */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              boxSizing: 'border-box',
+              paddingTop: '50px',
+              paddingBottom: '22px',
+              paddingLeft: '96px',
+              paddingRight: '96px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: selections.length >= 100 ? '46px' : '52px',
+                fontWeight: 900,
+                fontStyle: 'italic',
+                lineHeight: 0.96,
+                letterSpacing: '-0.02em',
+                textTransform: 'uppercase',
+                textShadow: '0 6px 16px rgba(0, 0, 0, 0.88)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ color: '#f8fafc' }}>TODAY&apos;S </span>
+              <span
+                style={{
+                  color: '#67f8e4',
+                  textShadow: '0 0 22px rgba(94, 252, 232, 0.45), 0 6px 16px rgba(0, 0, 0, 0.88)',
+                }}
+              >
+                TOP {selections.length}
               </span>
             </div>
+            <div
+              style={{
+                fontSize: '60px',
+                fontWeight: 900,
+                fontStyle: 'italic',
+                lineHeight: 0.96,
+                letterSpacing: '-0.02em',
+                textTransform: 'uppercase',
+                color: '#ffffff',
+                marginTop: '4px',
+                textShadow: '0 6px 18px rgba(0, 0, 0, 0.9)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {selections.length === 1 ? 'PREDICTION' : 'PREDICTIONS'}
+            </div>
           </div>
 
-          {/* Selections List */}
-          <div className="relative z-10 space-y-2.5 mb-6">
-            {selections.map((sel, idx) => (
+          {/* Glass Card Container Wrapper */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              width: '646px',
+              margin: '0 auto 38px auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <svg
+              width="66"
+              height="66"
+              viewBox="0 0 66 66"
+              style={{
+                position: 'absolute',
+                top: '-24px',
+                right: '-8px',
+                opacity: 0.28,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            >
+              <circle cx="33" cy="33" r="30" fill="#0e3a52" stroke="#67f8e4" strokeWidth="2" />
+              <polygon points="33,18 45,27 40,41 26,41 21,27" fill="#071e2c" stroke="#67f8e4" strokeWidth="1.5" />
+            </svg>
+
+            {/* Main Cyan-Bordered Glassmorphic Table Frame */}
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 5,
+                boxSizing: 'border-box',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                borderRadius: '22px',
+                border: '2.5px solid rgba(103, 248, 228, 0.82)',
+                background:
+                  'linear-gradient(180deg, rgba(10, 34, 52, 0.85) 0%, rgba(7, 23, 38, 0.91) 55%, rgba(5, 16, 28, 0.96) 100%)',
+                boxShadow:
+                  '0 0 28px rgba(45, 212, 191, 0.34), inset 0 0 22px rgba(45, 212, 191, 0.14), 0 22px 48px rgba(0, 0, 0, 0.72)',
+                padding: '10px 10px 0 10px',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Match Prediction Rows */}
               <div
-                key={sel.fixtureId || idx}
-                className="bg-white/[0.04] backdrop-blur-md border border-white/10 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: `${rowGapPx}px`,
+                }}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] text-amber-400/90 font-semibold uppercase tracking-wider mb-0.5">
-                    {sel.leagueName}
-                  </div>
-                  <div className="text-sm font-bold text-white tracking-tight truncate">
-                    {sel.homeTeam} vs {sel.awayTeam}
-                  </div>
-                  <div className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium mt-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    <span>🎯 Pick: {sel.marketName}</span>
-                  </div>
-                </div>
-                <div className="text-right shrink-0 bg-white/[0.06] px-3 py-2 rounded-xl border border-white/10">
-                  <span className="text-[10px] text-slate-400 block uppercase">Odds</span>
-                  <span className="text-base font-black text-white tabular-nums">{sel.odds.toFixed(2)}</span>
-                </div>
+                {selections.map((sel, idx) => {
+                  const shortPick = formatShortPick(sel.marketKey, sel.marketName);
+                  const pickFontSize =
+                    shortPick.length <= 4
+                      ? '27px'
+                      : shortPick.length <= 8
+                      ? '20px'
+                      : shortPick.length <= 12
+                      ? '16px'
+                      : '13px';
+                  const oddsFontSize = sel.odds >= 100 ? '19px' : '22px';
+
+                  return (
+                    <div
+                      key={sel.fixtureId || idx}
+                      style={{
+                        position: 'relative',
+                        boxSizing: 'border-box',
+                        height: `${rowHeightPx}px`,
+                        borderRadius: '14px',
+                        border: '1.5px solid rgba(94, 234, 212, 0.5)',
+                        background:
+                          'linear-gradient(180deg, rgba(22, 60, 84, 0.9) 0%, rgba(10, 32, 48, 0.96) 55%, rgba(6, 20, 33, 0.98) 100%)',
+                        boxShadow:
+                          'inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 12px rgba(0, 0, 0, 0.38)',
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) 1px 136px 1px 152px',
+                        alignItems: 'center',
+                        padding: '0 8px 0 12px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Column 1: Index Number + Fixture Title + Prediction Sub-line */}
+                      <div
+                        style={{
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          paddingRight: '10px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '30px',
+                            flexShrink: 0,
+                            fontSize: idx + 1 >= 10 ? '20px' : '22px',
+                            fontWeight: 800,
+                            fontStyle: 'italic',
+                            lineHeight: '26px',
+                            color: '#67f8e4',
+                            textShadow: '0 0 10px rgba(94, 252, 232, 0.6)',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              fontSize: '21px',
+                              fontWeight: 700,
+                              lineHeight: '26px',
+                              color: '#ffffff',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              letterSpacing: '-0.01em',
+                              textShadow: '0 2px 4px rgba(0, 0, 0, 0.65)',
+                            }}
+                          >
+                            {sel.homeTeam} vs {sel.awayTeam}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: '3px',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              lineHeight: '16px',
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                              color: '#bae6fd',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            PREDICTION: {shortPick}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Column 2: Vertical Hairline Divider 1 */}
+                      <div
+                        style={{
+                          width: '1px',
+                          height: '58px',
+                          background:
+                            'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.38) 50%, rgba(255,255,255,0) 100%)',
+                        }}
+                      />
+
+                      {/* Column 3: Middle PRED Column */}
+                      <div
+                        style={{
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 8px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            color: '#cbd5e1',
+                            textTransform: 'uppercase',
+                            lineHeight: 1.1,
+                          }}
+                        >
+                          PRED:
+                        </span>
+                        <span
+                          style={{
+                            maxWidth: '100%',
+                            fontSize: pickFontSize,
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            lineHeight: 1.15,
+                            marginTop: '2px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
+                          }}
+                        >
+                          {shortPick}
+                        </span>
+                      </div>
+
+                      {/* Column 4: Vertical Hairline Divider 2 */}
+                      <div
+                        style={{
+                          width: '1px',
+                          height: '58px',
+                          background:
+                            'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.38) 50%, rgba(255,255,255,0) 100%)',
+                        }}
+                      />
+
+                      {/* Column 5: Right ODDS Column */}
+                      <div
+                        style={{
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 6px',
+                          fontSize: oddsFontSize,
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          letterSpacing: '-0.01em',
+                          fontVariantNumeric: 'tabular-nums',
+                          textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        ODDS: {sel.odds.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
 
-          {/* Financial Summary Card */}
-          <div className="relative z-10 bg-gradient-to-r from-emerald-500/10 via-amber-500/10 to-indigo-500/10 border border-amber-500/25 rounded-2xl p-4 flex items-center justify-between gap-4 mb-5">
-            <div>
-              <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-semibold">Recommended Stake</span>
-              <span className="text-lg font-black text-white tabular-nums">{numericStake.toFixed(2)} Birr</span>
-            </div>
-            <div className="text-right">
-              <span className="text-[11px] text-emerald-400 uppercase tracking-wider block font-semibold">Potential Payout</span>
-              <span className="text-xl font-black text-emerald-400 tabular-nums">{potentialWin.toFixed(2)} Birr</span>
-            </div>
-          </div>
+              {/* Bottom Curved Speed Ribbon + Summary Strip + Soccer Ball */}
+              <div
+                style={{
+                  position: 'relative',
+                  boxSizing: 'border-box',
+                  height: '80px',
+                  marginTop: '10px',
+                  marginLeft: '-10px',
+                  marginRight: '-10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 130px 0 22px',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Flowing Cyan Ribbon Graphics */}
+                <svg
+                  viewBox="0 0 646 80"
+                  width="646"
+                  height="80"
+                  preserveAspectRatio="none"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <path
+                    d="M0 80 C85 34, 165 20, 250 80 Z"
+                    fill="#0d2a3d"
+                    opacity="0.85"
+                  />
+                  <path
+                    d="M360 80 C460 56, 540 26, 646 4 L646 80 Z"
+                    fill="#114e63"
+                    opacity="0.72"
+                  />
+                  <path
+                    d="M415 80 C495 58, 565 34, 646 14 L646 28 C575 46, 512 66, 460 80 Z"
+                    fill="#2dd4bf"
+                    opacity="0.38"
+                  />
+                  <path
+                    d="M0 60 C65 26, 130 24, 195 80"
+                    stroke="#67f8e4"
+                    strokeWidth="2"
+                    strokeOpacity="0.32"
+                    fill="none"
+                  />
+                </svg>
 
-          {/* Poster Footer Watermark */}
-          <div className="relative z-10 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-slate-300 font-semibold">AI Match Prediction Engine</span>
-            </div>
-            <div>
-              <span>Play Responsibly 18+</span>
+                {/* Accumulator Summary Metrics (clipped before soccer ball) */}
+                <div
+                  style={{
+                    position: 'relative',
+                    zIndex: 5,
+                    minWidth: 0,
+                    flex: 1,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  <div style={{ minWidth: 0, flexShrink: 0 }}>
+                    <span style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.07em', display: 'block' }}>
+                      TOTAL ODDS
+                    </span>
+                    <span style={{ fontSize: '20px', fontWeight: 900, color: '#67f8e4', lineHeight: 1.08, whiteSpace: 'nowrap' }}>
+                      {totalOdds.toFixed(2)}x
+                    </span>
+                  </div>
+                  <div style={{ width: '1px', height: '28px', flexShrink: 0, background: 'rgba(255,255,255,0.2)' }} />
+                  <div style={{ minWidth: 0, flexShrink: 0 }}>
+                    <span style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.07em', display: 'block' }}>
+                      STAKE
+                    </span>
+                    <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', lineHeight: 1.08, whiteSpace: 'nowrap' }}>
+                      {numericStake.toFixed(0)} Br
+                    </span>
+                  </div>
+                  <div style={{ width: '1px', height: '28px', flexShrink: 0, background: 'rgba(255,255,255,0.2)' }} />
+                  <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.07em', display: 'block' }}>
+                      PAYOUT
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '20px',
+                        fontWeight: 900,
+                        color: '#34d399',
+                        lineHeight: 1.08,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: 'block',
+                      }}
+                    >
+                      {potentialWin.toFixed(2)} Br
+                    </span>
+                  </div>
+                </div>
+
+                {/* Classic 3D Soccer Ball at Bottom-Right */}
+                <svg
+                  width="88"
+                  height="88"
+                  viewBox="0 0 100 100"
+                  style={{
+                    position: 'absolute',
+                    right: '22px',
+                    bottom: '-14px',
+                    zIndex: 6,
+                    pointerEvents: 'none',
+                    filter: 'drop-shadow(0 -2px 10px rgba(0,0,0,0.7))',
+                  }}
+                >
+                  <defs>
+                    <radialGradient id="soccer-sphere" cx="38%" cy="32%" r="65%">
+                      <stop offset="0%" stopColor="#ffffff" />
+                      <stop offset="65%" stopColor="#cbd5e1" />
+                      <stop offset="100%" stopColor="#475569" />
+                    </radialGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="46" fill="url(#soccer-sphere)" stroke="#1e293b" strokeWidth="2" />
+                  <polygon points="50,31 66,43 60,61 40,61 34,43" fill="#0f172a" />
+                  <polygon points="50,5 62,13 58,25 42,25 38,13" fill="#0f172a" />
+                  <polygon points="10,36 22,30 28,43 20,56 8,51" fill="#0f172a" />
+                  <polygon points="90,36 78,30 72,43 80,56 92,51" fill="#0f172a" />
+                  <polygon points="24,78 36,70 46,82 36,93 22,88" fill="#0f172a" />
+                  <polygon points="76,78 64,70 54,82 64,93 78,88" fill="#0f172a" />
+                  <g stroke="#334155" strokeWidth="2" fill="none">
+                    <line x1="50" y1="31" x2="50" y2="25" />
+                    <line x1="34" y1="43" x2="28" y2="43" />
+                    <line x1="66" y1="43" x2="72" y2="43" />
+                    <line x1="40" y1="61" x2="36" y2="70" />
+                    <line x1="60" y1="61" x2="64" y2="70" />
+                  </g>
+                </svg>
+              </div>
             </div>
           </div>
         </div>
