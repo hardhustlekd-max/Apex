@@ -1202,8 +1202,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <p className="text-2xs text-theme-sub leading-relaxed">
                     {resetCalcData
-                      ? 'Wipes all stored upcoming and historical predictions, fixture market/stats caches, and H2H measurement matrices before recalculating.'
-                      : 'Preserves evaluated historical predictions and cached H2H measurements while recalculating upcoming fixtures.'}
+                      ? 'Wipes all stored upcoming and historical predictions, fixture market/stats caches, and H2H measurement matrices before recalculating all markets & combo bet markets.'
+                      : 'Preserves evaluated historical predictions (and refreshes their combo markets) while recalculating all markets including combo bet markets for upcoming fixtures.'}
                   </p>
                 </div>
               </label>
@@ -1494,7 +1494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </Card>
 
-            {/* Action Card: Export 1X2 Predictions to JSON */}
+            {/* Action Card: Export All-Market Predictions to JSON */}
             <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
               <SectionHeader
                 title="Export Predictions"
@@ -1503,7 +1503,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
 
               <p className="text-sm font-normal text-theme-sub leading-relaxed font-sans">
-                Export all 1X2 model predictions to JSON for offline archiving or accuracy evaluation.
+                Export all calculated market predictions (1X2, Combo Bet Markets, Double Chance, O/U, BTTS, Team Goals &amp; Specials) to JSON.
               </p>
 
               {exportToast && (
@@ -1540,7 +1540,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 disabled={!isSqliteActive || isExporting || isOperating}
               >
                 <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
-                <span>{isExporting ? 'Exporting Predictions...' : 'Export 1X2 Predictions (JSON)'}</span>
+                <span>{isExporting ? 'Exporting Predictions...' : 'Export All-Market Predictions (JSON)'}</span>
               </Button>
             </Card>
 
@@ -1562,7 +1562,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-sky-400 shrink-0" />
-                  <span>Double Chance (1X, X2, 12)</span>
+                  <span>Double Chance &amp; Draw No Bet</span>
+                </div>
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-rose-400 shrink-0" />
+                  <span>Combo Bet Markets (Result/DC/BTTS + Goals)</span>
+                </div>
+                <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-violet-400 shrink-0" />
+                  <span>Team Goals, Win to Nil &amp; Specials</span>
                 </div>
               </div>
             </Card>

@@ -78,7 +78,7 @@ export default function App() {
   const [isLoadingFixtures, setIsLoadingFixtures] = useState<boolean>(true);
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('TODAY');
-  const [marketChoiceFilter, setMarketChoiceFilter] = useState<'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS'>('MOST_LIKELY');
+  const [marketChoiceFilter, setMarketChoiceFilter] = useState<'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS'>('MOST_LIKELY');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'WIREFRAME' | 'CARDS'>('WIREFRAME');

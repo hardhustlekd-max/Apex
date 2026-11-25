@@ -674,13 +674,16 @@ const MatchDetailDrawerContent: React.FC<{
     if (allMarketsList.length === 0) return [];
     const groups: Record<string, (typeof allMarketsList)[number]> = {};
     allMarketsList.forEach((market) => {
-      if (market.category === 'COMBOS') return;
+      if (['OVER_05', 'UNDER_05', 'OVER_45', 'UNDER_45', 'HOME_UNDER_25', 'AWAY_UNDER_25'].includes(market.key)) {
+        return;
+      }
       let group = '';
       if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
       else if (market.key.startsWith('DOUBLE_CHANCE')) group = 'Double Chance';
       else if (market.key.startsWith('DNB')) group = 'Draw No Bet';
       else if (market.key === 'OVER_25' || market.key === 'UNDER_25') group = 'Goals O/U 2.5';
       else if (market.key.startsWith('BTTS')) group = 'BTTS';
+      else if (market.category === 'COMBOS') group = 'Combos';
       else if (market.key === 'HOME_OVER_15' || market.key === 'AWAY_OVER_15' || market.key === 'HOME_CLEAN_SHEET' || market.key === 'AWAY_CLEAN_SHEET') group = 'Team Markets';
       else if (market.key === 'MULTIGOALS_1_3' || market.key === 'MULTIGOALS_2_4') group = 'Multi-Goals';
       if (group && (!groups[group] || market.probability > groups[group].probability)) {
@@ -691,9 +694,6 @@ const MatchDetailDrawerContent: React.FC<{
   }, [allMarketsList]);
 
   const recommendedPick = useMemo(() => {
-    if (currentFixture.authoritativePick) {
-      return currentFixture.authoritativePick;
-    }
     if (bestMarketsPerGroup.length > 0) {
       const sorted = bestMarketsPerGroup.slice().sort((a, b) => b.probability - a.probability);
       const top = sorted[0];
@@ -706,8 +706,31 @@ const MatchDetailDrawerContent: React.FC<{
         probabilityFormatted: `${pct.toFixed(1)}%`,
       };
     }
+    const ml = currentFixture.mostLikelyOutcome || pred?.mostLikelyOutcome;
+    if (ml?.marketKey) {
+      const pct = getProbValue(ml.probability, 1);
+      return {
+        key: ml.marketKey,
+        label: ml.selection,
+        probability: ml.probability,
+        probabilityPercent: pct,
+        probabilityFormatted: `${pct.toFixed(1)}%`,
+      };
+    }
+    if (currentFixture.highestPick?.key) {
+      return {
+        key: currentFixture.highestPick.key,
+        label: currentFixture.highestPick.label,
+        probability: currentFixture.highestPick.probability,
+        probabilityPercent: currentFixture.highestPick.probabilityPercent,
+        probabilityFormatted: currentFixture.highestPick.probabilityFormatted,
+      };
+    }
+    if (currentFixture.authoritativePick) {
+      return currentFixture.authoritativePick;
+    }
     return null;
-  }, [currentFixture.authoritativePick, bestMarketsPerGroup]);
+  }, [bestMarketsPerGroup, currentFixture.mostLikelyOutcome, pred?.mostLikelyOutcome, currentFixture.highestPick, currentFixture.authoritativePick]);
 
   const rawH2H: HeadToHeadMeasurement = useMemo(() => (
     scrapedH2H ||

@@ -57,7 +57,12 @@ function attachPredictionsToLiveScores(liveScores: LiveScore[]): Fixture[] {
     const cleanId = cleanFixtureId(lf.id);
     const stored = predMap.get(lf.id) || predMap.get(cleanId);
     if (stored && stored.prediction) {
-      return { ...lf, prediction: stored.prediction };
+      return {
+        ...lf,
+        prediction: stored.prediction,
+        markets: stored.markets,
+        mostLikelyOutcome: stored.mostLikelyOutcome,
+      };
     }
     return lf;
   });
@@ -712,20 +717,25 @@ export class SyncJobService {
       const totalCount = upcoming.length;
 
       if (totalCount === 0) {
+        let backfilledCompleted = 0;
         if (options.resetData) {
           await predictionsDb.clearPredictions('all', 'reset_predictions');
           db.clearAllPredictionData();
+        } else {
+          backfilledCompleted = predictionsDb.backfillAllMarketPredictionsSync().updatedCount;
         }
         this.updateProgress(jobId, {
           status: 'COMPLETED',
           progress: 100,
           currentStep: 'Completed',
-          matchesCount: 0,
+          matchesCount: backfilledCompleted,
           skippedCount: 0,
           upcomingCount: 0,
           predictionsCount: predictionsDb.count('all'),
           message: options.resetData
             ? 'Existing prediction data reset; no upcoming fixtures found in database.'
+            : backfilledCompleted > 0
+            ? `Updated ${backfilledCompleted} stored prediction(s) to include all markets & combo bet predictions; no upcoming fixtures pending.`
             : 'No upcoming fixtures found in database to update.',
           endTime: Date.now(),
         });
@@ -743,10 +753,11 @@ export class SyncJobService {
         matchesCount: 0,
         skippedCount: 0,
         currentStep: options.resetData
-          ? `Resetting all existing prediction data and caches before calculating ${totalCount} matches...`
-          : `Refreshing ${totalCount} upcoming predictions in SQLite database...`,
+          ? `Resetting all existing prediction data and caches before calculating all-market & combo predictions for ${totalCount} matches...`
+          : `Refreshing all-market & combo predictions for ${totalCount} upcoming matches in SQLite database...`,
       });
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      let backfilledCount = 0;
       await this.runStepWithTimeout(
         jobId,
         options.resetData ? 'Resetting existing prediction data' : 'Purging upcoming predictions',
@@ -757,18 +768,19 @@ export class SyncJobService {
             db.clearAllPredictionData();
           } else {
             await predictionsDb.clearPredictions('upcoming', 'update_predictions');
+            backfilledCount = predictionsDb.backfillAllMarketPredictionsSync().updatedCount;
           }
         }
       );
 
       if (this.isTerminated(jobId)) return;
 
-      // Step 3: Recalculate predictions in chunks using pure local DB data
+      // Step 3: Recalculate all-market + combo predictions in chunks using pure local DB data
       const existingCompletedCount = predictionsDb.count('completed');
       this.updateProgress(jobId, {
         stepIndex: 3,
         totalSteps: 3,
-        currentStep: `Recalculating predictions for ${totalCount} matches in chunks...`,
+        currentStep: `Calculating all markets & combo bet markets for ${totalCount} matches in chunks...`,
       });
 
       const { predictedCount, skippedCount } = await ServerEngine.recalculateUpcomingFromDbInChunks(
@@ -783,7 +795,7 @@ export class SyncJobService {
             skippedCount: skipped,
             upcomingCount: totalCount,
             predictionsCount: existingCompletedCount + predicted,
-            currentStep: `Processed ${processed}/${total} matches (${predicted} predicted, ${skipped} skipped)`,
+            currentStep: `Calculated all markets & combos for ${processed}/${total} matches (${predicted} predicted, ${skipped} skipped)`,
           });
         },
         {
@@ -798,7 +810,9 @@ export class SyncJobService {
 
       const finalStats = await collectEngineStatsSummary();
       const totalPredictionsCount = finalStats.predictionsCount;
-      const finalMessage = `Successfully recalculated predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <90% data completeness).`;
+      const backfillSuffix =
+        backfilledCount > 0 ? ` Refreshed ${backfilledCount} historical records with full combo markets.` : '';
+      const finalMessage = `Successfully calculated all-market & combo predictions for ${predictedCount} upcoming matches (${skippedCount} skipped due to <70% data completeness).${backfillSuffix}`;
 
       const now = Date.now();
       this.updateProgress(jobId, {

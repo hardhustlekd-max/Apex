@@ -2315,21 +2315,19 @@ export class ApexEngine {
     addMarket('GOALS_ODD', 'Total Goals - Odd', r3(goalsOdd));
     addMarket('GOALS_EVEN', 'Total Goals - Even', r3(1 - goalsOdd));
 
-    // Identify MOST LIKELY Outcome strictly from core primary markets so extreme O/U 0.5/4.5 lines don't overshadow main tips
-    const CORE_PRIMARY_KEYS = new Set<MarketOption['key']>([
-      'HOME_WIN',
-      'DRAW',
-      'AWAY_WIN',
-      'OVER_25',
-      'UNDER_25',
-      'BTTS_YES',
-      'BTTS_NO',
-      'DOUBLE_CHANCE_1X',
-      'DOUBLE_CHANCE_X2',
+    // Identify MOST LIKELY Outcome across ALL calculated markets including Combo Bet Markets, Double Chance, DNB, O/U, BTTS, Team Markets & Specials
+    // Exclude only trivial extreme goal lines (0.5 / 4.5 / team U2.5) so meaningful main & combo markets lead.
+    const TRIVIAL_EXTREME_KEYS = new Set<MarketOption['key']>([
+      'OVER_05',
+      'UNDER_05',
+      'OVER_45',
+      'UNDER_45',
+      'HOME_UNDER_25',
+      'AWAY_UNDER_25',
     ]);
-    const coreCandidates = markets.filter((m) => CORE_PRIMARY_KEYS.has(m.key));
-    let mostLikelyMarket = coreCandidates[0] || markets[0];
-    for (const m of coreCandidates) {
+    const outcomeCandidates = markets.filter((m) => !TRIVIAL_EXTREME_KEYS.has(m.key));
+    let mostLikelyMarket = outcomeCandidates[0] || markets[0];
+    for (const m of outcomeCandidates) {
       if (m.probability > (mostLikelyMarket?.probability || 0)) {
         mostLikelyMarket = m;
       }

@@ -1,10 +1,12 @@
-import { cleanFixtureId, Fixture } from './types.js';
+import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, MarketOption } from './types.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
 import { isSimulationLeague } from './leagueMapper.js';
 import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
 import { sqliteDb, notifyDbMutation, isSqliteEnabled } from './sqliteClient.js';
 import { isScrapingEnabled } from './scrapingGate.js';
 import { loggerService } from '../services/loggerService.js';
+import { evaluateMarketOutcome, normalizeMarketKey } from './marketEvaluator.js';
+import { ApexEngine } from './poisson.js';
 
 export interface PredictionEvaluationSummary {
   upcomingFixturesInDb: number;
@@ -150,18 +152,35 @@ export class PredictionsDB {
             }
 
             const pred = f.prediction;
-            const bestTip = f.mostLikelyOutcome;
+            let resolvedMarkets = f.markets;
+            let bestTip = f.mostLikelyOutcome || pred.mostLikelyOutcome;
 
-            // Determine authoritative tip key/name/prob for DB summary columns
+            if (!resolvedMarkets || resolvedMarkets.length === 0 || !bestTip) {
+              const calc = ApexEngine.calculateMarkets(
+                pred,
+                DEFAULT_ENGINE_SETTINGS,
+                f.homeTeam,
+                f.awayTeam,
+                f.marketOdds || pred.marketOdds
+              );
+              if (!resolvedMarkets || resolvedMarkets.length === 0) {
+                resolvedMarkets = calc.markets;
+              }
+              if (!bestTip) {
+                bestTip = calc.mostLikelyOutcome;
+              }
+            }
+
+            // Determine authoritative tip key/name/prob across all markets including combo markets
             const hw = Number(pred.homeWinProb ?? 0);
             const dr = Number(pred.drawProb ?? 0);
             const aw = Number(pred.awayWinProb ?? 0);
 
-            let tipKey = bestTip?.marketKey || 'HOME_WIN';
-            let tipName = (bestTip as any)?.selection || bestTip?.marketKey || `${f.homeTeam} Win`;
-            let tipProb = bestTip?.probability ?? hw;
+            let tipKey = bestTip?.marketKey || '';
+            let tipName = (bestTip as any)?.selection || bestTip?.marketKey || '';
+            let tipProb = Number(bestTip?.probability ?? 0);
 
-            if (hw > 0 || dr > 0 || aw > 0) {
+            if (!tipKey && (hw > 0 || dr > 0 || aw > 0)) {
               if (hw >= dr && hw >= aw) {
                 tipKey = 'HOME_WIN';
                 tipName = `${f.homeTeam} Win`;
@@ -176,6 +195,21 @@ export class PredictionsDB {
                 tipProb = dr;
               }
             }
+            if (!tipKey) {
+              tipKey = 'HOME_WIN';
+              tipName = `${f.homeTeam} Win`;
+              tipProb = hw;
+            }
+
+            const fixtureToStore: Fixture = {
+              ...f,
+              markets: resolvedMarkets,
+              mostLikelyOutcome: bestTip,
+              prediction: {
+                ...pred,
+                mostLikelyOutcome: bestTip || pred.mostLikelyOutcome,
+              },
+            };
 
             // Determine match state: only mark as completed if status is FINISHED/POSTPONED/CANCELLED or FT
             const statusUpper = String(f.status || 'SCHEDULED').toUpperCase();
@@ -214,7 +248,7 @@ export class PredictionsDB {
               tipKey,
               tipName,
               tipProb,
-              this.sanitizeFixtureForStorage(f),
+              this.sanitizeFixtureForStorage(fixtureToStore),
               now
             );
             savedCount++;
@@ -475,19 +509,121 @@ export class PredictionsDB {
     console.warn(`[PredictionsDB] Blocked unauthorized clearAll call (origin=${String(origin || 'none')}).`);
   }
 
-  getHistoricalPredictions(filters?: { league?: string; limit?: number }): Fixture[] {
-    const list = this.getPredictions({ ...filters, state: 'completed' });
-    if (filters?.limit && filters.limit > 0 && list.length > filters.limit) {
-      // Sort descending by date/time before slicing if limited
-      const sortedDesc = list.slice().sort((a, b) => {
-        const da = normalizeDateStr(a.matchDate);
-        const db = normalizeDateStr(b.matchDate);
-        if (da !== db) return db.localeCompare(da);
-        return normalizeTimeStr(b.kickOffTime || '00:00').localeCompare(normalizeTimeStr(a.kickOffTime || '00:00'));
+  /**
+   * Ensures all existing stored prediction rows (including preserved completed/historical rows)
+   * contain complete multi-market + combo bet market calculations and all-market tip metadata.
+   */
+  backfillAllMarketPredictionsSync(): { updatedCount: number } {
+    if (!isSqliteEnabled()) return { updatedCount: 0 };
+
+    try {
+      const rows = sqliteDb
+        .prepare(
+          `SELECT fixture_id, home_team, away_team, tip_key, full_fixture_json
+           FROM predictions
+           WHERE full_fixture_json IS NOT NULL`
+        )
+        .all() as Array<{
+          fixture_id: string;
+          home_team: string;
+          away_team: string;
+          tip_key: string | null;
+          full_fixture_json: string;
+        }>;
+
+      if (!rows || rows.length === 0) return { updatedCount: 0 };
+
+      const updateStmt = sqliteDb.prepare(`
+        UPDATE predictions
+        SET tip_key = ?, tip_name = ?, tip_prob = ?, full_fixture_json = ?
+        WHERE fixture_id = ?
+      `);
+
+      let updatedCount = 0;
+      const runTx = sqliteDb.transaction(() => {
+        for (const row of rows) {
+          try {
+            const parsed = JSON.parse(row.full_fixture_json) as Fixture;
+            if (!parsed?.prediction) continue;
+
+            const hasCombos =
+              Array.isArray(parsed.markets) &&
+              parsed.markets.some((m) => m.key.startsWith('COMBO_'));
+            const currentMostLikely = parsed.mostLikelyOutcome || parsed.prediction.mostLikelyOutcome;
+
+            const calc = ApexEngine.calculateMarkets(
+              parsed.prediction,
+              DEFAULT_ENGINE_SETTINGS,
+              parsed.homeTeam || row.home_team,
+              parsed.awayTeam || row.away_team,
+              parsed.marketOdds || parsed.prediction.marketOdds
+            );
+
+            const targetMostLikely = calc.mostLikelyOutcome || currentMostLikely;
+            const targetKey = targetMostLikely?.marketKey || row.tip_key || 'HOME_WIN';
+            const targetName =
+              targetMostLikely?.selection ||
+              parsed.homeTeam ||
+              row.home_team ||
+              targetKey;
+            const targetProb = Number(targetMostLikely?.probability ?? 0);
+
+            const needsUpdate =
+              !hasCombos ||
+              !currentMostLikely ||
+              currentMostLikely.marketKey !== targetKey ||
+              row.tip_key !== targetKey;
+
+            if (!needsUpdate) continue;
+
+            const updatedFixture: Fixture = {
+              ...parsed,
+              markets: calc.markets,
+              mostLikelyOutcome: targetMostLikely,
+              prediction: {
+                ...parsed.prediction,
+                mostLikelyOutcome: targetMostLikely,
+                bestValueBet: calc.bestValueBet || parsed.prediction.bestValueBet,
+              },
+            };
+
+            updateStmt.run(
+              targetKey,
+              targetName,
+              targetProb,
+              this.sanitizeFixtureForStorage(updatedFixture),
+              row.fixture_id
+            );
+            updatedCount++;
+          } catch {
+            // Skip malformed row JSON
+          }
+        }
       });
+
+      runTx();
+      if (updatedCount > 0) {
+        notifyDbMutation();
+      }
+      return { updatedCount };
+    } catch (err: any) {
+      console.warn('[PredictionsDB] Error backfilling all-market predictions:', err?.message);
+      return { updatedCount: 0 };
+    }
+  }
+
+  getHistoricalPredictions(filters?: { league?: string; limit?: number }): Fixture[] {
+    const list = this.getPredictions({ ...filters, state: 'completed', skipSort: true });
+    const sortedDesc = list.slice().sort((a, b) => {
+      const da = normalizeDateStr(a.matchDate);
+      const db = normalizeDateStr(b.matchDate);
+      if (da !== db) return db.localeCompare(da);
+      return normalizeTimeStr(b.kickOffTime || '00:00').localeCompare(normalizeTimeStr(a.kickOffTime || '00:00'));
+    });
+    if (filters?.limit && filters.limit > 0 && sortedDesc.length > filters.limit) {
       return sortedDesc.slice(0, filters.limit);
     }
-    return list;
+    return sortedDesc;
   }
 
   async getHistoricalPredictionsAsync(filters?: any): Promise<Fixture[]> {
@@ -995,16 +1131,17 @@ export class PredictionsDB {
       over25Prob: number | null;
       over35Prob: number | null;
       bttsProb: number | null;
-      tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN';
+      tipKey: string;
       tipName: string;
       tipProb: number;
+      markets?: Array<{ key: string; name: string; probability: number }>;
       predictedAt: string;
     }>;
   } {
     if (!isSqliteEnabled()) {
       return {
-        format: 'APEX_1X2_PREDICTIONS',
-        version: '1.0',
+        format: 'APEX_ALL_MARKETS_PREDICTIONS',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         count: 0,
         predictions: [],
@@ -1026,7 +1163,7 @@ export class PredictionsDB {
           home_score, away_score, home_xg, away_xg,
           home_win_prob, draw_prob, away_win_prob,
           over15_prob, over25_prob, over35_prob, btts_prob,
-          tip_key, tip_name, tip_prob, predicted_at
+          tip_key, tip_name, tip_prob, full_fixture_json, predicted_at
         FROM predictions
         ${orderClause}
       `).all() as any[];
@@ -1038,7 +1175,7 @@ export class PredictionsDB {
         const dr = Number(r.draw_prob ?? 0);
         const aw = Number(r.away_win_prob ?? 0);
 
-        let fallbackTip: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' = 'HOME_WIN';
+        let fallbackTip: string = 'HOME_WIN';
         let fallbackName = `${r.home_team} Win`;
         let fallbackProb = hw;
 
@@ -1056,18 +1193,33 @@ export class PredictionsDB {
           fallbackProb = dr;
         }
 
-        const validTips = new Set([
-          'HOME_WIN',
-          'DRAW',
-          'AWAY_WIN',
-          'OVER_25',
-          'UNDER_25',
-          'BTTS_YES',
-          'BTTS_NO',
-          'DOUBLE_CHANCE_1X',
-          'DOUBLE_CHANCE_X2',
-        ]);
-        const tipKey = validTips.has(String(r.tip_key || '')) ? r.tip_key : fallbackTip;
+        const normalizedSavedKey = normalizeMarketKey(r.tip_key);
+        const tipKey = normalizedSavedKey || fallbackTip;
+
+        let markets: Array<{ key: string; name: string; probability: number }> | undefined;
+        try {
+          if (r.full_fixture_json) {
+            const parsedFixture = JSON.parse(r.full_fixture_json) as Fixture;
+            const rawMarkets =
+              parsedFixture.markets && parsedFixture.markets.length > 0
+                ? parsedFixture.markets
+                : parsedFixture.prediction
+                ? ApexEngine.calculateMarkets(
+                    parsedFixture.prediction,
+                    DEFAULT_ENGINE_SETTINGS,
+                    r.home_team,
+                    r.away_team
+                  ).markets
+                : [];
+            if (rawMarkets.length > 0) {
+              markets = rawMarkets.map((m) => ({
+                key: m.key,
+                name: m.name,
+                probability: Number(Number(m.probability).toFixed(3)),
+              }));
+            }
+          }
+        } catch {}
 
         return {
           fixtureId: r.fixture_id,
@@ -1093,25 +1245,26 @@ export class PredictionsDB {
           over25Prob: r.over25_prob !== null && r.over25_prob !== undefined ? Number(Number(r.over25_prob).toFixed(3)) : null,
           over35Prob: r.over35_prob !== null && r.over35_prob !== undefined ? Number(Number(r.over35_prob).toFixed(3)) : null,
           bttsProb: r.btts_prob !== null && r.btts_prob !== undefined ? Number(Number(r.btts_prob).toFixed(3)) : null,
-          tipKey,
+          tipKey: tipKey as any,
           tipName: r.tip_name || fallbackName,
           tipProb: Number(Number(r.tip_prob ?? fallbackProb).toFixed(3)),
+          markets,
           predictedAt: r.predicted_at || new Date().toISOString(),
         };
       });
 
       return {
-        format: 'APEX_1X2_PREDICTIONS',
-        version: '1.0',
+        format: 'APEX_ALL_MARKETS_PREDICTIONS',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         count: predictions.length,
         predictions,
       };
     } catch (err: any) {
-      console.error('[PredictionsDB] Error exporting 1X2 predictions:', err?.message);
+      console.error('[PredictionsDB] Error exporting predictions:', err?.message);
       return {
-        format: 'APEX_1X2_PREDICTIONS',
-        version: '1.0',
+        format: 'APEX_ALL_MARKETS_PREDICTIONS',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         count: 0,
         predictions: [],
@@ -1149,9 +1302,14 @@ export class PredictionsDB {
       homeWinProb: number;
       drawProb: number;
       awayWinProb: number;
-      tipKey: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN';
+      over15Prob?: number | null;
+      over25Prob?: number | null;
+      over35Prob?: number | null;
+      bttsProb?: number | null;
+      tipKey: string;
       tipName: string;
       tipProb: number;
+      markets?: Array<{ key: string; name: string; probability: number; isBanker?: boolean }>;
       actualOutcome: 'HOME_WIN' | 'DRAW' | 'AWAY_WIN' | null;
       isCorrect: boolean | null;
       evaluationState: 'WON' | 'LOST' | 'PENDING';
@@ -1207,7 +1365,7 @@ export class PredictionsDB {
     // Prepare lookup statements against SQLite database to reconcile actual scores (only if SQLite is enabled)
     const predStmt = sqliteActive
       ? sqliteDb.prepare(`
-          SELECT status, home_score, away_score
+          SELECT status, home_score, away_score, full_fixture_json
           FROM predictions
           WHERE (fixture_id = ? OR fixture_id = ?)
             OR (LOWER(home_team) = LOWER(?) AND LOWER(away_team) = LOWER(?) AND match_date = ?)
@@ -1273,29 +1431,16 @@ export class PredictionsDB {
       const dr = Number(item.drawProb ?? item.draw_prob ?? item.prediction?.drawProb ?? 0);
       const aw = Number(item.awayWinProb ?? item.away_win_prob ?? item.prediction?.awayWinProb ?? 0);
 
-      // Determine predicted choice
+      // Determine predicted choice (supports all markets & combo markets)
       let tipKey: string = 'HOME_WIN';
       let tipName = item.tipName || item.tip_name || '';
       let tipProb = Number(item.tipProb ?? item.tip_prob ?? 0);
 
-      const rawKey = String(item.tipKey || item.tip_key || item.predictedTip || '').toUpperCase();
-      if (rawKey === 'HOME_WIN' || rawKey === 'HOME' || rawKey === '1') {
-        tipKey = 'HOME_WIN';
-      } else if (rawKey === 'AWAY_WIN' || rawKey === 'AWAY' || rawKey === '2') {
-        tipKey = 'AWAY_WIN';
-      } else if (rawKey === 'DRAW' || rawKey === 'X') {
-        tipKey = 'DRAW';
-      } else if (
-        rawKey === 'OVER_25' ||
-        rawKey === 'UNDER_25' ||
-        rawKey === 'BTTS_YES' ||
-        rawKey === 'BTTS_NO' ||
-        rawKey === 'DOUBLE_CHANCE_1X' ||
-        rawKey === 'DOUBLE_CHANCE_X2'
-      ) {
+      const rawKey = normalizeMarketKey(item.tipKey || item.tip_key || item.predictedTip || '');
+      if (rawKey) {
         tipKey = rawKey;
       } else {
-        // Evaluate from probabilities
+        // Fallback to highest 1X2 probability
         if (hw >= dr && hw >= aw) {
           tipKey = 'HOME_WIN';
         } else if (aw >= hw && aw >= dr) {
@@ -1315,6 +1460,38 @@ export class PredictionsDB {
       if (tipKey === 'HOME_WIN') homePicksCount++;
       else if (tipKey === 'DRAW') drawPicksCount++;
       else if (tipKey === 'AWAY_WIN') awayPicksCount++;
+
+      // Resolve optional full markets array from item or predictions table
+      let resolvedMarkets: MarketOption[] | undefined = Array.isArray(item.markets) && item.markets.length > 0 ? item.markets : undefined;
+      let resolvedPredRow: any = null;
+      if (predStmt) {
+        resolvedPredRow = predStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
+        if (!resolvedMarkets && resolvedPredRow?.full_fixture_json) {
+          try {
+            const parsedDbFix = JSON.parse(resolvedPredRow.full_fixture_json) as Fixture;
+            if (parsedDbFix.markets && parsedDbFix.markets.length > 0) {
+              resolvedMarkets = parsedDbFix.markets.map((m) => ({
+                key: m.key,
+                name: m.name,
+                probability: m.probability,
+                isBanker: m.isBanker,
+              }));
+            } else if (parsedDbFix.prediction) {
+              resolvedMarkets = ApexEngine.calculateMarkets(
+                parsedDbFix.prediction,
+                DEFAULT_ENGINE_SETTINGS,
+                homeTeam || parsedDbFix.homeTeam,
+                awayTeam || parsedDbFix.awayTeam
+              ).markets.map((m) => ({
+                key: m.key,
+                name: m.name,
+                probability: m.probability,
+                isBanker: m.isBanker,
+              }));
+            }
+          } catch {}
+        }
+      }
 
       // Reconcile actual scores
       let finalHomeScore: number | null = null;
@@ -1338,12 +1515,11 @@ export class PredictionsDB {
       }
 
       // Priority 2: Look up updated result in predictions DB
-      if (predStmt && (finalHomeScore === null || finalAwayScore === null)) {
-        const predRow = predStmt.get(fixtureId, cleanId, homeTeam, awayTeam, matchDate) as any;
-        if (predRow && predRow.home_score !== null && predRow.away_score !== null) {
-          finalHomeScore = Number(predRow.home_score);
-          finalAwayScore = Number(predRow.away_score);
-          matchStatus = String(predRow.status || 'FINISHED').toUpperCase();
+      if (resolvedPredRow && (finalHomeScore === null || finalAwayScore === null)) {
+        if (resolvedPredRow.home_score !== null && resolvedPredRow.away_score !== null) {
+          finalHomeScore = Number(resolvedPredRow.home_score);
+          finalAwayScore = Number(resolvedPredRow.away_score);
+          matchStatus = String(resolvedPredRow.status || 'FINISHED').toUpperCase();
         }
       }
 
@@ -1392,98 +1568,19 @@ export class PredictionsDB {
         else if (finalAwayScore > finalHomeScore) actualOutcome = 'AWAY_WIN';
         else actualOutcome = 'DRAW';
 
-        const totalGoals = finalHomeScore + finalAwayScore;
-        const csMatch = /^CORRECT_SCORE_(\d+)_(\d+)$/.exec(tipKey);
-        if (csMatch) {
-          isCorrect = finalHomeScore === Number(csMatch[1]) && finalAwayScore === Number(csMatch[2]);
-        }
-        else if (tipKey === 'HOME_WIN') isCorrect = finalHomeScore > finalAwayScore;
-        else if (tipKey === 'AWAY_WIN') isCorrect = finalAwayScore > finalHomeScore;
-        else if (tipKey === 'DRAW') isCorrect = finalHomeScore === finalAwayScore;
-        else if (tipKey === 'DOUBLE_CHANCE_1X') isCorrect = finalHomeScore >= finalAwayScore;
-        else if (tipKey === 'DOUBLE_CHANCE_X2') isCorrect = finalAwayScore >= finalHomeScore;
-        else if (tipKey === 'DOUBLE_CHANCE_12') isCorrect = finalHomeScore !== finalAwayScore;
-        else if (tipKey === 'DNB_HOME') isCorrect = finalHomeScore > finalAwayScore ? true : finalHomeScore === finalAwayScore ? null : false;
-        else if (tipKey === 'DNB_AWAY') isCorrect = finalAwayScore > finalHomeScore ? true : finalHomeScore === finalAwayScore ? null : false;
-        else if (tipKey === 'OVER_05') isCorrect = totalGoals >= 1;
-        else if (tipKey === 'UNDER_05') isCorrect = totalGoals === 0;
-        else if (tipKey === 'OVER_15') isCorrect = totalGoals >= 2;
-        else if (tipKey === 'UNDER_15') isCorrect = totalGoals <= 1;
-        else if (tipKey === 'OVER_25') isCorrect = totalGoals >= 3;
-        else if (tipKey === 'UNDER_25') isCorrect = totalGoals <= 2;
-        else if (tipKey === 'OVER_35') isCorrect = totalGoals >= 4;
-        else if (tipKey === 'UNDER_35') isCorrect = totalGoals <= 3;
-        else if (tipKey === 'OVER_45') isCorrect = totalGoals >= 5;
-        else if (tipKey === 'UNDER_45') isCorrect = totalGoals <= 4;
-        else if (tipKey === 'BTTS_YES') isCorrect = finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'BTTS_NO') isCorrect = finalHomeScore === 0 || finalAwayScore === 0;
-        else if (tipKey === 'COMBO_1_OVER_15') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_2_OVER_15') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_1_OVER_25') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 3;
-        else if (tipKey === 'COMBO_2_OVER_25') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 3;
-        else if (tipKey === 'COMBO_1_OVER_35') isCorrect = finalHomeScore > finalAwayScore && totalGoals >= 4;
-        else if (tipKey === 'COMBO_2_OVER_35') isCorrect = finalAwayScore > finalHomeScore && totalGoals >= 4;
-        else if (tipKey === 'COMBO_1_UNDER_25') isCorrect = finalHomeScore > finalAwayScore && totalGoals <= 2;
-        else if (tipKey === 'COMBO_2_UNDER_25') isCorrect = finalAwayScore > finalHomeScore && totalGoals <= 2;
-        else if (tipKey === 'COMBO_1_UNDER_35') isCorrect = finalHomeScore > finalAwayScore && totalGoals <= 3;
-        else if (tipKey === 'COMBO_2_UNDER_35') isCorrect = finalAwayScore > finalHomeScore && totalGoals <= 3;
-        else if (tipKey === 'COMBO_X_UNDER_25') isCorrect = finalHomeScore === finalAwayScore && totalGoals <= 2;
-        else if (tipKey === 'COMBO_X_OVER_15') isCorrect = finalHomeScore === finalAwayScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_X_BTTS') isCorrect = finalHomeScore === finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'COMBO_1X_OVER_15') isCorrect = finalHomeScore >= finalAwayScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_X2_OVER_15') isCorrect = finalAwayScore >= finalHomeScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_12_OVER_15') isCorrect = finalHomeScore !== finalAwayScore && totalGoals >= 2;
-        else if (tipKey === 'COMBO_1X_OVER_25') isCorrect = finalHomeScore >= finalAwayScore && totalGoals >= 3;
-        else if (tipKey === 'COMBO_X2_OVER_25') isCorrect = finalAwayScore >= finalHomeScore && totalGoals >= 3;
-        else if (tipKey === 'COMBO_12_OVER_25') isCorrect = finalHomeScore !== finalAwayScore && totalGoals >= 3;
-        else if (tipKey === 'COMBO_1X_UNDER_25') isCorrect = finalHomeScore >= finalAwayScore && totalGoals <= 2;
-        else if (tipKey === 'COMBO_X2_UNDER_25') isCorrect = finalAwayScore >= finalHomeScore && totalGoals <= 2;
-        else if (tipKey === 'COMBO_1X_UNDER_35') isCorrect = finalHomeScore >= finalAwayScore && totalGoals <= 3;
-        else if (tipKey === 'COMBO_X2_UNDER_35') isCorrect = finalAwayScore >= finalHomeScore && totalGoals <= 3;
-        else if (tipKey === 'COMBO_12_UNDER_35') isCorrect = finalHomeScore !== finalAwayScore && totalGoals <= 3;
-        else if (tipKey === 'COMBO_1X_BTTS') isCorrect = finalHomeScore >= finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'COMBO_X2_BTTS') isCorrect = finalAwayScore >= finalHomeScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'COMBO_12_BTTS') isCorrect = finalHomeScore !== finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'COMBO_BTTS_OVER_25') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals >= 3;
-        else if (tipKey === 'COMBO_BTTS_OVER_35') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals >= 4;
-        else if (tipKey === 'COMBO_BTTS_UNDER_35') isCorrect = finalHomeScore > 0 && finalAwayScore > 0 && totalGoals <= 3;
-        else if (tipKey === 'COMBO_BTTS_NO_UNDER_25') isCorrect = (finalHomeScore === 0 || finalAwayScore === 0) && totalGoals <= 2;
-        else if (tipKey === 'COMBO_1_BTTS') isCorrect = finalHomeScore > finalAwayScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'COMBO_2_BTTS') isCorrect = finalAwayScore > finalHomeScore && finalHomeScore > 0 && finalAwayScore > 0;
-        else if (tipKey === 'HOME_OVER_05') isCorrect = finalHomeScore >= 1;
-        else if (tipKey === 'HOME_UNDER_05') isCorrect = finalHomeScore === 0;
-        else if (tipKey === 'HOME_OVER_15') isCorrect = finalHomeScore >= 2;
-        else if (tipKey === 'HOME_UNDER_15') isCorrect = finalHomeScore <= 1;
-        else if (tipKey === 'HOME_OVER_25') isCorrect = finalHomeScore >= 3;
-        else if (tipKey === 'HOME_UNDER_25') isCorrect = finalHomeScore <= 2;
-        else if (tipKey === 'AWAY_OVER_05') isCorrect = finalAwayScore >= 1;
-        else if (tipKey === 'AWAY_UNDER_05') isCorrect = finalAwayScore === 0;
-        else if (tipKey === 'AWAY_OVER_15') isCorrect = finalAwayScore >= 2;
-        else if (tipKey === 'AWAY_UNDER_15') isCorrect = finalAwayScore <= 1;
-        else if (tipKey === 'AWAY_OVER_25') isCorrect = finalAwayScore >= 3;
-        else if (tipKey === 'AWAY_UNDER_25') isCorrect = finalAwayScore <= 2;
-        else if (tipKey === 'HOME_CLEAN_SHEET') isCorrect = finalAwayScore === 0;
-        else if (tipKey === 'AWAY_CLEAN_SHEET') isCorrect = finalHomeScore === 0;
-        else if (tipKey === 'HOME_WIN_TO_NIL') isCorrect = finalHomeScore > finalAwayScore && finalAwayScore === 0;
-        else if (tipKey === 'AWAY_WIN_TO_NIL') isCorrect = finalAwayScore > finalHomeScore && finalHomeScore === 0;
-        else if (tipKey === 'HANDICAP_HOME_MINUS_1') isCorrect = (finalHomeScore - finalAwayScore) >= 2;
-        else if (tipKey === 'HANDICAP_AWAY_MINUS_1') isCorrect = (finalAwayScore - finalHomeScore) >= 2;
-        else if (tipKey === 'MULTIGOALS_1_3') isCorrect = totalGoals >= 1 && totalGoals <= 3;
-        else if (tipKey === 'MULTIGOALS_2_4') isCorrect = totalGoals >= 2 && totalGoals <= 4;
-        else if (tipKey === 'MULTIGOALS_2_5') isCorrect = totalGoals >= 2 && totalGoals <= 5;
-        else if (tipKey === 'GOALS_ODD') isCorrect = totalGoals % 2 === 1;
-        else if (tipKey === 'GOALS_EVEN') isCorrect = totalGoals % 2 === 0;
-        else isCorrect = tipKey === actualOutcome;
-
-        if (isCorrect === true) {
+        const outcome = evaluateMarketOutcome(tipKey, finalHomeScore, finalAwayScore);
+        if (outcome === 'WON') {
+          isCorrect = true;
           evaluationState = 'WON';
           wonCount++;
-        } else if (isCorrect === false) {
-          evaluationState = 'LOST';
-          lostCount++;
-        } else {
+        } else if (outcome === 'VOID') {
+          isCorrect = null;
           evaluationState = 'PENDING';
           pendingCount++;
+        } else {
+          isCorrect = false;
+          evaluationState = 'LOST';
+          lostCount++;
         }
       } else {
         evaluationState = 'PENDING';
@@ -1506,9 +1603,14 @@ export class PredictionsDB {
         homeWinProb: Number(hw.toFixed(3)),
         drawProb: Number(dr.toFixed(3)),
         awayWinProb: Number(aw.toFixed(3)),
+        over15Prob: item.over15Prob ?? item.over15_prob ?? null,
+        over25Prob: item.over25Prob ?? item.over25_prob ?? null,
+        over35Prob: item.over35Prob ?? item.over35_prob ?? null,
+        bttsProb: item.bttsProb ?? item.btts_prob ?? null,
         tipKey,
         tipName,
         tipProb: Number(tipProb.toFixed(3)),
+        markets: resolvedMarkets,
         actualOutcome,
         isCorrect,
         evaluationState,

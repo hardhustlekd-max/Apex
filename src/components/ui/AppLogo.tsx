@@ -137,8 +137,13 @@ export const AppLogo: React.FC<AppLogoProps> = ({
   const activeMode = mode ?? liveMode;
   const pal = LOGO_PALETTES[activeVariant][activeMode];
 
-  const ballClipId = `flat-crest-ball-clip-${uid}`;
-  const ballMaskId = `flat-crest-ball-mask-${uid}`;
+  const ballClipId = `sharp-crest-ball-clip-${uid}`;
+  const headMaskId = `sharp-crest-head-mask-${uid}`;
+  const pitchMaskId = `sharp-crest-pitch-mask-${uid}`;
+
+  // Sharp faceted leopard head silhouette for clean backdrop knockout masks
+  const leopardKnockoutPath =
+    'M73 43 L62 31 L45 32 L39 45 L42 64 L34 92 L40 96 L33 114 L43 119 L55 130 L68 136 L73 158 L87 168 L113 168 L127 158 L132 136 L145 130 L157 119 L167 114 L160 96 L166 92 L158 64 L161 45 L155 32 L138 31 L127 43 L112 37 L88 37 Z';
 
   return (
     <svg
@@ -154,204 +159,237 @@ export const AppLogo: React.FC<AppLogoProps> = ({
     >
       <defs>
         <clipPath id={ballClipId}>
-          <circle cx="100" cy="100" r="79" />
+          <circle cx="100" cy="96" r="78" />
         </clipPath>
-        <mask id={ballMaskId}>
+        <mask id={headMaskId}>
           <rect x="0" y="0" width="200" height="200" fill="white" />
           <path
-            d="M78 43 C74 33 67 27 59 27 C46 28 45 43 54 55 C44 67 39 84 42 99 C44 109 50 116 54 120 C59 132 70 142 84 148 C91 151 96 153 100 153 C104 153 109 151 116 148 C130 142 141 132 146 120 C150 116 156 109 158 99 C161 84 156 67 146 55 C155 43 154 28 141 27 C133 27 126 33 122 43 C110 38 90 38 78 43 Z"
+            d={leopardKnockoutPath}
             fill="black"
             stroke="black"
-            strokeWidth="12"
-            strokeLinejoin="round"
+            strokeWidth="8"
+            strokeLinejoin="miter"
           />
+        </mask>
+        <mask id={pitchMaskId}>
+          <rect x="0" y="0" width="200" height="200" fill="white" />
+          <path
+            d={leopardKnockoutPath}
+            fill="black"
+            stroke="black"
+            strokeWidth="7"
+            strokeLinejoin="miter"
+          />
+          {/* Clear whiskers zone so razor whiskers slice cleanly over the pitch */}
+          <polygon points="18,115 76,118 76,144 24,146" fill="black" />
+          <polygon points="182,115 124,118 124,144 176,146" fill="black" />
         </mask>
       </defs>
 
-      {/* LAYER 1: Minimalist Flat Soccer Ball Backdrop (transparent cutouts + clean negative-space mask) */}
-      <g clipPath={`url(#${ballClipId})`} mask={`url(#${ballMaskId})`}>
-        {/* Classic Perimeter Soccer Ball Pentagons */}
-        <polygon points="100,156 120,169 113,186 87,186 80,169" fill={pal.accent} />
-        <polygon points="24,128 42,121 52,142 34,158 16,146" fill={pal.accent} />
-        <polygon points="176,128 184,146 166,158 148,142 158,121" fill={pal.accent} />
-        <polygon points="22,72 40,64 48,84 32,98 14,88" fill={pal.accent} />
-        <polygon points="178,72 186,88 168,98 152,84 160,64" fill={pal.accent} />
-
-        {/* Flat Soccer Ball Panel Seams */}
-        <g
-          stroke={pal.primary}
-          strokeWidth="4.8"
-          strokeLinecap="round"
-          strokeOpacity="0.34"
-        >
-          <line x1="42" y1="121" x2="48" y2="84" />
-          <line x1="158" y1="121" x2="152" y2="84" />
-          <line x1="52" y1="142" x2="80" y2="169" />
-          <line x1="148" y1="142" x2="120" y2="169" />
-          <line x1="48" y1="84" x2="74" y2="72" />
-          <line x1="152" y1="84" x2="126" y2="72" />
-          <line x1="42" y1="121" x2="68" y2="118" />
-          <line x1="158" y1="121" x2="132" y2="118" />
-          <line x1="100" y1="156" x2="100" y2="138" />
-        </g>
+      {/* LAYER 1: Sharp Football Pitch Perspective Lines */}
+      <g
+        mask={`url(#${pitchMaskId})`}
+        stroke={pal.primary}
+        strokeWidth="4"
+        strokeLinejoin="miter"
+        strokeLinecap="butt"
+      >
+        {/* Pitch Touchline Perimeter Trapezoid */}
+        <polygon points="41,123 159,123 184,183 16,183" fill="none" />
+        {/* 18-Yard Penalty Box */}
+        <polyline points="52,183 59,147 141,147 148,183" fill="none" />
+        {/* 6-Yard Goal Box */}
+        <polyline points="75,183 78,166 122,166 125,183" fill="none" />
+        {/* Corner Flags */}
+        <polyline points="19,173 28,173 28,183" fill="none" strokeWidth="3.2" />
+        <polyline points="181,173 172,173 172,183" fill="none" strokeWidth="3.2" />
       </g>
 
-      {/* Bold Open Sports Crest Ring Framing the Ball & Leopard */}
-      <path
-        d="M 166 48 A 84 84 0 1 1 34 48"
+      {/* LAYER 2: Sharp Geometric Soccer Ball Panels Behind Leopard */}
+      <g clipPath={`url(#${ballClipId})`} mask={`url(#${headMaskId})`}>
+        <polygon points="97,20 97,36 75,41 59,30 77,20" fill={pal.accent} />
+        <polygon points="103,20 103,36 125,41 141,30 123,20" fill={pal.accent} />
+        <polygon points="53,33 70,44 50,59 33,55 40,40" fill={pal.accent} />
+        <polygon points="147,33 130,44 150,59 167,55 160,40" fill={pal.accent} />
+        <polygon points="30,61 48,63 40,94 25,116 21,88" fill={pal.accent} />
+        <polygon points="170,61 152,63 160,94 175,116 179,88" fill={pal.accent} />
+        <polygon points="31,119 44,98 56,121 29,121" fill={pal.accent} />
+        <polygon points="169,119 156,98 144,121 171,121" fill={pal.accent} />
+      </g>
+
+      {/* Crisp Outer Ball Frame */}
+      <circle
+        cx="100"
+        cy="96"
+        r="83"
         stroke={pal.primary}
-        strokeWidth="9.5"
-        strokeLinecap="butt"
+        strokeWidth="6"
       />
 
-      {/* LAYER 2: Bold Flat Straight-Facing Leopard Face (Linework + Negative Space) */}
-      {/* Left & Right Rounded Big-Cat Ears */}
-      <path
-        d="M58 56 C46 46 47 30 61 29 C69 29 75 36 78 44"
+      {/* LAYER 3: Aggressive Snarling Leopard Face (Razor-Sharp Angular Vector) */}
+      {/* Ears with Sharp Zigzag Inner Fur */}
+      <polyline
+        points="44,63 40,43 47,32 62,33 74,44"
         stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        strokeWidth="5.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M57 47 C54 41 58 37 64 39"
-        stroke={pal.primary}
-        strokeWidth="4.4"
-        strokeLinecap="round"
+      <polygon
+        points="49,54 45,42 54,45 52,38 64,43 56,49 59,54"
+        fill={pal.primary}
       />
 
-      <path
-        d="M142 56 C154 46 153 30 139 29 C131 29 125 36 122 44"
+      <polyline
+        points="156,63 160,43 153,32 138,33 126,44"
         stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        strokeWidth="5.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M143 47 C146 41 142 37 136 39"
-        stroke={pal.primary}
-        strokeWidth="4.4"
-        strokeLinecap="round"
+      <polygon
+        points="151,54 155,42 146,45 148,38 136,43 144,49 141,54"
+        fill={pal.primary}
       />
 
-      {/* Crown, Cheekbones & Tapered Jawline Contour */}
-      <path
-        d="M78 43 C90 38 110 38 122 43"
+      {/* Angular Crown & Jagged Cheek Fur Spikes */}
+      <polyline
+        points="74,44 88,39 112,39 126,44"
         stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
+        strokeWidth="5.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M58 56 C47 68 42 84 45 98 C47 107 53 114 60 119"
-        stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M142 56 C153 68 158 84 155 98 C153 107 147 114 140 119"
-        stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M55 113 C58 127 69 138 84 144 C91 147 96 149 100 149 C104 149 109 147 116 144 C131 138 142 127 145 113"
-        stroke={pal.primary}
-        strokeWidth="7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Sweeping Cheek Fur Lines (Flat Crest Rhythm) */}
-      <path
-        d="M55 96 C61 105 69 112 77 116"
+      <polyline
+        points="44,63 36,91 43,95 35,113 45,117 61,130"
         stroke={pal.primary}
         strokeWidth="5"
-        strokeLinecap="round"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M145 96 C139 105 131 112 123 116"
+      <polyline
+        points="156,63 164,91 157,95 165,113 155,117 139,130"
         stroke={pal.primary}
         strokeWidth="5"
-        strokeLinecap="round"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
 
-      {/* Fierce Straight-Looking Brow Ridge & Nasal Bridge */}
-      <path
-        d="M59 71 C70 67 83 70 91 79 L93 102"
+      {/* Sharp Forehead & Temple Leopard Markings */}
+      <polygon points="100,43 103,54 100,67 97,54" fill={pal.primary} />
+      <polygon points="75,46 92,52 89,57 71,50" fill={pal.primary} />
+      <polygon points="125,46 108,52 111,57 129,50" fill={pal.primary} />
+      <polygon points="69,56 89,64 86,69 65,61" fill={pal.primary} />
+      <polygon points="131,56 111,64 114,69 135,61" fill={pal.primary} />
+      <polygon points="61,48 68,51 64,57 58,53" fill={pal.primary} />
+      <polygon points="139,48 132,51 136,57 142,53" fill={pal.primary} />
+      <polygon points="52,61 59,64 56,71 49,67" fill={pal.primary} />
+      <polygon points="148,61 141,64 144,71 151,67" fill={pal.primary} />
+
+      {/* Fierce Furrowed V-Brows & Nasal Bridge */}
+      <polyline
+        points="51,76 69,72 89,84 91,102"
         stroke={pal.primary}
-        strokeWidth="6.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        strokeWidth="5.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M141 71 C130 67 117 70 109 79 L107 102"
+      <polyline
+        points="149,76 131,72 111,84 109,102"
         stroke={pal.primary}
-        strokeWidth="6.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        strokeWidth="5.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
 
-      {/* Intense Forward-Staring Almond Eyes */}
-      <path
-        d="M64 81 C71 77 81 79 86 85 C81 90 71 90 64 85 Z"
-        fill={pal.accent}
+      {/* Sharp Nose-Bridge Snarl Wrinkles */}
+      <polyline points="93,86 100,90 107,86" stroke={pal.primary} strokeWidth="2.8" strokeLinejoin="miter" />
+      <polyline points="92,92 100,96 108,92" stroke={pal.primary} strokeWidth="2.8" strokeLinejoin="miter" />
+      <polyline points="93,98 100,101 107,98" stroke={pal.primary} strokeWidth="2.6" strokeLinejoin="miter" />
+
+      {/* Piercing Forward-Staring Predator Eyes */}
+      <polygon points="56,77 73,77 87,85 81,91 66,90" fill={pal.primary} />
+      <polygon points="64,81 84,85 80,89 67,89" fill={pal.accent} />
+      <polygon points="73,82 77,82 75,89 72,86" fill={pal.primary} />
+
+      <polygon points="144,77 127,77 113,85 119,91 134,90" fill={pal.primary} />
+      <polygon points="136,81 116,85 120,89 133,89" fill={pal.accent} />
+      <polygon points="127,82 123,82 125,89 128,86" fill={pal.primary} />
+
+      {/* Sharp Cheekbone Stripes & Leopard Spots */}
+      <polygon points="56,88 67,96 63,109 53,99" fill={pal.primary} />
+      <polygon points="144,88 133,96 137,109 147,99" fill={pal.primary} />
+      <polygon points="48,99 54,104 49,112 44,106" fill={pal.primary} />
+      <polygon points="152,99 146,104 151,112 156,106" fill={pal.primary} />
+      <polygon points="72,96 86,102 74,109 67,103" fill={pal.primary} />
+      <polygon points="128,96 114,102 126,109 133,103" fill={pal.primary} />
+      <polygon points="62,110 69,113 64,119 58,115" fill={pal.primary} />
+      <polygon points="138,110 131,113 136,119 142,115" fill={pal.primary} />
+
+      {/* Broad Angular Leopard Nose */}
+      <polygon points="86,104 100,106 114,104 109,113 100,118 91,113" fill={pal.primary} />
+
+      {/* Snarling Upper Muzzle Pads */}
+      <polyline
+        points="99,118 99,125 87,129 67,128 63,121 76,113"
+        stroke={pal.primary}
+        strokeWidth="4.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <path
-        d="M136 81 C129 77 119 79 114 85 C119 90 129 90 136 85 Z"
-        fill={pal.accent}
+      <polyline
+        points="101,125 113,129 133,128 137,121 124,113"
+        stroke={pal.primary}
+        strokeWidth="4.2"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
 
-      {/* Broad Leopard Nose & Split Muzzle */}
-      <path
-        d="M89 104 C95 101 105 101 111 104 C112 109 105 115 100 116 C95 115 88 109 89 104 Z"
-        fill={pal.primary}
-      />
-      <path
-        d="M100 115 V127"
-        stroke={pal.primary}
-        strokeWidth="5.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M81 128 C88 134 95 133 100 127 C105 133 112 134 119 128"
-        stroke={pal.primary}
-        strokeWidth="5.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M91 139 C96 141 104 141 109 139"
-        stroke={pal.primary}
-        strokeWidth="4.8"
-        strokeLinecap="round"
-      />
+      {/* Razor-Tapered Aggressive Whiskers */}
+      <polygon points="73,120 26,116 72,123" fill={pal.primary} />
+      <polygon points="70,125 21,129 70,128" fill={pal.primary} />
+      <polygon points="73,130 29,143 74,133" fill={pal.primary} />
 
-      {/* Bold Geometric-Organic Leopard Spots */}
-      <ellipse cx="100" cy="54" rx="3.2" ry="5.5" fill={pal.primary} />
-      <ellipse
-        cx="86"
-        cy="55"
-        rx="2.9"
-        ry="4.4"
-        transform="rotate(-12 86 55)"
-        fill={pal.primary}
+      <polygon points="127,120 174,116 128,123" fill={pal.primary} />
+      <polygon points="130,125 179,129 130,128" fill={pal.primary} />
+      <polygon points="127,130 171,143 126,133" fill={pal.primary} />
+
+      {/* Open Roaring Jaw, Sharp Fangs, Incisors & Tongue */}
+      {/* Upper Canines (Fangs) */}
+      <polygon points="80,129 87,129 83,144" fill={pal.primary} />
+      <polygon points="120,129 113,129 117,144" fill={pal.primary} />
+      {/* Upper Incisors */}
+      <polygon points="90,129 94,129 92,135" fill={pal.primary} />
+      <polygon points="95,129 99,129 97,135" fill={pal.primary} />
+      <polygon points="101,129 105,129 103,135" fill={pal.primary} />
+      <polygon points="106,129 110,129 108,135" fill={pal.primary} />
+
+      {/* Lower Canines (Fangs) */}
+      <polygon points="80,156 88,156 84,142" fill={pal.primary} />
+      <polygon points="120,156 112,156 116,142" fill={pal.primary} />
+      {/* Lower Incisors */}
+      <polygon points="90,156 94,156 92,150" fill={pal.primary} />
+      <polygon points="95,156 99,156 97,150" fill={pal.primary} />
+      <polygon points="101,156 105,156 103,150" fill={pal.primary} />
+      <polygon points="106,156 110,156 108,150" fill={pal.primary} />
+
+      {/* Roaring Tongue */}
+      <polygon points="92,143 100,147 108,143 106,151 100,153 94,151" fill={pal.accent} />
+
+      {/* Angular Lower Jaw & Chin Contour */}
+      <polyline
+        points="71,129 74,157 88,167 112,167 126,157 129,129"
+        stroke={pal.primary}
+        strokeWidth="5"
+        strokeLinejoin="miter"
+        strokeLinecap="square"
       />
-      <ellipse
-        cx="114"
-        cy="55"
-        rx="2.9"
-        ry="4.4"
-        transform="rotate(12 114 55)"
-        fill={pal.primary}
+      <polyline
+        points="82,158 91,161 109,161 118,158"
+        stroke={pal.primary}
+        strokeWidth="2.8"
+        strokeLinejoin="miter"
       />
-      <path d="M68 57 C72 54 76 57 74 61 C72 64 67 62 68 57 Z" fill={pal.primary} />
-      <path d="M132 57 C128 54 124 57 126 61 C128 64 133 62 132 57 Z" fill={pal.primary} />
-      <circle cx="62" cy="96" r="3.4" fill={pal.primary} />
-      <circle cx="138" cy="96" r="3.4" fill={pal.primary} />
-      <circle cx="72" cy="105" r="3" fill={pal.primary} />
-      <circle cx="128" cy="105" r="3" fill={pal.primary} />
     </svg>
   );
 };

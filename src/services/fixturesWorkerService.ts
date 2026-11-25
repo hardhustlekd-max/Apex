@@ -5,6 +5,7 @@ import { getSqliteGateState, isSqliteEnabled, registerDbMutationListener } from 
 import { getScrapingGateState, isScrapingEnabled } from '../core/scrapingGate.js';
 import {
   cleanFixtureId,
+  DEFAULT_ENGINE_SETTINGS,
   Fixture,
   FeaturedTipDTO,
   LeagueGroupDTO,
@@ -13,6 +14,7 @@ import {
   ScrapedMarketOdds,
   StandingsCatalogItem,
 } from '../core/types.js';
+import { ApexEngine } from '../core/poisson.js';
 import { matchesResolvedDateFilter, resolveDateFilter } from '../core/dateUtils.js';
 import { cleanStr, getLeagueAliases, isSimulationLeague, matchesLeague } from '../core/leagueMapper.js';
 import { GLOBAL_LEAGUES_DATASET } from '../core/globalLeaguesDataset.js';
@@ -26,7 +28,7 @@ import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { LiveScore } from '../providers/types.js';
 
 export type SortByOption = 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
-export type MarketFilterOption = 'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS';
+export type MarketFilterOption = 'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS';
 
 export interface WorkerQueryParams {
   league?: string;
@@ -116,14 +118,119 @@ export function extractFlashscoreOddsServer(
   return null;
 }
 
+const WORKER_TRIVIAL_EXTREME_KEYS = new Set<MarketOption['key']>([
+  'OVER_05',
+  'UNDER_05',
+  'OVER_45',
+  'UNDER_45',
+  'HOME_UNDER_25',
+  'AWAY_UNDER_25',
+]);
+
+function getShortMarketLabel(key: MarketOption['key'], fallbackName?: string): string {
+  switch (key) {
+    case 'HOME_WIN': return '1';
+    case 'DRAW': return 'X';
+    case 'AWAY_WIN': return '2';
+    case 'DOUBLE_CHANCE_1X': return '1X';
+    case 'DOUBLE_CHANCE_X2': return 'X2';
+    case 'DOUBLE_CHANCE_12': return '12';
+    case 'DNB_HOME': return 'DNB 1';
+    case 'DNB_AWAY': return 'DNB 2';
+    case 'OVER_15': return 'O 1.5';
+    case 'UNDER_15': return 'U 1.5';
+    case 'OVER_25': return 'O 2.5';
+    case 'UNDER_25': return 'U 2.5';
+    case 'OVER_35': return 'O 3.5';
+    case 'UNDER_35': return 'U 3.5';
+    case 'BTTS_YES': return 'GG';
+    case 'BTTS_NO': return 'NG';
+    case 'COMBO_1_OVER_15': return '1 & O1.5';
+    case 'COMBO_2_OVER_15': return '2 & O1.5';
+    case 'COMBO_1_OVER_25': return '1 & O2.5';
+    case 'COMBO_2_OVER_25': return '2 & O2.5';
+    case 'COMBO_1_OVER_35': return '1 & O3.5';
+    case 'COMBO_2_OVER_35': return '2 & O3.5';
+    case 'COMBO_1_UNDER_25': return '1 & U2.5';
+    case 'COMBO_2_UNDER_25': return '2 & U2.5';
+    case 'COMBO_1_UNDER_35': return '1 & U3.5';
+    case 'COMBO_2_UNDER_35': return '2 & U3.5';
+    case 'COMBO_X_UNDER_25': return 'X & U2.5';
+    case 'COMBO_X_OVER_15': return 'X & O1.5';
+    case 'COMBO_1_BTTS': return '1 & GG';
+    case 'COMBO_2_BTTS': return '2 & GG';
+    case 'COMBO_X_BTTS': return 'X & GG';
+    case 'COMBO_1X_OVER_15': return '1X & O1.5';
+    case 'COMBO_X2_OVER_15': return 'X2 & O1.5';
+    case 'COMBO_12_OVER_15': return '12 & O1.5';
+    case 'COMBO_1X_OVER_25': return '1X & O2.5';
+    case 'COMBO_X2_OVER_25': return 'X2 & O2.5';
+    case 'COMBO_12_OVER_25': return '12 & O2.5';
+    case 'COMBO_1X_UNDER_25': return '1X & U2.5';
+    case 'COMBO_X2_UNDER_25': return 'X2 & U2.5';
+    case 'COMBO_1X_UNDER_35': return '1X & U3.5';
+    case 'COMBO_X2_UNDER_35': return 'X2 & U3.5';
+    case 'COMBO_12_UNDER_35': return '12 & U3.5';
+    case 'COMBO_1X_BTTS': return '1X & GG';
+    case 'COMBO_X2_BTTS': return 'X2 & GG';
+    case 'COMBO_12_BTTS': return '12 & GG';
+    case 'COMBO_BTTS_OVER_25': return 'GG & O2.5';
+    case 'COMBO_BTTS_OVER_35': return 'GG & O3.5';
+    case 'COMBO_BTTS_UNDER_35': return 'GG & U3.5';
+    case 'COMBO_BTTS_NO_UNDER_25': return 'NG & U2.5';
+    case 'HOME_WIN_TO_NIL': return '1 Nil';
+    case 'AWAY_WIN_TO_NIL': return '2 Nil';
+    case 'HOME_OVER_05': return 'H O0.5';
+    case 'HOME_UNDER_05': return 'H U0.5';
+    case 'HOME_OVER_15': return 'H O1.5';
+    case 'HOME_UNDER_15': return 'H U1.5';
+    case 'HOME_OVER_25': return 'H O2.5';
+    case 'AWAY_OVER_05': return 'A O0.5';
+    case 'AWAY_UNDER_05': return 'A U0.5';
+    case 'AWAY_OVER_15': return 'A O1.5';
+    case 'AWAY_UNDER_15': return 'A U1.5';
+    case 'AWAY_OVER_25': return 'A O2.5';
+    case 'HOME_CLEAN_SHEET': return 'H CS';
+    case 'AWAY_CLEAN_SHEET': return 'A CS';
+    case 'HANDICAP_HOME_MINUS_1': return 'H -1.5';
+    case 'HANDICAP_AWAY_MINUS_1': return 'A -1.5';
+    case 'MULTIGOALS_1_3': return '1-3 G';
+    case 'MULTIGOALS_2_4': return '2-4 G';
+    case 'MULTIGOALS_2_5': return '2-5 G';
+    case 'GOALS_ODD': return 'Odd';
+    case 'GOALS_EVEN': return 'Even';
+    default:
+      return fallbackName ? fallbackName.slice(0, 12) : String(key).slice(0, 12);
+  }
+}
+
+function mapMarketToPickType(
+  key: MarketOption['key']
+): NonNullable<Fixture['highestPick']>['type'] {
+  if (key === 'HOME_WIN') return '1';
+  if (key === 'DRAW') return 'X';
+  if (key === 'AWAY_WIN') return '2';
+  if (key === 'OVER_25') return 'O2.5';
+  if (key === 'UNDER_25') return 'U2.5';
+  if (key === 'BTTS_YES') return 'BTTS_Y';
+  if (key === 'BTTS_NO') return 'BTTS_N';
+  if (key === 'DOUBLE_CHANCE_1X') return '1X';
+  if (key === 'DOUBLE_CHANCE_X2') return 'X2';
+  if (key.startsWith('COMBO_') || key === 'HOME_WIN_TO_NIL' || key === 'AWAY_WIN_TO_NIL') return 'COMBO';
+  return 'MARKET';
+}
+
 function computePrecomputedFields(
   f: Fixture
 ): {
   authoritativePick?: Fixture['authoritativePick'];
   highestPick?: Fixture['highestPick'];
+  comboPick?: Fixture['comboPick'];
+  dcPick?: Fixture['dcPick'];
   probs?: Fixture['probs'];
   popularityScore: number;
   slimPrediction?: Fixture['prediction'];
+  resolvedMarkets?: MarketOption[];
   hasPrediction: boolean;
 } {
   const popularityScore = getLeaguePopularityScore(f.league, f.leagueName, f.stage);
@@ -172,33 +279,79 @@ function computePrecomputedFields(
     probabilityFormatted: format1(authProb),
   };
 
-  const candidates: Array<{
-    type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N';
-    label: string;
-    shortLabel: string;
-    probability: number;
-  }> = [
-    { type: '1', label: `${f.homeTeam} Win`, shortLabel: '1', probability: hw },
-    { type: 'X', label: 'Draw', shortLabel: 'X', probability: dr },
-    { type: '2', label: `${f.awayTeam} Win`, shortLabel: '2', probability: aw },
-    { type: 'O2.5', label: 'Over 2.5 Goals', shortLabel: 'O 2.5', probability: o25 },
-    { type: 'U2.5', label: 'Under 2.5 Goals', shortLabel: 'U 2.5', probability: u25 },
-    { type: 'BTTS_Y', label: 'Both Teams To Score (Yes)', shortLabel: 'BTTS Y', probability: bttsY },
-    { type: 'BTTS_N', label: 'Both Teams To Score (No)', shortLabel: 'BTTS N', probability: bttsN },
-  ];
+  // Resolve full markets list including all combo markets
+  const hasStoredCombos =
+    Array.isArray(f.markets) && f.markets.some((m) => m.key.startsWith('COMBO_'));
+  let resolvedMarkets: MarketOption[];
+  let calcMostLikely = f.mostLikelyOutcome || pred.mostLikelyOutcome;
 
-  candidates.sort((a, b) => b.probability - a.probability);
-  const best = candidates[0];
-  const highestPercent = round1(best.probability);
+  if (hasStoredCombos && f.markets) {
+    resolvedMarkets = f.markets;
+  } else {
+    const calc = ApexEngine.calculateMarkets(
+      pred,
+      DEFAULT_ENGINE_SETTINGS,
+      f.homeTeam,
+      f.awayTeam,
+      f.marketOdds || pred.marketOdds
+    );
+    resolvedMarkets = calc.markets;
+    if (!calcMostLikely) {
+      calcMostLikely = calc.mostLikelyOutcome;
+    }
+  }
+
+  const marketCandidates = resolvedMarkets.filter((m) => !WORKER_TRIVIAL_EXTREME_KEYS.has(m.key));
+  const bestMarket = (marketCandidates.length > 0 ? marketCandidates : resolvedMarkets)
+    .slice()
+    .sort((a, b) => b.probability - a.probability)[0];
+
+  const highestProb = bestMarket ? bestMarket.probability : authProb;
+  const highestPercent = round1(highestProb);
+  const highestKey = bestMarket ? bestMarket.key : authKey;
+  const highestLabel = bestMarket ? bestMarket.name : authLabel;
 
   const highestPick: Fixture['highestPick'] = {
-    type: best.type,
-    label: best.label,
-    shortLabel: best.shortLabel,
-    probability: best.probability,
+    key: highestKey,
+    type: bestMarket ? mapMarketToPickType(bestMarket.key) : authType,
+    label: highestLabel,
+    shortLabel: getShortMarketLabel(highestKey, highestLabel),
+    probability: highestProb,
     probabilityPercent: highestPercent,
-    probabilityFormatted: format1(best.probability),
+    probabilityFormatted: format1(highestProb),
   };
+
+  const bestCombo = resolvedMarkets
+    .filter((m) => m.key.startsWith('COMBO_') || m.key === 'HOME_WIN_TO_NIL' || m.key === 'AWAY_WIN_TO_NIL')
+    .slice()
+    .sort((a, b) => b.probability - a.probability)[0];
+
+  const comboPick: Fixture['comboPick'] = bestCombo
+    ? {
+        key: bestCombo.key,
+        label: bestCombo.name,
+        shortLabel: getShortMarketLabel(bestCombo.key, bestCombo.name),
+        probability: bestCombo.probability,
+        probabilityPercent: round1(bestCombo.probability),
+        probabilityFormatted: format1(bestCombo.probability),
+      }
+    : undefined;
+
+  const bestDc = resolvedMarkets
+    .filter((m) => m.key.startsWith('DOUBLE_CHANCE_'))
+    .slice()
+    .sort((a, b) => b.probability - a.probability)[0];
+
+  const dcPick: Fixture['dcPick'] = bestDc
+    ? {
+        key: bestDc.key,
+        label: bestDc.name,
+        shortLabel: getShortMarketLabel(bestDc.key, bestDc.name),
+        probability: bestDc.probability,
+        probabilityPercent: round1(bestDc.probability),
+        probabilityFormatted: format1(bestDc.probability),
+      }
+    : undefined;
 
   const over25Pct = round1(o25);
   const under25Pct = Number((100 - over25Pct).toFixed(1));
@@ -217,6 +370,8 @@ function computePrecomputedFields(
     tipProbOverUnder: Math.max(over25Pct, under25Pct),
     tipProbBtts: Math.max(bttsYesPct, bttsNoPct),
     tipProb1X2: authoritativePick.probabilityPercent,
+    tipProbCombo: comboPick?.probabilityPercent,
+    tipProbDoubleChance: dcPick?.probabilityPercent,
   };
 
   // Minimal prediction summary for list views (eliminates heavy 6x6 matrix, H2H, elo, stats blobs)
@@ -230,14 +385,18 @@ function computePrecomputedFields(
     over25Prob: pred.over25Prob,
     over35Prob: pred.over35Prob,
     bttsProb: pred.bttsProb,
+    mostLikelyOutcome: calcMostLikely,
   } as Fixture['prediction'];
 
   return {
     authoritativePick,
     highestPick,
+    comboPick,
+    dcPick,
     probs,
     popularityScore,
     slimPrediction,
+    resolvedMarkets,
     hasPrediction: true,
   };
 }
@@ -266,8 +425,11 @@ function buildSlimFixture(
     minute: source.minute,
     hasPrediction: computed.hasPrediction,
     prediction: computed.slimPrediction,
+    mostLikelyOutcome: computed.slimPrediction?.mostLikelyOutcome,
     authoritativePick: computed.authoritativePick,
     highestPick: computed.highestPick,
+    comboPick: computed.comboPick,
+    dcPick: computed.dcPick,
     probs: computed.probs,
     popularityScore: computed.popularityScore,
   };
@@ -312,6 +474,8 @@ function buildGroupsForFixtures(fixtures: Fixture[]): LeagueGroupDTO[] {
 
 function getTipProbForSort(f: Fixture, marketFilter: string): number {
   if (!f.probs) return 0;
+  if (marketFilter === 'COMBOS') return f.probs.tipProbCombo ?? f.comboPick?.probabilityPercent ?? 0;
+  if (marketFilter === 'DOUBLE_CHANCE') return f.probs.tipProbDoubleChance ?? f.dcPick?.probabilityPercent ?? 0;
   if (marketFilter === 'OVER_UNDER') return f.probs.tipProbOverUnder ?? Math.max(f.probs.over25, f.probs.under25);
   if (marketFilter === 'BTTS') return f.probs.tipProbBtts ?? Math.max(f.probs.bttsYes, f.probs.bttsNo);
   if (marketFilter === '1X2') return f.probs.tipProb1X2 ?? (f.authoritativePick?.probabilityPercent ?? 0);
@@ -449,6 +613,7 @@ class FixturesWorkerService {
                     timestamp: resolvedTimestamp,
                     prediction: p.prediction,
                     markets: p.markets || f.markets,
+                    mostLikelyOutcome: p.mostLikelyOutcome || f.mostLikelyOutcome,
                   }
                 : {
                     ...f,
@@ -456,11 +621,10 @@ class FixturesWorkerService {
                     prediction: undefined,
                   };
 
-            const rawMarkets = p?.markets || f.markets;
-            const { slimFixture } = buildSlimFixture(mergedSource, resolvedTimestamp);
+            const { slimFixture, computed } = buildSlimFixture(mergedSource, resolvedTimestamp);
             const rec: WorkerIndexedRecord = {
               slimFixture,
-              fullMarkets: rawMarkets,
+              fullMarkets: computed.resolvedMarkets || p?.markets || f.markets,
               marketOdds: resolvedOdds,
               cleanId,
               sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -484,10 +648,10 @@ class FixturesWorkerService {
                   : undefined);
               const resolvedOdds =
                 p.marketOdds || p.prediction?.marketOdds || oddsMap.get(cleanId) || oddsMap.get(p.id);
-              const { slimFixture } = buildSlimFixture(p, pTimestamp);
+              const { slimFixture, computed } = buildSlimFixture(p, pTimestamp);
               const rec: WorkerIndexedRecord = {
                 slimFixture,
-                fullMarkets: p.markets,
+                fullMarkets: computed.resolvedMarkets || p.markets,
                 marketOdds: resolvedOdds,
                 cleanId,
                 sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -505,10 +669,10 @@ class FixturesWorkerService {
             const cleanId = cleanFixtureId(p.id);
             const resolvedOdds =
               p.marketOdds || p.prediction?.marketOdds || oddsMap.get(cleanId) || oddsMap.get(p.id);
-            const { slimFixture } = buildSlimFixture(p, p.timestamp);
+            const { slimFixture, computed } = buildSlimFixture(p, p.timestamp);
             const rec: WorkerIndexedRecord = {
               slimFixture,
-              fullMarkets: p.markets,
+              fullMarkets: computed.resolvedMarkets || p.markets,
               marketOdds: resolvedOdds,
               cleanId,
               sortableDateTime: getFixtureSortableDateTime(slimFixture),
@@ -1076,9 +1240,10 @@ class FixturesWorkerService {
     await predictionsDb.init();
     await predictionsDb.reconcileAndSyncResults({ force: Boolean(params?.forceRefresh) });
 
+    const effectiveLimit = params?.limit === 0 ? 0 : (params?.limit || 300);
     const rawMatches = await predictionsDb.getHistoricalPredictionsAsync({
       league: params?.league,
-      limit: params?.limit || 300,
+      limit: effectiveLimit,
     });
     const summary = predictionsDb.getEvaluationSummary();
 
@@ -1097,6 +1262,23 @@ class FixturesWorkerService {
         if (!blob.includes(search)) continue;
       }
       const { slimFixture } = buildSlimFixture(m, m.timestamp);
+      const rawMarkets =
+        m.markets && m.markets.length > 0
+          ? m.markets
+          : ApexEngine.calculateMarkets(
+              m.prediction,
+              DEFAULT_ENGINE_SETTINGS,
+              m.homeTeam,
+              m.awayTeam
+            ).markets;
+      if (rawMarkets && rawMarkets.length > 0) {
+        slimFixture.markets = rawMarkets.map((mk) => ({
+          key: mk.key,
+          name: mk.name,
+          probability: Number(Number(mk.probability ?? 0).toFixed(3)),
+          isBanker: Boolean(mk.isBanker),
+        }));
+      }
       slimmed.push(slimFixture);
     }
 

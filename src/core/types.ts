@@ -465,7 +465,7 @@ export interface Fixture {
   hasPrediction?: boolean;
   authoritativePick?: {
     key: MarketOption['key'];
-    type?: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2';
+    type?: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2' | 'COMBO' | 'MARKET';
     label: string;
     shortLabel?: string;
     probability: number;
@@ -473,7 +473,24 @@ export interface Fixture {
     probabilityFormatted: string;
   };
   highestPick?: {
-    type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2';
+    key?: MarketOption['key'];
+    type: '1' | 'X' | '2' | 'O2.5' | 'U2.5' | 'BTTS_Y' | 'BTTS_N' | '1X' | 'X2' | 'COMBO' | 'MARKET';
+    label: string;
+    shortLabel: string;
+    probability: number;
+    probabilityPercent: number;
+    probabilityFormatted: string;
+  };
+  comboPick?: {
+    key: MarketOption['key'];
+    label: string;
+    shortLabel: string;
+    probability: number;
+    probabilityPercent: number;
+    probabilityFormatted: string;
+  };
+  dcPick?: {
+    key: MarketOption['key'];
     label: string;
     shortLabel: string;
     probability: number;
@@ -492,6 +509,8 @@ export interface Fixture {
     tipProbOverUnder?: number;
     tipProbBtts?: number;
     tipProb1X2?: number;
+    tipProbCombo?: number;
+    tipProbDoubleChance?: number;
   };
   popularityScore?: number;
 }

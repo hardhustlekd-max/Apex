@@ -839,7 +839,7 @@ export class ServerEngine {
       level: 'INFO',
       category: 'PREDICTION',
       source: 'ServerEngine',
-      message: `Prediction update completed for ${validFixtures.length} matches: ${predictedCount} predicted (>=90% data), ${skippedCount} skipped (<90% data)`,
+      message: `All-market & combo prediction update completed for ${validFixtures.length} matches: ${predictedCount} predicted (>=70% data), ${skippedCount} skipped (<70% data)`,
       details: { total: validFixtures.length, predictedCount, skippedCount },
     });
 

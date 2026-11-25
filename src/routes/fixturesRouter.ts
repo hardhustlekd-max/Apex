@@ -135,7 +135,9 @@ fixturesRouter.get('/history', async (req, res) => {
     const sortBy = req.query.sortBy as string | undefined;
     const marketFilter = req.query.marketFilter as string | undefined;
     const dateFilter = req.query.dateFilter as string | undefined;
-    const limit = parseInt((req.query.limit as string) || '300', 10);
+    const rawLimit = req.query.limit;
+    const parsedLimit = rawLimit !== undefined ? parseInt(String(rawLimit), 10) : 300;
+    const limit = !isNaN(parsedLimit) && parsedLimit >= 0 ? parsedLimit : 300;
     const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
 
     const result = await fixturesWorkerService.queryHistoryFixtures({

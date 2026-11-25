@@ -150,7 +150,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const dateOptions = useMemo(() => getDateFilterOptions(), []);
 
   const marketOptions = [
-    { key: 'MOST_LIKELY', label: 'Most Likely' },
+    { key: 'MOST_LIKELY', label: 'Most Likely (All Markets)' },
+    { key: 'COMBOS', label: 'Combo Bet Markets' },
+    { key: 'DOUBLE_CHANCE', label: 'Double Chance' },
     { key: 'OVER_UNDER', label: 'Over Under' },
     { key: '1X2', label: '1X2 Match Winner' },
     { key: 'BTTS', label: 'Both Teams to Score' },

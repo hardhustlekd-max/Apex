@@ -8,7 +8,7 @@ interface FixtureCardProps {
   fixture: Fixture;
   onSelectDetail: (fixture: Fixture) => void;
   isSelected?: boolean;
-  marketFilter?: 'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS';
+  marketFilter?: 'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS';
 }
 
 export const FixtureCard: React.FC<FixtureCardProps> = ({
@@ -28,8 +28,28 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
   const bttsYesPct = probs ? probs.bttsYes : (fixture.prediction ? Math.round((fixture.prediction.bttsProb ?? 0) * 1000) / 10 : 0);
   const bttsNoPct = probs ? probs.bttsNo : Number((100 - bttsYesPct).toFixed(1));
 
+  const dc1XPct = Number(Math.min(99, homePct + drawPct).toFixed(1));
+  const dcX2Pct = Number(Math.min(99, awayPct + drawPct).toFixed(1));
+  const dc12Pct = Number(Math.min(99, homePct + awayPct).toFixed(1));
+
   const pick = (() => {
     if (!hasPred) return null;
+    if (marketFilter === 'COMBOS' && fixture.comboPick) {
+      return fixture.comboPick;
+    }
+    if (marketFilter === 'DOUBLE_CHANCE') {
+      if (fixture.dcPick) return fixture.dcPick;
+      const bestDc = [
+        { label: `${fixture.homeTeam} or Draw (1X)`, pct: dc1XPct },
+        { label: `Draw or ${fixture.awayTeam} (X2)`, pct: dcX2Pct },
+        { label: `${fixture.homeTeam} or ${fixture.awayTeam} (12)`, pct: dc12Pct },
+      ].sort((a, b) => b.pct - a.pct)[0];
+      return {
+        label: bestDc.label,
+        probabilityPercent: bestDc.pct,
+        probabilityFormatted: `${bestDc.pct.toFixed(1)}%`,
+      };
+    }
     if (marketFilter === 'OVER_UNDER') {
       const isOver = over25Pct >= under25Pct;
       const pct = isOver ? over25Pct : under25Pct;
@@ -140,7 +160,36 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         {/* Probability Bar Indicator */}
         {hasPred && (
           <div className="my-2 space-y-1">
-            {marketFilter === 'OVER_UNDER' ? (
+            {marketFilter === 'COMBOS' && fixture.comboPick ? (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub gap-2">
+                  <span className="font-semibold text-theme-main truncate">{fixture.comboPick.label}</span>
+                  <span className="font-semibold text-theme-primary shrink-0">{fixture.comboPick.probabilityFormatted}</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full overflow-hidden">
+                  <div
+                    style={{ width: `${Math.min(100, fixture.comboPick.probabilityPercent)}%` }}
+                    className="h-full bg-theme-primary rounded-full transition-all duration-300"
+                    title={`${fixture.comboPick.label}: ${fixture.comboPick.probabilityFormatted}`}
+                  />
+                </div>
+              </>
+            ) : marketFilter === 'DOUBLE_CHANCE' ? (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                  <span className="font-semibold text-theme-main">1X · {dc1XPct.toFixed(0)}%</span>
+                  <span className="font-normal text-theme-sub">12 · {dc12Pct.toFixed(0)}%</span>
+                  <span className="font-semibold text-theme-main">X2 · {dcX2Pct.toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                  <div
+                    style={{ width: `${dc1XPct}%` }}
+                    className="bg-theme-primary rounded-full transition-all duration-300"
+                    title={`1X: ${dc1XPct.toFixed(1)}%`}
+                  />
+                </div>
+              </>
+            ) : marketFilter === 'OVER_UNDER' ? (
               <>
                 <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
                   <span className="font-semibold text-theme-main">Over 2.5 · {over25Pct.toFixed(0)}%</span>
