@@ -8,26 +8,58 @@ interface FixtureCardProps {
   fixture: Fixture;
   onSelectDetail: (fixture: Fixture) => void;
   isSelected?: boolean;
+  marketFilter?: 'MOST_LIKELY' | 'OVER_UNDER' | '1X2' | 'BTTS';
 }
 
 export const FixtureCard: React.FC<FixtureCardProps> = ({
   fixture,
   onSelectDetail,
   isSelected = false,
+  marketFilter = 'MOST_LIKELY',
 }) => {
   const probs = fixture.probs;
   const hasPred = Boolean(fixture.hasPrediction || fixture.prediction || probs);
-  const pick = fixture.authoritativePick || null;
+
+  const homePct = probs ? probs.home : (fixture.prediction ? Math.round((fixture.prediction.homeWinProb ?? 0) * 1000) / 10 : 0);
+  const drawPct = probs ? probs.draw : (fixture.prediction ? Math.round((fixture.prediction.drawProb ?? 0) * 1000) / 10 : 0);
+  const awayPct = probs ? probs.away : (fixture.prediction ? Math.round((fixture.prediction.awayWinProb ?? 0) * 1000) / 10 : 0);
+  const over25Pct = probs ? probs.over25 : (fixture.prediction ? Math.round((fixture.prediction.over25Prob ?? 0) * 1000) / 10 : 0);
+  const under25Pct = probs ? probs.under25 : Number((100 - over25Pct).toFixed(1));
+  const bttsYesPct = probs ? probs.bttsYes : (fixture.prediction ? Math.round((fixture.prediction.bttsProb ?? 0) * 1000) / 10 : 0);
+  const bttsNoPct = probs ? probs.bttsNo : Number((100 - bttsYesPct).toFixed(1));
+
+  const pick = (() => {
+    if (!hasPred) return null;
+    if (marketFilter === 'OVER_UNDER') {
+      const isOver = over25Pct >= under25Pct;
+      const pct = isOver ? over25Pct : under25Pct;
+      return {
+        label: isOver ? 'Over 2.5 Goals' : 'Under 2.5 Goals',
+        probabilityPercent: pct,
+        probabilityFormatted: `${pct.toFixed(1)}%`,
+      };
+    }
+    if (marketFilter === 'BTTS') {
+      const isYes = bttsYesPct >= bttsNoPct;
+      const pct = isYes ? bttsYesPct : bttsNoPct;
+      return {
+        label: isYes ? 'Both Teams To Score (Yes)' : 'Both Teams To Score (No)',
+        probabilityPercent: pct,
+        probabilityFormatted: `${pct.toFixed(1)}%`,
+      };
+    }
+    if (marketFilter === 'MOST_LIKELY' && fixture.highestPick) {
+      return fixture.highestPick;
+    }
+    return fixture.authoritativePick || null;
+  })();
+
   const topPredictionLabel = pick
     ? `${pick.label} (${pick.probabilityFormatted})`
     : null;
 
   const isHighConfidence = Boolean(pick && pick.probabilityPercent >= 65);
   const { dateStr: localDate, timeStr: localTime } = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime, fixture.timestamp);
-
-  const homePct = probs ? probs.home : (fixture.prediction ? Math.round((fixture.prediction.homeWinProb ?? 0) * 1000) / 10 : 0);
-  const drawPct = probs ? probs.draw : (fixture.prediction ? Math.round((fixture.prediction.drawProb ?? 0) * 1000) / 10 : 0);
-  const awayPct = probs ? probs.away : (fixture.prediction ? Math.round((fixture.prediction.awayWinProb ?? 0) * 1000) / 10 : 0);
 
   return (
     <Card
@@ -108,28 +140,70 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         {/* Probability Bar Indicator */}
         {hasPred && (
           <div className="my-2 space-y-1">
-            <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
-              <span className="font-semibold text-theme-main">1 · {homePct.toFixed(0)}%</span>
-              <span className="font-normal text-theme-sub">X · {drawPct.toFixed(0)}%</span>
-              <span className="font-semibold text-theme-main">2 · {awayPct.toFixed(0)}%</span>
-            </div>
-            <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
-              <div
-                style={{ width: `${homePct}%` }}
-                className="bg-theme-primary rounded-full transition-all duration-300"
-                title={`Home Win: ${homePct.toFixed(1)}%`}
-              />
-              <div
-                style={{ width: `${drawPct}%` }}
-                className="bg-theme-dim/40 rounded-full transition-all duration-300"
-                title={`Draw: ${drawPct.toFixed(1)}%`}
-              />
-              <div
-                style={{ width: `${awayPct}%` }}
-                className="bg-theme-main/70 rounded-full transition-all duration-300"
-                title={`Away Win: ${awayPct.toFixed(1)}%`}
-              />
-            </div>
+            {marketFilter === 'OVER_UNDER' ? (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                  <span className="font-semibold text-theme-main">Over 2.5 · {over25Pct.toFixed(0)}%</span>
+                  <span className="font-semibold text-theme-main">Under 2.5 · {under25Pct.toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                  <div
+                    style={{ width: `${over25Pct}%` }}
+                    className="bg-theme-primary rounded-full transition-all duration-300"
+                    title={`Over 2.5: ${over25Pct.toFixed(1)}%`}
+                  />
+                  <div
+                    style={{ width: `${under25Pct}%` }}
+                    className="bg-theme-main/70 rounded-full transition-all duration-300"
+                    title={`Under 2.5: ${under25Pct.toFixed(1)}%`}
+                  />
+                </div>
+              </>
+            ) : marketFilter === 'BTTS' ? (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                  <span className="font-semibold text-theme-main">BTTS Yes · {bttsYesPct.toFixed(0)}%</span>
+                  <span className="font-semibold text-theme-main">BTTS No · {bttsNoPct.toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                  <div
+                    style={{ width: `${bttsYesPct}%` }}
+                    className="bg-theme-primary rounded-full transition-all duration-300"
+                    title={`BTTS Yes: ${bttsYesPct.toFixed(1)}%`}
+                  />
+                  <div
+                    style={{ width: `${bttsNoPct}%` }}
+                    className="bg-theme-main/70 rounded-full transition-all duration-300"
+                    title={`BTTS No: ${bttsNoPct.toFixed(1)}%`}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
+                  <span className="font-semibold text-theme-main">1 · {homePct.toFixed(0)}%</span>
+                  <span className="font-normal text-theme-sub">X · {drawPct.toFixed(0)}%</span>
+                  <span className="font-semibold text-theme-main">2 · {awayPct.toFixed(0)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full flex overflow-hidden gap-0.5">
+                  <div
+                    style={{ width: `${homePct}%` }}
+                    className="bg-theme-primary rounded-full transition-all duration-300"
+                    title={`Home Win: ${homePct.toFixed(1)}%`}
+                  />
+                  <div
+                    style={{ width: `${drawPct}%` }}
+                    className="bg-theme-dim/40 rounded-full transition-all duration-300"
+                    title={`Draw: ${drawPct.toFixed(1)}%`}
+                  />
+                  <div
+                    style={{ width: `${awayPct}%` }}
+                    className="bg-theme-main/70 rounded-full transition-all duration-300"
+                    title={`Away Win: ${awayPct.toFixed(1)}%`}
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

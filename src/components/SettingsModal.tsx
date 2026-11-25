@@ -43,6 +43,8 @@ import {
 } from '../core/googleDriveAuth.js';
 import { COLOR_THEMES, applyColorTheme, getActiveColorThemeId } from '../core/themeEngine.js';
 import {
+  AppLogo,
+  AppLogoVariant,
   Badge,
   Button,
   Card,
@@ -1649,17 +1651,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       />
 
                       <div className="p-2.5 space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-base font-semibold text-theme-main truncate tracking-[-0.01em]">{t.name}</span>
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <AppLogo
+                              variant={t.id as AppLogoVariant}
+                              mode={theme}
+                              size={32}
+                              title={`${t.name} (${theme} mode crest)`}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <span className="text-base font-semibold text-theme-main truncate block tracking-[-0.01em]">{t.name}</span>
+                              <p className="text-xs font-normal text-theme-sub truncate">{t.tagline}</p>
+                            </div>
+                          </div>
                           {isSelected ? (
-                            <Badge variant="solid" size="xs">
+                            <Badge variant="solid" size="xs" className="shrink-0">
                               <Check className="w-3 h-3 stroke-[3]" />
                               <span>Active</span>
                             </Badge>
                           ) : null}
                         </div>
-
-                        <p className="text-sm font-normal text-theme-sub truncate">{t.tagline}</p>
 
                         {t.colorways && t.colorways.length > 0 && (
                           <p className="text-xs font-normal text-theme-dim truncate">
@@ -1699,6 +1710,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {t.accentName}
                           </span>
                         </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* App Crest Varieties (Light & Dark Mode Preview) */}
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5 space-y-2.5">
+              <SectionHeader
+                title="App Emblem Varieties (Light & Dark)"
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+                size="sm"
+              />
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {COLOR_THEMES.map((t) => {
+                  const isCurrentPalette = activeThemeId === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`rounded-xl border p-2 space-y-1.5 transition-colors ${
+                        isCurrentPalette
+                          ? 'border-theme-accent bg-theme-primary-subtle'
+                          : 'border-theme-subdued bg-theme-card'
+                      }`}
+                    >
+                      <div className="text-2xs font-semibold text-theme-main truncate text-center">
+                        {t.accentName}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (theme !== 'light') onToggleTheme();
+                            handleSelectColorTheme(t.id);
+                          }}
+                          className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                            isCurrentPalette && theme === 'light'
+                              ? 'border-theme-accent ring-1 ring-theme-accent'
+                              : 'border-slate-300/70 hover:border-theme-accent'
+                          }`}
+                          style={{ backgroundColor: t.previewColors.surfaceLight }}
+                          title={`Apply ${t.name} in Light mode`}
+                        >
+                          <AppLogo variant={t.id as AppLogoVariant} mode="light" size={28} />
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-700">Light</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (theme !== 'dark') onToggleTheme();
+                            handleSelectColorTheme(t.id);
+                          }}
+                          className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                            isCurrentPalette && theme === 'dark'
+                              ? 'border-theme-accent ring-1 ring-theme-accent'
+                              : 'border-white/10 hover:border-theme-accent'
+                          }`}
+                          style={{ backgroundColor: t.previewColors.surfaceDark }}
+                          title={`Apply ${t.name} in Dark mode`}
+                        >
+                          <AppLogo variant={t.id as AppLogoVariant} mode="dark" size={28} />
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-200">Dark</span>
+                        </button>
                       </div>
                     </div>
                   );

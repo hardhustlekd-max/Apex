@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'motion/react';
-import { ArrowLeft, History, Target, Trophy, Copy, Check, Ticket } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowLeft, History, Target, Trophy, Copy, Check, ChevronDown } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -10,7 +10,7 @@ import { LeagueStandings } from './LeagueStandings.js';
 import { getProbValue } from '../core/formatters.js';
 import { teamMatchScore, resolveFixtureAlignment, resolveTeamSide } from '../core/feedParser.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
-import { Card, SegmentedTabs, StatTile, EmptyState, SectionHeader, TeamAvatar } from './ui/index.js';
+import { Card, SegmentedTabs, SegmentedTabItem, StatTile, EmptyState, SectionHeader, TeamAvatar } from './ui/index.js';
 
 export interface MatchDetailViewProps {
   fixture: Fixture | null;
@@ -21,17 +21,145 @@ export interface MatchDetailViewProps {
 }
 
 type DetailTab = 'OVERVIEW' | 'H2H' | 'STATS' | 'TEAMS' | 'STANDINGS' | 'PREDICTIONS' | 'TACTICS';
-type MarketCategoryFilter = 'ALL' | '1X2_DC' | 'GOALS' | 'BTTS' | 'COMBOS' | 'TEAM' | 'SPECIALS';
+type MarketCategoryFilter =
+  | 'ALL'
+  | 'MAIN'
+  | 'TOTALS'
+  | 'COMBOS'
+  | 'TEAM'
+  | 'SPECIALS';
+type ComboSubFilter = 'ALL' | 'WIN_GOALS' | 'DC_GOALS' | 'BTTS_COMBOS';
 
-const MARKET_CATEGORY_TABS: Array<{ id: MarketCategoryFilter; label: string }> = [
-  { id: 'ALL', label: 'All' },
-  { id: '1X2_DC', label: '1X2 / DC / DNB' },
-  { id: 'GOALS', label: 'Goals O/U' },
-  { id: 'BTTS', label: 'BTTS' },
+const MARKET_CATEGORY_META: Array<{ id: Exclude<MarketCategoryFilter, 'ALL'>; label: string }> = [
+  { id: 'MAIN', label: 'Main' },
+  { id: 'TOTALS', label: 'Totals' },
   { id: 'COMBOS', label: 'Combos' },
   { id: 'TEAM', label: 'Team Goals' },
   { id: 'SPECIALS', label: 'Specials' },
 ];
+
+const COMBO_SUBFILTER_META: Array<{ id: ComboSubFilter; label: string }> = [
+  { id: 'ALL', label: 'All' },
+  { id: 'WIN_GOALS', label: 'Win & Goals' },
+  { id: 'DC_GOALS', label: 'DC & Goals' },
+  { id: 'BTTS_COMBOS', label: 'BTTS Combos' },
+];
+
+function getComboSubGroup(key: string): Exclude<ComboSubFilter, 'ALL'> {
+  if (key.includes('BTTS')) return 'BTTS_COMBOS';
+  if (key.startsWith('COMBO_1X_') || key.startsWith('COMBO_X2_') || key.startsWith('COMBO_12_')) return 'DC_GOALS';
+  return 'WIN_GOALS';
+}
+
+const MARKET_KEY_SORT_ORDER: Record<string, number> = {
+  HOME_WIN: 1,
+  DRAW: 2,
+  AWAY_WIN: 3,
+  BTTS_YES: 1,
+  BTTS_NO: 2,
+  DOUBLE_CHANCE_1X: 1,
+  DOUBLE_CHANCE_12: 2,
+  DOUBLE_CHANCE_X2: 3,
+  DNB_HOME: 1,
+  DNB_AWAY: 2,
+  OVER_05: 1,
+  UNDER_05: 2,
+  OVER_15: 3,
+  UNDER_15: 4,
+  OVER_25: 5,
+  UNDER_25: 6,
+  OVER_35: 7,
+  UNDER_35: 8,
+  OVER_45: 9,
+  UNDER_45: 10,
+  HOME_OVER_05: 1,
+  HOME_UNDER_05: 2,
+  HOME_OVER_15: 3,
+  HOME_UNDER_15: 4,
+  HOME_OVER_25: 5,
+  HOME_UNDER_25: 6,
+  AWAY_OVER_05: 7,
+  AWAY_UNDER_05: 8,
+  AWAY_OVER_15: 9,
+  AWAY_UNDER_15: 10,
+  AWAY_OVER_25: 11,
+  AWAY_UNDER_25: 12,
+  HOME_CLEAN_SHEET: 13,
+  AWAY_CLEAN_SHEET: 14,
+  HANDICAP_HOME_MINUS_1: 1,
+  HANDICAP_AWAY_MINUS_1: 2,
+  MULTIGOALS_1_3: 3,
+  MULTIGOALS_2_4: 4,
+  MULTIGOALS_2_5: 5,
+  GOALS_ODD: 6,
+  GOALS_EVEN: 7,
+};
+
+function getMarketSectionInfo(key: string): {
+  sectionId: string;
+  sectionTitle: string;
+  sectionOrder: number;
+  columnsClass: string;
+  category: Exclude<MarketCategoryFilter, 'ALL'>;
+} {
+  if (key === 'HOME_WIN' || key === 'DRAW' || key === 'AWAY_WIN') {
+    return { sectionId: '1x2', sectionTitle: '1X2', sectionOrder: 1, columnsClass: 'grid-cols-3', category: 'MAIN' };
+  }
+  if (key.startsWith('BTTS_')) {
+    return { sectionId: 'btts', sectionTitle: 'Both Teams to Score', sectionOrder: 2, columnsClass: 'grid-cols-2', category: 'MAIN' };
+  }
+  if (key.startsWith('DOUBLE_CHANCE_')) {
+    return { sectionId: 'double-chance', sectionTitle: 'Double Chance', sectionOrder: 3, columnsClass: 'grid-cols-2', category: 'MAIN' };
+  }
+  if (key.startsWith('DNB_')) {
+    return { sectionId: 'dnb', sectionTitle: 'Draw No Bet', sectionOrder: 4, columnsClass: 'grid-cols-2', category: 'MAIN' };
+  }
+  if (key.startsWith('OVER_') || key.startsWith('UNDER_')) {
+    return { sectionId: 'total', sectionTitle: 'Total', sectionOrder: 5, columnsClass: 'grid-cols-2', category: 'TOTALS' };
+  }
+  if (key.startsWith('COMBO_') || key === 'HOME_WIN_TO_NIL' || key === 'AWAY_WIN_TO_NIL') {
+    return { sectionId: 'combos', sectionTitle: 'Combos', sectionOrder: 6, columnsClass: 'grid-cols-1 sm:grid-cols-2', category: 'COMBOS' };
+  }
+  if (key.startsWith('HOME_') || key.startsWith('AWAY_')) {
+    return { sectionId: 'team', sectionTitle: 'Team Goals & Clean Sheets', sectionOrder: 7, columnsClass: 'grid-cols-2', category: 'TEAM' };
+  }
+  if (key.startsWith('MULTIGOALS_') || key.startsWith('GOALS_')) {
+    return { sectionId: 'totals-specials', sectionTitle: 'Multi-Goals & Odd/Even', sectionOrder: 8, columnsClass: 'grid-cols-2', category: 'TOTALS' };
+  }
+  return { sectionId: 'specials', sectionTitle: 'Handicaps & Specials', sectionOrder: 9, columnsClass: 'grid-cols-2', category: 'SPECIALS' };
+}
+
+function formatSportsbookMarketLabel(key: string, fullName: string): string {
+  switch (key) {
+    case 'HOME_WIN': return '1';
+    case 'DRAW': return 'X';
+    case 'AWAY_WIN': return '2';
+    case 'BTTS_YES': return 'Yes';
+    case 'BTTS_NO': return 'No';
+    case 'DOUBLE_CHANCE_1X': return '1X';
+    case 'DOUBLE_CHANCE_12': return '12';
+    case 'DOUBLE_CHANCE_X2': return 'X2';
+    case 'DNB_HOME': return '1 (DNB)';
+    case 'DNB_AWAY': return '2 (DNB)';
+    case 'OVER_05': return 'Over 0.5';
+    case 'UNDER_05': return 'Under 0.5';
+    case 'OVER_15': return 'Over 1.5';
+    case 'UNDER_15': return 'Under 1.5';
+    case 'OVER_25': return 'Over 2.5';
+    case 'UNDER_25': return 'Under 2.5';
+    case 'OVER_35': return 'Over 3.5';
+    case 'UNDER_35': return 'Under 3.5';
+    case 'OVER_45': return 'Over 4.5';
+    case 'UNDER_45': return 'Under 4.5';
+    case 'MULTIGOALS_1_3': return '1 - 3 Goals';
+    case 'MULTIGOALS_2_4': return '2 - 4 Goals';
+    case 'MULTIGOALS_2_5': return '2 - 5 Goals';
+    case 'GOALS_ODD': return 'Odd';
+    case 'GOALS_EVEN': return 'Even';
+    default:
+      return fullName.replace(/\s+Goals$/i, '').replace(/^Multi-Goals:\s*/i, '');
+  }
+}
 
 export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
   fixture,
@@ -161,8 +289,9 @@ const MatchDetailDrawerContent: React.FC<{
     selectedSelections.some((s) => s.fixtureId === fixture.id && s.marketKey === marketKey);
   const [activeTab, setActiveTab] = useState<DetailTab>('OVERVIEW');
   const [statFilterGroup] = useState<StatCategoryGroup>('ALL');
-  const [predictionViewFilter, setPredictionViewFilter] = useState<'BEST' | 'COMBOS' | 'ALL'>('BEST');
   const [marketCategoryFilter, setMarketCategoryFilter] = useState<MarketCategoryFilter>('ALL');
+  const [collapsedMarketSections, setCollapsedMarketSections] = useState<Record<string, boolean>>({});
+  const [comboSubFilter, setComboSubFilter] = useState<ComboSubFilter>('ALL');
 
   const [enrichedFixture, setEnrichedFixture] = useState<Fixture>(fixture);
   const [, setIsParsing] = useState<boolean>(false);
@@ -235,6 +364,8 @@ const MatchDetailDrawerContent: React.FC<{
   useEffect(() => {
     setCopiedKey(null);
     setMarketCategoryFilter('ALL');
+    setCollapsedMarketSections({});
+    setComboSubFilter('ALL');
     return () => {
       if (copyTimerRef.current) {
         clearTimeout(copyTimerRef.current);
@@ -480,57 +611,84 @@ const MatchDetailDrawerContent: React.FC<{
 
   const allMarketsList = useMemo(() => {
     if (!currentFixture.markets || currentFixture.markets.length === 0) return [];
-    return currentFixture.markets.map((market) => {
-      let groupName = 'Other';
-      let category: MarketCategoryFilter = 'SPECIALS';
-      if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) {
-        groupName = '1X2';
-        category = '1X2_DC';
-      } else if (['DOUBLE_CHANCE_1X', 'DOUBLE_CHANCE_X2', 'DOUBLE_CHANCE_12'].includes(market.key)) {
-        groupName = 'Double Chance';
-        category = '1X2_DC';
-      } else if (['DNB_HOME', 'DNB_AWAY'].includes(market.key)) {
-        groupName = 'Draw No Bet';
-        category = '1X2_DC';
-      } else if (market.key.startsWith('OVER_') || market.key.startsWith('UNDER_')) {
-        groupName = 'Goals Over/Under';
-        category = 'GOALS';
-      } else if (market.key.startsWith('BTTS_')) {
-        groupName = 'BTTS';
-        category = 'BTTS';
-      } else if (market.key.startsWith('COMBO_')) {
-        groupName = 'Match Combos';
-        category = 'COMBOS';
-      } else if (market.key.startsWith('HOME_') || market.key.startsWith('AWAY_')) {
-        groupName = 'Team Markets';
-        category = 'TEAM';
-      } else if (market.key.startsWith('HANDICAP_') || market.key.startsWith('MULTIGOALS_') || market.key.startsWith('GOALS_')) {
-        groupName = 'Handicap & Specials';
-        category = 'SPECIALS';
+    const dedupedByKey = new Map<string, MarketOption>();
+    for (const market of currentFixture.markets) {
+      const existing = dedupedByKey.get(market.key);
+      if (!existing || market.probability > existing.probability) {
+        dedupedByKey.set(market.key, market);
       }
-      return { groupName, category, ...market };
+    }
+    return Array.from(dedupedByKey.values()).map((market) => {
+      const info = getMarketSectionInfo(market.key);
+      return {
+        groupName: info.sectionTitle,
+        ...info,
+        ...market,
+      };
     });
   }, [currentFixture.markets]);
 
+  const availableMarketTabs = useMemo<SegmentedTabItem<MarketCategoryFilter>[]>(() => {
+    const counts: Record<Exclude<MarketCategoryFilter, 'ALL'>, number> = {
+      MAIN: 0,
+      TOTALS: 0,
+      COMBOS: 0,
+      TEAM: 0,
+      SPECIALS: 0,
+    };
+
+    for (const m of allMarketsList) {
+      counts[m.category] += 1;
+    }
+    if (pred?.topCorrectScores && pred.topCorrectScores.length > 0) {
+      counts.SPECIALS += Math.min(6, pred.topCorrectScores.length);
+    }
+
+    const totalCount =
+      allMarketsList.length + (pred?.topCorrectScores ? Math.min(6, pred.topCorrectScores.length) : 0);
+
+    const tabs: SegmentedTabItem<MarketCategoryFilter>[] = [
+      { id: 'ALL', label: 'All', count: totalCount },
+    ];
+
+    for (const meta of MARKET_CATEGORY_META) {
+      if (counts[meta.id] > 0) {
+        tabs.push({
+          id: meta.id,
+          label: meta.label,
+          count: counts[meta.id],
+        });
+      }
+    }
+
+    return tabs;
+  }, [allMarketsList, pred?.topCorrectScores]);
+
+  useEffect(() => {
+    if (marketCategoryFilter !== 'ALL' && !availableMarketTabs.some((t) => t.id === marketCategoryFilter)) {
+      setMarketCategoryFilter('ALL');
+    }
+  }, [availableMarketTabs, marketCategoryFilter]);
+
   const bestMarketsPerGroup = useMemo(() => {
-    if (!currentFixture.markets) return [];
-    const groups: Record<string, MarketOption> = {};
-    currentFixture.markets.forEach((market) => {
+    if (allMarketsList.length === 0) return [];
+    const groups: Record<string, (typeof allMarketsList)[number]> = {};
+    allMarketsList.forEach((market) => {
+      if (market.category === 'COMBOS') return;
       let group = '';
       if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
       else if (market.key.startsWith('DOUBLE_CHANCE')) group = 'Double Chance';
       else if (market.key.startsWith('DNB')) group = 'Draw No Bet';
       else if (market.key === 'OVER_25' || market.key === 'UNDER_25') group = 'Goals O/U 2.5';
       else if (market.key.startsWith('BTTS')) group = 'BTTS';
-      else if (market.key.startsWith('COMBO_')) group = 'Match Combos';
       else if (market.key === 'HOME_OVER_15' || market.key === 'AWAY_OVER_15' || market.key === 'HOME_CLEAN_SHEET' || market.key === 'AWAY_CLEAN_SHEET') group = 'Team Markets';
       else if (market.key === 'MULTIGOALS_1_3' || market.key === 'MULTIGOALS_2_4') group = 'Multi-Goals';
       if (group && (!groups[group] || market.probability > groups[group].probability)) {
         groups[group] = market;
       }
     });
-    return Object.entries(groups).map(([groupName, market]) => ({ groupName, ...market }));
-  }, [currentFixture.markets]);
+    return Object.entries(groups).map(([groupName, market]) => ({ ...market, groupName }));
+  }, [allMarketsList]);
 
   const recommendedPick = useMemo(() => {
     if (currentFixture.authoritativePick) {
@@ -1411,293 +1569,338 @@ const MatchDetailDrawerContent: React.FC<{
         )}
 
         {/* TAB 5: PREDICTIONS */}
-        {activeTab === 'PREDICTIONS' && (
-          <div className="space-y-2.5">
-            {/* Top Model Recommendation Banner with direct Add to Bet Slip */}
-            {recommendedPick && (
-              <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden border border-theme-primary/30">
-                <div className="min-h-[34px] px-3.5 py-1.5 bg-theme-primary-subtle border-b border-theme-subdued flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-theme-primary animate-pulse" />
-                    <span className="text-2xs font-bold text-theme-primary uppercase tracking-[0.06em]">
-                      Model Recommendation
-                    </span>
-                  </div>
-                  <span className="text-xs font-bold text-theme-primary tabular-nums">
-                    {recommendedPick.probabilityFormatted}
-                  </span>
-                </div>
-                <div className="p-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-bold text-theme-main tracking-[-0.01em] truncate">
-                      {recommendedPick.label}
-                    </div>
-                    <div className="text-xs text-theme-sub truncate mt-0.5">
-                      {currentFixture.homeTeam} vs {currentFixture.awayTeam} · {currentFixture.leagueName}
-                    </div>
-                  </div>
-                  {onAddSelection && (() => {
-                    const authKey = recommendedPick.key;
-                    const { odds: authOdds } = getOddsForMarket(authKey, recommendedPick.probability);
-                    const isAuthSelected = isSel(authKey);
-                    return (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleAddBet(
-                            authKey,
-                            `${recommendedPick.label} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
-                            authOdds
-                          )
-                        }
-                        className={`h-[32px] px-3.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent shrink-0 active:scale-95 ${
-                          isAuthSelected
-                            ? 'bg-theme-primary text-theme-primary-text shadow-theme-glow'
-                            : 'bg-theme-primary text-theme-primary-text hover:opacity-90 shadow-theme-sm'
-                        }`}
-                        title={isAuthSelected ? 'Remove from Bet Slip' : 'Add to Bet Slip'}
-                        aria-label={`${isAuthSelected ? 'Remove' : 'Add'} ${recommendedPick.label} to Bet Slip`}
-                      >
-                        {isAuthSelected ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.2]" />
-                            <span>Added to Slip</span>
-                          </>
-                        ) : (
-                          <>
-                            <Ticket className="w-3.5 h-3.5" />
-                            <span>Add to Slip ({authOdds.toFixed(2)})</span>
-                          </>
-                        )}
-                      </button>
-                    );
-                  })()}
-                </div>
-              </Card>
-            )}
+        {activeTab === 'PREDICTIONS' && (() => {
+          type MarketTileItem = {
+            key: string;
+            shortLabel: string;
+            fullName: string;
+            probability: number;
+            odds: number;
+            isSelected: boolean;
+          };
 
-            {/* Market Predictions List */}
-            <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
-                <SectionHeader title="Market Predictions" size="sm" />
-                {allMarketsList.length > 0 && (() => {
-                  const comboMarketsCount = allMarketsList.filter((m) => m.category === 'COMBOS').length;
-                  return (
-                    <div className="flex items-center gap-0.5 p-[3px] bg-theme-subtle rounded-full border border-theme-subdued text-xs font-medium">
-                      <button
-                        type="button"
-                        onClick={() => setPredictionViewFilter('BEST')}
-                        className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
-                          predictionViewFilter === 'BEST'
-                            ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
-                            : 'text-theme-sub hover:text-theme-main'
+          type MarketSectionGroup = {
+            sectionId: string;
+            sectionTitle: string;
+            sectionOrder: number;
+            columnsClass: string;
+            category: Exclude<MarketCategoryFilter, 'ALL'>;
+            items: MarketTileItem[];
+          };
+
+          const sectionMap = new Map<string, MarketSectionGroup>();
+
+          for (const market of allMarketsList) {
+            if (marketCategoryFilter !== 'ALL' && market.category !== marketCategoryFilter) {
+              continue;
+            }
+            const { odds: betOdds } = getOddsForMarket(market.key, market.probability);
+            const tile: MarketTileItem = {
+              key: market.key,
+              shortLabel: formatSportsbookMarketLabel(market.key, market.name),
+              fullName: market.name,
+              probability: market.probability,
+              odds: betOdds,
+              isSelected: isSel(market.key),
+            };
+            const existing = sectionMap.get(market.sectionId);
+            if (existing) {
+              existing.items.push(tile);
+            } else {
+              sectionMap.set(market.sectionId, {
+                sectionId: market.sectionId,
+                sectionTitle: market.sectionTitle,
+                sectionOrder: market.sectionOrder,
+                columnsClass: market.columnsClass,
+                category: market.category,
+                items: [tile],
+              });
+            }
+          }
+
+          if (
+            pred?.topCorrectScores &&
+            pred.topCorrectScores.length > 0 &&
+            (marketCategoryFilter === 'ALL' || marketCategoryFilter === 'SPECIALS')
+          ) {
+            sectionMap.set('correct-score', {
+              sectionId: 'correct-score',
+              sectionTitle: 'Correct Score',
+              sectionOrder: 10,
+              columnsClass: 'grid-cols-2 sm:grid-cols-3',
+              category: 'SPECIALS',
+              items: pred.topCorrectScores.slice(0, 6).map((cs) => {
+                const csKey = `CORRECT_SCORE_${cs.homeGoals}_${cs.awayGoals}`;
+                const { odds: csOdds } = getOddsForMarket(csKey, cs.probability);
+                return {
+                  key: csKey,
+                  shortLabel: cs.score,
+                  fullName: `Correct Score ${cs.score}`,
+                  probability: cs.probability,
+                  odds: csOdds,
+                  isSelected: isSel(csKey),
+                };
+              }),
+            });
+          }
+
+          const sections = Array.from(sectionMap.values())
+            .sort((a, b) => a.sectionOrder - b.sectionOrder)
+            .map((section) => {
+              if (section.sectionId === 'combos') {
+                const sortedCombos = section.items.slice().sort((a, b) => b.probability - a.probability);
+                return { ...section, items: sortedCombos };
+              }
+              const sorted = section.items.slice().sort((a, b) => {
+                const orderA = MARKET_KEY_SORT_ORDER[a.key] ?? 999;
+                const orderB = MARKET_KEY_SORT_ORDER[b.key] ?? 999;
+                if (orderA !== orderB) return orderA - orderB;
+                return b.probability - a.probability;
+              });
+              return { ...section, items: sorted };
+            });
+
+          const toggleSection = (sectionId: string) => {
+            setCollapsedMarketSections((prev) => ({
+              ...prev,
+              [sectionId]: !prev[sectionId],
+            }));
+          };
+
+          return (
+            <div className="space-y-2.5">
+              {/* Clickable Top Model Recommendation Card (No separate Add to Slip button) */}
+              {recommendedPick && (() => {
+                const authKey = recommendedPick.key;
+                const { odds: authOdds } = getOddsForMarket(authKey, recommendedPick.probability);
+                const isAuthSelected = isSel(authKey);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => handleAddBet(authKey, recommendedPick.label, authOdds)}
+                    aria-pressed={isAuthSelected}
+                    aria-label={`${recommendedPick.label} — ${recommendedPick.probabilityFormatted}, odds ${authOdds.toFixed(2)}${isAuthSelected ? ' (Selected in Bet Slip)' : ''}`}
+                    className={`w-full rounded-2xl border px-3.5 py-2.5 text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      isAuthSelected
+                        ? 'bg-theme-primary text-theme-primary-text border-theme-primary shadow-theme-glow'
+                        : 'bg-theme-card-elevated hover:bg-theme-subtle border-theme-primary/35 text-theme-main shadow-theme-sm'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {isAuthSelected && <Check className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />}
+                        <span
+                          className={`text-2xs font-bold uppercase tracking-[0.06em] ${
+                            isAuthSelected ? 'text-theme-primary-text/90' : 'text-theme-primary'
+                          }`}
+                        >
+                          Model Recommendation
+                        </span>
+                      </div>
+                      <div className="text-base font-bold tracking-[-0.01em] truncate mt-0.5">
+                        {recommendedPick.label}
+                      </div>
+                    </div>
+
+                    <div className="text-right tabular-nums shrink-0 leading-tight">
+                      <span
+                        className={`block text-base font-bold ${
+                          isAuthSelected ? 'text-theme-primary-text' : 'text-theme-primary'
                         }`}
                       >
-                        Best Picks
-                      </button>
-                      {comboMarketsCount > 0 && (
+                        {authOdds.toFixed(2)}
+                      </span>
+                      <span
+                        className={`block text-xs font-semibold mt-0.5 ${
+                          isAuthSelected ? 'text-theme-primary-text/90' : 'text-theme-main'
+                        }`}
+                      >
+                        {recommendedPick.probabilityFormatted}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {/* Sportsbook Grouped Market Predictions Container */}
+              <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
+                {/* Top Horizontal Underline Filter Bar */}
+                {availableMarketTabs.length > 1 && (
+                  <div
+                    role="tablist"
+                    aria-label="Filter match predictions by market"
+                    className="px-2 border-b border-theme-subdued flex items-center gap-1 overflow-x-auto no-scrollbar bg-theme-card"
+                  >
+                    {availableMarketTabs.map((tab) => {
+                      const isActive = marketCategoryFilter === tab.id;
+                      return (
                         <button
+                          key={tab.id}
                           type="button"
-                          onClick={() => setPredictionViewFilter('COMBOS')}
-                          className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
-                            predictionViewFilter === 'COMBOS'
-                              ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
+                          role="tab"
+                          aria-selected={isActive}
+                          onClick={() => {
+                            setMarketCategoryFilter(tab.id);
+                            if (tab.id === 'COMBOS') {
+                              setComboSubFilter('ALL');
+                            }
+                          }}
+                          className={`relative min-h-[42px] px-3 text-xs font-bold uppercase tracking-[0.05em] whitespace-nowrap shrink-0 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-theme-accent ${
+                            isActive
+                              ? 'text-theme-primary'
                               : 'text-theme-sub hover:text-theme-main'
                           }`}
                         >
-                          Combos ({comboMarketsCount})
+                          <span>{tab.label}</span>
+                          {isActive && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-theme-primary"
+                            />
+                          )}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setPredictionViewFilter('ALL')}
-                        className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
-                          predictionViewFilter === 'ALL'
-                            ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
-                            : 'text-theme-sub hover:text-theme-main'
-                        }`}
-                      >
-                        All ({allMarketsList.length})
-                      </button>
-                    </div>
-                  );
-                })()}
-              </div>
-              {predictionViewFilter === 'ALL' && allMarketsList.length > 0 && (
-                <div className="px-3.5 py-2 border-b border-theme-subdued bg-theme-card/50 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                  {MARKET_CATEGORY_TABS.map((cat) => {
-                    const count =
-                      cat.id === 'ALL'
-                        ? allMarketsList.length
-                        : allMarketsList.filter((m) => m.category === cat.id).length;
-                    if (cat.id !== 'ALL' && count === 0) return null;
-                    const active = marketCategoryFilter === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setMarketCategoryFilter(cat.id)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
-                          active
-                            ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
-                            : 'bg-theme-subtle text-theme-sub hover:text-theme-main'
-                        }`}
-                      >
-                        {cat.label} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {(() => {
-                const filteredAllMarkets =
-                  marketCategoryFilter === 'ALL'
-                    ? allMarketsList
-                    : allMarketsList.filter((m) => m.category === marketCategoryFilter);
-
-                const comboMarkets = allMarketsList.filter((m) => m.category === 'COMBOS');
-
-                const listToRender =
-                  predictionViewFilter === 'COMBOS' && comboMarkets.length > 0
-                    ? comboMarkets
-                    : predictionViewFilter === 'ALL' && allMarketsList.length > 0
-                    ? filteredAllMarkets
-                    : bestMarketsPerGroup;
-
-                if (!listToRender || listToRender.length === 0) {
-                  return <div className="py-5 text-center text-sm text-theme-sub">No predictions computed</div>;
-                }
-
-                return (
-                  <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
-                    {listToRender.map((market, idx) => {
-                      const { odds: betOdds, isFlashscore } = getOddsForMarket(market.key, market.probability);
-                      const isSelected = isSel(market.key);
-                      return (
-                        <div key={market.key || idx} className="min-h-[50px] px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-theme-card-elevated transition-colors">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">
-                              {market.groupName} Market
-                            </span>
-                            <span className="font-semibold text-theme-main text-base tracking-[-0.01em] truncate block mt-0.5">
-                              {market.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="text-right">
-                              <span className="font-bold text-theme-primary block text-lg leading-none tracking-[-0.015em]">
-                                {(market.probability * 100).toFixed(1)}%
-                              </span>
-                              <span className="text-xs font-normal text-theme-dim block mt-0.5">
-                                {isFlashscore ? `FS ${betOdds.toFixed(2)}` : `Model ${betOdds.toFixed(2)}`}
-                                {market.evEdge !== undefined && (
-                                  <span
-                                    className={`ml-1.5 font-medium ${
-                                      market.isPositiveEV ? 'text-emerald-700 dark:text-emerald-400' : 'text-theme-dim'
-                                    }`}
-                                  >
-                                    · {market.evEdge >= 0 ? '+' : ''}
-                                    {(market.evEdge * 100).toFixed(1)}% EV
-                                    {market.isPositiveEV && (market.kellyStakeFraction ?? 0) > 0
-                                      ? ` · K ${((market.kellyStakeFraction || 0) * 100).toFixed(1)}%`
-                                      : ''}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                            {onAddSelection && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleAddBet(
-                                    market.key,
-                                    `${market.name} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
-                                    betOdds
-                                  )
-                                }
-                                className={`h-[30px] px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:scale-95 shrink-0 ${
-                                  isSelected
-                                    ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
-                                    : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'
-                                }`}
-                                title={isSelected ? 'Remove from Bet Slip' : 'Add to Bet Slip'}
-                                aria-label={`${isSelected ? 'Remove' : 'Add'} ${market.name} to Bet Slip`}
-                              >
-                                {isSelected ? (
-                                  <>
-                                    <Check className="w-3.5 h-3.5 stroke-[2.2]" />
-                                    <span>Added</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Ticket className="w-3.5 h-3.5" />
-                                    <span>+ Slip</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
                       );
                     })}
                   </div>
-                );
-              })()}
-            </Card>
+                )}
 
-            {/* Correct Score Predictions Grid */}
-            {pred?.topCorrectScores && pred.topCorrectScores.length > 0 && (
-              <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                <div className="min-h-[34px] px-3.5 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
-                  <SectionHeader title="Correct Score Predictions" size="sm" />
-                  <span className="text-2xs text-theme-dim uppercase tracking-[0.06em] font-medium">
-                    Tap to add to slip
-                  </span>
-                </div>
-                <div className="p-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2 tabular-nums">
-                  {pred.topCorrectScores.slice(0, 6).map((cs) => {
-                    const csKey = `CORRECT_SCORE_${cs.homeGoals}_${cs.awayGoals}`;
-                    const { odds: csOdds, isFlashscore } = getOddsForMarket(csKey, cs.probability);
-                    const isSelected = isSel(csKey);
-                    return (
-                      <button
-                        key={csKey}
-                        type="button"
-                        onClick={() =>
-                          handleAddBet(
-                            csKey,
-                            `Correct Score ${cs.score} (${currentFixture.homeTeam} vs ${currentFixture.awayTeam})`,
-                            csOdds
-                          )
-                        }
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                          isSelected
-                            ? 'bg-theme-primary/15 border-theme-primary shadow-theme-sm'
-                            : 'bg-theme-card border-theme-subdued hover:bg-theme-card-elevated hover:border-theme-accent'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-base font-bold text-theme-main">{cs.score}</div>
-                          <div className="text-2xs text-theme-sub">
-                            {(cs.probability * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-sm font-bold text-theme-primary block">
-                            {csOdds.toFixed(2)}
-                          </span>
-                          <span className="text-2xs text-theme-dim block">
-                            {isFlashscore ? 'FS Odds' : isSelected ? 'In Slip' : '+ Slip'}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Collapsible Market Sections */}
+                {sections.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-theme-sub">No predictions computed</div>
+                ) : (
+                  <div className="divide-y divide-[var(--border-subdued)]">
+                    {sections.map((section) => {
+                      const isCollapsed = Boolean(collapsedMarketSections[section.sectionId]);
+                      const isCombosSection = section.sectionId === 'combos';
+                      const visibleItems =
+                        isCombosSection && comboSubFilter !== 'ALL'
+                          ? section.items.filter((item) => getComboSubGroup(item.key) === comboSubFilter)
+                          : section.items;
+
+                      return (
+                        <section key={section.sectionId} aria-labelledby={`section-heading-${section.sectionId}`}>
+                          <button
+                            id={`section-heading-${section.sectionId}`}
+                            type="button"
+                            onClick={() => toggleSection(section.sectionId)}
+                            aria-expanded={!isCollapsed}
+                            aria-controls={`section-body-${section.sectionId}`}
+                            className="w-full min-h-[44px] px-3.5 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-theme-subtle/40 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-theme-accent"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-bold uppercase tracking-[0.04em] text-theme-main truncate">
+                                {section.sectionTitle}
+                              </span>
+                            </div>
+                            <ChevronDown
+                              className={`w-4 h-4 text-theme-primary shrink-0 transition-transform duration-150 ${
+                                !isCollapsed ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {!isCollapsed && (
+                              <motion.div
+                                id={`section-body-${section.sectionId}`}
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                                className="overflow-hidden"
+                              >
+                                {isCombosSection && section.items.length > 0 && (
+                                  <div className="px-3.5 pb-2.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
+                                    <div className="flex items-center gap-1 p-0.5 bg-theme-subtle rounded-full border border-theme-subdued">
+                                      {COMBO_SUBFILTER_META.map((sub) => {
+                                        const subCount =
+                                          sub.id === 'ALL'
+                                            ? section.items.length
+                                            : section.items.filter((c) => getComboSubGroup(c.key) === sub.id).length;
+                                        if (sub.id !== 'ALL' && subCount === 0) return null;
+                                        const isSubActive = comboSubFilter === sub.id;
+                                        return (
+                                          <button
+                                            key={sub.id}
+                                            type="button"
+                                            onClick={() => setComboSubFilter(sub.id)}
+                                            className={`h-[26px] px-2.5 rounded-full text-2xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                                              isSubActive
+                                                ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                                                : 'text-theme-sub hover:text-theme-main'
+                                            }`}
+                                          >
+                                            {sub.label} ({subCount})
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className={`px-3.5 pb-3.5 pt-0.5 grid gap-2 ${section.columnsClass}`}>
+                                  {visibleItems.map((item) => {
+                                    const probPct = (item.probability * 100).toFixed(1);
+                                    const isHighProb = item.probability >= 0.65;
+                                    return (
+                                      <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => handleAddBet(item.key, item.fullName, item.odds)}
+                                        aria-pressed={item.isSelected}
+                                        title={item.fullName}
+                                        aria-label={`${item.fullName} — ${probPct}% probability, odds ${item.odds.toFixed(2)}${item.isSelected ? ' (Selected)' : ''}`}
+                                        className={`min-h-[44px] px-3 py-2 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 text-left active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                                          item.isSelected
+                                            ? 'bg-theme-primary text-theme-primary-text border-theme-primary shadow-theme-sm'
+                                            : 'bg-theme-subtle/75 hover:bg-theme-card-elevated border-theme-subdued text-theme-main'
+                                        }`}
+                                      >
+                                        <div className="min-w-0 flex items-center gap-1.5">
+                                          {item.isSelected && (
+                                            <Check className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
+                                          )}
+                                          <span className="text-sm font-semibold truncate">
+                                            {item.shortLabel}
+                                          </span>
+                                        </div>
+
+                                        <div className="text-right tabular-nums shrink-0 leading-tight">
+                                          <span
+                                            className={`block text-sm font-bold ${
+                                              item.isSelected ? 'text-theme-primary-text' : 'text-theme-primary'
+                                            }`}
+                                          >
+                                            {item.odds.toFixed(2)}
+                                          </span>
+                                          <span
+                                            className={`block text-2xs font-semibold mt-0.5 ${
+                                              item.isSelected
+                                                ? 'text-theme-primary-text/90'
+                                                : isHighProb
+                                                ? 'text-theme-main'
+                                                : 'text-theme-sub'
+                                            }`}
+                                          >
+                                            {probPct}%
+                                          </span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
               </Card>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {/* TAB 6: STANDINGS */}
         {activeTab === 'STANDINGS' && (

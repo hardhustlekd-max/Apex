@@ -963,7 +963,7 @@ class FixturesWorkerService {
     }
 
     const tips: FeaturedTipDTO[] = [];
-    const seenIds = new Set<string>();
+    const comboMarketsByFixture: Record<string, Array<{ market: MarketOption; odds: number; hasScrapedOdds: boolean }>> = {};
     const todayResolved = resolveDateFilter('TODAY');
 
     const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
@@ -977,11 +977,14 @@ class FixturesWorkerService {
       if (!matchesResolvedDateFilter(f, todayResolved)) continue;
       if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') continue;
 
+      let fixtureHasTip = false;
       for (const market of rec.fullMarkets) {
+        if (market.key === 'OVER_05') continue;
         if (market.probability >= 0.75) {
+          fixtureHasTip = true;
           const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
           const hasScrapedOdds = fsOdd !== null;
-          const odds = fsOdd ?? (market.probability > 0 ? Number((1 / market.probability).toFixed(2)) : 1.5);
+          const odds = fsOdd ?? (market.probability > 0 ? Number(Math.max(1.02, Math.min(50, 1 / market.probability)).toFixed(2)) : 1.5);
 
           tips.push({
             fixture: f,
@@ -991,20 +994,44 @@ class FixturesWorkerService {
           });
         }
       }
+
+      if (fixtureHasTip && !comboMarketsByFixture[f.id]) {
+        comboMarketsByFixture[f.id] = rec.fullMarkets
+          .filter((m) => m.key.startsWith('COMBO_'))
+          .map((m) => {
+            const fsOdd = extractFlashscoreOddsServer(m.key, rec.marketOdds);
+            const hasScrapedOdds = fsOdd !== null;
+            const odds = fsOdd ?? (m.probability > 0 ? Number(Math.max(1.02, Math.min(50, 1 / m.probability)).toFixed(2)) : 1.5);
+            return {
+              market: m,
+              odds,
+              hasScrapedOdds,
+            };
+          })
+          .sort((a, b) => b.market.probability - a.market.probability);
+      }
     }
 
     tips.sort((a, b) => b.market.probability - a.market.probability);
 
+    const seenComboFixtures = new Set<string>();
+    const uniqueMatchTips = tips.filter((t) => {
+      if (seenComboFixtures.has(t.fixture.id)) return false;
+      seenComboFixtures.add(t.fixture.id);
+      return true;
+    });
+
     const totalOdds =
-      tips.length === 0
+      uniqueMatchTips.length === 0
         ? 1.0
-        : Number(tips.reduce((acc, tip) => acc * tip.odds, 1.0).toFixed(2));
+        : Number(uniqueMatchTips.reduce((acc, tip) => acc * tip.odds, 1.0).toFixed(2));
 
     const payloadObj = {
       success: true,
       count: tips.length,
       totalOdds,
       tips,
+      comboMarketsByFixture,
     };
 
     const jsonPayload = JSON.stringify(payloadObj);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings, Search, X } from 'lucide-react';
+import { AppLogo } from './ui/index.js';
 
 interface HeaderProps {
   activeTab: 'FIXTURES' | 'ACCAS' | 'STANDINGS' | 'HISTORY' | 'BETS';
@@ -27,9 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="w-full max-w-7xl h-full mx-auto px-3 sm:px-4 flex items-center justify-between gap-2">
         {/* Zone 1: Brand Title */}
         <div className="flex items-center gap-2 min-w-0 shrink-0">
-          <div className="w-[22px] h-[22px] rounded-lg bg-theme-primary text-theme-primary-text flex items-center justify-center font-bold text-sm shrink-0 shadow-theme-glow">
-            A
-          </div>
+          <AppLogo size={28} title="Apex Live Score" />
           <span className="font-bold text-base tracking-[-0.015em] text-theme-main whitespace-nowrap truncate hidden sm:inline">
             Apex Live Score
           </span>

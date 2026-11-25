@@ -42,3 +42,6 @@ export type { PaginationBarProps } from './PaginationBar.js';
 
 export { Toast } from './Toast.js';
 export type { ToastProps } from './Toast.js';
+
+export { AppLogo, LOGO_PALETTES } from './AppLogo.js';
+export type { AppLogoProps, AppLogoVariant } from './AppLogo.js';

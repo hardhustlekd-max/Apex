@@ -124,7 +124,6 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     const isSelected = selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id);
     const kickOff = formatMatchDateTime(fixture.matchDate, fixture.kickOffTime || '19:00', fixture.timestamp).timeStr;
     const hasPred = fixture.hasPrediction ?? Boolean(fixture.prediction || fixture.probs);
-    const pick = fixture.authoritativePick;
     const probs = fixture.probs;
 
     const homeProb = hasPred && probs ? probs.home : null;
@@ -134,6 +133,45 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
     const under25 = hasPred && probs ? probs.under25 : null;
     const bttsYes = hasPred && probs ? probs.bttsYes : null;
     const bttsNo = hasPred && probs ? probs.bttsNo : null;
+
+    const pick = (() => {
+      if (!hasPred) return null;
+      if (marketFilter === 'OVER_UNDER' && over25 !== null && under25 !== null) {
+        const isOver = over25 >= under25;
+        const pct = isOver ? over25 : under25;
+        return {
+          type: isOver ? 'O2.5' : 'U2.5',
+          shortLabel: isOver ? 'O 2.5' : 'U 2.5',
+          label: isOver ? 'Over 2.5 Goals' : 'Under 2.5 Goals',
+          probabilityPercent: pct,
+          probabilityFormatted: `${pct.toFixed(1)}%`,
+        };
+      }
+      if (marketFilter === 'BTTS' && bttsYes !== null && bttsNo !== null) {
+        const isYes = bttsYes >= bttsNo;
+        const pct = isYes ? bttsYes : bttsNo;
+        return {
+          type: isYes ? 'BTTS_Y' : 'BTTS_N',
+          shortLabel: isYes ? 'GG' : 'NG',
+          label: isYes ? 'Both Teams To Score (Yes)' : 'Both Teams To Score (No)',
+          probabilityPercent: pct,
+          probabilityFormatted: `${pct.toFixed(1)}%`,
+        };
+      }
+      if (marketFilter === 'MOST_LIKELY' && fixture.highestPick) {
+        const sl =
+          fixture.highestPick.type === 'BTTS_Y'
+            ? 'GG'
+            : fixture.highestPick.type === 'BTTS_N'
+            ? 'NG'
+            : fixture.highestPick.shortLabel;
+        return {
+          ...fixture.highestPick,
+          shortLabel: sl,
+        };
+      }
+      return fixture.authoritativePick || null;
+    })();
 
     return (
       <div

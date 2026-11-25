@@ -708,6 +708,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                           fixture={fixture}
                           onSelectDetail={onSelectDetail}
                           isSelected={selectedFixtureId !== undefined && String(selectedFixtureId) === String(fixture.id)}
+                          marketFilter={marketChoiceFilter as any}
                         />
                       ))}
                     </div>

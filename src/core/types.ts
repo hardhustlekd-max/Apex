@@ -542,11 +542,18 @@ export interface LiveFixturesResponse {
   groups: LeagueGroupDTO[];
 }
 
+export interface FeaturedTipComboOptionDTO {
+  market: MarketOption;
+  odds: number;
+  hasScrapedOdds: boolean;
+}
+
 export interface FeaturedTipDTO {
   fixture: Fixture;
   market: MarketOption;
   odds: number;
   hasScrapedOdds: boolean;
+  comboMarkets?: FeaturedTipComboOptionDTO[];
 }
 
 export interface FeaturedTipsResponse {
@@ -556,6 +563,7 @@ export interface FeaturedTipsResponse {
   count: number;
   totalOdds: number;
   tips: FeaturedTipDTO[];
+  comboMarketsByFixture?: Record<string, FeaturedTipComboOptionDTO[]>;
 }
 
 export interface LeagueOptionDTO {
