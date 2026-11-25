@@ -8,7 +8,7 @@ interface FixtureCardProps {
   fixture: Fixture;
   onSelectDetail: (fixture: Fixture) => void;
   isSelected?: boolean;
-  marketFilter?: 'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS';
+  marketFilter?: string;
 }
 
 export const FixtureCard: React.FC<FixtureCardProps> = ({
@@ -34,6 +34,9 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
 
   const pick = (() => {
     if (!hasPred) return null;
+    if (marketFilter !== 'MOST_LIKELY' && fixture.activeMarketPick) {
+      return fixture.activeMarketPick;
+    }
     if (marketFilter === 'COMBOS' && fixture.comboPick) {
       return fixture.comboPick;
     }
@@ -160,21 +163,7 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         {/* Probability Bar Indicator */}
         {hasPred && (
           <div className="my-2 space-y-1">
-            {marketFilter === 'COMBOS' && fixture.comboPick ? (
-              <>
-                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub gap-2">
-                  <span className="font-semibold text-theme-main truncate">{fixture.comboPick.label}</span>
-                  <span className="font-semibold text-theme-primary shrink-0">{fixture.comboPick.probabilityFormatted}</span>
-                </div>
-                <div className="h-1.5 w-full bg-theme-subtle rounded-full overflow-hidden">
-                  <div
-                    style={{ width: `${Math.min(100, fixture.comboPick.probabilityPercent)}%` }}
-                    className="h-full bg-theme-primary rounded-full transition-all duration-300"
-                    title={`${fixture.comboPick.label}: ${fixture.comboPick.probabilityFormatted}`}
-                  />
-                </div>
-              </>
-            ) : marketFilter === 'DOUBLE_CHANCE' ? (
+            {marketFilter === 'DOUBLE_CHANCE' ? (
               <>
                 <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub">
                   <span className="font-semibold text-theme-main">1X · {dc1XPct.toFixed(0)}%</span>
@@ -224,6 +213,20 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
                     style={{ width: `${bttsNoPct}%` }}
                     className="bg-theme-main/70 rounded-full transition-all duration-300"
                     title={`BTTS No: ${bttsNoPct.toFixed(1)}%`}
+                  />
+                </div>
+              </>
+            ) : marketFilter !== 'MOST_LIKELY' && marketFilter !== '1X2' && pick ? (
+              <>
+                <div className="flex items-center justify-between text-xs tabular-nums text-theme-sub gap-2">
+                  <span className="font-semibold text-theme-main truncate">{pick.label}</span>
+                  <span className="font-semibold text-theme-primary shrink-0">{pick.probabilityFormatted}</span>
+                </div>
+                <div className="h-1.5 w-full bg-theme-subtle rounded-full overflow-hidden">
+                  <div
+                    style={{ width: `${Math.min(100, pick.probabilityPercent)}%` }}
+                    className="h-full bg-theme-primary rounded-full transition-all duration-300"
+                    title={`${pick.label}: ${pick.probabilityFormatted}`}
                   />
                 </div>
               </>

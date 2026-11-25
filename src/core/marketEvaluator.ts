@@ -160,6 +160,57 @@ export function getHistoryMarketCategory(key: string): Exclude<HistoryMarketCate
   return 'SPECIALS';
 }
 
+export const UPCOMING_MARKET_CATEGORIES: Array<{
+  key: 'MOST_LIKELY' | Exclude<HistoryMarketCategory, 'ALL'>;
+  label: string;
+}> = [
+  { key: 'MOST_LIKELY', label: 'Most Likely (All Markets)' },
+  { key: 'COMBOS', label: 'Combo Bet Markets' },
+  { key: '1X2', label: '1X2 Match Winner' },
+  { key: 'DOUBLE_CHANCE', label: 'Double Chance & DNB' },
+  { key: 'OVER_UNDER', label: 'Over / Under Goals' },
+  { key: 'BTTS', label: 'Both Teams to Score' },
+  { key: 'TEAM_GOALS', label: 'Team Goals & Clean Sheets' },
+  { key: 'SPECIALS', label: 'Specials (Handicaps & Multi-Goals)' },
+];
+
+const UPCOMING_CATEGORY_KEYS = new Set<string>(UPCOMING_MARKET_CATEGORIES.map((c) => c.key));
+
+export function parseUpcomingMarketFilter(rawFilter?: string | null): {
+  category: HistoryMarketCategory;
+  specificMarket: string;
+} {
+  const normalized = String(rawFilter || 'MOST_LIKELY').trim().toUpperCase();
+  if (!normalized || normalized === 'MOST_LIKELY' || normalized === 'ALL') {
+    return { category: 'ALL', specificMarket: 'AUTO' };
+  }
+  if (UPCOMING_CATEGORY_KEYS.has(normalized)) {
+    return {
+      category: normalized as Exclude<HistoryMarketCategory, 'ALL'>,
+      specificMarket: 'AUTO',
+    };
+  }
+  const canonicalKey = normalizeMarketKey(normalized);
+  return {
+    category: getHistoryMarketCategory(canonicalKey),
+    specificMarket: canonicalKey,
+  };
+}
+
+export function getUpcomingMarketFilterDisplayLabel(rawFilter?: string | null): string {
+  const normalized = String(rawFilter || 'MOST_LIKELY').trim().toUpperCase();
+  const catMatch = UPCOMING_MARKET_CATEGORIES.find((c) => c.key === normalized);
+  if (catMatch) return catMatch.label;
+  const canonicalKey = normalizeMarketKey(normalized);
+  for (const cat of Object.keys(SPECIFIC_MARKET_OPTIONS_BY_CATEGORY) as Array<
+    Exclude<HistoryMarketCategory, 'ALL'>
+  >) {
+    const found = SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[cat].find((m) => m.key === canonicalKey);
+    if (found) return found.label;
+  }
+  return normalized || 'Most Likely (All Markets)';
+}
+
 export function evaluateMarketOutcome(
   rawMarketKey: string,
   hG: number,

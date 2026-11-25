@@ -9,7 +9,7 @@ interface SimplifiedPredictionsWireframeProps {
   fixtures: Fixture[];
   groups?: LeagueGroupDTO[];
   onSelectDetail: (fixture: Fixture) => void;
-  marketFilter?: 'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS';
+  marketFilter?: string;
   sortBy?: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
   onSelectSortBy?: (s: 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC') => void;
   selectedFixtureId?: string | number;
@@ -136,6 +136,15 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
 
     const pick = (() => {
       if (!hasPred) return null;
+      if (marketFilter !== 'MOST_LIKELY' && fixture.activeMarketPick) {
+        return {
+          type: 'MARKET',
+          shortLabel: fixture.activeMarketPick.shortLabel,
+          label: fixture.activeMarketPick.label,
+          probabilityPercent: fixture.activeMarketPick.probabilityPercent,
+          probabilityFormatted: fixture.activeMarketPick.probabilityFormatted,
+        };
+      }
       if (marketFilter === 'COMBOS' && fixture.comboPick) {
         return {
           type: 'COMBO',
@@ -311,7 +320,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
           {/* Section 1: Highest Probability Pick */}
           <div
-            className="w-[62px] sm:w-[92px] flex items-center justify-center shrink-0"
+            className="w-[66px] sm:w-[100px] flex items-center justify-center shrink-0"
             title={
               pick
                 ? `Model Pick: ${pick.label} (${pick.probabilityFormatted})`
@@ -320,7 +329,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           >
             {pick && hasPred ? (
               <div className="flex items-center justify-center gap-1 tabular-nums">
-                <span className="min-w-[32px] max-w-[66px] px-1.5 h-[21px] flex items-center justify-center rounded-full bg-theme-model-pick text-theme-model-pick-text shadow-theme-sm text-2xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
+                <span className="min-w-[32px] max-w-[66px] sm:max-w-[74px] truncate px-1.5 h-[21px] flex items-center justify-center rounded-full bg-theme-model-pick text-theme-model-pick-text shadow-theme-sm text-2xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
                   {pick.shortLabel || pick.type || '1'}
                 </span>
                 <span className="hidden sm:inline-block w-[25px] text-right text-xs font-semibold text-theme-main tabular-nums">
@@ -450,7 +459,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <span className="truncate whitespace-nowrap font-semibold text-base tracking-[-0.01em] text-theme-main">Matches</span>
             </div>
             <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-              <div className="w-[62px] sm:w-[92px] flex items-center justify-center shrink-0">
+              <div className="w-[66px] sm:w-[100px] flex items-center justify-center shrink-0">
                 <button
                   type="button"
                   onClick={() =>
@@ -621,7 +630,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     </div>
 
                     <div className="col-span-6 sm:col-span-6 flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0">
-                      <div className="w-[62px] sm:w-[92px] flex items-center justify-center shrink-0">
+                      <div className="w-[66px] sm:w-[100px] flex items-center justify-center shrink-0">
                         <button
                           type="button"
                           onClick={() => onSelectSortBy?.('PROB_DESC')}

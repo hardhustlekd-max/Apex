@@ -24,11 +24,16 @@ import {
   getLeaguePopularityScore,
   sortFixturesByPopularityInPlace,
 } from '../core/leaguePriority.js';
+import {
+  getHistoryMarketCategory,
+  normalizeMarketKey,
+  parseUpcomingMarketFilter,
+} from '../core/marketEvaluator.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { LiveScore } from '../providers/types.js';
 
 export type SortByOption = 'DEFAULT' | 'PROB_DESC' | 'PROB_ASC' | 'HOME_DESC' | 'DRAW_DESC' | 'AWAY_DESC';
-export type MarketFilterOption = 'MOST_LIKELY' | 'COMBOS' | 'DOUBLE_CHANCE' | 'OVER_UNDER' | '1X2' | 'BTTS';
+export type MarketFilterOption = string;
 
 export interface WorkerQueryParams {
   league?: string;
@@ -472,7 +477,71 @@ function buildGroupsForFixtures(fixtures: Fixture[]): LeagueGroupDTO[] {
   });
 }
 
+function resolveMarketPickForMarkets(
+  markets: MarketOption[] | undefined,
+  marketFilter: string
+): Fixture['activeMarketPick'] | null | undefined {
+  const { category, specificMarket } = parseUpcomingMarketFilter(marketFilter);
+  if (category === 'ALL' && specificMarket === 'AUTO') {
+    return undefined;
+  }
+
+  if (!markets || markets.length === 0) {
+    return null;
+  }
+
+  let matched: MarketOption | undefined;
+
+  if (specificMarket !== 'AUTO') {
+    matched = markets.find((m) => normalizeMarketKey(m.key) === specificMarket);
+  } else if (category === 'OVER_UNDER') {
+    const ou25 = markets.filter((m) => m.key === 'OVER_25' || m.key === 'UNDER_25');
+    const pool =
+      ou25.length > 0
+        ? ou25
+        : markets.filter(
+            (m) =>
+              getHistoryMarketCategory(m.key) === 'OVER_UNDER' &&
+              !WORKER_TRIVIAL_EXTREME_KEYS.has(m.key)
+          );
+    matched = pool.slice().sort((a, b) => b.probability - a.probability)[0];
+  } else if (category === 'DOUBLE_CHANCE') {
+    const dcOnly = markets.filter((m) => m.key.startsWith('DOUBLE_CHANCE_'));
+    const pool =
+      dcOnly.length > 0
+        ? dcOnly
+        : markets.filter((m) => getHistoryMarketCategory(m.key) === 'DOUBLE_CHANCE');
+    matched = pool.slice().sort((a, b) => b.probability - a.probability)[0];
+  } else {
+    const pool = markets.filter(
+      (m) =>
+        getHistoryMarketCategory(m.key) === category &&
+        !WORKER_TRIVIAL_EXTREME_KEYS.has(m.key)
+    );
+    const resolvedPool =
+      pool.length > 0
+        ? pool
+        : markets.filter((m) => getHistoryMarketCategory(m.key) === category);
+    matched = resolvedPool.slice().sort((a, b) => b.probability - a.probability)[0];
+  }
+
+  if (!matched) {
+    return null;
+  }
+
+  return {
+    key: matched.key,
+    label: matched.name,
+    shortLabel: getShortMarketLabel(matched.key, matched.name),
+    probability: matched.probability,
+    probabilityPercent: round1(matched.probability),
+    probabilityFormatted: format1(matched.probability),
+    category: getHistoryMarketCategory(matched.key),
+  };
+}
+
 function getTipProbForSort(f: Fixture, marketFilter: string): number {
+  if (f.activeMarketPick) return f.activeMarketPick.probabilityPercent;
   if (!f.probs) return 0;
   if (marketFilter === 'COMBOS') return f.probs.tipProbCombo ?? f.comboPick?.probabilityPercent ?? 0;
   if (marketFilter === 'DOUBLE_CHANCE') return f.probs.tipProbDoubleChance ?? f.dcPick?.probabilityPercent ?? 0;
@@ -926,7 +995,12 @@ class FixturesWorkerService {
         continue;
       }
 
-      filtered.push(f);
+      const activeMarketPick = resolveMarketPickForMarkets(r.fullMarkets, marketFilter);
+      if (activeMarketPick === null) {
+        continue;
+      }
+
+      filtered.push(activeMarketPick ? { ...f, activeMarketPick } : f);
     }
 
     const sorted =
@@ -1057,16 +1131,21 @@ class FixturesWorkerService {
         .map((r) => r.slimFixture);
     }
 
-    const filtered = rawLive.filter((f) => {
-      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) return false;
-      if (league !== 'ALL' && !matchesLeague(f.league, f.leagueName, league)) return false;
-      if (league === 'ALL' && excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) return false;
+    const filtered: Fixture[] = [];
+    for (const f of rawLive) {
+      if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) continue;
+      if (league !== 'ALL' && !matchesLeague(f.league, f.leagueName, league)) continue;
+      if (league === 'ALL' && excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) continue;
       if (search.length > 0) {
         const blob = `${f.homeTeam || ''} ${f.awayTeam || ''} ${f.leagueName || ''}`.toLowerCase();
-        if (!blob.includes(search)) return false;
+        if (!blob.includes(search)) continue;
       }
-      return true;
-    });
+      const cleanId = cleanFixtureId(f.id);
+      const existingRec = this.byCleanId.get(f.id) || this.byCleanId.get(cleanId);
+      const activeMarketPick = resolveMarketPickForMarkets(existingRec?.fullMarkets, marketFilter);
+      if (activeMarketPick === null) continue;
+      filtered.push(activeMarketPick ? { ...f, activeMarketPick } : f);
+    }
 
     const sorted = sortFixturesForQuery(filtered, sortBy, marketFilter).slice(0, limit);
     const groups = buildGroupsForFixtures(sorted);
@@ -1278,6 +1357,11 @@ class FixturesWorkerService {
           probability: Number(Number(mk.probability ?? 0).toFixed(3)),
           isBanker: Boolean(mk.isBanker),
         }));
+      }
+      const activeMarketPick = resolveMarketPickForMarkets(rawMarkets, marketFilter);
+      if (activeMarketPick === null) continue;
+      if (activeMarketPick) {
+        slimFixture.activeMarketPick = activeMarketPick;
       }
       slimmed.push(slimFixture);
     }

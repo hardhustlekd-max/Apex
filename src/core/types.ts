@@ -497,6 +497,15 @@ export interface Fixture {
     probabilityPercent: number;
     probabilityFormatted: string;
   };
+  activeMarketPick?: {
+    key: MarketOption['key'];
+    label: string;
+    shortLabel: string;
+    probability: number;
+    probabilityPercent: number;
+    probabilityFormatted: string;
+    category?: string;
+  };
   probs?: {
     home: number;
     draw: number;

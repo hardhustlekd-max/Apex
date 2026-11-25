@@ -365,8 +365,8 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
         <div
           ref={posterRef}
           style={{
-            width: '747px',
-            minHeight: '1372px',
+            width: '680px',
+            minHeight: '1180px',
             boxSizing: 'border-box',
             position: 'relative',
             overflow: 'hidden',
@@ -376,13 +376,15 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
               'linear-gradient(180deg, #040d18 0%, #081c30 28%, #0b2d42 48%, #102e24 62%, #1d431b 74%, #0f2511 88%, #040b06 100%)',
             fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
             color: '#ffffff',
+            transform: 'scale(0.85)',
+            transformOrigin: 'top left',
           }}
         >
           {/* Stadium Night Sky, Floodlight Beams, Crowd Horizon & Pitch Markings SVG */}
           <svg
-            viewBox="0 0 747 1372"
-            width="747"
-            height="1372"
+            viewBox="0 0 680 1180"
+            width="680"
+            height="1180"
             preserveAspectRatio="xMidYMid slice"
             style={{
               position: 'absolute',
@@ -432,55 +434,55 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
             </defs>
 
             {/* Atmospheric Sky Glow */}
-            <rect x="0" y="0" width="747" height="750" fill="url(#poster-sky-glow)" />
+            <rect x="0" y="0" width="680" height="680" fill="url(#poster-sky-glow)" />
 
             {/* Subtle Night Stars / Bokeh */}
             <circle cx="92" cy="78" r="1.4" fill="#a5f3fc" opacity="0.55" />
             <circle cx="195" cy="42" r="1.1" fill="#ffffff" opacity="0.45" />
-            <circle cx="628" cy="64" r="1.6" fill="#a5f3fc" opacity="0.6" />
-            <circle cx="690" cy="145" r="1.2" fill="#ffffff" opacity="0.4" />
+            <circle cx="580" cy="64" r="1.6" fill="#a5f3fc" opacity="0.6" />
+            <circle cx="630" cy="145" r="1.2" fill="#ffffff" opacity="0.4" />
             <circle cx="48" cy="195" r="1.3" fill="#67e8f9" opacity="0.5" />
-            <circle cx="712" cy="240" r="1.5" fill="#a5f3fc" opacity="0.55" />
+            <circle cx="645" cy="240" r="1.5" fill="#a5f3fc" opacity="0.55" />
 
             {/* Stadium Tier & Advertising Board Silhouette */}
-            <path d="M0 540 L747 540 L747 740 L0 740 Z" fill="#06131c" opacity="0.82" />
-            <rect x="0" y="728" width="747" height="24" fill="#0a1622" opacity="0.92" />
-            <rect x="0" y="728" width="747" height="3" fill="#22d3ee" opacity="0.35" />
+            <path d="M0 480 L680 480 L680 660 L0 660 Z" fill="#06131c" opacity="0.82" />
+            <rect x="0" y="648" width="680" height="22" fill="#0a1622" opacity="0.92" />
+            <rect x="0" y="648" width="680" height="3" fill="#22d3ee" opacity="0.35" />
 
             {/* Crowd Bokeh Lights */}
             <g opacity="0.35">
-              <circle cx="24" cy="648" r="3" fill="#e2e8f0" />
-              <circle cx="42" cy="662" r="2.5" fill="#fb7185" />
-              <circle cx="58" cy="638" r="3.2" fill="#38bdf8" />
-              <circle cx="18" cy="692" r="2.8" fill="#facc15" />
-              <circle cx="688" cy="650" r="3" fill="#e2e8f0" />
-              <circle cx="708" cy="666" r="2.6" fill="#38bdf8" />
-              <circle cx="725" cy="642" r="3.2" fill="#fb7185" />
-              <circle cx="696" cy="692" r="2.5" fill="#5efce8" />
+              <circle cx="24" cy="580" r="3" fill="#e2e8f0" />
+              <circle cx="42" cy="594" r="2.5" fill="#fb7185" />
+              <circle cx="58" cy="570" r="3.2" fill="#38bdf8" />
+              <circle cx="18" cy="620" r="2.8" fill="#facc15" />
+              <circle cx="628" cy="582" r="3" fill="#e2e8f0" />
+              <circle cx="648" cy="598" r="2.6" fill="#38bdf8" />
+              <circle cx="665" cy="574" r="3.2" fill="#fb7185" />
+              <circle cx="636" cy="620" r="2.5" fill="#5efce8" />
             </g>
 
             {/* Turf & Center Pitch Lighting */}
-            <rect x="0" y="746" width="747" height="626" fill="url(#poster-turf-wash)" />
-            <rect x="0" y="746" width="747" height="626" fill="url(#poster-center-turf)" />
+            <rect x="0" y="666" width="680" height="514" fill="url(#poster-turf-wash)" />
+            <rect x="0" y="666" width="680" height="514" fill="url(#poster-center-turf)" />
 
             {/* Subtle Perspective Pitch Lines */}
             <g stroke="#d9f99d" strokeOpacity="0.22" strokeWidth="2" fill="none">
-              <line x1="0" y1="785" x2="747" y2="785" />
-              <line x1="0" y1="845" x2="747" y2="845" strokeOpacity="0.11" />
-              <line x1="0" y1="920" x2="747" y2="920" strokeOpacity="0.09" />
-              <line x1="373.5" y1="746" x2="373.5" y2="1372" strokeOpacity="0.14" />
-              <ellipse cx="373.5" cy="905" rx="185" ry="52" strokeOpacity="0.14" />
+              <line x1="0" y1="700" x2="680" y2="700" />
+              <line x1="0" y1="755" x2="680" y2="755" strokeOpacity="0.11" />
+              <line x1="0" y1="825" x2="680" y2="825" strokeOpacity="0.09" />
+              <line x1="340" y1="666" x2="340" y2="1180" strokeOpacity="0.14" />
+              <ellipse cx="340" cy="810" rx="165" ry="46" strokeOpacity="0.14" />
             </g>
 
             {/* Left & Right Stadium Floodlight Beams */}
-            <polygon points="0,420 500,660 440,760 0,565" fill="url(#poster-beam-l)" />
-            <polygon points="747,420 247,660 307,760 747,565" fill="url(#poster-beam-r)" />
-            <rect x="0" y="250" width="380" height="520" fill="url(#poster-flood-left)" />
-            <rect x="367" y="250" width="380" height="520" fill="url(#poster-flood-right)" />
+            <polygon points="0,380 450,590 390,680 0,510" fill="url(#poster-beam-l)" />
+            <polygon points="680,380 230,590 290,680 680,510" fill="url(#poster-beam-r)" />
+            <rect x="0" y="220" width="340" height="460" fill="url(#poster-flood-left)" />
+            <rect x="340" y="220" width="340" height="460" fill="url(#poster-flood-right)" />
 
             {/* Vertical Cyan Laser Edge Lines flanking Card */}
-            <line x1="38" y1="340" x2="38" y2="1140" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
-            <line x1="709" y1="340" x2="709" y2="1140" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
+            <line x1="32" y1="300" x2="32" y2="1020" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
+            <line x1="648" y1="300" x2="648" y2="1020" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
           </svg>
 
           {/* Top-Left Transparent Leopard-in-Ball Crest Emblem */}

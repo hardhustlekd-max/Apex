@@ -14,6 +14,10 @@ import { SimplifiedPredictionsWireframe } from './SimplifiedPredictionsWireframe
 import { LeagueSelectorModal } from './LeagueSelectorModal.js';
 import { FixturesFilterModal } from './FixturesFilterModal.js';
 import { EngineService } from '../services/engineService.js';
+import {
+  UPCOMING_MARKET_CATEGORIES,
+  getUpcomingMarketFilterDisplayLabel,
+} from '../core/marketEvaluator.js';
 import { Button, EmptyState, LoadingState, PaginationBar, SegmentedTabs } from './ui/index.js';
 
 interface FixturesListProps {
@@ -149,14 +153,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
   const dateOptions = useMemo(() => getDateFilterOptions(), []);
 
-  const marketOptions = [
-    { key: 'MOST_LIKELY', label: 'Most Likely (All Markets)' },
-    { key: 'COMBOS', label: 'Combo Bet Markets' },
-    { key: 'DOUBLE_CHANCE', label: 'Double Chance' },
-    { key: 'OVER_UNDER', label: 'Over Under' },
-    { key: '1X2', label: '1X2 Match Winner' },
-    { key: 'BTTS', label: 'Both Teams to Score' },
-  ];
+  const marketOptions = UPCOMING_MARKET_CATEGORIES;
 
   const sortOptions = [
     { key: 'DEFAULT', label: 'Default (League & Kickoff)' },
@@ -354,7 +351,10 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const selectedLeagueObj = leagueOptions.find((l) => l.code === selectedLeague);
   const selectedLeagueLabel = selectedLeagueObj ? selectedLeagueObj.name : selectedLeague;
   const dateFilterLabel = useMemo(() => getDateFilterDisplayLabel(canonicalDateFilter), [canonicalDateFilter]);
-  const marketOptionObj = marketOptions.find((m) => m.key === marketChoiceFilter);
+  const marketFilterLabel = useMemo(
+    () => getUpcomingMarketFilterDisplayLabel(marketChoiceFilter),
+    [marketChoiceFilter]
+  );
   const sortOptionObj = sortOptions.find((s) => s.key === sortBy);
 
   const calendarDays = useMemo(() => getCalendarStripDays(7), [utcToday]);
@@ -540,7 +540,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 
           {marketChoiceFilter !== 'MOST_LIKELY' && (
             <span className="h-[22px] inline-flex items-center gap-1 pl-2.5 pr-1 rounded-full bg-theme-subtle text-theme-main text-xs">
-              <span className="font-medium">{marketOptionObj?.label || marketChoiceFilter}</span>
+              <span className="font-medium truncate max-w-[180px]">{marketFilterLabel}</span>
               <button
                 type="button"
                 onClick={() => setMarketChoiceFilter('MOST_LIKELY')}

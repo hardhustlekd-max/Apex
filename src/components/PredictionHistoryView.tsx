@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   MinusCircle,
+  Trophy,
 } from 'lucide-react';
 import {
   normalizeDateStr,
@@ -118,6 +119,7 @@ interface EvaluatedRowModel {
   fixture?: Fixture;
   homeTeam: string;
   awayTeam: string;
+  leagueKey: string;
   leagueLabel: string;
   matchDate: string;
   kickOffTime: string;
@@ -306,12 +308,16 @@ function evaluateImportItemForFilter(
     outcomeState = hasScore ? marketEval.outcome : 'PENDING';
   }
 
+  const rawLeagueLabel = String(item.leagueName || item.league || 'Unknown League').trim();
+  const leagueKey = rawLeagueLabel.toLowerCase();
+
   return {
     rowKey: `${item.fixtureId}_${idx}`,
     fixtureId: item.fixtureId,
     homeTeam: item.homeTeam,
     awayTeam: item.awayTeam,
-    leagueLabel: item.leagueName || item.league,
+    leagueKey,
+    leagueLabel: rawLeagueLabel,
     matchDate: item.matchDate,
     kickOffTime: item.kickOffTime || 'TBD',
     status: item.status,
@@ -625,9 +631,10 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const [isSyncingHistory, setIsSyncingHistory] = useState<boolean>(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
-  // Redesigned Top Filter States (All Markets + Combos + Search + Date + Prob + Outcome + Sort)
+  // Redesigned Top Filter States (All Markets + Combos + League + Search + Date + Prob + Outcome + Sort)
   const [marketCategory, setMarketCategory] = useState<HistoryMarketCategory>('ALL');
   const [specificMarket, setSpecificMarket] = useState<string>('AUTO');
+  const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string>('ALL');
   const [probFilter, setProbFilter] = useState<string>('ALL');
@@ -687,6 +694,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   }, [
     marketCategory,
     specificMarket,
+    selectedLeague,
     searchQuery,
     dateFilter,
     probFilter,
@@ -760,6 +768,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const resetAllFilters = () => {
     setMarketCategory('ALL');
     setSpecificMarket('AUTO');
+    setSelectedLeague('ALL');
     setSearchQuery('');
     setDateFilter('ALL');
     setProbFilter('ALL');
@@ -771,11 +780,54 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const hasActiveFilters =
     marketCategory !== 'ALL' ||
     specificMarket !== 'AUTO' ||
+    selectedLeague !== 'ALL' ||
     searchQuery.trim() !== '' ||
     dateFilter !== 'ALL' ||
     probFilter !== 'ALL' ||
     outcomeFilter !== 'ALL' ||
     sortMode !== 'DATE_DESC';
+
+  // Build available league options from active dataset (database or imported JSON)
+  const leagueOptions = useMemo(() => {
+    const map = new Map<string, { value: string; label: string; count: number }>();
+    const addEntry = (rawName?: string, rawCode?: string) => {
+      const displayName = String(rawName || rawCode || 'Unknown League').trim();
+      if (!displayName) return;
+      const key = displayName.toLowerCase();
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, { value: key, label: displayName, count: 1 });
+      }
+    };
+
+    if (importedEvaluation) {
+      for (const item of importedEvaluation.evaluated) {
+        addEntry(item.leagueName, item.league);
+      }
+    } else {
+      for (const f of history) {
+        addEntry(f.leagueName, f.league);
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+  }, [history, importedEvaluation]);
+
+  useEffect(() => {
+    if (selectedLeague !== 'ALL' && !leagueOptions.some((opt) => opt.value === selectedLeague)) {
+      setSelectedLeague('ALL');
+    }
+  }, [leagueOptions, selectedLeague]);
+
+  const selectedLeagueLabel = useMemo(() => {
+    if (selectedLeague === 'ALL') return null;
+    return leagueOptions.find((opt) => opt.value === selectedLeague)?.label || null;
+  }, [leagueOptions, selectedLeague]);
 
   // Build evaluated rows across all markets (including combos) for DB or Imported dataset
   const { allEvaluatedRows, categoryCounts } = useMemo(() => {
@@ -793,8 +845,15 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     const rows: EvaluatedRowModel[] = [];
 
     if (importedEvaluation) {
-      counts.ALL = importedEvaluation.evaluated.length;
       importedEvaluation.evaluated.forEach((item, idx) => {
+        const itemLeagueKey = String(item.leagueName || item.league || 'Unknown League')
+          .trim()
+          .toLowerCase();
+        if (selectedLeague !== 'ALL' && itemLeagueKey !== selectedLeague) {
+          return;
+        }
+
+        counts.ALL += 1;
         const baseline = evaluateImportItemForFilter(item, idx, 'ALL', 'AUTO');
         if (baseline) {
           const presentCats = new Set(baseline.allEvaluatedMarkets.map((m) => m.category));
@@ -814,8 +873,14 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         }
       });
     } else {
-      counts.ALL = history.length;
       for (const f of history) {
+        const fixtureLeagueLabel = String(f.leagueName || f.league || 'Unknown League').trim();
+        const fixtureLeagueKey = fixtureLeagueLabel.toLowerCase();
+        if (selectedLeague !== 'ALL' && fixtureLeagueKey !== selectedLeague) {
+          continue;
+        }
+
+        counts.ALL += 1;
         const res = evaluateFixtureForMarketFilter(f, marketCategory, specificMarket);
         const presentCats = new Set(res.allEvaluatedMarkets.map((m) => m.category));
         for (const cat of presentCats) {
@@ -830,7 +895,8 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           fixture: f,
           homeTeam: f.homeTeam,
           awayTeam: f.awayTeam,
-          leagueLabel: f.leagueName || f.league,
+          leagueKey: fixtureLeagueKey,
+          leagueLabel: fixtureLeagueLabel,
           matchDate: normalizeDateStr(f.matchDate),
           kickOffTime: f.kickOffTime || 'FT',
           status: f.status,
@@ -850,13 +916,17 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     }
 
     return { allEvaluatedRows: rows, categoryCounts: counts };
-  }, [history, importedEvaluation, marketCategory, specificMarket]);
+  }, [history, importedEvaluation, marketCategory, specificMarket, selectedLeague]);
 
   // Apply Search, Date, Probability, Outcome filters + Sorting
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
     const matched = allEvaluatedRows.filter((row) => {
+      if (selectedLeague !== 'ALL' && row.leagueKey !== selectedLeague) {
+        return false;
+      }
+
       if (q) {
         const matchesText =
           row.homeTeam.toLowerCase().includes(q) ||
@@ -902,7 +972,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       const timeB = normalizeTimeStr(b.kickOffTime || '00:00');
       return timeB.localeCompare(timeA);
     });
-  }, [allEvaluatedRows, searchQuery, dateFilter, probFilter, outcomeFilter, sortMode]);
+  }, [allEvaluatedRows, selectedLeague, searchQuery, dateFilter, probFilter, outcomeFilter, sortMode]);
 
   // Compute accuracy and summary metrics for current active filter selection
   const metrics = useMemo(() => {
@@ -1155,16 +1225,16 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           ariaLabel="Filter historical evaluation by market category"
         />
 
-        {/* Responsive 6-Control Filter Matrix */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-          {/* Search Team or League */}
-          <div className="space-y-1">
+        {/* Responsive 7-Control Filter Matrix (2 balanced rows on desktop) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          {/* Search Team or Match */}
+          <div className="space-y-1 sm:col-span-2 lg:col-span-2">
             <label
               htmlFor="history-search-input"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
               <Search className="w-3 h-3 text-theme-primary" />
-              <span>Team / League</span>
+              <span>Search Match</span>
             </label>
             <Input
               id="history-search-input"
@@ -1172,10 +1242,37 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onClear={() => setSearchQuery('')}
-              placeholder="Search match..."
+              placeholder="Search team, league, or market..."
               inputSize="sm"
               surface="subtle"
               leftIcon={<Search className="w-3.5 h-3.5" />}
+            />
+          </div>
+
+          {/* Filter by League */}
+          <div className="space-y-1">
+            <label
+              htmlFor="history-league-filter"
+              className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
+            >
+              <Trophy className="w-3 h-3 text-theme-primary" />
+              <span>League</span>
+            </label>
+            <Select
+              id="history-league-filter"
+              aria-label="Filter predictions by league"
+              value={selectedLeague}
+              onChange={(e) => setSelectedLeague(e.target.value)}
+              surface="subtle"
+              selectSize="sm"
+              containerClassName="w-full"
+              options={[
+                { value: 'ALL', label: `All Leagues (${totalRawCount})` },
+                ...leagueOptions.map((opt) => ({
+                  value: opt.value,
+                  label: `${opt.label} (${opt.count})`,
+                })),
+              ]}
             />
           </div>
 
@@ -1532,8 +1629,8 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           icon={<Filter className="w-6 h-6 text-theme-primary" />}
           title="No Predictions Match Selected Filters"
           description={`0 of ${totalRawCount} evaluated matches matched "${activeCategoryLabel}"${
-            specificMarket !== 'AUTO' ? ` · ${getGenericMarketLabel(specificMarket)}` : ''
-          } with your active filters.`}
+            selectedLeagueLabel ? ` · ${selectedLeagueLabel}` : ''
+          }${specificMarket !== 'AUTO' ? ` · ${getGenericMarketLabel(specificMarket)}` : ''} with your active filters.`}
           actions={
             <Button variant="primary" size="sm" onClick={resetAllFilters}>
               <RotateCcw className="w-3.5 h-3.5" />

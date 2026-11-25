@@ -1,6 +1,13 @@
 import React from 'react';
-import { Filter } from 'lucide-react';
+import { Filter, Layers } from 'lucide-react';
 import { getDateFilterDisplayLabel, resolveDateFilter } from '../core/dateUtils.js';
+import {
+  HISTORY_MARKET_CATEGORIES,
+  HistoryMarketCategory,
+  SPECIFIC_MARKET_OPTIONS_BY_CATEGORY,
+  UPCOMING_MARKET_CATEGORIES,
+  parseUpcomingMarketFilter,
+} from '../core/marketEvaluator.js';
 import { Button, Modal, Select } from './ui/index.js';
 
 interface FixturesFilterModalProps {
@@ -20,7 +27,7 @@ interface FixturesFilterModalProps {
   activeFilterCount?: number;
   leagueOptions: { code: string; name: string }[];
   dateOptions: { key: string; label: string }[];
-  marketOptions: { key: string; label: string }[];
+  marketOptions?: { key: string; label: string }[];
   sortOptions: { key: string; label: string }[];
 }
 
@@ -46,11 +53,35 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
   const canonicalDateFilter = resolveDateFilter(dateFilter).canonicalKey;
   const hasMatchingDateOption = dateOptions.some((opt) => opt.key === canonicalDateFilter);
 
+  const categoryOptions =
+    marketOptions && marketOptions.length >= UPCOMING_MARKET_CATEGORIES.length
+      ? marketOptions
+      : UPCOMING_MARKET_CATEGORIES;
+
+  const { category: parsedCategory, specificMarket: parsedSpecificMarket } =
+    parseUpcomingMarketFilter(marketChoiceFilter);
+
+  const selectedCategoryValue = parsedCategory === 'ALL' ? 'MOST_LIKELY' : parsedCategory;
+  const selectedCategoryLabel =
+    HISTORY_MARKET_CATEGORIES.find((c) => c.id === parsedCategory)?.label || 'All Markets';
+
+  const handleCategoryChange = (nextCategoryValue: string) => {
+    setMarketChoiceFilter(nextCategoryValue || 'MOST_LIKELY');
+  };
+
+  const handleSpecificMarketChange = (nextSpecificKey: string) => {
+    if (!nextSpecificKey || nextSpecificKey === 'AUTO') {
+      setMarketChoiceFilter(selectedCategoryValue);
+    } else {
+      setMarketChoiceFilter(nextSpecificKey);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="max-w-sm"
+      maxWidth="max-w-md"
       title="Filters"
       icon={<Filter className="w-4 h-4" />}
       closeLabel="Close filters"
@@ -73,9 +104,13 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </Button>
       }
     >
+      {/* League Filter */}
       <div className="w-full relative min-w-0">
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] truncate">
+          <label
+            htmlFor="upcoming-league-filter"
+            className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] truncate"
+          >
             League Filter
           </label>
           <button
@@ -90,6 +125,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           </button>
         </div>
         <Select
+          id="upcoming-league-filter"
           value={selectedLeague}
           onChange={(e) => onSelectLeague(e.target.value)}
           containerClassName="w-full"
@@ -102,12 +138,17 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* Date Range & Market Category */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <div className="relative min-w-0">
-          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5">
+          <label
+            htmlFor="upcoming-date-filter"
+            className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5"
+          >
             Date Range
           </label>
           <Select
+            id="upcoming-date-filter"
             value={canonicalDateFilter}
             onChange={(e) => setDateFilter(resolveDateFilter(e.target.value).canonicalKey)}
             containerClassName="w-full"
@@ -126,15 +167,19 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </div>
 
         <div className="relative min-w-0">
-          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5">
-            Market
+          <label
+            htmlFor="upcoming-market-category-filter"
+            className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block mb-1.5"
+          >
+            Market Category
           </label>
           <Select
-            value={marketChoiceFilter}
-            onChange={(e) => setMarketChoiceFilter(e.target.value)}
+            id="upcoming-market-category-filter"
+            value={selectedCategoryValue}
+            onChange={(e) => handleCategoryChange(e.target.value)}
             containerClassName="w-full"
           >
-            {marketOptions.map((opt) => (
+            {categoryOptions.map((opt) => (
               <option key={opt.key} value={opt.key} className="bg-theme-card text-theme-main">
                 {opt.label}
               </option>
@@ -143,9 +188,75 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
         </div>
       </div>
 
+      {/* Filter by Specific Market Type (All Market Types Including Combo Markets) */}
       <div className="relative min-w-0">
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">
+          <label
+            htmlFor="upcoming-market-type-filter"
+            className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] flex items-center gap-1"
+          >
+            <Layers className="w-3 h-3 text-theme-primary" />
+            <span>Market Type (All Markets &amp; Combos)</span>
+          </label>
+          {marketChoiceFilter !== 'MOST_LIKELY' && (
+            <button
+              type="button"
+              onClick={() => setMarketChoiceFilter('MOST_LIKELY')}
+              className="text-xs font-medium text-rose-700 dark:text-rose-400 hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            >
+              Reset Market
+            </button>
+          )}
+        </div>
+        <Select
+          id="upcoming-market-type-filter"
+          aria-label="Filter upcoming fixtures by market type"
+          value={parsedSpecificMarket}
+          onChange={(e) => handleSpecificMarketChange(e.target.value)}
+          containerClassName="w-full"
+        >
+          <option value="AUTO" className="bg-theme-card text-theme-main">
+            {parsedCategory === 'ALL'
+              ? 'Best Pick (All Markets)'
+              : `Best Pick (${selectedCategoryLabel})`}
+          </option>
+          {parsedCategory === 'ALL' ? (
+            HISTORY_MARKET_CATEGORIES.filter((c) => c.id !== 'ALL').map((cat) => (
+              <optgroup key={cat.id} label={cat.label}>
+                {SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[
+                  cat.id as Exclude<HistoryMarketCategory, 'ALL'>
+                ].map((opt) => (
+                  <option
+                    key={opt.key}
+                    value={opt.key}
+                    className="bg-theme-card text-theme-main"
+                  >
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))
+          ) : (
+            SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[parsedCategory].map((opt) => (
+              <option
+                key={opt.key}
+                value={opt.key}
+                className="bg-theme-card text-theme-main"
+              >
+                {opt.label}
+              </option>
+            ))
+          )}
+        </Select>
+      </div>
+
+      {/* Sort by Percentage */}
+      <div className="relative min-w-0">
+        <div className="flex items-center justify-between mb-1.5">
+          <label
+            htmlFor="sort-predictions-by-percentage"
+            className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block"
+          >
             Sort by Percentage
           </label>
           {sortBy && sortBy !== 'DEFAULT' && (
