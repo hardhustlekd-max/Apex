@@ -92,6 +92,10 @@ export function isSimulationLeague(
   homeTeam?: string | null,
   awayTeam?: string | null
 ): boolean {
+  if (isBlockedLeague(league, leagueName, country, stage)) {
+    return true;
+  }
+
   if (
     matchesSimulationCompetitionText(league) ||
     matchesSimulationCompetitionText(leagueName) ||
@@ -110,6 +114,45 @@ export function isSimulationLeague(
 
   if (matchesSimulationTeamText(homeTeam) || matchesSimulationTeamText(awayTeam)) {
     return true;
+  }
+
+  return false;
+}
+
+const BLOCKED_LEAGUE_TERMS = [
+  'botswana',
+  'dr congo',
+  'democratic republic of the congo',
+  'congo dr',
+  'asia afc',
+  'afc cups',
+  'montenegro',
+  'mozambique',
+  'zambia',
+  'kenya',
+  'angola',
+];
+
+export function isBlockedLeague(
+  league?: string | null,
+  leagueName?: string | null,
+  country?: string | null,
+  stage?: string | null
+): boolean {
+  const combined = [league, leagueName, country, stage]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (!combined) return false;
+
+  for (const term of BLOCKED_LEAGUE_TERMS) {
+    if (combined.includes(term)) {
+      if (term === 'afc' && !/\b(afc)\b/.test(combined)) continue;
+      return true;
+    }
   }
 
   return false;
