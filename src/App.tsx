@@ -647,13 +647,17 @@ export default function App() {
     return () => clearInterval(liveInterval);
   }, [scrapingGate?.enabled, fetchLiveScores]);
 
+  // Refresh leagues catalog whenever database data changes
+  useEffect(() => {
+    void EngineService.getLeaguesCatalog(dataRefreshVersion > 0).then((catalog) => {
+      if (Array.isArray(catalog)) setLeaguesCatalog(catalog);
+    });
+  }, [dataRefreshVersion]);
+
   // One-time mount initialization (settings, catalog, error logs, sync job resume; ZERO live scraping on boot)
   useEffect(() => {
     applyColorTheme(getActiveColorThemeId());
     void fetchSettingsAndProviders();
-    void EngineService.getLeaguesCatalog().then((catalog) => {
-      if (Array.isArray(catalog)) setLeaguesCatalog(catalog);
-    });
     void checkForNewErrorLogs();
 
     const errInterval = setInterval(() => {

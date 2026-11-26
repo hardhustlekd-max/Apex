@@ -227,14 +227,33 @@ export class FootballDB {
     if (!isSqliteEnabled()) return [];
     try {
       const rows = sqliteDb
-        .prepare('SELECT DISTINCT league, league_name, stage FROM upcoming_fixtures WHERE league IS NOT NULL AND league_name IS NOT NULL')
+        .prepare(`
+          SELECT league, league_name, MAX(stage) as stage, MAX(league_url) as league_url
+          FROM (
+            SELECT league, league_name, stage, league_url
+            FROM upcoming_fixtures
+            WHERE league IS NOT NULL AND TRIM(league) != ''
+              AND league_name IS NOT NULL AND TRIM(league_name) != ''
+            UNION ALL
+            SELECT league, league_name, stage, NULL as league_url
+            FROM predictions
+            WHERE league IS NOT NULL AND TRIM(league) != ''
+              AND league_name IS NOT NULL AND TRIM(league_name) != ''
+              AND (match_state IS NULL OR match_state != 'completed')
+              AND (status IS NULL OR status NOT IN ('FINISHED', 'CANCELLED', 'POSTPONED'))
+          )
+          GROUP BY LOWER(league)
+        `)
         .all() as any[];
-      return rows.map((r) => ({
-        league: r.league,
-        leagueName: r.league_name,
-        stage: r.stage,
-      }));
-    } catch {
+      return rows
+        .filter((r) => !isSimulationLeague(r.league, r.league_name, undefined, r.league_url, r.stage))
+        .map((r) => ({
+          league: String(r.league).trim(),
+          leagueName: String(r.league_name).trim(),
+          stage: r.stage ? String(r.stage).trim() : undefined,
+        }));
+    } catch (err: any) {
+      console.warn('[FootballDB] getAllUpcomingLeagues failed:', err?.message);
       return [];
     }
   }

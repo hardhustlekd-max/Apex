@@ -178,12 +178,14 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
         await document.fonts.ready;
       }
       await new Promise((r) => setTimeout(r, 120));
-      const exportHeight = Math.max(1372, posterRef.current.scrollHeight || 1372);
+      const exportWidth = 540;
+      const minPosterHeight = rowCount <= 4 ? 700 : rowCount <= 6 ? 780 : 860;
+      const exportHeight = Math.max(minPosterHeight, posterRef.current.scrollHeight || minPosterHeight);
       const exportOpts = {
         cacheBust: true,
         quality: 1.0,
         pixelRatio: 1,
-        width: 747,
+        width: exportWidth,
         height: exportHeight,
       };
       let dataUrl: string;
@@ -196,7 +198,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
       link.download = `todays-top-${selections.length}-predictions-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
-      showToast('Bet slip poster (747×1372) downloaded!', 'success');
+      showToast(`Bet slip poster (${exportWidth}×${exportHeight}) downloaded!`, 'success');
     } catch (err: any) {
       console.error('Failed to generate poster:', err);
       showToast('Failed to generate poster image', 'info');
@@ -208,15 +210,14 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
   const rowCount = selections.length;
   const rowHeightPx =
     rowCount <= 4
-      ? 112
+      ? 82
       : rowCount <= 6
-      ? 104
+      ? 76
       : rowCount <= 8
-      ? 96
-      : rowCount === 9
-      ? 92
-      : 88;
-  const rowGapPx = rowCount <= 6 ? 10 : 7;
+      ? 70
+      : 64;
+  const rowGapPx = rowCount <= 6 ? 8 : 6;
+  const minPosterHeightPx = rowCount <= 4 ? 700 : rowCount <= 6 ? 780 : 860;
   const isCompactSlip = rowCount <= 7;
 
   return (
@@ -360,13 +361,13 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
         )}
       </aside>
 
-      {/* Hidden 747x1372 Stadium Floodlight Social Poster Template for PNG export */}
+      {/* Hidden Compact Mobile-Share Stadium Floodlight Social Poster Template for PNG export */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none select-none" aria-hidden="true">
         <div
           ref={posterRef}
           style={{
-            width: '680px',
-            minHeight: '1180px',
+            width: '540px',
+            minHeight: `${minPosterHeightPx}px`,
             boxSizing: 'border-box',
             position: 'relative',
             overflow: 'hidden',
@@ -376,15 +377,13 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
               'linear-gradient(180deg, #040d18 0%, #081c30 28%, #0b2d42 48%, #102e24 62%, #1d431b 74%, #0f2511 88%, #040b06 100%)',
             fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
             color: '#ffffff',
-            transform: 'scale(0.85)',
-            transformOrigin: 'top left',
           }}
         >
           {/* Stadium Night Sky, Floodlight Beams, Crowd Horizon & Pitch Markings SVG */}
           <svg
-            viewBox="0 0 680 1180"
-            width="680"
-            height="1180"
+            viewBox="0 0 540 960"
+            width="540"
+            height="960"
             preserveAspectRatio="xMidYMid slice"
             style={{
               position: 'absolute',
@@ -434,93 +433,93 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
             </defs>
 
             {/* Atmospheric Sky Glow */}
-            <rect x="0" y="0" width="680" height="680" fill="url(#poster-sky-glow)" />
+            <rect x="0" y="0" width="540" height="540" fill="url(#poster-sky-glow)" />
 
             {/* Subtle Night Stars / Bokeh */}
-            <circle cx="92" cy="78" r="1.4" fill="#a5f3fc" opacity="0.55" />
-            <circle cx="195" cy="42" r="1.1" fill="#ffffff" opacity="0.45" />
-            <circle cx="580" cy="64" r="1.6" fill="#a5f3fc" opacity="0.6" />
-            <circle cx="630" cy="145" r="1.2" fill="#ffffff" opacity="0.4" />
-            <circle cx="48" cy="195" r="1.3" fill="#67e8f9" opacity="0.5" />
-            <circle cx="645" cy="240" r="1.5" fill="#a5f3fc" opacity="0.55" />
+            <circle cx="74" cy="64" r="1.3" fill="#a5f3fc" opacity="0.55" />
+            <circle cx="155" cy="36" r="1.0" fill="#ffffff" opacity="0.45" />
+            <circle cx="462" cy="52" r="1.4" fill="#a5f3fc" opacity="0.6" />
+            <circle cx="500" cy="118" r="1.1" fill="#ffffff" opacity="0.4" />
+            <circle cx="38" cy="160" r="1.2" fill="#67e8f9" opacity="0.5" />
+            <circle cx="512" cy="195" r="1.3" fill="#a5f3fc" opacity="0.55" />
 
             {/* Stadium Tier & Advertising Board Silhouette */}
-            <path d="M0 480 L680 480 L680 660 L0 660 Z" fill="#06131c" opacity="0.82" />
-            <rect x="0" y="648" width="680" height="22" fill="#0a1622" opacity="0.92" />
-            <rect x="0" y="648" width="680" height="3" fill="#22d3ee" opacity="0.35" />
+            <path d="M0 390 L540 390 L540 536 L0 536 Z" fill="#06131c" opacity="0.82" />
+            <rect x="0" y="526" width="540" height="18" fill="#0a1622" opacity="0.92" />
+            <rect x="0" y="526" width="540" height="2.5" fill="#22d3ee" opacity="0.35" />
 
             {/* Crowd Bokeh Lights */}
             <g opacity="0.35">
-              <circle cx="24" cy="580" r="3" fill="#e2e8f0" />
-              <circle cx="42" cy="594" r="2.5" fill="#fb7185" />
-              <circle cx="58" cy="570" r="3.2" fill="#38bdf8" />
-              <circle cx="18" cy="620" r="2.8" fill="#facc15" />
-              <circle cx="628" cy="582" r="3" fill="#e2e8f0" />
-              <circle cx="648" cy="598" r="2.6" fill="#38bdf8" />
-              <circle cx="665" cy="574" r="3.2" fill="#fb7185" />
-              <circle cx="636" cy="620" r="2.5" fill="#5efce8" />
+              <circle cx="20" cy="470" r="2.6" fill="#e2e8f0" />
+              <circle cx="34" cy="482" r="2.2" fill="#fb7185" />
+              <circle cx="48" cy="462" r="2.8" fill="#38bdf8" />
+              <circle cx="15" cy="502" r="2.4" fill="#facc15" />
+              <circle cx="498" cy="472" r="2.6" fill="#e2e8f0" />
+              <circle cx="514" cy="486" r="2.2" fill="#38bdf8" />
+              <circle cx="526" cy="466" r="2.8" fill="#fb7185" />
+              <circle cx="504" cy="504" r="2.1" fill="#5efce8" />
             </g>
 
             {/* Turf & Center Pitch Lighting */}
-            <rect x="0" y="666" width="680" height="514" fill="url(#poster-turf-wash)" />
-            <rect x="0" y="666" width="680" height="514" fill="url(#poster-center-turf)" />
+            <rect x="0" y="542" width="540" height="418" fill="url(#poster-turf-wash)" />
+            <rect x="0" y="542" width="540" height="418" fill="url(#poster-center-turf)" />
 
             {/* Subtle Perspective Pitch Lines */}
-            <g stroke="#d9f99d" strokeOpacity="0.22" strokeWidth="2" fill="none">
-              <line x1="0" y1="700" x2="680" y2="700" />
-              <line x1="0" y1="755" x2="680" y2="755" strokeOpacity="0.11" />
-              <line x1="0" y1="825" x2="680" y2="825" strokeOpacity="0.09" />
-              <line x1="340" y1="666" x2="340" y2="1180" strokeOpacity="0.14" />
-              <ellipse cx="340" cy="810" rx="165" ry="46" strokeOpacity="0.14" />
+            <g stroke="#d9f99d" strokeOpacity="0.22" strokeWidth="1.8" fill="none">
+              <line x1="0" y1="570" x2="540" y2="570" />
+              <line x1="0" y1="615" x2="540" y2="615" strokeOpacity="0.11" />
+              <line x1="0" y1="672" x2="540" y2="672" strokeOpacity="0.09" />
+              <line x1="270" y1="542" x2="270" y2="960" strokeOpacity="0.14" />
+              <ellipse cx="270" cy="660" rx="132" ry="38" strokeOpacity="0.14" />
             </g>
 
             {/* Left & Right Stadium Floodlight Beams */}
-            <polygon points="0,380 450,590 390,680 0,510" fill="url(#poster-beam-l)" />
-            <polygon points="680,380 230,590 290,680 680,510" fill="url(#poster-beam-r)" />
-            <rect x="0" y="220" width="340" height="460" fill="url(#poster-flood-left)" />
-            <rect x="340" y="220" width="340" height="460" fill="url(#poster-flood-right)" />
+            <polygon points="0,310 360,480 310,552 0,415" fill="url(#poster-beam-l)" />
+            <polygon points="540,310 180,480 230,552 540,415" fill="url(#poster-beam-r)" />
+            <rect x="0" y="180" width="270" height="375" fill="url(#poster-flood-left)" />
+            <rect x="270" y="180" width="270" height="375" fill="url(#poster-flood-right)" />
 
             {/* Vertical Cyan Laser Edge Lines flanking Card */}
-            <line x1="32" y1="300" x2="32" y2="1020" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
-            <line x1="648" y1="300" x2="648" y2="1020" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.45" />
+            <line x1="14" y1="180" x2="14" y2="880" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.4" />
+            <line x1="526" y1="180" x2="526" y2="880" stroke="#67f8e4" strokeWidth="1.5" strokeOpacity="0.4" />
           </svg>
 
           {/* Top-Left Transparent Leopard-in-Ball Crest Emblem */}
           <div
             style={{
               position: 'absolute',
-              top: '22px',
-              left: '24px',
+              top: '16px',
+              left: '18px',
               zIndex: 10,
               pointerEvents: 'none',
             }}
           >
-            <AppLogo size={60} mode="dark" />
+            <AppLogo size={46} mode="dark" />
           </div>
 
-          {/* Hero Title Block (Athletic Condensed Typography, cleared 96px left/right) */}
+          {/* Hero Title Block (Athletic Condensed Typography, cleared 68px left/right) */}
           <div
             style={{
               position: 'relative',
               zIndex: 10,
               boxSizing: 'border-box',
-              paddingTop: '42px',
-              paddingBottom: '18px',
-              paddingLeft: '96px',
-              paddingRight: '96px',
+              paddingTop: '24px',
+              paddingBottom: '14px',
+              paddingLeft: '68px',
+              paddingRight: '68px',
               textAlign: 'center',
               fontFamily: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
             }}
           >
             <div
               style={{
-                fontSize: selections.length >= 100 ? '54px' : '62px',
+                fontSize: selections.length >= 100 ? '38px' : '44px',
                 fontWeight: 900,
                 fontStyle: 'italic',
                 lineHeight: 0.92,
                 letterSpacing: '0.015em',
                 textTransform: 'uppercase',
-                textShadow: '0 6px 18px rgba(0, 0, 0, 0.9)',
+                textShadow: '0 4px 14px rgba(0, 0, 0, 0.9)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -528,7 +527,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
               <span
                 style={{
                   color: '#67f8e4',
-                  textShadow: '0 0 24px rgba(94, 252, 232, 0.48), 0 6px 18px rgba(0, 0, 0, 0.9)',
+                  textShadow: '0 0 20px rgba(94, 252, 232, 0.5), 0 4px 14px rgba(0, 0, 0, 0.9)',
                 }}
               >
                 TOP {selections.length}
@@ -536,15 +535,15 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
             </div>
             <div
               style={{
-                fontSize: '72px',
+                fontSize: '50px',
                 fontWeight: 900,
                 fontStyle: 'italic',
                 lineHeight: 0.9,
                 letterSpacing: '0.02em',
                 textTransform: 'uppercase',
                 color: '#ffffff',
-                marginTop: '4px',
-                textShadow: '0 8px 20px rgba(0, 0, 0, 0.92)',
+                marginTop: '2px',
+                textShadow: '0 6px 16px rgba(0, 0, 0, 0.92)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -552,13 +551,13 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
             </div>
           </div>
 
-          {/* Stadium Stage Wrapper (vertically balances compact slips without giant empty voids) */}
+          {/* Stadium Stage Wrapper */}
           <div
             style={{
               position: 'relative',
               zIndex: 10,
-              width: '652px',
-              margin: '0 auto 30px auto',
+              width: '504px',
+              margin: '0 auto 20px auto',
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
@@ -567,13 +566,13 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
           >
             <div style={{ position: 'relative', width: '100%' }}>
               <svg
-                width="66"
-                height="66"
+                width="52"
+                height="52"
                 viewBox="0 0 66 66"
                 style={{
                   position: 'absolute',
-                  top: '-24px',
-                  right: '-6px',
+                  top: '-18px',
+                  right: '-4px',
                   opacity: 0.28,
                   pointerEvents: 'none',
                   zIndex: 1,
@@ -591,38 +590,41 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   boxSizing: 'border-box',
                   display: 'flex',
                   flexDirection: 'column',
-                  borderRadius: '22px',
-                  border: '2px solid rgba(103, 248, 228, 0.78)',
+                  borderRadius: '18px',
+                  border: '2px solid rgba(103, 248, 228, 0.8)',
                   background:
-                    'linear-gradient(180deg, rgba(9, 32, 48, 0.88) 0%, rgba(6, 20, 34, 0.93) 55%, rgba(4, 13, 24, 0.97) 100%)',
+                    'linear-gradient(180deg, rgba(9, 32, 48, 0.9) 0%, rgba(6, 20, 34, 0.94) 55%, rgba(4, 13, 24, 0.98) 100%)',
                   boxShadow:
-                    '0 0 32px rgba(45, 212, 191, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 24px rgba(45, 212, 191, 0.1), 0 24px 52px rgba(0, 0, 0, 0.78)',
+                    '0 0 26px rgba(45, 212, 191, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 20px rgba(45, 212, 191, 0.1), 0 18px 40px rgba(0, 0, 0, 0.78)',
                   padding: '0',
                   overflow: 'hidden',
                 }}
               >
-                {/* Crisp Table Column Header Strip */}
+                {/* Table Column Header Strip (matched condensed athletic typography, cyan glow & balanced size) */}
                 <div
                   style={{
-                    height: '36px',
+                    height: '38px',
                     boxSizing: 'border-box',
                     display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) 1px 142px 1px 128px',
+                    gridTemplateColumns: 'minmax(0, 1fr) 1px 112px 1px 96px',
                     alignItems: 'center',
-                    padding: '0 14px 0 22px',
-                    background: 'linear-gradient(90deg, rgba(16, 56, 78, 0.72) 0%, rgba(10, 36, 54, 0.78) 100%)',
-                    borderBottom: '1px solid rgba(103, 248, 228, 0.24)',
-                    fontSize: '10.5px',
+                    padding: '0 8px 0 12px',
+                    background: 'linear-gradient(90deg, rgba(16, 56, 78, 0.78) 0%, rgba(10, 36, 54, 0.84) 100%)',
+                    borderBottom: '1px solid rgba(103, 248, 228, 0.28)',
+                    fontFamily: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
+                    fontSize: '14px',
                     fontWeight: 800,
-                    letterSpacing: '0.12em',
+                    fontStyle: 'italic',
+                    letterSpacing: '0.07em',
                     textTransform: 'uppercase',
-                    color: '#7dd3fc',
+                    color: '#67f8e4',
+                    textShadow: '0 0 10px rgba(94, 252, 232, 0.35), 0 1px 4px rgba(0, 0, 0, 0.75)',
                   }}
                 >
-                  <span style={{ paddingLeft: '36px' }}>FIXTURE &amp; COMPETITION</span>
-                  <span style={{ width: '1px', height: '14px', background: 'rgba(103, 248, 228, 0.2)' }} />
+                  <span style={{ paddingLeft: '30px' }}>FIXTURE &amp; COMPETITION</span>
+                  <span style={{ width: '1px', height: '16px', background: 'rgba(103, 248, 228, 0.26)' }} />
                   <span style={{ textAlign: 'center' }}>PICK</span>
-                  <span style={{ width: '1px', height: '14px', background: 'rgba(103, 248, 228, 0.2)' }} />
+                  <span style={{ width: '1px', height: '16px', background: 'rgba(103, 248, 228, 0.26)' }} />
                   <span style={{ textAlign: 'center' }}>ODDS</span>
                 </div>
 
@@ -632,20 +634,20 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: `${rowGapPx}px`,
-                    padding: '10px 10px 0 10px',
+                    padding: '8px 8px 0 8px',
                   }}
                 >
                   {selections.map((sel, idx) => {
                     const shortPick = formatShortPick(sel.marketKey, sel.marketName);
                     const pickFontSize =
                       shortPick.length <= 4
-                        ? '28px'
+                        ? '23px'
                         : shortPick.length <= 8
-                        ? '22px'
+                        ? '19px'
                         : shortPick.length <= 12
-                        ? '17px'
-                        : '14px';
-                    const oddsFontSize = sel.odds >= 100 ? '21px' : '25px';
+                        ? '15px'
+                        : '13px';
+                    const oddsFontSize = sel.odds >= 100 ? '18px' : '22px';
                     const subtitleText = [sel.leagueName, sel.kickOffTime].filter(Boolean).join(' · ') || sel.marketName;
 
                     return (
@@ -655,16 +657,16 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                           position: 'relative',
                           boxSizing: 'border-box',
                           height: `${rowHeightPx}px`,
-                          borderRadius: '14px',
+                          borderRadius: '12px',
                           border: '1px solid rgba(103, 248, 228, 0.36)',
                           background:
                             'linear-gradient(180deg, rgba(20, 56, 78, 0.9) 0%, rgba(9, 29, 44, 0.96) 58%, rgba(6, 19, 31, 0.98) 100%)',
                           boxShadow:
-                            'inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 12px rgba(0, 0, 0, 0.34)',
+                            'inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 10px rgba(0, 0, 0, 0.34)',
                           display: 'grid',
-                          gridTemplateColumns: 'minmax(0, 1fr) 1px 142px 1px 128px',
+                          gridTemplateColumns: 'minmax(0, 1fr) 1px 112px 1px 96px',
                           alignItems: 'center',
-                          padding: '0 4px 0 12px',
+                          padding: '0 2px 0 8px',
                           overflow: 'hidden',
                         }}
                       >
@@ -675,22 +677,22 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                             overflow: 'hidden',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '10px',
-                            paddingRight: '12px',
+                            gap: '8px',
+                            paddingRight: '8px',
                           }}
                         >
                           <span
                             style={{
-                              width: '26px',
+                              width: '22px',
                               flexShrink: 0,
                               textAlign: 'center',
                               fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
-                              fontSize: idx + 1 >= 10 ? '23px' : '25px',
+                              fontSize: idx + 1 >= 10 ? '19px' : '21px',
                               fontWeight: 900,
                               fontStyle: 'italic',
                               lineHeight: 1,
                               color: '#67f8e4',
-                              textShadow: '0 0 12px rgba(94, 252, 232, 0.55)',
+                              textShadow: '0 0 10px rgba(94, 252, 232, 0.5)',
                               fontVariantNumeric: 'tabular-nums',
                             }}
                           >
@@ -700,27 +702,27 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                             <div
                               style={{
                                 fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
-                                fontSize: '25px',
+                                fontSize: '20px',
                                 fontWeight: 700,
-                                lineHeight: '27px',
+                                lineHeight: '22px',
                                 color: '#ffffff',
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 letterSpacing: '0.01em',
-                                textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
+                                textShadow: '0 2px 5px rgba(0, 0, 0, 0.7)',
                               }}
                             >
                               {sel.homeTeam} vs {sel.awayTeam}
                             </div>
                             <div
                               style={{
-                                marginTop: '3px',
-                                fontSize: '11.5px',
+                                marginTop: '2px',
+                                fontSize: '11px',
                                 fontWeight: 600,
-                                lineHeight: '15px',
-                                letterSpacing: '0.02em',
-                                color: '#94c5d8',
+                                lineHeight: '14px',
+                                letterSpacing: '0.015em',
+                                color: '#a5d8e8',
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -735,7 +737,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                         <div
                           style={{
                             width: '1px',
-                            height: `${Math.max(44, rowHeightPx - 34)}px`,
+                            height: `${Math.max(36, rowHeightPx - 24)}px`,
                             background:
                               'linear-gradient(180deg, rgba(103,248,228,0) 0%, rgba(103,248,228,0.34) 50%, rgba(103,248,228,0) 100%)',
                           }}
@@ -750,18 +752,20 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: '0 8px',
+                            padding: '0 6px',
                             textAlign: 'center',
                           }}
                         >
                           <span
                             style={{
-                              fontSize: '10px',
+                              fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
+                              fontSize: '11.5px',
                               fontWeight: 800,
-                              letterSpacing: '0.1em',
-                              color: '#7dd3fc',
+                              fontStyle: 'italic',
+                              letterSpacing: '0.08em',
+                              color: '#a5f3fc',
                               textTransform: 'uppercase',
-                              lineHeight: 1.1,
+                              lineHeight: 1.05,
                             }}
                           >
                             PICK
@@ -774,11 +778,11 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                               fontWeight: 800,
                               color: '#ffffff',
                               lineHeight: 1.05,
-                              marginTop: '3px',
+                              marginTop: '2px',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              textShadow: '0 2px 6px rgba(0, 0, 0, 0.72)',
+                              textShadow: '0 2px 5px rgba(0, 0, 0, 0.72)',
                             }}
                           >
                             {shortPick}
@@ -789,7 +793,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                         <div
                           style={{
                             width: '1px',
-                            height: `${Math.max(44, rowHeightPx - 34)}px`,
+                            height: `${Math.max(36, rowHeightPx - 24)}px`,
                             background:
                               'linear-gradient(180deg, rgba(103,248,228,0) 0%, rgba(103,248,228,0.34) 50%, rgba(103,248,228,0) 100%)',
                           }}
@@ -804,18 +808,20 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: '0 8px',
+                            padding: '0 6px',
                             textAlign: 'center',
                           }}
                         >
                           <span
                             style={{
-                              fontSize: '10px',
+                              fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
+                              fontSize: '11.5px',
                               fontWeight: 800,
-                              letterSpacing: '0.1em',
-                              color: '#7dd3fc',
+                              fontStyle: 'italic',
+                              letterSpacing: '0.08em',
+                              color: '#a5f3fc',
                               textTransform: 'uppercase',
-                              lineHeight: 1.1,
+                              lineHeight: 1.05,
                             }}
                           >
                             ODDS
@@ -827,9 +833,9 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                               fontWeight: 800,
                               color: '#67f8e4',
                               lineHeight: 1.05,
-                              marginTop: '3px',
+                              marginTop: '2px',
                               fontVariantNumeric: 'tabular-nums',
-                              textShadow: '0 0 12px rgba(103, 248, 228, 0.35), 0 2px 6px rgba(0, 0, 0, 0.7)',
+                              textShadow: '0 0 10px rgba(103, 248, 228, 0.35), 0 2px 5px rgba(0, 0, 0, 0.7)',
                               whiteSpace: 'nowrap',
                             }}
                           >
@@ -846,23 +852,23 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   style={{
                     position: 'relative',
                     boxSizing: 'border-box',
-                    height: '88px',
-                    marginTop: '12px',
-                    borderTop: '1px solid rgba(103, 248, 228, 0.25)',
+                    height: '78px',
+                    marginTop: '10px',
+                    borderTop: '1px solid rgba(103, 248, 228, 0.28)',
                     background:
                       'linear-gradient(90deg, rgba(5, 18, 30, 0.94) 0%, rgba(8, 32, 46, 0.94) 72%, rgba(11, 44, 52, 0.96) 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0 122px 0 24px',
+                    padding: '0 92px 0 16px',
                     overflow: 'hidden',
                   }}
                 >
                   {/* Flowing Cyan Ribbon Graphics */}
                   <svg
-                    viewBox="0 0 652 88"
-                    width="652"
-                    height="88"
+                    viewBox="0 0 504 78"
+                    width="504"
+                    height="78"
                     preserveAspectRatio="none"
                     style={{
                       position: 'absolute',
@@ -873,22 +879,22 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     }}
                   >
                     <path
-                      d="M0 88 C85 38, 165 22, 250 88 Z"
+                      d="M0 78 C65 34, 128 20, 195 78 Z"
                       fill="#0d2a3d"
                       opacity="0.82"
                     />
                     <path
-                      d="M365 88 C465 60, 545 28, 652 4 L652 88 Z"
+                      d="M282 78 C360 53, 422 24, 504 4 L504 78 Z"
                       fill="#114e63"
                       opacity="0.72"
                     />
                     <path
-                      d="M420 88 C500 62, 570 36, 652 14 L652 28 C580 48, 517 70, 465 88 Z"
+                      d="M325 78 C386 55, 440 32, 504 12 L504 25 C448 42, 400 62, 360 78 Z"
                       fill="#2dd4bf"
                       opacity="0.38"
                     />
                     <path
-                      d="M0 64 C65 28, 130 26, 195 88"
+                      d="M0 56 C50 25, 100 23, 150 78"
                       stroke="#67f8e4"
                       strokeWidth="1.5"
                       strokeOpacity="0.28"
@@ -896,7 +902,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     />
                   </svg>
 
-                  {/* Accumulator Summary Metrics (clipped cleanly before soccer ball) */}
+                  {/* Accumulator Summary Metrics (unified condensed typography & bright cyan/white/emerald hierarchy) */}
                   <div
                     style={{
                       position: 'relative',
@@ -906,17 +912,21 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                       overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '20px',
+                      gap: '14px',
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
                     <div style={{ minWidth: 0, flexShrink: 0 }}>
                       <span
                         style={{
-                          fontSize: '10px',
-                          color: '#94a3b8',
+                          fontFamily: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
+                          fontSize: '13px',
+                          color: '#a5f3fc',
                           fontWeight: 800,
-                          letterSpacing: '0.1em',
+                          fontStyle: 'italic',
+                          letterSpacing: '0.07em',
+                          textTransform: 'uppercase',
+                          textShadow: '0 1px 4px rgba(0, 0, 0, 0.75)',
                           display: 'block',
                         }}
                       >
@@ -925,26 +935,31 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                       <span
                         style={{
                           fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
-                          fontSize: '26px',
+                          fontSize: '24px',
                           fontWeight: 900,
                           color: '#67f8e4',
                           lineHeight: 1.05,
                           whiteSpace: 'nowrap',
                           display: 'block',
-                          marginTop: '2px',
+                          marginTop: '1px',
+                          textShadow: '0 0 12px rgba(103, 248, 228, 0.35), 0 2px 6px rgba(0, 0, 0, 0.7)',
                         }}
                       >
                         {totalOdds.toFixed(2)}x
                       </span>
                     </div>
-                    <div style={{ width: '1px', height: '34px', flexShrink: 0, background: 'rgba(103, 248, 228, 0.22)' }} />
+                    <div style={{ width: '1px', height: '32px', flexShrink: 0, background: 'rgba(103, 248, 228, 0.25)' }} />
                     <div style={{ minWidth: 0, flexShrink: 0 }}>
                       <span
                         style={{
-                          fontSize: '10px',
-                          color: '#94a3b8',
+                          fontFamily: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
+                          fontSize: '13px',
+                          color: '#a5f3fc',
                           fontWeight: 800,
-                          letterSpacing: '0.1em',
+                          fontStyle: 'italic',
+                          letterSpacing: '0.07em',
+                          textTransform: 'uppercase',
+                          textShadow: '0 1px 4px rgba(0, 0, 0, 0.75)',
                           display: 'block',
                         }}
                       >
@@ -953,26 +968,31 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                       <span
                         style={{
                           fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
-                          fontSize: '24px',
+                          fontSize: '23px',
                           fontWeight: 800,
                           color: '#ffffff',
                           lineHeight: 1.05,
                           whiteSpace: 'nowrap',
                           display: 'block',
-                          marginTop: '2px',
+                          marginTop: '1px',
+                          textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
                         }}
                       >
                         {numericStake.toFixed(0)} Br
                       </span>
                     </div>
-                    <div style={{ width: '1px', height: '34px', flexShrink: 0, background: 'rgba(103, 248, 228, 0.22)' }} />
+                    <div style={{ width: '1px', height: '32px', flexShrink: 0, background: 'rgba(103, 248, 228, 0.25)' }} />
                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                       <span
                         style={{
-                          fontSize: '10px',
-                          color: '#94a3b8',
+                          fontFamily: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
+                          fontSize: '13px',
+                          color: '#a5f3fc',
                           fontWeight: 800,
-                          letterSpacing: '0.1em',
+                          fontStyle: 'italic',
+                          letterSpacing: '0.07em',
+                          textTransform: 'uppercase',
+                          textShadow: '0 1px 4px rgba(0, 0, 0, 0.75)',
                           display: 'block',
                         }}
                       >
@@ -981,7 +1001,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                       <span
                         style={{
                           fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
-                          fontSize: '26px',
+                          fontSize: '24px',
                           fontWeight: 900,
                           color: '#34d399',
                           lineHeight: 1.05,
@@ -989,7 +1009,8 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           display: 'block',
-                          marginTop: '2px',
+                          marginTop: '1px',
+                          textShadow: '0 0 12px rgba(52, 211, 153, 0.35), 0 2px 6px rgba(0, 0, 0, 0.7)',
                         }}
                       >
                         {potentialWin.toFixed(2)} Br
@@ -999,16 +1020,16 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
 
                   {/* Classic 3D Soccer Ball at Bottom-Right */}
                   <svg
-                    width="84"
-                    height="84"
+                    width="70"
+                    height="70"
                     viewBox="0 0 100 100"
                     style={{
                       position: 'absolute',
-                      right: '18px',
-                      bottom: '-12px',
+                      right: '14px',
+                      bottom: '-10px',
                       zIndex: 6,
                       pointerEvents: 'none',
-                      filter: 'drop-shadow(0 -2px 10px rgba(0,0,0,0.7))',
+                      filter: 'drop-shadow(0 -2px 8px rgba(0,0,0,0.7))',
                     }}
                   >
                     <defs>

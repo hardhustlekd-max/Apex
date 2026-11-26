@@ -296,15 +296,19 @@ export class EngineService {
     return cached?.data || { success: false, count: 0, totalOdds: 1.0, tips: [] };
   }
 
-  public static async getLeaguesCatalog(): Promise<LeagueOptionDTO[]> {
-    const cached = await ClientCache.getCachedLeagues();
+  public static async getLeaguesCatalog(forceRefresh = false): Promise<LeagueOptionDTO[]> {
+    const cached = forceRefresh ? null : await ClientCache.getCachedLeagues();
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (cached?.etag) {
+    if (cached?.etag && !forceRefresh) {
       headers['If-None-Match'] = cached.etag;
     }
 
     try {
-      const res = await fetch('/api/fixtures/leagues', { method: 'GET', headers });
+      const res = await fetch('/api/fixtures/leagues', {
+        method: 'GET',
+        headers,
+        cache: 'no-cache',
+      });
       if (res.status === 304 && cached?.data) {
         return cached.data;
       }

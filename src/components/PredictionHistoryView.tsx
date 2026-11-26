@@ -145,8 +145,8 @@ const COMPACT_CATEGORY_LABELS: Record<HistoryMarketCategory, string> = {
   ALL: 'All',
   COMBOS: 'Combos',
   '1X2': '1X2',
+  OVER_UNDER: 'Over / Under',
   DOUBLE_CHANCE: 'DC / DNB',
-  OVER_UNDER: 'O/U',
   BTTS: 'BTTS',
   TEAM_GOALS: 'Team',
   SPECIALS: 'Specials',
@@ -835,8 +835,8 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       ALL: 0,
       COMBOS: 0,
       '1X2': 0,
-      DOUBLE_CHANCE: 0,
       OVER_UNDER: 0,
+      DOUBLE_CHANCE: 0,
       BTTS: 0,
       TEAM_GOALS: 0,
       SPECIALS: 0,
@@ -1211,7 +1211,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           )}
         </div>
 
-        {/* Market Scope Tabs covering All Markets, Combos, 1X2, Double Chance, O/U, BTTS, Team Goals, Specials */}
+        {/* Market Scope Tabs covering All Markets, Combos, 1X2, Over/Under, Double Chance, BTTS, Team Goals, Specials */}
         <SegmentedTabs
           items={marketTabItems}
           value={marketCategory}

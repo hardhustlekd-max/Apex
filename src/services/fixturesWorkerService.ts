@@ -26,6 +26,7 @@ import {
 } from '../core/leaguePriority.js';
 import {
   getHistoryMarketCategory,
+  isZeroFiveGoalsKey,
   normalizeMarketKey,
   parseUpcomingMarketFilter,
 } from '../core/marketEvaluator.js';
@@ -88,12 +89,6 @@ export function extractFlashscoreOddsServer(
     case 'AWAY_WIN':
       odd = marketOdds.awayOdds;
       break;
-    case 'OVER_25':
-      odd = marketOdds.over25Odds;
-      break;
-    case 'UNDER_25':
-      odd = marketOdds.under25Odds;
-      break;
     case 'BTTS_YES':
       odd = marketOdds.bttsYesOdds;
       break;
@@ -114,6 +109,24 @@ export function extractFlashscoreOddsServer(
           ? Number((1 / (1 / marketOdds.awayOdds + 1 / marketOdds.drawOdds)).toFixed(2))
           : undefined);
       break;
+    case 'OVER_15':
+      odd = marketOdds.over15Odds;
+      break;
+    case 'UNDER_15':
+      odd = marketOdds.under15Odds;
+      break;
+    case 'OVER_25':
+      odd = marketOdds.over25Odds;
+      break;
+    case 'UNDER_25':
+      odd = marketOdds.under25Odds;
+      break;
+    case 'OVER_35':
+      odd = marketOdds.over35Odds;
+      break;
+    case 'UNDER_35':
+      odd = marketOdds.under35Odds;
+      break;
     default:
       odd = undefined;
   }
@@ -124,9 +137,6 @@ export function extractFlashscoreOddsServer(
 }
 
 const WORKER_TRIVIAL_EXTREME_KEYS = new Set<MarketOption['key']>([
-  'OVER_05',
-  'UNDER_05',
-  'OVER_45',
   'UNDER_45',
   'HOME_UNDER_25',
   'AWAY_UNDER_25',
@@ -142,12 +152,14 @@ function getShortMarketLabel(key: MarketOption['key'], fallbackName?: string): s
     case 'DOUBLE_CHANCE_12': return '12';
     case 'DNB_HOME': return 'DNB 1';
     case 'DNB_AWAY': return 'DNB 2';
-    case 'OVER_15': return 'O 1.5';
-    case 'UNDER_15': return 'U 1.5';
-    case 'OVER_25': return 'O 2.5';
-    case 'UNDER_25': return 'U 2.5';
-    case 'OVER_35': return 'O 3.5';
-    case 'UNDER_35': return 'U 3.5';
+    case 'OVER_15': return 'O1.5';
+    case 'UNDER_15': return 'U1.5';
+    case 'OVER_25': return 'O2.5';
+    case 'UNDER_25': return 'U2.5';
+    case 'OVER_35': return 'O3.5';
+    case 'UNDER_35': return 'U3.5';
+    case 'OVER_45': return 'O4.5';
+    case 'UNDER_45': return 'U4.5';
     case 'BTTS_YES': return 'GG';
     case 'BTTS_NO': return 'NG';
     case 'COMBO_1_OVER_15': return '1 & O1.5';
@@ -185,13 +197,9 @@ function getShortMarketLabel(key: MarketOption['key'], fallbackName?: string): s
     case 'COMBO_BTTS_NO_UNDER_25': return 'NG & U2.5';
     case 'HOME_WIN_TO_NIL': return '1 Nil';
     case 'AWAY_WIN_TO_NIL': return '2 Nil';
-    case 'HOME_OVER_05': return 'H O0.5';
-    case 'HOME_UNDER_05': return 'H U0.5';
     case 'HOME_OVER_15': return 'H O1.5';
     case 'HOME_UNDER_15': return 'H U1.5';
     case 'HOME_OVER_25': return 'H O2.5';
-    case 'AWAY_OVER_05': return 'A O0.5';
-    case 'AWAY_UNDER_05': return 'A U0.5';
     case 'AWAY_OVER_15': return 'A O1.5';
     case 'AWAY_UNDER_15': return 'A U1.5';
     case 'AWAY_OVER_25': return 'A O2.5';
@@ -215,8 +223,8 @@ function mapMarketToPickType(
   if (key === 'HOME_WIN') return '1';
   if (key === 'DRAW') return 'X';
   if (key === 'AWAY_WIN') return '2';
-  if (key === 'OVER_25') return 'O2.5';
-  if (key === 'UNDER_25') return 'U2.5';
+  if (key === 'OVER_15' || key === 'OVER_25' || key === 'OVER_35' || key === 'OVER_45') return 'O2.5';
+  if (key === 'UNDER_15' || key === 'UNDER_25' || key === 'UNDER_35' || key === 'UNDER_45') return 'U2.5';
   if (key === 'BTTS_YES') return 'BTTS_Y';
   if (key === 'BTTS_NO') return 'BTTS_N';
   if (key === 'DOUBLE_CHANCE_1X') return '1X';
@@ -284,14 +292,16 @@ function computePrecomputedFields(
     probabilityFormatted: format1(authProb),
   };
 
-  // Resolve full markets list including all combo markets
+  // Resolve full markets list including Over/Under >=1.5 and all combo markets (never 0.5 goals)
   const hasStoredCombos =
     Array.isArray(f.markets) && f.markets.some((m) => m.key.startsWith('COMBO_'));
+  const hasStoredTotals =
+    Array.isArray(f.markets) && f.markets.some((m) => m.key === 'OVER_25');
   let resolvedMarkets: MarketOption[];
   let calcMostLikely = f.mostLikelyOutcome || pred.mostLikelyOutcome;
 
-  if (hasStoredCombos && f.markets) {
-    resolvedMarkets = f.markets;
+  if (hasStoredCombos && hasStoredTotals && f.markets) {
+    resolvedMarkets = f.markets.filter((m) => !isZeroFiveGoalsKey(m.key));
   } else {
     const calc = ApexEngine.calculateMarkets(
       pred,
@@ -300,7 +310,7 @@ function computePrecomputedFields(
       f.awayTeam,
       f.marketOdds || pred.marketOdds
     );
-    resolvedMarkets = calc.markets;
+    resolvedMarkets = (calc.markets || []).filter((m) => !isZeroFiveGoalsKey(m.key));
     if (!calcMostLikely) {
       calcMostLikely = calc.mostLikelyOutcome;
     }
@@ -494,17 +504,6 @@ function resolveMarketPickForMarkets(
 
   if (specificMarket !== 'AUTO') {
     matched = markets.find((m) => normalizeMarketKey(m.key) === specificMarket);
-  } else if (category === 'OVER_UNDER') {
-    const ou25 = markets.filter((m) => m.key === 'OVER_25' || m.key === 'UNDER_25');
-    const pool =
-      ou25.length > 0
-        ? ou25
-        : markets.filter(
-            (m) =>
-              getHistoryMarketCategory(m.key) === 'OVER_UNDER' &&
-              !WORKER_TRIVIAL_EXTREME_KEYS.has(m.key)
-          );
-    matched = pool.slice().sort((a, b) => b.probability - a.probability)[0];
   } else if (category === 'DOUBLE_CHANCE') {
     const dcOnly = markets.filter((m) => m.key.startsWith('DOUBLE_CHANCE_'));
     const pool =
@@ -604,6 +603,7 @@ class FixturesWorkerService {
     }
     this.queryCache.clear();
     this.featuredTipsCache = null;
+    this.leaguesCatalogCache = null;
     this.standingsCatalogCache = null;
     this.liveQueryCache.clear();
   }
@@ -773,6 +773,7 @@ class FixturesWorkerService {
         this.indexBuiltAt = Date.now();
         this.queryCache.clear();
         this.featuredTipsCache = null;
+        this.leaguesCatalogCache = null;
         this.liveQueryCache.clear();
       } finally {
         this.indexPromise = null;
@@ -1222,7 +1223,7 @@ class FixturesWorkerService {
 
       let fixtureHasTip = false;
       for (const market of rec.fullMarkets) {
-        if (market.key === 'OVER_05') continue;
+        if (isZeroFiveGoalsKey(market.key)) continue;
         if (market.probability >= 0.75) {
           fixtureHasTip = true;
           const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
@@ -1240,7 +1241,7 @@ class FixturesWorkerService {
 
       if (fixtureHasTip && !comboMarketsByFixture[f.id]) {
         comboMarketsByFixture[f.id] = rec.fullMarkets
-          .filter((m) => m.key.startsWith('COMBO_'))
+          .filter((m) => m.key.startsWith('COMBO_') && !isZeroFiveGoalsKey(m.key))
           .map((m) => {
             const fsOdd = extractFlashscoreOddsServer(m.key, rec.marketOdds);
             const hasScrapedOdds = fsOdd !== null;
@@ -1341,8 +1342,9 @@ class FixturesWorkerService {
         if (!blob.includes(search)) continue;
       }
       const { slimFixture } = buildSlimFixture(m, m.timestamp);
-      const rawMarkets =
-        m.markets && m.markets.length > 0
+      const hasStoredOverUnder = Array.isArray(m.markets) && m.markets.some((mk) => mk.key === 'OVER_25');
+      const rawMarketsSource =
+        m.markets && m.markets.length > 0 && hasStoredOverUnder
           ? m.markets
           : ApexEngine.calculateMarkets(
               m.prediction,
@@ -1350,7 +1352,8 @@ class FixturesWorkerService {
               m.homeTeam,
               m.awayTeam
             ).markets;
-      if (rawMarkets && rawMarkets.length > 0) {
+      const rawMarkets = (rawMarketsSource || []).filter((mk) => !isZeroFiveGoalsKey(mk.key));
+      if (rawMarkets.length > 0) {
         slimFixture.markets = rawMarkets.map((mk) => ({
           key: mk.key,
           name: mk.name,
@@ -1382,15 +1385,48 @@ class FixturesWorkerService {
   }
 
   /**
-   * Returns pre-sorted global leagues catalog once from server memory (avoids shipping & sorting dataset on client).
+   * Returns pre-sorted global & upcoming leagues catalog from SQLite and in-memory index.
    */
-  public getSortedLeaguesCatalog(): { jsonPayload: string; etag: string } {
+  public async getSortedLeaguesCatalog(): Promise<{ jsonPayload: string; etag: string }> {
+    const sqliteActive = isSqliteEnabled();
+    if (sqliteActive) {
+      await db.init();
+      await predictionsDb.init();
+    }
+
     if (this.leaguesCatalogCache) {
       return {
         jsonPayload: this.leaguesCatalogCache.jsonPayload,
         etag: this.leaguesCatalogCache.etag,
       };
     }
+
+    const parseCountryAndName = (rawName: string, fallbackStage?: string): { name: string; country: string } => {
+      const trimmed = String(rawName || '').trim();
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx > 0) {
+        const prefix = trimmed.slice(0, colonIdx).trim();
+        const suffix = trimmed.slice(colonIdx + 1).trim();
+        if (suffix) {
+          return {
+            country: prefix.replace(/\b\w/g, (c) => c.toUpperCase()),
+            name: suffix,
+          };
+        }
+      }
+      const stageTrimmed = String(fallbackStage || '').trim();
+      const stageColon = stageTrimmed.indexOf(':');
+      if (stageColon > 0) {
+        return {
+          country: stageTrimmed.slice(0, stageColon).trim(),
+          name: trimmed,
+        };
+      }
+      return {
+        country: stageTrimmed || 'Global',
+        name: trimmed,
+      };
+    };
 
     const map = new Map<string, { code: string; name: string; country?: string }>();
     for (const l of GLOBAL_LEAGUES_DATASET) {
@@ -1403,21 +1439,23 @@ class FixturesWorkerService {
       }
     }
 
-    if (isSqliteEnabled()) {
+    if (sqliteActive) {
       try {
-        db.init();
         const dbLeagues = db.getAllUpcomingLeagues ? db.getAllUpcomingLeagues() : [];
         for (const dl of dbLeagues) {
           if (dl.league && dl.leagueName) {
             const code = String(dl.league).trim();
-            const name = String(dl.leagueName).trim();
+            const rawName = String(dl.leagueName).trim();
             const key = code.toLowerCase();
-            if (!map.has(key) && !isSimulationLeague(code, name, undefined, undefined, dl.stage)) {
-              map.set(key, {
-                code,
-                name,
-                country: dl.stage || dl.country || 'Global',
-              });
+            if (!isSimulationLeague(code, rawName, undefined, undefined, dl.stage)) {
+              const parsed = parseCountryAndName(rawName, dl.stage);
+              if (!map.has(key)) {
+                map.set(key, {
+                  code,
+                  name: parsed.name,
+                  country: parsed.country,
+                });
+              }
             }
           }
         }
@@ -1431,14 +1469,17 @@ class FixturesWorkerService {
         const f = r.slimFixture;
         if (f.league && f.leagueName) {
           const code = String(f.league).trim();
-          const name = String(f.leagueName).trim();
+          const rawName = String(f.leagueName).trim();
           const key = code.toLowerCase();
-          if (!map.has(key) && !isSimulationLeague(code, name, undefined, f.leagueUrl, f.stage)) {
-            map.set(key, {
-              code,
-              name,
-              country: f.stage || 'Global',
-            });
+          if (!isSimulationLeague(code, rawName, undefined, f.leagueUrl, f.stage)) {
+            const parsed = parseCountryAndName(rawName, f.stage);
+            if (!map.has(key)) {
+              map.set(key, {
+                code,
+                name: parsed.name,
+                country: parsed.country,
+              });
+            }
           }
         }
       }

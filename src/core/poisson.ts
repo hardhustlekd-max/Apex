@@ -2234,12 +2234,10 @@ export class ApexEngine {
 
     const r3 = (v: number) => Number(Math.max(0.001, Math.min(0.999, v)).toFixed(3));
 
-    // Goal Totals (0.5, 1.5, 2.5, 3.5, 4.5)
-    addMarket('OVER_05', 'Over 0.5 Goals', r3(over05));
-    addMarket('UNDER_05', 'Under 0.5 Goals (0-0)', r3(1 - over05));
+    // Over / Under Goal Totals (excluding 0.5 goals line)
     addMarket('OVER_15', 'Over 1.5 Goals', r3(over15));
     addMarket('UNDER_15', 'Under 1.5 Goals', r3(1 - over15));
-    addMarket('OVER_25', 'Over 2.5 Goals', prediction.over25Prob);
+    addMarket('OVER_25', 'Over 2.5 Goals', r3(prediction.over25Prob));
     addMarket('UNDER_25', 'Under 2.5 Goals', r3(1 - prediction.over25Prob));
     addMarket('OVER_35', 'Over 3.5 Goals', r3(over35));
     addMarket('UNDER_35', 'Under 3.5 Goals', r3(1 - over35));
@@ -2285,16 +2283,12 @@ export class ApexEngine {
     addMarket('COMBO_BTTS_UNDER_35', 'BTTS Yes & Under 3.5 Goals', r3(cBttsU35));
     addMarket('COMBO_BTTS_NO_UNDER_25', 'BTTS No & Under 2.5 Goals', r3(cBttsNoU25));
 
-    // Team Goals & Clean Sheets
-    addMarket('HOME_OVER_05', `${homeTeam} Over 0.5 Goals`, r3(homeOver05));
-    addMarket('HOME_UNDER_05', `${homeTeam} Under 0.5 Goals`, r3(1 - homeOver05));
+    // Team Goals & Clean Sheets (excluding 0.5 goals lines)
     addMarket('HOME_OVER_15', `${homeTeam} Over 1.5 Goals`, r3(homeOver15));
     addMarket('HOME_UNDER_15', `${homeTeam} Under 1.5 Goals`, r3(1 - homeOver15));
     addMarket('HOME_OVER_25', `${homeTeam} Over 2.5 Goals`, r3(homeOver25));
     addMarket('HOME_UNDER_25', `${homeTeam} Under 2.5 Goals`, r3(1 - homeOver25));
 
-    addMarket('AWAY_OVER_05', `${awayTeam} Over 0.5 Goals`, r3(awayOver05));
-    addMarket('AWAY_UNDER_05', `${awayTeam} Under 0.5 Goals`, r3(1 - awayOver05));
     addMarket('AWAY_OVER_15', `${awayTeam} Over 1.5 Goals`, r3(awayOver15));
     addMarket('AWAY_UNDER_15', `${awayTeam} Under 1.5 Goals`, r3(1 - awayOver15));
     addMarket('AWAY_OVER_25', `${awayTeam} Over 2.5 Goals`, r3(awayOver25));
@@ -2315,17 +2309,18 @@ export class ApexEngine {
     addMarket('GOALS_ODD', 'Total Goals - Odd', r3(goalsOdd));
     addMarket('GOALS_EVEN', 'Total Goals - Even', r3(1 - goalsOdd));
 
-    // Identify MOST LIKELY Outcome across ALL calculated markets including Combo Bet Markets, Double Chance, DNB, O/U, BTTS, Team Markets & Specials
-    // Exclude only trivial extreme goal lines (0.5 / 4.5 / team U2.5) so meaningful main & combo markets lead.
+    // Identify MOST LIKELY Outcome across calculated markets (1X2, Combo Bet Markets, Double Chance, DNB, Over/Under >= 1.5, BTTS, Team Markets & Specials)
+    // Exclude trivial extreme goal lines (U4.5, team U2.5) and any 0.5 goal lines so meaningful main & combo markets lead.
     const TRIVIAL_EXTREME_KEYS = new Set<MarketOption['key']>([
-      'OVER_05',
-      'UNDER_05',
-      'OVER_45',
       'UNDER_45',
       'HOME_UNDER_25',
       'AWAY_UNDER_25',
     ]);
-    const outcomeCandidates = markets.filter((m) => !TRIVIAL_EXTREME_KEYS.has(m.key));
+    const outcomeCandidates = markets.filter(
+      (m) =>
+        !TRIVIAL_EXTREME_KEYS.has(m.key) &&
+        !/(?:^|_)05(?:_|$)/.test(String(m.key).toUpperCase())
+    );
     let mostLikelyMarket = outcomeCandidates[0] || markets[0];
     for (const m of outcomeCandidates) {
       if (m.probability > (mostLikelyMarket?.probability || 0)) {

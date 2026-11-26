@@ -188,12 +188,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
                   <div
                     style={{ width: `${over25Pct}%` }}
                     className="bg-theme-primary rounded-full transition-all duration-300"
-                    title={`Over 2.5: ${over25Pct.toFixed(1)}%`}
+                    title={`Over 2.5 Goals: ${over25Pct.toFixed(1)}%`}
                   />
                   <div
                     style={{ width: `${under25Pct}%` }}
                     className="bg-theme-main/70 rounded-full transition-all duration-300"
-                    title={`Under 2.5: ${under25Pct.toFixed(1)}%`}
+                    title={`Under 2.5 Goals: ${under25Pct.toFixed(1)}%`}
                   />
                 </div>
               </>

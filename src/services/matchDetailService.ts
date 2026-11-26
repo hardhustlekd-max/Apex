@@ -7,6 +7,7 @@ import { convertHistoricalMatchToFixture, flashscoreScraperService } from './fla
 import { OnDemandParser } from '../core/onDemandParser.js';
 import { ApexEngine } from '../core/poisson.js';
 import { isSimulationLeague } from '../core/leagueMapper.js';
+import { isZeroFiveGoalsKey } from '../core/marketEvaluator.js';
 import { loggerService } from './loggerService.js';
 
 function buildFallbackTeamStats(teamName: string, recentMatches: TeamFormMatch[]): TeamStatsSummary {
@@ -233,17 +234,19 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
     );
   }
 
-  // Ensure comprehensive markets (including 1X2) and EV edges are populated on stored predictions
+  // Ensure comprehensive markets (including 1X2, Over/Under >= 1.5, Combos) and EV edges are populated without any 0.5 markets
   if (stored.prediction) {
     const has1x2Markets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'HOME_WIN');
     const hasComprehensiveMarkets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'COMBO_1X_BTTS');
+    const hasOverUnderMarkets = Array.isArray(stored.markets) && stored.markets.some((m) => m.key === 'OVER_25');
+    const hasDisallowedZeroFive = Array.isArray(stored.markets) && stored.markets.some((m) => isZeroFiveGoalsKey(m.key));
     const needsEvPopulation = Boolean(
       stored.marketOdds &&
         stored.markets &&
         !stored.markets.some((m) => m.marketOdds !== undefined)
     );
 
-    if (!has1x2Markets || !hasComprehensiveMarkets || needsEvPopulation) {
+    if (!has1x2Markets || !hasComprehensiveMarkets || !hasOverUnderMarkets || hasDisallowedZeroFive || needsEvPopulation) {
       const settings = db.getSettings() || DEFAULT_ENGINE_SETTINGS;
       const updatedPrediction = {
         ...stored.prediction,
@@ -261,8 +264,10 @@ export async function getMatchDetailById(fixtureId: string): Promise<Fixture | n
         mostLikelyOutcome: recalc.mostLikelyOutcome,
         bestValueBet: recalc.bestValueBet,
       };
-      stored.markets = recalc.markets;
+      stored.markets = recalc.markets.filter((m) => !isZeroFiveGoalsKey(m.key));
       stored.mostLikelyOutcome = recalc.mostLikelyOutcome;
+    } else if (Array.isArray(stored.markets)) {
+      stored.markets = stored.markets.filter((m) => !isZeroFiveGoalsKey(m.key));
     }
   }
 

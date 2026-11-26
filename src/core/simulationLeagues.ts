@@ -92,7 +92,7 @@ export function isSimulationLeague(
   homeTeam?: string | null,
   awayTeam?: string | null
 ): boolean {
-  if (isBlockedLeague(league, leagueName, country, stage)) {
+  if (isBlockedLeague(league, leagueName, country, stage, leagueUrl)) {
     return true;
   }
 
@@ -119,41 +119,38 @@ export function isSimulationLeague(
   return false;
 }
 
-const BLOCKED_LEAGUE_TERMS = [
-  'botswana',
-  'dr congo',
-  'democratic republic of the congo',
-  'congo dr',
-  'asia afc',
-  'afc cups',
-  'montenegro',
-  'mozambique',
-  'zambia',
-  'kenya',
-  'angola',
+const BLOCKED_LEAGUE_PATTERNS: RegExp[] = [
+  /\bbotswana\b/,
+  /\bdr congo\b/,
+  /\bcongo dr\b/,
+  /\bdemocratic republic of (?:the )?congo\b/,
+  /\basia afc\b/,
+  /\bafc\b/,
+  /\bmontenegro\b/,
+  /\bmozambique\b/,
+  /\bzambia\b/,
+  /\bkenya\b/,
+  /\bangola\b/,
 ];
 
 export function isBlockedLeague(
   league?: string | null,
   leagueName?: string | null,
   country?: string | null,
-  stage?: string | null
+  stage?: string | null,
+  leagueUrl?: string | null
 ): boolean {
-  const combined = [league, leagueName, country, stage]
+  const normalized = [league, leagueName, country, stage, leagueUrl]
     .filter(Boolean)
     .join(' ')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  if (!combined) return false;
+  if (!normalized) return false;
 
-  for (const term of BLOCKED_LEAGUE_TERMS) {
-    if (combined.includes(term)) {
-      if (term === 'afc' && !/\b(afc)\b/.test(combined)) continue;
-      return true;
-    }
-  }
-
-  return false;
+  return BLOCKED_LEAGUE_PATTERNS.some((re) => re.test(normalized));
 }

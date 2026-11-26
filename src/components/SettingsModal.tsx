@@ -1503,7 +1503,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
 
               <p className="text-sm font-normal text-theme-sub leading-relaxed font-sans">
-                Export all calculated market predictions (1X2, Combo Bet Markets, Double Chance, O/U, BTTS, Team Goals &amp; Specials) to JSON.
+                Export all calculated market predictions (1X2, Over/Under, Combo Bet Markets, Double Chance, BTTS, Team Goals &amp; Specials) to JSON.
               </p>
 
               {exportToast && (
@@ -1554,7 +1554,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-emerald-400 shrink-0" />
-                  <span>Goals Over/Under (1.5, 2.5, 3.5)</span>
+                  <span>Goals Over/Under (1.5, 2.5, 3.5, 4.5)</span>
                 </div>
                 <div className="min-h-[28px] px-2.5 py-1 rounded-lg bg-theme-subtle/75 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-sm bg-indigo-400 shrink-0" />

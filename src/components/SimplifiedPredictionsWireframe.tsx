@@ -187,7 +187,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
         const pct = isOver ? over25 : under25;
         return {
           type: isOver ? 'O2.5' : 'U2.5',
-          shortLabel: isOver ? 'O 2.5' : 'U 2.5',
+          shortLabel: isOver ? 'O2.5' : 'U2.5',
           label: isOver ? 'Over 2.5 Goals' : 'Under 2.5 Goals',
           probabilityPercent: pct,
           probabilityFormatted: `${pct.toFixed(1)}%`,
@@ -480,8 +480,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">
                 {marketFilter === 'OVER_UNDER' ? (
                   <>
-                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O 2.5</span>
-                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U 2.5</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O2.5</span>
+                    <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U2.5</span>
                   </>
                 ) : marketFilter === 'BTTS' ? (
                   <>
@@ -645,8 +645,8 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">
                         {marketFilter === 'OVER_UNDER' ? (
                           <>
-                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O 2.5</span>
-                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U 2.5</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">O2.5</span>
+                            <span className="w-[32px] sm:w-[36px] h-[24px] flex items-center justify-center text-center">U2.5</span>
                           </>
                         ) : marketFilter === 'BTTS' ? (
                           <>

@@ -33,13 +33,24 @@ export const HISTORY_MARKET_CATEGORIES: Array<{
 ];
 
 export const TRIVIAL_EXTREME_LINES = new Set<string>([
-  'OVER_05',
-  'UNDER_05',
-  'OVER_45',
   'UNDER_45',
   'HOME_UNDER_25',
   'AWAY_UNDER_25',
 ]);
+
+export function isZeroFiveGoalsKey(rawKey?: string | null): boolean {
+  const k = String(rawKey || '').trim().toUpperCase();
+  if (!k) return false;
+  return (
+    k === 'OVER_05' ||
+    k === 'UNDER_05' ||
+    k === 'HOME_OVER_05' ||
+    k === 'HOME_UNDER_05' ||
+    k === 'AWAY_OVER_05' ||
+    k === 'AWAY_UNDER_05' ||
+    /(?:^|_)05(?:_|$)/.test(k)
+  );
+}
 
 export const SPECIFIC_MARKET_OPTIONS_BY_CATEGORY: Record<
   Exclude<HistoryMarketCategory, 'ALL'>,
@@ -103,22 +114,16 @@ export const SPECIFIC_MARKET_OPTIONS_BY_CATEGORY: Record<
     { key: 'UNDER_35', label: 'Under 3.5 Goals' },
     { key: 'OVER_45', label: 'Over 4.5 Goals' },
     { key: 'UNDER_45', label: 'Under 4.5 Goals' },
-    { key: 'OVER_05', label: 'Over 0.5 Goals' },
-    { key: 'UNDER_05', label: 'Under 0.5 Goals (0-0)' },
   ],
   BTTS: [
     { key: 'BTTS_YES', label: 'Both Teams to Score (Yes)' },
     { key: 'BTTS_NO', label: 'Both Teams to Score (No)' },
   ],
   TEAM_GOALS: [
-    { key: 'HOME_OVER_05', label: 'Home Over 0.5 Goals' },
-    { key: 'HOME_UNDER_05', label: 'Home Under 0.5 Goals' },
     { key: 'HOME_OVER_15', label: 'Home Over 1.5 Goals' },
     { key: 'HOME_UNDER_15', label: 'Home Under 1.5 Goals' },
     { key: 'HOME_OVER_25', label: 'Home Over 2.5 Goals' },
     { key: 'HOME_UNDER_25', label: 'Home Under 2.5 Goals' },
-    { key: 'AWAY_OVER_05', label: 'Away Over 0.5 Goals' },
-    { key: 'AWAY_UNDER_05', label: 'Away Under 0.5 Goals' },
     { key: 'AWAY_OVER_15', label: 'Away Over 1.5 Goals' },
     { key: 'AWAY_UNDER_15', label: 'Away Under 1.5 Goals' },
     { key: 'AWAY_OVER_25', label: 'Away Over 2.5 Goals' },
@@ -410,8 +415,8 @@ export function getGenericMarketLabel(key: string, homeTeam = 'Home', awayTeam =
 }
 
 export function getFixtureMarketsForEvaluation(f: Fixture): MarketOption[] {
-  if (f.markets && f.markets.length > 0) {
-    return f.markets;
+  if (f.markets && f.markets.length > 0 && f.markets.some((m) => m.key === 'OVER_25')) {
+    return f.markets.filter((m) => !isZeroFiveGoalsKey(m.key));
   }
   if (f.prediction) {
     try {
@@ -421,7 +426,7 @@ export function getFixtureMarketsForEvaluation(f: Fixture): MarketOption[] {
         f.homeTeam,
         f.awayTeam
       );
-      return calc.markets || [];
+      return (calc.markets || []).filter((m) => !isZeroFiveGoalsKey(m.key));
     } catch {
       const p = f.prediction;
       const hw = Number(p.homeWinProb ?? 0);
@@ -436,11 +441,14 @@ export function getFixtureMarketsForEvaluation(f: Fixture): MarketOption[] {
         { key: 'DOUBLE_CHANCE_1X', name: `${f.homeTeam} or Draw (1X)`, probability: Math.min(0.99, hw + dr), isBanker: hw + dr >= 0.72 },
         { key: 'DOUBLE_CHANCE_X2', name: `Draw or ${f.awayTeam} (X2)`, probability: Math.min(0.99, aw + dr), isBanker: aw + dr >= 0.72 },
         { key: 'OVER_25', name: 'Over 2.5 Goals', probability: o25, isBanker: o25 >= 0.72 },
-        { key: 'UNDER_25', name: 'Under 2.5 Goals', probability: 1 - o25, isBanker: 1 - o25 >= 0.72 },
+        { key: 'UNDER_25', name: 'Under 2.5 Goals', probability: Math.max(0, 1 - o25), isBanker: 1 - o25 >= 0.72 },
         { key: 'BTTS_YES', name: 'Both Teams to Score (Yes)', probability: btts, isBanker: btts >= 0.72 },
         { key: 'BTTS_NO', name: 'Both Teams to Score (No)', probability: 1 - btts, isBanker: 1 - btts >= 0.72 },
       ];
     }
+  }
+  if (f.markets && f.markets.length > 0) {
+    return f.markets.filter((m) => !isZeroFiveGoalsKey(m.key));
   }
   return [];
 }

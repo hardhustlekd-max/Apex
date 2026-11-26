@@ -62,30 +62,24 @@ const MARKET_KEY_SORT_ORDER: Record<string, number> = {
   DOUBLE_CHANCE_X2: 3,
   DNB_HOME: 1,
   DNB_AWAY: 2,
-  OVER_05: 1,
-  UNDER_05: 2,
-  OVER_15: 3,
-  UNDER_15: 4,
-  OVER_25: 5,
-  UNDER_25: 6,
-  OVER_35: 7,
-  UNDER_35: 8,
-  OVER_45: 9,
-  UNDER_45: 10,
-  HOME_OVER_05: 1,
-  HOME_UNDER_05: 2,
-  HOME_OVER_15: 3,
-  HOME_UNDER_15: 4,
-  HOME_OVER_25: 5,
-  HOME_UNDER_25: 6,
-  AWAY_OVER_05: 7,
-  AWAY_UNDER_05: 8,
-  AWAY_OVER_15: 9,
-  AWAY_UNDER_15: 10,
-  AWAY_OVER_25: 11,
-  AWAY_UNDER_25: 12,
-  HOME_CLEAN_SHEET: 13,
-  AWAY_CLEAN_SHEET: 14,
+  OVER_15: 1,
+  UNDER_15: 2,
+  OVER_25: 3,
+  UNDER_25: 4,
+  OVER_35: 5,
+  UNDER_35: 6,
+  OVER_45: 7,
+  UNDER_45: 8,
+  HOME_OVER_15: 1,
+  HOME_UNDER_15: 2,
+  HOME_OVER_25: 3,
+  HOME_UNDER_25: 4,
+  AWAY_OVER_15: 5,
+  AWAY_UNDER_15: 6,
+  AWAY_OVER_25: 7,
+  AWAY_UNDER_25: 8,
+  HOME_CLEAN_SHEET: 9,
+  AWAY_CLEAN_SHEET: 10,
   HANDICAP_HOME_MINUS_1: 1,
   HANDICAP_AWAY_MINUS_1: 2,
   MULTIGOALS_1_3: 3,
@@ -115,7 +109,7 @@ function getMarketSectionInfo(key: string): {
     return { sectionId: 'dnb', sectionTitle: 'Draw No Bet', sectionOrder: 4, columnsClass: 'grid-cols-2', category: 'MAIN' };
   }
   if (key.startsWith('OVER_') || key.startsWith('UNDER_')) {
-    return { sectionId: 'total', sectionTitle: 'Total', sectionOrder: 5, columnsClass: 'grid-cols-2', category: 'TOTALS' };
+    return { sectionId: 'totals', sectionTitle: 'Goals Over/Under', sectionOrder: 5, columnsClass: 'grid-cols-2', category: 'TOTALS' };
   }
   if (key.startsWith('COMBO_') || key === 'HOME_WIN_TO_NIL' || key === 'AWAY_WIN_TO_NIL') {
     return { sectionId: 'combos', sectionTitle: 'Combos', sectionOrder: 6, columnsClass: 'grid-cols-1 sm:grid-cols-2', category: 'COMBOS' };
@@ -124,7 +118,7 @@ function getMarketSectionInfo(key: string): {
     return { sectionId: 'team', sectionTitle: 'Team Goals & Clean Sheets', sectionOrder: 7, columnsClass: 'grid-cols-2', category: 'TEAM' };
   }
   if (key.startsWith('MULTIGOALS_') || key.startsWith('GOALS_')) {
-    return { sectionId: 'totals-specials', sectionTitle: 'Multi-Goals & Odd/Even', sectionOrder: 8, columnsClass: 'grid-cols-2', category: 'TOTALS' };
+    return { sectionId: 'specials-goals', sectionTitle: 'Multi-Goals & Odd/Even', sectionOrder: 8, columnsClass: 'grid-cols-2', category: 'SPECIALS' };
   }
   return { sectionId: 'specials', sectionTitle: 'Handicaps & Specials', sectionOrder: 9, columnsClass: 'grid-cols-2', category: 'SPECIALS' };
 }
@@ -141,8 +135,6 @@ function formatSportsbookMarketLabel(key: string, fullName: string): string {
     case 'DOUBLE_CHANCE_X2': return 'X2';
     case 'DNB_HOME': return '1 (DNB)';
     case 'DNB_AWAY': return '2 (DNB)';
-    case 'OVER_05': return 'Over 0.5';
-    case 'UNDER_05': return 'Under 0.5';
     case 'OVER_15': return 'Over 1.5';
     case 'UNDER_15': return 'Under 1.5';
     case 'OVER_25': return 'Over 2.5';
@@ -613,6 +605,7 @@ const MatchDetailDrawerContent: React.FC<{
     if (!currentFixture.markets || currentFixture.markets.length === 0) return [];
     const dedupedByKey = new Map<string, MarketOption>();
     for (const market of currentFixture.markets) {
+      if (/(?:^|_)05(?:_|$)/i.test(String(market.key))) continue;
       const existing = dedupedByKey.get(market.key);
       if (!existing || market.probability > existing.probability) {
         dedupedByKey.set(market.key, market);
@@ -674,14 +667,14 @@ const MatchDetailDrawerContent: React.FC<{
     if (allMarketsList.length === 0) return [];
     const groups: Record<string, (typeof allMarketsList)[number]> = {};
     allMarketsList.forEach((market) => {
-      if (['OVER_05', 'UNDER_05', 'OVER_45', 'UNDER_45', 'HOME_UNDER_25', 'AWAY_UNDER_25'].includes(market.key)) {
+      if (['UNDER_45', 'HOME_UNDER_25', 'AWAY_UNDER_25'].includes(market.key)) {
         return;
       }
       let group = '';
       if (['HOME_WIN', 'DRAW', 'AWAY_WIN'].includes(market.key)) group = '1X2';
       else if (market.key.startsWith('DOUBLE_CHANCE')) group = 'Double Chance';
       else if (market.key.startsWith('DNB')) group = 'Draw No Bet';
-      else if (market.key === 'OVER_25' || market.key === 'UNDER_25') group = 'Goals O/U 2.5';
+      else if (['OVER_25', 'UNDER_25'].includes(market.key)) group = 'Goals O/U 2.5';
       else if (market.key.startsWith('BTTS')) group = 'BTTS';
       else if (market.category === 'COMBOS') group = 'Combos';
       else if (market.key === 'HOME_OVER_15' || market.key === 'AWAY_OVER_15' || market.key === 'HOME_CLEAN_SHEET' || market.key === 'AWAY_CLEAN_SHEET') group = 'Team Markets';
@@ -1211,22 +1204,14 @@ const MatchDetailDrawerContent: React.FC<{
                         ))}
                       </div>
                     )}
-                    {(enrichedFixture.marketOdds.over15Odds ||
-                      enrichedFixture.marketOdds.under15Odds ||
-                      enrichedFixture.marketOdds.over25Odds ||
+                    {(enrichedFixture.marketOdds.over25Odds ||
                       enrichedFixture.marketOdds.under25Odds ||
-                      enrichedFixture.marketOdds.over35Odds ||
-                      enrichedFixture.marketOdds.under35Odds ||
                       enrichedFixture.marketOdds.bttsYesOdds ||
                       enrichedFixture.marketOdds.bttsNoOdds) && (
-                      <div className="border-t border-theme-subdued grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-[var(--border-subdued)] text-xs tabular-nums">
+                      <div className="border-t border-theme-subdued grid grid-cols-2 divide-x divide-y divide-[var(--border-subdued)] text-xs tabular-nums">
                         {([
-                          { key: 'OVER_15', label: 'O 1.5', val: enrichedFixture.marketOdds.over15Odds, name: 'Over 1.5 Goals' },
-                          { key: 'UNDER_15', label: 'U 1.5', val: enrichedFixture.marketOdds.under15Odds, name: 'Under 1.5 Goals' },
-                          { key: 'OVER_25', label: 'O 2.5', val: enrichedFixture.marketOdds.over25Odds, name: 'Over 2.5 Goals' },
-                          { key: 'UNDER_25', label: 'U 2.5', val: enrichedFixture.marketOdds.under25Odds, name: 'Under 2.5 Goals' },
-                          { key: 'OVER_35', label: 'O 3.5', val: enrichedFixture.marketOdds.over35Odds, name: 'Over 3.5 Goals' },
-                          { key: 'UNDER_35', label: 'U 3.5', val: enrichedFixture.marketOdds.under35Odds, name: 'Under 3.5 Goals' },
+                          { key: 'OVER_25', label: 'Over 2.5', val: enrichedFixture.marketOdds.over25Odds, name: 'Over 2.5 Goals' },
+                          { key: 'UNDER_25', label: 'Under 2.5', val: enrichedFixture.marketOdds.under25Odds, name: 'Under 2.5 Goals' },
                           { key: 'BTTS_YES', label: 'BTTS Yes', val: enrichedFixture.marketOdds.bttsYesOdds, name: 'Both Teams to Score (Yes)' },
                           { key: 'BTTS_NO', label: 'BTTS No', val: enrichedFixture.marketOdds.bttsNoOdds, name: 'Both Teams to Score (No)' },
                         ])

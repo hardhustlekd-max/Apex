@@ -35,7 +35,7 @@ type ComboSubFilter = 'ALL' | 'WIN_GOALS' | 'DC_GOALS' | 'BTTS_COMBOS';
 const MARKET_CATEGORY_META: Array<{ id: Exclude<FeaturedMarketCategory, 'ALL'>; label: string }> = [
   { id: '1X2', label: '1X2' },
   { id: 'DOUBLE_CHANCE', label: 'Double Chance' },
-  { id: 'OVER_UNDER', label: 'Over / Under' },
+  { id: 'OVER_UNDER', label: 'O/U' },
   { id: 'BTTS', label: 'BTTS' },
   { id: 'COMBOS', label: 'Combos' },
   { id: 'TEAM_GOALS', label: 'Team Markets' },
@@ -95,7 +95,9 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
         }
         const res = await EngineService.getFeaturedTips(refreshKey > 0);
         if (!isCancelled) {
-          const sanitizedTips = (res.tips || []).filter((tip) => tip.market?.key !== 'OVER_05');
+          const sanitizedTips = (res.tips || []).filter(
+            (tip) => !/(?:^|_)05(?:_|$)/.test(String(tip.market?.key || '').toUpperCase())
+          );
           setTips(sanitizedTips);
           if (res.comboMarketsByFixture) {
             setComboMarketsByFixture(res.comboMarketsByFixture);
@@ -125,7 +127,11 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
         if (detail?.markets?.length) {
           const mOdds = detail.marketOdds;
           const combos: FeaturedTipComboOptionDTO[] = detail.markets
-            .filter((m) => m.key.startsWith('COMBO_'))
+            .filter(
+              (m) =>
+                m.key.startsWith('COMBO_') &&
+                !/(?:^|_)05(?:_|$)/.test(String(m.key).toUpperCase())
+            )
             .map((m) => ({
               market: m,
               odds: computeClientFallbackOdds(m.probability),

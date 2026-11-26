@@ -61,11 +61,11 @@ fixturesRouter.get('/', async (req, res) => {
   }
 });
 
-fixturesRouter.get('/leagues', (_req, res) => {
+fixturesRouter.get('/leagues', async (_req, res) => {
   try {
-    const catalog = fixturesWorkerService.getSortedLeaguesCatalog();
+    const catalog = await fixturesWorkerService.getSortedLeaguesCatalog();
     res.setHeader('ETag', catalog.etag);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', 'private, no-cache');
 
     if (isEtagMatch(_req.headers['if-none-match'], catalog.etag)) {
       return res.status(304).end();

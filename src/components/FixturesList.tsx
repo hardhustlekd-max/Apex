@@ -125,9 +125,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const [cardsLeaguePages, setCardsLeaguePages] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    if (propLeaguesCatalog && propLeaguesCatalog.length > 0) return;
+    if (propLeaguesCatalog && propLeaguesCatalog.length > 0 && refreshKey === 0) return;
     let cancelled = false;
-    EngineService.getLeaguesCatalog().then((list) => {
+    EngineService.getLeaguesCatalog(refreshKey > 0).then((list) => {
       if (!cancelled && Array.isArray(list)) {
         setFetchedLeaguesCatalog(list);
       }
@@ -135,7 +135,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [propLeaguesCatalog]);
+  }, [propLeaguesCatalog, refreshKey]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -164,17 +164,41 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     { key: 'AWAY_DESC', label: 'Highest Away Win % (2)' },
   ];
 
-  const resolvedLeaguesCatalog = useMemo(
-    () => (propLeaguesCatalog && propLeaguesCatalog.length > 0 ? propLeaguesCatalog : fetchedLeaguesCatalog),
-    [propLeaguesCatalog, fetchedLeaguesCatalog]
-  );
+  const resolvedLeaguesCatalog = useMemo(() => {
+    const base =
+      fetchedLeaguesCatalog.length >= (propLeaguesCatalog?.length || 0)
+        ? fetchedLeaguesCatalog
+        : propLeaguesCatalog || [];
+    const byCode = new Map<string, LeagueOptionDTO>();
+    for (const l of base) {
+      if (l?.code) {
+        byCode.set(l.code.toLowerCase(), l);
+      }
+    }
+    for (const f of [...fixtures, ...propLiveFixtures]) {
+      if (!f?.league || !f?.leagueName) continue;
+      const code = String(f.league).trim();
+      const key = code.toLowerCase();
+      if (!byCode.has(key)) {
+        const raw = String(f.leagueName).trim();
+        const colonIdx = raw.indexOf(':');
+        const name = colonIdx > 0 ? raw.slice(colonIdx + 1).trim() || raw : raw;
+        const country = colonIdx > 0 ? raw.slice(0, colonIdx).trim() : (f.stage || 'Global');
+        byCode.set(key, { code, name, country });
+      }
+    }
+    return Array.from(byCode.values());
+  }, [propLeaguesCatalog, fetchedLeaguesCatalog, fixtures, propLiveFixtures]);
 
   const leagueOptions = useMemo(
     () => [
       { code: 'ALL', name: 'All Leagues Worldwide' },
       ...resolvedLeaguesCatalog.map((l) => ({
         code: l.code,
-        name: `${l.name} (${l.country || 'Global'})`,
+        name:
+          l.country && !l.name.toLowerCase().startsWith(l.country.toLowerCase())
+            ? `${l.name} (${l.country})`
+            : l.name,
       })),
     ],
     [resolvedLeaguesCatalog]
