@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Fixture, LeagueGroupDTO } from '../core/types.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
@@ -329,7 +329,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
           >
             {pick && hasPred ? (
               <div className="flex items-center justify-center gap-1 tabular-nums">
-                <span className="min-w-[32px] max-w-[66px] sm:max-w-[74px] truncate px-1.5 h-[21px] flex items-center justify-center rounded-full bg-theme-model-pick text-theme-model-pick-text shadow-theme-sm text-2xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
+                <span className="min-w-[32px] max-w-[66px] sm:max-w-[74px] truncate px-1.5 h-[21px] flex items-center justify-center rounded-full bg-theme-model-pick text-theme-model-pick-text text-2xs leading-none font-bold whitespace-nowrap shrink-0 tabular-nums">
                   {pick.shortLabel || pick.type || '1'}
                 </span>
                 <span className="hidden sm:inline-block w-[25px] text-right text-xs font-semibold text-theme-main tabular-nums">
@@ -403,7 +403,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                 <span
                   className={`w-[27px] sm:w-[30px] h-[21px] flex items-center justify-center rounded-full text-sm whitespace-nowrap shrink-0 transition-colors tabular-nums ${
                     drawProb && drawProb >= 35
-                      ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold'
+                      ? 'bg-amber-500/12 text-theme-warning font-semibold'
                       : 'text-theme-sub font-normal'
                   }`}
                 >
@@ -449,12 +449,12 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
   return (
     <div className="w-full max-w-full space-y-2.5 text-theme-main font-sans">
       {orderedFixtures.length === 0 ? (
-        <div className="p-6 text-center text-theme-sub bg-theme-card border border-theme rounded-2xl shadow-theme-sm font-medium text-sm">
-          No matches found for the selected filters.
+        <div className="p-6 text-center text-theme-sub bg-theme-card rounded-2xl font-medium text-sm">
+          No matches found
         </div>
       ) : isPercentageSortActive ? (
-        <div className="rounded-2xl border border-theme overflow-hidden bg-theme-card shadow-theme-sm transition-all">
-          <div className="bg-theme-header-grad border-b border-theme-subdued grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none min-h-[38px]">
+        <div className="rounded-2xl overflow-hidden bg-theme-card transition-colors">
+          <div className="bg-theme-card-elevated grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none min-h-[38px]">
             <div className="col-span-6 sm:col-span-6 flex items-center gap-1.5 min-w-0 pr-1">
               <span className="truncate whitespace-nowrap font-semibold text-base tracking-[-0.01em] text-theme-main">Matches</span>
             </div>
@@ -470,11 +470,6 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                   aria-label="Sort by Model Pick Probability"
                 >
                   <span>PICK</span>
-                  {sortBy === 'PROB_DESC' && <ArrowDown className="w-3 h-3 text-theme-primary" />}
-                  {sortBy === 'PROB_ASC' && <ArrowUp className="w-3 h-3 text-theme-primary" />}
-                  {sortBy !== 'PROB_DESC' && sortBy !== 'PROB_ASC' && (
-                    <ArrowUpDown className="w-3 h-3 opacity-50" />
-                  )}
                 </button>
               </div>
               <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">
@@ -495,42 +490,39 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'HOME_DESC' ? 'DEFAULT' : 'HOME_DESC')
                       }
-                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'HOME_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Home Win %"
                       aria-label="Sort by Home Win %"
                     >
                       <span>1</span>
-                      {sortBy === 'HOME_DESC' && <ArrowDown className="w-3 h-3" />}
                     </button>
                     <button
                       type="button"
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'DRAW_DESC' ? 'DEFAULT' : 'DRAW_DESC')
                       }
-                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'DRAW_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Draw %"
                       aria-label="Sort by Draw %"
                     >
                       <span>X</span>
-                      {sortBy === 'DRAW_DESC' && <ArrowDown className="w-3 h-3" />}
                     </button>
                     <button
                       type="button"
                       onClick={() =>
                         onSelectSortBy?.(sortBy === 'AWAY_DESC' ? 'DEFAULT' : 'AWAY_DESC')
                       }
-                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center gap-0.5 rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`h-[24px] w-[27px] sm:w-[30px] flex items-center justify-center rounded-full cursor-pointer hover:text-theme-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         sortBy === 'AWAY_DESC' ? 'text-theme-primary font-semibold' : ''
                       }`}
                       title="Sort by Away Win %"
                       aria-label="Sort by Away Win %"
                     >
                       <span>2</span>
-                      {sortBy === 'AWAY_DESC' && <ArrowDown className="w-3 h-3" />}
                     </button>
                   </>
                 )}
@@ -552,19 +544,9 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
               <button
                 type="button"
                 onClick={handleToggleAllLeagues}
-                className="h-[24px] inline-flex items-center gap-1 text-xs font-medium text-theme-sub hover:text-theme-primary hover:bg-theme-card transition-colors cursor-pointer px-2.5 rounded-full whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                className="h-[24px] inline-flex items-center text-xs font-medium text-theme-sub hover:text-theme-primary hover:bg-theme-card transition-colors cursor-pointer px-2.5 rounded-full whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
-                {areAllLeaguesExpanded ? (
-                  <>
-                    <ChevronsDownUp className="w-3.5 h-3.5" />
-                    <span>Collapse all</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronsUpDown className="w-3.5 h-3.5" />
-                    <span>Expand all</span>
-                  </>
-                )}
+                <span>{areAllLeaguesExpanded ? 'Collapse all' : 'Expand all'}</span>
               </button>
             </div>
           )}
@@ -586,7 +568,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
             return (
               <div
                 key={group.headerKey}
-                className="rounded-2xl border border-theme overflow-hidden bg-theme-card shadow-theme-sm transition-colors"
+                className="rounded-2xl overflow-hidden bg-theme-card transition-colors"
               >
                 {isCollapsed ? (
                   <button
@@ -597,7 +579,6 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     className="w-full min-h-[34px] flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 bg-theme-card hover:bg-theme-card-elevated transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <ChevronDown className="w-3.5 h-3.5 text-theme-primary shrink-0 -rotate-90 transition-transform duration-150" />
                       <span
                         className="font-semibold text-theme-main text-xs leading-snug tracking-[-0.01em] truncate"
                         title={group.subDivision || group.leagueName}
@@ -610,7 +591,7 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                     </span>
                   </button>
                 ) : (
-                  <div className="grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none transition-colors min-h-[34px] bg-theme-header-grad border-b border-theme-subdued">
+                  <div className="grid grid-cols-12 items-center px-2.5 sm:px-3 py-1.5 gap-1.5 select-none transition-colors min-h-[34px] bg-theme-card-elevated">
                     <div className="col-span-6 sm:col-span-6 flex items-center min-w-0 pr-1">
                       <button
                         type="button"
@@ -619,7 +600,6 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                         aria-controls={panelId}
                         className="w-full min-h-[24px] flex items-center gap-2 text-left cursor-pointer rounded-full hover:text-theme-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent min-w-0"
                       >
-                        <ChevronDown className="w-3.5 h-3.5 text-theme-primary shrink-0 rotate-0 transition-transform duration-150" />
                         <span className="font-semibold text-theme-main text-xs leading-snug tracking-[-0.01em] break-words">
                           {group.subDivision || group.leagueName}
                         </span>
@@ -634,12 +614,11 @@ export const SimplifiedPredictionsWireframe: React.FC<SimplifiedPredictionsWiref
                         <button
                           type="button"
                           onClick={() => onSelectSortBy?.('PROB_DESC')}
-                          className="h-[24px] flex items-center justify-center gap-0.5 tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-full px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                          className="h-[24px] flex items-center justify-center tabular-nums text-2xs font-medium text-theme-sub hover:text-theme-primary cursor-pointer rounded-full px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                           title="Click to sort table by Model Pick %"
                           aria-label="Sort table by Model Pick %"
                         >
                           <span>PICK</span>
-                          <ArrowUpDown className="w-3 h-3 opacity-50" />
                         </button>
                       </div>
                       <div className="flex items-center justify-end gap-0.5 tabular-nums text-2xs font-medium text-theme-sub shrink-0">

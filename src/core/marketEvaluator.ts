@@ -165,11 +165,17 @@ export function getHistoryMarketCategory(key: string): Exclude<HistoryMarketCate
   return 'SPECIALS';
 }
 
+export type UpcomingMarketCategoryKey =
+  | 'MOST_LIKELY'
+  | 'POPULAR'
+  | Exclude<HistoryMarketCategory, 'ALL'>;
+
 export const UPCOMING_MARKET_CATEGORIES: Array<{
-  key: 'MOST_LIKELY' | Exclude<HistoryMarketCategory, 'ALL'>;
+  key: UpcomingMarketCategoryKey;
   label: string;
 }> = [
   { key: 'MOST_LIKELY', label: 'Most Likely (All Markets)' },
+  { key: 'POPULAR', label: 'Popular (Top 3 Markets)' },
   { key: 'COMBOS', label: 'Combo Bet Markets' },
   { key: '1X2', label: '1X2 Match Winner' },
   { key: 'DOUBLE_CHANCE', label: 'Double Chance & DNB' },
@@ -182,12 +188,15 @@ export const UPCOMING_MARKET_CATEGORIES: Array<{
 const UPCOMING_CATEGORY_KEYS = new Set<string>(UPCOMING_MARKET_CATEGORIES.map((c) => c.key));
 
 export function parseUpcomingMarketFilter(rawFilter?: string | null): {
-  category: HistoryMarketCategory;
+  category: HistoryMarketCategory | 'POPULAR';
   specificMarket: string;
 } {
   const normalized = String(rawFilter || 'MOST_LIKELY').trim().toUpperCase();
   if (!normalized || normalized === 'MOST_LIKELY' || normalized === 'ALL') {
     return { category: 'ALL', specificMarket: 'AUTO' };
+  }
+  if (normalized === 'POPULAR') {
+    return { category: 'POPULAR', specificMarket: 'AUTO' };
   }
   if (UPCOMING_CATEGORY_KEYS.has(normalized)) {
     return {

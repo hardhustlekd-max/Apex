@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Filter, ChevronDown, X, RefreshCw, Power, Database } from 'lucide-react';
-import { Fixture, LeagueGroupDTO, LeagueOptionDTO, SqliteGateState } from '../core/types.js';
+import { X, Calendar, Flame } from 'lucide-react';
+import { Fixture, LeagueGroupDTO, LeagueOptionDTO } from '../core/types.js';
 import { LiveScore } from '../providers/types.js';
 import {
   getUtcDateStr,
@@ -17,8 +17,14 @@ import { EngineService } from '../services/engineService.js';
 import {
   UPCOMING_MARKET_CATEGORIES,
   getUpcomingMarketFilterDisplayLabel,
+  parseUpcomingMarketFilter,
 } from '../core/marketEvaluator.js';
-import { Button, EmptyState, LoadingState, PaginationBar, SegmentedTabs } from './ui/index.js';
+import {
+  PopularMarketEntry,
+  getTopPopularMarkets,
+  subscribeMarketActivity,
+} from '../core/marketActivity.js';
+import { EmptyState, LoadingState, PaginationBar, SegmentedTabs } from './ui/index.js';
 
 interface FixturesListProps {
   fixtures: Fixture[];
@@ -51,14 +57,6 @@ interface FixturesListProps {
   isProcessingActive?: boolean;
   onTriggerFullSync?: () => void;
   refreshKey?: number;
-  sqliteBlocked?: boolean;
-  sqliteGate?: SqliteGateState | null;
-  onSwitchOnSqlite?: () => void;
-  isTogglingSqlite?: boolean;
-  scrapingBlocked?: boolean;
-  onSwitchOnScraping?: () => void;
-  isTogglingScraping?: boolean;
-  onOpenSettings?: () => void;
 }
 
 export const FixturesList: React.FC<FixturesListProps> = ({
@@ -90,14 +88,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   selectedFixtureId,
   onTriggerFullSync,
   refreshKey = 0,
-  sqliteBlocked = false,
-  sqliteGate = null,
-  onSwitchOnSqlite,
-  isTogglingSqlite = false,
-  scrapingBlocked = true,
-  onSwitchOnScraping,
-  isTogglingScraping = false,
-  onOpenSettings,
 }) => {
   const [internalScope, setInternalScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const activeScope = propActiveScope ?? internalScope;
@@ -123,6 +113,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const [expandedLeagues, setExpandedLeagues] = useState<Record<string, boolean>>({});
   const [cardsPageSize, setCardsPageSize] = useState<number>(10);
   const [cardsLeaguePages, setCardsLeaguePages] = useState<Record<string, number>>({});
+  const [popularMarkets, setPopularMarkets] = useState<PopularMarketEntry[]>(() => getTopPopularMarkets(3));
+
+  useEffect(() => {
+    return subscribeMarketActivity(() => {
+      setPopularMarkets(getTopPopularMarkets(3));
+    });
+  }, []);
 
   useEffect(() => {
     if (propLeaguesCatalog && propLeaguesCatalog.length > 0 && refreshKey === 0) return;
@@ -154,6 +151,34 @@ export const FixturesList: React.FC<FixturesListProps> = ({
   const dateOptions = useMemo(() => getDateFilterOptions(), []);
 
   const marketOptions = UPCOMING_MARKET_CATEGORIES;
+
+  const compactMarketTabs = useMemo(
+    () => [
+      { key: 'MOST_LIKELY', label: 'All' },
+      { key: 'POPULAR', label: 'Popular' },
+      { key: '1X2', label: '1X2' },
+      { key: 'OVER_UNDER', label: 'O/U' },
+      { key: 'DOUBLE_CHANCE', label: 'DC / DNB' },
+      { key: 'BTTS', label: 'BTTS' },
+      { key: 'COMBOS', label: 'Combos' },
+      { key: 'TEAM_GOALS', label: 'Team' },
+      { key: 'SPECIALS', label: 'Specials' },
+    ],
+    []
+  );
+
+  const parsedMarketFilter = useMemo(
+    () => parseUpcomingMarketFilter(marketChoiceFilter),
+    [marketChoiceFilter]
+  );
+
+  const activeMarketTabKey =
+    parsedMarketFilter.category === 'ALL'
+      ? 'MOST_LIKELY'
+      : parsedMarketFilter.category;
+
+  const popularMarketsKey =
+    marketChoiceFilter === 'POPULAR' ? popularMarkets.map((p) => p.key).join(',') : '';
 
   const sortOptions = [
     { key: 'DEFAULT', label: 'Default (League & Kickoff)' },
@@ -230,6 +255,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
             search: debouncedHistorySearch,
             sortBy,
             marketFilter: marketChoiceFilter,
+            popularMarkets: marketChoiceFilter === 'POPULAR' ? popularMarkets.map((p) => p.key) : undefined,
           }
         );
         if (!isCancelled) {
@@ -251,7 +277,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [activeScope, selectedLeague, debouncedHistorySearch, sortBy, marketChoiceFilter, refreshKey]);
+  }, [activeScope, selectedLeague, debouncedHistorySearch, sortBy, marketChoiceFilter, popularMarketsKey, refreshKey]);
 
   const liveScoresMap = useMemo(() => {
     const map = new Map<string, LiveScore>();
@@ -394,7 +420,6 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         id: 'LIVE' as const,
         label: 'Live',
         buttonId: 'subtab-live-btn',
-        icon: <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />,
         count: liveScores && liveScores.length > 0 ? liveScores.length : undefined,
       },
       {
@@ -406,23 +431,12 @@ export const FixturesList: React.FC<FixturesListProps> = ({
     [liveScores]
   );
 
-  const emptyTitle = sqliteBlocked
-    ? sqliteGate?.blockedReason === 'MISSING_DB_ON_PREVIEW'
-      ? 'No SQLite DB on Preview (Switched Off)'
-      : 'SQLite Database Switched Off'
-    : activeScope === 'UPCOMING'
-    ? 'No Upcoming Fixtures'
-    : activeScope === 'LIVE'
-    ? scrapingBlocked
-      ? 'Live Data Scraping Switched Off'
-      : 'No Live Matches'
-    : historySummary && historySummary.completedAwaitingScore > 0
-    ? `Awaiting Final Scores (${historySummary.completedAwaitingScore})`
-    : historySummary && (historySummary.upcomingPredictions > 0 || historySummary.livePredictions > 0)
-    ? `Pending Results (${historySummary.upcomingPredictions} Upcoming, ${historySummary.livePredictions} Live)`
-    : historySummary && historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb > 0
-    ? `No Predictions Generated (${historySummary.upcomingFixturesInDb} Fixtures)`
-    : 'No Historical Predictions';
+  const emptyTitle =
+    activeScope === 'UPCOMING'
+      ? 'No upcoming fixtures found'
+      : activeScope === 'LIVE'
+      ? 'No live matches found'
+      : 'No historical predictions found';
 
   return (
     <div className="space-y-2.5 font-sans flex-1 flex flex-col">
@@ -485,20 +499,18 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className={`h-[34px] min-h-[34px] flex items-center justify-center gap-1.5 px-3 rounded-full text-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+            className={`h-[34px] min-h-[34px] flex items-center justify-center gap-1.5 px-3.5 rounded-full text-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               activeFilterCount > 0
-                ? 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow'
-                : 'bg-theme-card border border-theme text-theme-main font-medium hover:bg-theme-card-elevated hover:border-theme-accent shadow-theme-sm'
+                ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                : 'bg-theme-card text-theme-main font-medium hover:bg-theme-card-elevated'
             }`}
           >
-            <Filter className="w-3.5 h-3.5 text-current" />
             <span>Filters</span>
             {activeFilterCount > 0 && (
               <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-black/20 text-theme-primary-text text-2xs leading-none font-semibold tabular-nums inline-flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
-            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
         </div>
 
@@ -521,13 +533,73 @@ export const FixturesList: React.FC<FixturesListProps> = ({
           leagueOptions={leagueOptions}
           dateOptions={dateOptions}
           marketOptions={marketOptions}
+          popularMarkets={popularMarkets}
           sortOptions={sortOptions}
         />
       </div>
 
+      {/* Market Filter Tabs Strip (including Popular Top 3 by user activity) */}
+      <div className="space-y-1.5">
+        <div
+          role="tablist"
+          aria-label="Market filter categories"
+          className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 px-1 bg-theme-card rounded-full"
+        >
+          {compactMarketTabs.map((tab) => {
+            const isTabActive = activeMarketTabKey === tab.key;
+            const isPopularTab = tab.key === 'POPULAR';
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={isTabActive}
+                onClick={() => setMarketChoiceFilter(tab.key)}
+                title={
+                  isPopularTab
+                    ? `Prioritize top 3 markets: ${popularMarkets.map((p) => p.shortLabel).join(', ')}`
+                    : undefined
+                }
+                className={`h-[28px] px-2.5 rounded-full text-xs whitespace-nowrap shrink-0 cursor-pointer transition-all duration-150 inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  isTabActive
+                    ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                    : 'text-theme-sub hover:text-theme-main font-medium'
+                }`}
+              >
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {activeMarketTabKey === 'POPULAR' && popularMarkets.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap px-2.5 py-1.5 rounded-xl bg-theme-subtle text-xs">
+            <span className="text-2xs font-semibold uppercase tracking-[0.05em] text-theme-sub inline-flex items-center gap-1 shrink-0">
+              <Flame className="w-3.5 h-3.5 text-theme-warning" />
+              <span>Top 3 Active:</span>
+            </span>
+            {popularMarkets.map((pm, idx) => (
+              <button
+                key={pm.key}
+                type="button"
+                onClick={() => setMarketChoiceFilter(pm.key)}
+                title={`Filter strictly by #${idx + 1} ${pm.label}`}
+                className="h-[22px] px-2 rounded-full bg-theme-card hover:bg-theme-card-elevated text-theme-main text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              >
+                <span className="text-theme-primary font-bold">#{idx + 1}</span>
+                <span>{pm.shortLabel}</span>
+                {pm.count > 0 && (
+                  <span className="text-2xs text-theme-sub font-normal">({pm.count})</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Active Filter Chips Strip */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap py-1.5 px-2.5 bg-theme-card border border-theme rounded-xl text-xs shadow-theme-sm">
+        <div className="flex items-center gap-1.5 flex-wrap py-1.5 px-2.5 bg-theme-card rounded-xl text-xs">
           <span className="text-2xs font-medium uppercase tracking-[0.05em] text-theme-sub shrink-0">
             Filters:
           </span>
@@ -542,7 +614,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 title="Remove league filter"
                 aria-label="Remove league filter"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           )}
@@ -557,7 +629,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 title="Reset date filter"
                 aria-label="Reset date filter"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           )}
@@ -572,7 +644,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 title="Reset to Most Likely"
                 aria-label="Reset market filter"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           )}
@@ -587,7 +659,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 title="Clear search"
                 aria-label="Clear search"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           )}
@@ -602,7 +674,7 @@ export const FixturesList: React.FC<FixturesListProps> = ({
                 title="Reset sort"
                 aria-label="Reset sort"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           )}
@@ -622,51 +694,9 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         <LoadingState />
       ) : displayedFixtures.length === 0 ? (
         <EmptyState
-          icon={sqliteBlocked ? <Database className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
+          icon={<Calendar className="w-5 h-5" />}
           title={emptyTitle}
           minHeight="min-h-[156px]"
-          actions={
-            sqliteBlocked ? (
-              <>
-                {onSwitchOnSqlite && (
-                  <Button variant="primary" size="sm" onClick={onSwitchOnSqlite} disabled={isTogglingSqlite}>
-                    <Power className="w-3.5 h-3.5" />
-                    <span>{isTogglingSqlite ? 'Switching On...' : 'Switch On SQLite DB'}</span>
-                  </Button>
-                )}
-                {onOpenSettings && (
-                  <Button variant="secondary" size="sm" onClick={onOpenSettings}>
-                    <span>Open Settings / Drive Restore</span>
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                {activeScope === 'LIVE' && scrapingBlocked && onSwitchOnScraping && (
-                  <Button variant="primary" size="sm" onClick={onSwitchOnScraping} disabled={isTogglingScraping}>
-                    <Power className="w-3.5 h-3.5" />
-                    <span>{isTogglingScraping ? 'Switching On...' : 'Switch Scraping ON'}</span>
-                  </Button>
-                )}
-                {onTriggerFullSync && !scrapingBlocked && (activeScope !== 'HISTORY' || !historySummary || (historySummary.totalPredictions === 0 && historySummary.upcomingFixturesInDb === 0)) && (
-                  <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Start Full Sync &amp; Update Data</span>
-                  </Button>
-                )}
-                {activeFilterCount > 0 && (
-                  <Button variant="subtle" size="sm" onClick={handleResetAllFilters}>
-                    Reset filters ({activeFilterCount})
-                  </Button>
-                )}
-                {activeScope === 'UPCOMING' && canonicalDateFilter !== 'ALL' && (
-                  <Button variant="subtle" size="sm" onClick={() => handleSelectDateFilter('ALL')}>
-                    Show all dates ({totalDatabaseCount ?? fixtures.length})
-                  </Button>
-                )}
-              </>
-            )
-          }
         />
       ) : viewMode === 'CARDS' ? (
         <div className="space-y-2.5">
@@ -685,22 +715,17 @@ export const FixturesList: React.FC<FixturesListProps> = ({
               : group.fixtures;
 
             return (
-              <div key={group.headerKey} className="bg-theme-card rounded-2xl border border-theme overflow-hidden shadow-theme-sm">
+              <div key={group.headerKey} className="bg-theme-card rounded-2xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleLeagueExpand(group.headerKey)}
                   aria-expanded={isExpanded}
                   aria-controls={panelId}
                   className={`w-full min-h-[34px] flex items-center justify-between gap-2 px-3 py-1.5 transition-colors cursor-pointer text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
-                    isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-header-grad border-b border-theme-subdued'
+                    isCollapsed ? 'bg-theme-card hover:bg-theme-card-elevated' : 'bg-theme-card-elevated'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 text-theme-primary shrink-0 transition-transform duration-150 ${
-                        isCollapsed ? '-rotate-90' : 'rotate-0'
-                      }`}
-                    />
                     <span
                       className={`font-semibold text-xs leading-snug tracking-[-0.01em] text-theme-main ${
                         isCollapsed ? 'truncate' : 'break-words'

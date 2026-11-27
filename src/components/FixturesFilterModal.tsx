@@ -8,6 +8,7 @@ import {
   UPCOMING_MARKET_CATEGORIES,
   parseUpcomingMarketFilter,
 } from '../core/marketEvaluator.js';
+import { PopularMarketEntry, getTopPopularMarkets } from '../core/marketActivity.js';
 import { Button, Modal, Select } from './ui/index.js';
 
 interface FixturesFilterModalProps {
@@ -28,6 +29,7 @@ interface FixturesFilterModalProps {
   leagueOptions: { code: string; name: string }[];
   dateOptions: { key: string; label: string }[];
   marketOptions?: { key: string; label: string }[];
+  popularMarkets?: PopularMarketEntry[];
   sortOptions: { key: string; label: string }[];
 }
 
@@ -48,6 +50,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
   leagueOptions,
   dateOptions,
   marketOptions,
+  popularMarkets,
   sortOptions,
 }) => {
   const canonicalDateFilter = resolveDateFilter(dateFilter).canonicalKey;
@@ -61,9 +64,14 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
   const { category: parsedCategory, specificMarket: parsedSpecificMarket } =
     parseUpcomingMarketFilter(marketChoiceFilter);
 
+  const resolvedPopularMarkets =
+    popularMarkets && popularMarkets.length > 0 ? popularMarkets : getTopPopularMarkets(3);
+
   const selectedCategoryValue = parsedCategory === 'ALL' ? 'MOST_LIKELY' : parsedCategory;
   const selectedCategoryLabel =
-    HISTORY_MARKET_CATEGORIES.find((c) => c.id === parsedCategory)?.label || 'All Markets';
+    parsedCategory === 'POPULAR'
+      ? 'Popular Top 3'
+      : HISTORY_MARKET_CATEGORIES.find((c) => c.id === parsedCategory)?.label || 'All Markets';
 
   const handleCategoryChange = (nextCategoryValue: string) => {
     setMarketChoiceFilter(nextCategoryValue || 'MOST_LIKELY');
@@ -91,7 +99,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
           <button
             type="button"
             onClick={onResetFilters}
-            className="h-[30px] inline-flex items-center text-xs font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 cursor-pointer px-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="h-[30px] inline-flex items-center text-xs font-medium text-theme-danger hover:bg-rose-500/10 cursor-pointer px-2.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
           >
             Reset All
           </button>
@@ -99,7 +107,6 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
       }
       footer={
         <Button variant="primary" size="md" fullWidth onClick={onClose}>
-          <Filter className="w-3.5 h-3.5" />
           <span>Apply Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>
         </Button>
       }
@@ -195,14 +202,14 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             htmlFor="upcoming-market-type-filter"
             className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] flex items-center gap-1"
           >
-            <Layers className="w-3 h-3 text-theme-primary" />
-            <span>Market Type (All Markets &amp; Combos)</span>
+            <Layers className="w-3.5 h-3.5 text-theme-primary" />
+            <span>Market Type</span>
           </label>
           {marketChoiceFilter !== 'MOST_LIKELY' && (
             <button
               type="button"
               onClick={() => setMarketChoiceFilter('MOST_LIKELY')}
-              className="text-xs font-medium text-rose-700 dark:text-rose-400 hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="text-xs font-medium text-theme-danger hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               Reset Market
             </button>
@@ -220,22 +227,64 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
               ? 'Best Pick (All Markets)'
               : `Best Pick (${selectedCategoryLabel})`}
           </option>
-          {parsedCategory === 'ALL' ? (
-            HISTORY_MARKET_CATEGORIES.filter((c) => c.id !== 'ALL').map((cat) => (
-              <optgroup key={cat.id} label={cat.label}>
-                {SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[
-                  cat.id as Exclude<HistoryMarketCategory, 'ALL'>
-                ].map((opt) => (
+          {parsedCategory === 'POPULAR' ? (
+            <>
+              <optgroup label="Top 3 Popular (User Activity)">
+                {resolvedPopularMarkets.map((pm, idx) => (
                   <option
-                    key={opt.key}
-                    value={opt.key}
+                    key={`pop_${pm.key}`}
+                    value={pm.key}
                     className="bg-theme-card text-theme-main"
                   >
-                    {opt.label}
+                    #{idx + 1} {pm.label}{pm.count > 0 ? ` (${pm.count})` : ''}
                   </option>
                 ))}
               </optgroup>
-            ))
+              {HISTORY_MARKET_CATEGORIES.filter((c) => c.id !== 'ALL').map((cat) => (
+                <optgroup key={cat.id} label={cat.label}>
+                  {SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[
+                    cat.id as Exclude<HistoryMarketCategory, 'ALL'>
+                  ].map((opt) => (
+                    <option
+                      key={opt.key}
+                      value={opt.key}
+                      className="bg-theme-card text-theme-main"
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </>
+          ) : parsedCategory === 'ALL' ? (
+            <>
+              <optgroup label="Popular (Top 3 by Activity)">
+                {resolvedPopularMarkets.map((pm, idx) => (
+                  <option
+                    key={`top_${pm.key}`}
+                    value={pm.key}
+                    className="bg-theme-card text-theme-main"
+                  >
+                    #{idx + 1} {pm.label}{pm.count > 0 ? ` (${pm.count})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+              {HISTORY_MARKET_CATEGORIES.filter((c) => c.id !== 'ALL').map((cat) => (
+                <optgroup key={cat.id} label={cat.label}>
+                  {SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[
+                    cat.id as Exclude<HistoryMarketCategory, 'ALL'>
+                  ].map((opt) => (
+                    <option
+                      key={opt.key}
+                      value={opt.key}
+                      className="bg-theme-card text-theme-main"
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </>
           ) : (
             SPECIFIC_MARKET_OPTIONS_BY_CATEGORY[parsedCategory].map((opt) => (
               <option
@@ -263,7 +312,7 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
             <button
               type="button"
               onClick={() => onSelectSortBy?.('DEFAULT')}
-              className="text-xs font-medium text-rose-700 dark:text-rose-400 hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="text-xs font-medium text-theme-danger hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               Reset Sort
             </button>

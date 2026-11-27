@@ -19,16 +19,16 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div
-      className={`bg-theme-card border border-theme rounded-2xl p-4 sm:p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center space-y-2.5 shadow-theme-sm font-sans ${className}`}
+      className={`bg-theme-card rounded-2xl p-4 sm:p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center space-y-2 font-sans ${className}`}
     >
       {icon && (
-        <div className="text-theme-primary shrink-0 flex items-center justify-center">
+        <div className="text-theme-sub shrink-0 flex items-center justify-center">
           {icon}
         </div>
       )}
       <div className="max-w-md space-y-1">
-        <h3 className="text-lg font-semibold text-theme-main tracking-[-0.015em]">{title}</h3>
-        {description && <p className="text-sm font-normal text-theme-sub">{description}</p>}
+        <p className="text-sm font-medium text-theme-sub">{title}</p>
+        {description && <p className="text-xs font-normal text-theme-dim">{description}</p>}
       </div>
       {actions && (
         <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">

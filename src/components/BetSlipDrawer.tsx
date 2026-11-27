@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { BetSelection, SlipBet } from '../core/types.js';
 import { EngineService } from '../services/engineService.js';
 import { AppLogo, Button } from './ui/index.js';
-import { Ticket, Trash2, X, ChevronUp, ChevronDown, CheckCircle2, Coins, Download } from 'lucide-react';
+import { Ticket, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface BetSlipDrawerProps {
@@ -53,7 +53,6 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
       setIsPlacing(true);
       const res = await EngineService.saveBet(bet);
       if (res.success) {
-        showToast(`Bet placed successfully for ${numericStake.toFixed(2)} Birr!`, 'success');
         onClearSelections();
         onBetPlaced();
       } else {
@@ -224,7 +223,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
     <>
       <aside
         aria-label="Bet slip builder tray"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+60px)] lg:bottom-4 right-3 lg:right-4 z-50 w-[calc(100vw-24px)] max-w-sm bg-theme-card border border-theme rounded-2xl shadow-theme-md overflow-hidden font-sans animate-in slide-in-from-bottom-4 duration-200"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] lg:bottom-4 right-3 lg:right-4 z-50 w-[calc(100vw-24px)] max-w-sm bg-theme-card border border-theme-subdued rounded-2xl shadow-theme-md overflow-hidden font-sans animate-in slide-in-from-bottom-4 duration-200"
       >
         {/* Header Bar */}
         <div
@@ -237,7 +236,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
               setIsExpanded(!isExpanded);
             }
           }}
-          className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2 cursor-pointer select-none"
+          className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center justify-between gap-2 cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-theme-primary shrink-0" />
@@ -273,7 +272,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                         e.stopPropagation();
                         onRemoveSelection(sel.fixtureId);
                       }}
-                      className="text-theme-dim hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-1 cursor-pointer"
+                      className="text-theme-dim hover:text-theme-danger transition-colors p-1 cursor-pointer"
                       aria-label="Remove selection"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -283,7 +282,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
               ))}
             </div>
 
-            <div className="border-t border-theme-subdued pt-2.5 space-y-2.5">
+            <div className="pt-1 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-theme-sub">Stake (Birr):</span>
                 <div className="relative w-[130px]">
@@ -293,7 +292,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     step="10"
                     value={stake}
                     onChange={(e) => setStake(e.target.value)}
-                    className="w-full h-[32px] px-2.5 bg-theme-subtle border border-theme rounded-xl text-xs font-semibold text-theme-main text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-theme-accent"
+                    className="w-full h-[32px] px-2.5 bg-theme-subtle rounded-xl text-xs font-semibold text-theme-main text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-theme-accent"
                     placeholder="100"
                   />
                 </div>
@@ -307,8 +306,8 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     onClick={() => setStake(String(preset))}
                     className={`h-[26px] rounded-full text-2xs font-semibold transition-colors cursor-pointer ${
                       numericStake === preset
-                        ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
-                        : 'bg-theme-subtle text-theme-sub hover:text-theme-main border border-theme-subdued'
+                        ? 'bg-theme-primary text-theme-primary-text'
+                        : 'bg-theme-subtle text-theme-sub hover:text-theme-main'
                     }`}
                   >
                     {preset} Br
@@ -318,7 +317,7 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
 
               <div className="flex items-center justify-between text-xs tabular-nums">
                 <span className="text-theme-sub font-medium">Potential Payout:</span>
-                <span className="font-bold text-base text-emerald-700 dark:text-emerald-400">
+                <span className="font-bold text-base text-theme-success">
                   {potentialWin.toFixed(2)} Birr
                 </span>
               </div>
@@ -340,7 +339,6 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                     disabled={isPlacing || selections.length === 0}
                     className="flex-1"
                   >
-                    <Coins className="w-3.5 h-3.5" />
                     <span>Place Bet</span>
                   </Button>
                 </div>
@@ -350,9 +348,8 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                   fullWidth
                   onClick={() => void handleDownloadPoster()}
                   disabled={isGeneratingPoster || selections.length === 0}
-                  className="bg-gradient-to-r from-cyan-500/15 via-emerald-500/15 to-sky-500/15 border-cyan-500/35 hover:border-cyan-400/70 font-semibold cursor-pointer"
+                  className="font-semibold cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
                   <span>{isGeneratingPoster ? 'Generating Poster...' : 'Download Social Poster'}</span>
                 </Button>
               </div>

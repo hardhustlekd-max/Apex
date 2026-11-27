@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
-import { RefreshCw, Database, Power } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { Header } from './components/Header.js';
 import { DesktopSidebar } from './components/DesktopSidebar.js';
 import { FixturesList } from './components/FixturesList.js';
@@ -8,14 +8,14 @@ import { DailyFeaturedTip } from './components/DailyFeaturedTip.js';
 import { LeagueStandings } from './components/LeagueStandings.js';
 import { PredictionHistoryView } from './components/PredictionHistoryView.js';
 import { MatchDetailDrawer, MatchDetailView } from './components/MatchDetailDrawer.js';
-import { SettingsModal } from './components/SettingsModal.js';
+import { SettingPage } from './components/SettingPage.js';
 import { TerminalModal } from './components/TerminalModal.js';
 import { ErrorLogModal } from './components/ErrorLogModal.js';
 import { BottomNavDock } from './components/BottomNavDock.js';
 import { SyncLockOverlay } from './components/SyncLockOverlay.js';
 import { BetsView } from './components/BetsView.js';
 import { BetSlipDrawer } from './components/BetSlipDrawer.js';
-import { Button, Card, Toast } from './components/ui/index.js';
+import { Button, Card, SavedOverlayToast, Toast } from './components/ui/index.js';
 import {
   Fixture,
   LeagueGroupDTO,
@@ -33,6 +33,11 @@ import { TerminalLogEntry } from './services/loggerService.js';
 import type { SyncJobState } from './services/syncJobService.js';
 import { applyColorTheme, getActiveColorThemeId, setThemeMode, getSavedThemeMode } from './core/themeEngine.js';
 import { ClientCache } from './core/clientCache.js';
+import {
+  getPopularMarketKeys,
+  recordMarketActivity,
+  subscribeMarketActivity,
+} from './core/marketActivity.js';
 
 export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -43,6 +48,12 @@ export default function App() {
   const [betSelections, setBetSelections] = useState<BetSelection[]>([]);
 
   const handleToggleSelection = (selection: BetSelection) => {
+    const alreadyExists = betSelections.some(
+      (s) => s.fixtureId === selection.fixtureId && s.marketKey === selection.marketKey
+    );
+    if (!alreadyExists && selection.marketKey) {
+      recordMarketActivity(selection.marketKey, 'BET_SLIP');
+    }
     setBetSelections((prev) => {
       const exists = prev.some((s) => s.fixtureId === selection.fixtureId && s.marketKey === selection.marketKey);
       if (exists) {
@@ -63,6 +74,11 @@ export default function App() {
   };
 
   const handleAddComboSelections = (items: BetSelection[]) => {
+    for (const item of items) {
+      if (item.marketKey) {
+        recordMarketActivity(item.marketKey, 'BET_SLIP');
+      }
+    }
     setBetSelections((prev) => {
       const incomingMap = new Map(items.map((item) => [item.fixtureId, item]));
       const merged = prev.filter((s) => !incomingMap.has(s.fixtureId));
@@ -79,6 +95,7 @@ export default function App() {
   const [selectedLeague, setSelectedLeague] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('TODAY');
   const [marketChoiceFilter, setMarketChoiceFilter] = useState<string>('MOST_LIKELY');
+  const [popularMarkets, setPopularMarkets] = useState<string[]>(() => getPopularMarketKeys(3));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'WIREFRAME' | 'CARDS'>('WIREFRAME');
@@ -112,9 +129,8 @@ export default function App() {
   const [activeSyncJob, setActiveSyncJob] = useState<SyncJobState | null>(null);
   const [dataRefreshVersion, setDataRefreshVersion] = useState<number>(0);
   const [sqliteGate, setSqliteGate] = useState<SqliteGateState | null>(null);
-  const [isTogglingSqlite, setIsTogglingSqlite] = useState<boolean>(false);
   const [scrapingGate, setScrapingGate] = useState<ScrapingGateState | null>(null);
-  const [isTogglingScraping, setIsTogglingScraping] = useState<boolean>(false);
+  const [isTogglingLoadData, setIsTogglingLoadData] = useState<boolean>(false);
 
   const hasInitializedDateFilterRef = useRef<boolean>(false);
   const skipNextDateFilterFetchRef = useRef<boolean>(false);
@@ -123,6 +139,8 @@ export default function App() {
   const liveFixturesCountRef = useRef<number>(0);
   liveFixturesCountRef.current = liveFixtures.length;
   const upcomingAbortRef = useRef<AbortController | null>(null);
+  const popularMarketsRef = useRef<string[]>(popularMarkets);
+  popularMarketsRef.current = popularMarkets;
   const latestQueryParamsRef = useRef({
     selectedLeague,
     dateFilter,
@@ -138,8 +156,61 @@ export default function App() {
     marketChoiceFilter,
   };
 
+  useEffect(() => {
+    return subscribeMarketActivity(() => {
+      setPopularMarkets(getPopularMarketKeys(3));
+    });
+  }, []);
+
+  const handleSelectMarketChoiceFilter = useCallback((nextFilter: string) => {
+    const normalized = String(nextFilter || 'MOST_LIKELY').trim().toUpperCase();
+    setMarketChoiceFilter(normalized);
+    if (normalized !== 'MOST_LIKELY' && normalized !== 'ALL' && normalized !== 'POPULAR') {
+      const isCategory = [
+        '1X2',
+        'OVER_UNDER',
+        'DOUBLE_CHANCE',
+        'BTTS',
+        'COMBOS',
+        'TEAM_GOALS',
+        'SPECIALS',
+      ].includes(normalized);
+      recordMarketActivity(normalized, isCategory ? 'CATEGORY_FILTER' : 'SPECIFIC_FILTER');
+    }
+  }, []);
+
   const syncAbortControllerRef = useRef<AbortController | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'danger' } | null>(null);
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savedOverlayMessage, setSavedOverlayMessage] = useState<string | null>(null);
+  const savedOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerSavedOverlay = useCallback((message: string = 'Settings Saved') => {
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+      notificationTimerRef.current = null;
+    }
+    setNotification(null);
+    if (savedOverlayTimerRef.current) {
+      clearTimeout(savedOverlayTimerRef.current);
+    }
+    setSavedOverlayMessage(message);
+    savedOverlayTimerRef.current = setTimeout(() => {
+      setSavedOverlayMessage(null);
+      savedOverlayTimerRef.current = null;
+    }, 1800);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (savedOverlayTimerRef.current) {
+        clearTimeout(savedOverlayTimerRef.current);
+      }
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
 
   const isIgnoredHmrWebSocketError = useCallback((message: string, details?: any): boolean => {
     const msg = String(message || '').toLowerCase();
@@ -181,10 +252,21 @@ export default function App() {
     setIsErrorLogModalOpen(false);
   }, [errorLogs]);
 
-  const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
+  const showNotification = useCallback((message: string, type: 'success' | 'info' | 'danger' = 'success') => {
+    if (savedOverlayTimerRef.current) {
+      clearTimeout(savedOverlayTimerRef.current);
+      savedOverlayTimerRef.current = null;
+    }
+    setSavedOverlayMessage(null);
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+    }
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3500);
-  };
+    notificationTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      notificationTimerRef.current = null;
+    }, 2600);
+  }, []);
 
   const handleSelectFixture = (f: Fixture) => {
     setSelectedDetailFixture(f);
@@ -433,6 +515,7 @@ export default function App() {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
     setThemeMode(nextTheme);
+    triggerSavedOverlay('Settings Saved');
   };
 
   useEffect(() => {
@@ -469,12 +552,15 @@ export default function App() {
     const queryDateFilter = isInitialAuto ? 'AUTO' : params.dateFilter;
 
     try {
+      const activePopularMarkets =
+        params.marketChoiceFilter === 'POPULAR' ? popularMarketsRef.current : undefined;
       const cacheKey = EngineService.buildQueryFixturesCacheKey({
         league: params.selectedLeague,
         dateFilter: queryDateFilter,
         search: params.debouncedSearchQuery,
         sortBy: params.sortBy,
         marketFilter: params.marketChoiceFilter,
+        popularMarkets: activePopularMarkets,
       });
 
       if (!options?.forceRefresh && sqliteGate?.enabled !== false) {
@@ -499,6 +585,7 @@ export default function App() {
           search: params.debouncedSearchQuery,
           sortBy: params.sortBy,
           marketFilter: params.marketChoiceFilter,
+          popularMarkets: activePopularMarkets,
         },
         { forceRefresh: options?.forceRefresh, signal: controller.signal }
       );
@@ -588,6 +675,7 @@ export default function App() {
         search: params.debouncedSearchQuery,
         sortBy: params.sortBy,
         marketFilter: params.marketChoiceFilter,
+        popularMarkets: params.marketChoiceFilter === 'POPULAR' ? popularMarketsRef.current : undefined,
         limit: 200,
       });
       setLiveFixtures(res.fixtures || []);
@@ -598,6 +686,8 @@ export default function App() {
       setIsLoadingLivePredictions(false);
     }
   }, []);
+
+  const popularMarketsKey = marketChoiceFilter === 'POPULAR' ? popularMarkets.join(',') : '';
 
   // Execute server-side fixtures query on mount and when filter parameters change
   useEffect(() => {
@@ -612,6 +702,7 @@ export default function App() {
     debouncedSearchQuery,
     sortBy,
     marketChoiceFilter,
+    popularMarketsKey,
     dataRefreshVersion,
     fetchFixtures,
   ]);
@@ -630,6 +721,7 @@ export default function App() {
     debouncedSearchQuery,
     sortBy,
     marketChoiceFilter,
+    popularMarketsKey,
     dataRefreshVersion,
     fetchLivePredictions,
   ]);
@@ -760,10 +852,16 @@ export default function App() {
     };
   }, [fetchSettingsAndProviders, fetchFixtures, fetchLiveScores, checkForNewErrorLogs, isIgnoredHmrWebSocketError]);
 
-  const handleSaveSettings = async (newSettings: Partial<EngineSettings>) => {
+  const handleSaveSettings = async (
+    newSettings: Partial<EngineSettings>,
+    options?: { skipOverlay?: boolean }
+  ) => {
     try {
       const updated = await EngineService.updateSettings(newSettings);
       setSettings(updated);
+      if (!options?.skipOverlay) {
+        triggerSavedOverlay('Settings Saved');
+      }
       await fetchFixtures({ forceRefresh: true });
       await fetchSettingsAndProviders();
     } catch (e) {
@@ -780,74 +878,51 @@ export default function App() {
     ]);
   };
 
-  const handleToggleSqlite = async (enabled: boolean) => {
-    if (isTogglingSqlite) return;
-    setIsTogglingSqlite(true);
+  const handleToggleLoadData = async (enabled: boolean) => {
+    if (isTogglingLoadData) return;
+    setIsTogglingLoadData(true);
     try {
-      const res = await EngineService.toggleSqliteDb(enabled);
+      const res = await EngineService.toggleLoadData(enabled);
       if (res.sqliteGate) {
         setSqliteGate(res.sqliteGate);
       }
+      if (res.scrapingGate) {
+        setScrapingGate(res.scrapingGate);
+      }
       if (!res.success) {
-        showNotification(res.error || `Failed to switch SQLite DB ${enabled ? 'ON' : 'OFF'}.`, 'info');
+        showNotification(res.error || `Failed to switch Load Data ${enabled ? 'ON' : 'OFF'}.`, 'info');
         return;
       }
 
       if (enabled) {
         hasInitializedDateFilterRef.current = false;
-        await handleRefresh();
+        await Promise.all([
+          fetchSettingsAndProviders(),
+          fetchFixtures({ forceRefresh: true }),
+          fetchLiveScores(),
+          activeScope === 'LIVE' ? fetchLivePredictions() : Promise.resolve(),
+        ]);
         setDataRefreshVersion((v) => v + 1);
-        showNotification(res.message || 'SQLite database switched ON.', 'success');
+        showNotification(res.message || 'Load Data switched ON.', 'success');
       } else {
         setFixtures([]);
         setFixtureGroups([]);
         setLiveFixtures([]);
         setLiveGroups([]);
+        setLiveScores([]);
         setTotalDatabaseCount(0);
         setSelectedDetailFixture(null);
         await fetchSettingsAndProviders();
         setDataRefreshVersion((v) => v + 1);
-        showNotification(res.message || 'SQLite database switched OFF.', 'info');
+        showNotification(res.message || 'Load Data switched OFF.', 'info');
       }
     } finally {
-      setIsTogglingSqlite(false);
+      setIsTogglingLoadData(false);
     }
   };
 
-  const handleToggleScraping = async (enabled: boolean) => {
-    if (isTogglingScraping) return;
-    setIsTogglingScraping(true);
-    try {
-      const res = await EngineService.toggleScraping(enabled);
-      if (res.scrapingGate) {
-        setScrapingGate(res.scrapingGate);
-      }
-      if (!res.success) {
-        showNotification(res.error || `Failed to switch data scraping ${enabled ? 'ON' : 'OFF'}.`, 'info');
-        return;
-      }
-
-      if (enabled) {
-        await Promise.all([fetchSettingsAndProviders(), fetchLiveScores()]);
-        if (activeScope === 'LIVE') {
-          await fetchLivePredictions();
-        }
-        showNotification(res.message || 'Data scraping switched ON.', 'success');
-      } else {
-        setLiveScores([]);
-        await fetchSettingsAndProviders();
-        if (activeScope === 'LIVE') {
-          await fetchLivePredictions();
-        }
-        showNotification(res.message || 'Data scraping switched OFF.', 'info');
-      }
-    } finally {
-      setIsTogglingScraping(false);
-    }
-  };
-
-  const isSqliteBlocked = Boolean(sqliteGate && !sqliteGate.enabled);
-  const isScrapingBlocked = !scrapingGate?.enabled;
+  const isLoadDataEnabled = Boolean(sqliteGate?.enabled && scrapingGate?.enabled);
+  const isLoadDataBlocked = Boolean((sqliteGate && !sqliteGate.enabled) || (scrapingGate && !scrapingGate.enabled));
 
   const isProcessingActive = Boolean(
     isSyncingData ||
@@ -858,7 +933,22 @@ export default function App() {
   return (
     <div className="min-h-screen bg-theme-bg text-theme-main flex flex-col font-sans transition-colors">
       {/* Toast Notification */}
-      <Toast message={notification?.message ?? null} type={notification?.type ?? 'info'} />
+      <Toast
+        message={notification?.message ?? null}
+        type={notification?.type ?? 'info'}
+        onDismiss={() => {
+          if (notificationTimerRef.current) {
+            clearTimeout(notificationTimerRef.current);
+            notificationTimerRef.current = null;
+          }
+          setNotification(null);
+        }}
+      />
+      <SavedOverlayToast
+        isOpen={Boolean(savedOverlayMessage)}
+        message={savedOverlayMessage ?? 'Settings Saved'}
+        onDismiss={() => setSavedOverlayMessage(null)}
+      />
 
       {/* Top Application Header */}
       <Header
@@ -892,7 +982,7 @@ export default function App() {
             refreshingContent={
               <div className="flex items-center justify-center py-3">
                 <div
-                  className="w-9 h-9 rounded-full bg-theme-card border border-theme shadow-theme-md flex items-center justify-center text-theme-primary"
+                  className="w-9 h-9 rounded-full bg-theme-card border border-theme-subdued flex items-center justify-center text-theme-primary"
                   role="status"
                   aria-label="Refreshing"
                 >
@@ -916,7 +1006,7 @@ export default function App() {
               </div>
             }
           >
-            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 space-y-2.5 pb-16 lg:pb-5">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-5 py-2.5 space-y-2.5 pb-20 lg:pb-5">
               {/* Blocking Job Overlay when Full Data Sync or Calculate Predictions is in progress */}
               {isProcessingActive && (
                 <SyncLockOverlay
@@ -934,49 +1024,30 @@ export default function App() {
                 />
               )}
 
-              {/* Manual SQLite & Data Scraping Gate Banner when blocked on initialization */}
-              {isSqliteBlocked && (
-                <Card surface="elevated" padding="sm" radius="2xl" className="border-amber-500/35 bg-amber-500/5">
+              {/* Manual Load Data Gate Banner when switched off on initialization */}
+              {isLoadDataBlocked && (
+                <Card surface="elevated" padding="sm" radius="2xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <Database className="w-4 h-4" />
-                      </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Database className="w-4 h-4 text-theme-primary shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-theme-main">
                           {sqliteGate?.blockedReason === 'MISSING_DB_ON_PREVIEW'
-                            ? `SQLite${isScrapingBlocked ? ' & Data Scraping' : ''} Blocked — No DB on Preview`
-                            : `SQLite${isScrapingBlocked ? ' & Data Scraping' : ''} Blocked on Startup — Switched Off`}
+                            ? 'Load Data Off — No Local DB'
+                            : 'Load Data Switched Off'}
                         </div>
-                        <p className="text-xs text-theme-sub leading-relaxed mt-0.5">
-                          Automatic SQLite initialization{isScrapingBlocked ? ' and Flashscore data scraping are' : ' is'} turned off on startup. Switch ON manually to load or create{' '}
-                          <span className="font-mono text-theme-main">football_engine.db</span>, or restore your backup from Google Drive in Settings.
-                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <Button
-                        id="banner-switch-on-sqlite-btn"
+                        id="banner-load-data-toggle-btn"
                         variant="primary"
                         size="sm"
-                        onClick={() => void handleToggleSqlite(true)}
-                        disabled={isTogglingSqlite || isProcessingActive}
+                        onClick={() => void handleToggleLoadData(true)}
+                        disabled={isTogglingLoadData || isProcessingActive}
                       >
-                        <Power className="w-3.5 h-3.5" />
-                        <span>{isTogglingSqlite ? 'Switching On...' : 'Switch SQLite ON'}</span>
+                        <span>{isTogglingLoadData ? 'Loading...' : 'Load Data ON'}</span>
                       </Button>
-                      {isScrapingBlocked && (
-                        <Button
-                          id="banner-switch-on-scraping-btn"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => void handleToggleScraping(true)}
-                          disabled={isTogglingScraping || isProcessingActive}
-                        >
-                          <Power className="w-3.5 h-3.5" />
-                          <span>{isTogglingScraping ? 'Switching On...' : 'Switch Scraping ON'}</span>
-                        </Button>
-                      )}
                       <Button
                         variant="secondary"
                         size="sm"
@@ -1011,7 +1082,7 @@ export default function App() {
                       dateFilter={dateFilter}
                       setDateFilter={setDateFilter}
                       marketChoiceFilter={marketChoiceFilter}
-                      setMarketChoiceFilter={setMarketChoiceFilter}
+                      setMarketChoiceFilter={handleSelectMarketChoiceFilter}
                       searchQuery={searchQuery}
                       setSearchQuery={setSearchQuery}
                       viewMode={viewMode}
@@ -1024,19 +1095,11 @@ export default function App() {
                       isProcessingActive={isProcessingActive}
                       onTriggerFullSync={handleResetAndSyncData}
                       refreshKey={dataRefreshVersion}
-                      sqliteBlocked={isSqliteBlocked}
-                      sqliteGate={sqliteGate}
-                      onSwitchOnSqlite={() => void handleToggleSqlite(true)}
-                      isTogglingSqlite={isTogglingSqlite}
-                      scrapingBlocked={isScrapingBlocked}
-                      onSwitchOnScraping={() => void handleToggleScraping(true)}
-                      isTogglingScraping={isTogglingScraping}
-                      onOpenSettings={() => setIsSettingsOpen(true)}
                     />
                   </div>
 
                   {/* Detail Inspector Column (Desktop Only Live Preview) */}
-                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[47px] h-[calc(100vh-58px)] rounded-none bg-theme-card border border-theme shadow-theme-md overflow-hidden">
+                  <div className="hidden lg:block lg:col-span-5 xl:col-span-5 sticky top-[47px] h-[calc(100vh-58px)] rounded-2xl bg-theme-card border border-theme-subdued overflow-hidden">
                     <MatchDetailView
                       fixture={selectedDetailFixture}
                       isPanel={true}
@@ -1077,6 +1140,7 @@ export default function App() {
                     onTriggerFullSync={handleResetAndSyncData}
                     onSelectDetail={handleSelectFixture}
                     refreshKey={dataRefreshVersion}
+                    onShowToast={showNotification}
                   />
                 </div>
               )}
@@ -1110,6 +1174,7 @@ export default function App() {
           onRemoveSelection={handleRemoveSelection}
           onClearSelections={handleClearSelections}
           onBetPlaced={() => {
+            triggerSavedOverlay('Settings Saved');
             void fetchFixtures({ forceRefresh: true });
             setDataRefreshVersion((v) => v + 1);
           }}
@@ -1142,8 +1207,8 @@ export default function App() {
         }}
       />
 
-      {/* Settings & Ingestion Modal */}
-      <SettingsModal
+      {/* Settings Full Page */}
+      <SettingPage
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
@@ -1162,11 +1227,12 @@ export default function App() {
         }}
         onRefreshMetrics={handleRefresh}
         sqliteGate={sqliteGate}
-        isTogglingSqlite={isTogglingSqlite}
-        onToggleSqlite={handleToggleSqlite}
         scrapingGate={scrapingGate}
-        isTogglingScraping={isTogglingScraping}
-        onToggleScraping={handleToggleScraping}
+        loadDataEnabled={isLoadDataEnabled}
+        isTogglingLoadData={isTogglingLoadData}
+        onToggleLoadData={handleToggleLoadData}
+        onTriggerSavedOverlay={triggerSavedOverlay}
+        onShowToast={showNotification}
       />
 
       {/* Floating Bottom Navigation Dock (Mobile Only) */}

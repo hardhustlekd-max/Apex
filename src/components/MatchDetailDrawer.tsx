@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, History, Target, Trophy, Copy, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, History, Target, Trophy, Copy, Check } from 'lucide-react';
 import { Fixture, HeadToHeadMeasurement, LeagueStandingEntry, LeagueStandingTable, MarketOption, BetSelection } from '../core/types.js';
 import { TacticalAnalysis } from './TacticalAnalysis.js';
 import { parseDynamicStatistics, StatCategoryGroup } from '../core/statisticsParser.js';
@@ -11,6 +11,8 @@ import { getProbValue } from '../core/formatters.js';
 import { teamMatchScore, resolveFixtureAlignment, resolveTeamSide } from '../core/feedParser.js';
 import { formatMatchDateTime } from '../core/dateUtils.js';
 import { Card, SegmentedTabs, SegmentedTabItem, StatTile, EmptyState, SectionHeader, TeamAvatar } from './ui/index.js';
+import { EloTrendChartCard } from './EloTrendChartCard.js';
+import { computeTeamEloTrend } from '../core/eloTrend.js';
 
 export interface MatchDetailViewProps {
   fixture: Fixture | null;
@@ -169,7 +171,7 @@ export const MatchDetailView: React.FC<MatchDetailViewProps> = ({
     if (isPanel) {
       return (
         <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center text-theme-sub bg-theme-card select-none">
-          <Target className="w-6 h-6 text-theme-primary mb-2" />
+          <Target className="w-5 h-5 text-theme-primary mb-2" />
           <h4 className="font-semibold text-lg text-theme-main tracking-[-0.015em]">Select a Match</h4>
         </div>
       );
@@ -780,6 +782,43 @@ const MatchDetailDrawerContent: React.FC<{
   const homeRecentMatchesList = useMemo(() => h2h.homeRecentMatches || [], [h2h.homeRecentMatches]);
   const awayRecentMatchesList = useMemo(() => h2h.awayRecentMatches || [], [h2h.awayRecentMatches]);
 
+  const resolvedHomeElo = pred?.eloRatings?.homeElo ?? homeStats?.eloRating ?? 1500;
+  const resolvedAwayElo = pred?.eloRatings?.awayElo ?? awayStats?.eloRating ?? 1500;
+
+  const homeEloTrend = useMemo(() => {
+    if (pred?.eloRatings?.homeEloTrend && pred.eloRatings.homeEloTrend.length > 0) {
+      return pred.eloRatings.homeEloTrend;
+    }
+    const sourceMatches = homeRecentMatchesList.length > 0 ? homeRecentMatchesList : homeStats?.recentMatches;
+    return computeTeamEloTrend(resolvedHomeElo, sourceMatches, {
+      limit: 5,
+      volatilityCoefficient: pred?.volatilityContext?.volatilityCoefficient ?? 1.0,
+    });
+  }, [
+    pred?.eloRatings?.homeEloTrend,
+    pred?.volatilityContext?.volatilityCoefficient,
+    resolvedHomeElo,
+    homeRecentMatchesList,
+    homeStats?.recentMatches,
+  ]);
+
+  const awayEloTrend = useMemo(() => {
+    if (pred?.eloRatings?.awayEloTrend && pred.eloRatings.awayEloTrend.length > 0) {
+      return pred.eloRatings.awayEloTrend;
+    }
+    const sourceMatches = awayRecentMatchesList.length > 0 ? awayRecentMatchesList : awayStats?.recentMatches;
+    return computeTeamEloTrend(resolvedAwayElo, sourceMatches, {
+      limit: 5,
+      volatilityCoefficient: pred?.volatilityContext?.volatilityCoefficient ?? 1.0,
+    });
+  }, [
+    pred?.eloRatings?.awayEloTrend,
+    pred?.volatilityContext?.volatilityCoefficient,
+    resolvedAwayElo,
+    awayRecentMatchesList,
+    awayStats?.recentMatches,
+  ]);
+
   const homeRecentFormList = useMemo(() => {
     return homeRecentMatchesList.map((m) => m.result);
   }, [homeRecentMatchesList]);
@@ -849,9 +888,9 @@ const MatchDetailDrawerContent: React.FC<{
       className="bg-theme-card text-theme-main flex flex-col overflow-hidden select-none h-full w-full rounded-none font-sans"
       style={{ scrollbarGutter: 'stable' }}
     >
-      {/* Neon Gradient Header Band */}
+      {/* Flat Minimal Header Band */}
       <div
-        className={`bg-theme-header-grad border-b border-theme px-3 sm:px-4 pb-2 shrink-0 ${
+        className={`bg-theme-card-elevated border-b border-theme-subdued px-3 sm:px-4 pb-2 shrink-0 ${
           isPanel ? 'pt-1.5' : 'pt-[calc(env(safe-area-inset-top)+6px)]'
         }`}
       >
@@ -866,7 +905,7 @@ const MatchDetailDrawerContent: React.FC<{
                 aria-label="Back to matches"
                 title="Back"
               >
-                <ArrowLeft className="w-[18px] h-[18px] stroke-[2.25]" />
+                <ArrowLeft className="w-4 h-4 stroke-[2.25]" />
               </button>
             )}
             <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar text-xs text-theme-sub">
@@ -888,7 +927,7 @@ const MatchDetailDrawerContent: React.FC<{
               className="w-8 h-8 rounded-full hover:bg-theme-subtle text-theme-sub hover:text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             >
               {copiedKey === 'MATCHUP' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
+                <Check className="w-3.5 h-3.5 text-theme-success stroke-[2.25]" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}
@@ -912,9 +951,9 @@ const MatchDetailDrawerContent: React.FC<{
                 className="w-[20px] h-[20px] rounded-full text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
                 {copiedKey === 'HOME' ? (
-                  <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
+                  <Check className="w-3.5 h-3.5 text-theme-success stroke-[2.25]" />
                 ) : (
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                 )}
               </button>
             </div>
@@ -927,17 +966,17 @@ const MatchDetailDrawerContent: React.FC<{
 
           <div className="flex flex-col items-center shrink-0 px-1.5">
             <span className={`text-xl leading-none font-bold tabular-nums tracking-[-0.025em] ${
-              (currentFixture.status || fixture.status) === 'LIVE' ? 'text-rose-600 dark:text-rose-400' : 'text-theme-main'
+              (currentFixture.status || fixture.status) === 'LIVE' ? 'text-theme-live' : 'text-theme-main'
             }`}>
               {(currentFixture.score || fixture.score) ? `${(currentFixture.score || fixture.score)!.home} - ${(currentFixture.score || fixture.score)!.away}` : 'VS'}
             </span>
             {(currentFixture.status || fixture.status) === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20 mt-1 tabular-nums whitespace-nowrap">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-theme-danger mt-1 tabular-nums whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-theme-live animate-pulse" />
                 <span>{(currentFixture.minute ?? fixture.minute) ? `${currentFixture.minute ?? fixture.minute}'` : 'LIVE'}</span>
               </span>
             ) : (currentFixture.status || fixture.status) === 'FINISHED' ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 mt-1 tabular-nums whitespace-nowrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/12 text-theme-success mt-1 tabular-nums whitespace-nowrap">
                 FT
               </span>
             ) : (
@@ -961,14 +1000,14 @@ const MatchDetailDrawerContent: React.FC<{
                 className="w-[20px] h-[20px] rounded-full text-theme-dim hover:text-theme-main hover:bg-theme-subtle transition-colors cursor-pointer inline-flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               >
                 {copiedKey === 'AWAY' ? (
-                  <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[2.25]" />
+                  <Check className="w-3.5 h-3.5 text-theme-success stroke-[2.25]" />
                 ) : (
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                 )}
               </button>
             </div>
             {pred && (
-              <span className="text-xs font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+              <span className="text-xs font-semibold tabular-nums text-theme-info">
                 {awayWinPct}%
               </span>
             )}
@@ -1002,16 +1041,16 @@ const MatchDetailDrawerContent: React.FC<{
             {pred ? (
               <>
                 <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                  <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+                  <div className="min-h-[34px] px-3 pt-2.5 pb-1 flex items-center">
                     <SectionHeader title="Projections" size="sm" className="w-full" />
                   </div>
-                  <div className="divide-y divide-[var(--border-subdued)] text-sm tabular-nums">
+                  <div className="divide-y divide-[var(--border-subdued)] text-sm tabular-nums pb-1">
                     <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
                       <span className="text-theme-sub font-normal">Expected Goals (xG)</span>
                       <div className="font-semibold text-theme-main">
                         <span className="text-theme-primary">{pred?.homeXG ?? '-'}</span>
                         <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                        <span className="text-sky-700 dark:text-sky-400">{pred?.awayXG ?? '-'}</span>
+                        <span className="text-theme-info">{pred?.awayXG ?? '-'}</span>
                       </div>
                     </div>
 
@@ -1021,7 +1060,7 @@ const MatchDetailDrawerContent: React.FC<{
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.teamStrength.homeStrengthRating}</span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-700 dark:text-sky-400">{pred.teamStrength.awayStrengthRating}</span>
+                          <span className="text-theme-info">{pred.teamStrength.awayStrengthRating}</span>
                         </div>
                       </div>
                     ) : pred?.eloRatings ? (
@@ -1030,7 +1069,7 @@ const MatchDetailDrawerContent: React.FC<{
                         <div className="font-semibold text-theme-main">
                           <span className="text-theme-primary">{pred.eloRatings.homeElo}</span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-700 dark:text-sky-400">{pred.eloRatings.awayElo}</span>
+                          <span className="text-theme-info">{pred.eloRatings.awayElo}</span>
                         </div>
                       </div>
                     ) : null}
@@ -1047,7 +1086,7 @@ const MatchDetailDrawerContent: React.FC<{
                               : '-'}
                           </span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-700 dark:text-sky-400">
+                          <span className="text-theme-info">
                             {pred.standingsContext.away
                               ? `#${pred.standingsContext.away.rank}/${pred.standingsContext.away.totalTeams} (${pred.standingsContext.away.ppg.toFixed(2)})`
                               : '-'}
@@ -1091,7 +1130,7 @@ const MatchDetailDrawerContent: React.FC<{
                             {pred.monteCarlo.homeGoalsP10.toFixed(2)}–{pred.monteCarlo.homeGoalsP90.toFixed(2)}
                           </span>
                           <span aria-hidden="true" className="text-theme-dim px-1.5 font-normal">vs</span>
-                          <span className="text-sky-700 dark:text-sky-400">
+                          <span className="text-theme-info">
                             {pred.monteCarlo.awayGoalsP10.toFixed(2)}–{pred.monteCarlo.awayGoalsP90.toFixed(2)}
                           </span>
                         </div>
@@ -1100,9 +1139,19 @@ const MatchDetailDrawerContent: React.FC<{
                   </div>
                 </Card>
 
+                <EloTrendChartCard
+                  homeTeam={fixture.homeTeam}
+                  awayTeam={fixture.awayTeam}
+                  homeElo={Math.round(resolvedHomeElo)}
+                  awayElo={Math.round(resolvedAwayElo)}
+                  homeTrend={homeEloTrend}
+                  awayTrend={awayEloTrend}
+                  isLoading={isLoadingH2H}
+                />
+
                 {enrichedFixture.marketOdds && (
                   <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                    <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+                    <div className="min-h-[34px] px-3 pt-2.5 pb-1.5 flex items-center">
                       <SectionHeader
                         title="Flashscore Market Odds"
                         size="sm"
@@ -1116,130 +1165,142 @@ const MatchDetailDrawerContent: React.FC<{
                         }
                       />
                     </div>
-                    <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isSel('HOME_WIN')
-                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
-                            : 'hover:bg-theme-card-elevated cursor-pointer'
-                        }`}
-                      >
-                        <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
-                        <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
-                        </span>
-                        <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.homeImpliedProb !== undefined
-                            ? `${(enrichedFixture.marketOdds.homeImpliedProb * 100).toFixed(1)}%`
-                            : '-'}
-                        </span>
+                    <div className="px-2.5 pb-2.5 space-y-1.5">
+                      <div className="grid grid-cols-3 gap-1.5 text-center tabular-nums">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleAddBet('HOME_WIN', `Home Win (${fixture.homeTeam})`, enrichedFixture.marketOdds?.homeOdds)}
+                          className={`min-h-[58px] py-2 px-2 rounded-xl flex flex-col justify-center transition-colors ${
+                            isSel('HOME_WIN')
+                              ? 'bg-theme-primary-subtle ring-1 ring-[var(--accent-default)] cursor-pointer'
+                              : 'bg-theme-card hover:bg-theme-subtle cursor-pointer'
+                          }`}
+                        >
+                          <span className="text-xs font-medium text-theme-sub block">1 (Home)</span>
+                          <span className="text-lg font-bold text-theme-primary block mt-0.5 tracking-[-0.015em]">
+                            {enrichedFixture.marketOdds.homeOdds ? enrichedFixture.marketOdds.homeOdds.toFixed(2) : '-'}
+                          </span>
+                          <span className="text-xs font-normal text-theme-dim block">
+                            {enrichedFixture.marketOdds.homeImpliedProb !== undefined
+                              ? `${(enrichedFixture.marketOdds.homeImpliedProb * 100).toFixed(1)}%`
+                              : '-'}
+                          </span>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
+                          className={`min-h-[58px] py-2 px-2 rounded-xl flex flex-col justify-center transition-colors ${
+                            isSel('DRAW')
+                              ? 'bg-theme-primary-subtle ring-1 ring-[var(--accent-default)] cursor-pointer'
+                              : 'bg-theme-card hover:bg-theme-subtle cursor-pointer'
+                          }`}
+                        >
+                          <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
+                          <span className="text-lg font-bold text-theme-warning block mt-0.5 tracking-[-0.015em]">
+                            {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
+                          </span>
+                          <span className="text-xs font-normal text-theme-dim block">
+                            {enrichedFixture.marketOdds.drawImpliedProb !== undefined
+                              ? `${(enrichedFixture.marketOdds.drawImpliedProb * 100).toFixed(1)}%`
+                              : '-'}
+                          </span>
+                        </div>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
+                          className={`min-h-[58px] py-2 px-2 rounded-xl flex flex-col justify-center transition-colors ${
+                            isSel('AWAY_WIN')
+                              ? 'bg-theme-primary-subtle ring-1 ring-[var(--accent-default)] cursor-pointer'
+                              : 'bg-theme-card hover:bg-theme-subtle cursor-pointer'
+                          }`}
+                        >
+                          <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
+                          <span className="text-lg font-bold text-theme-info block mt-0.5 tracking-[-0.015em]">
+                            {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
+                          </span>
+                          <span className="text-xs font-normal text-theme-dim block">
+                            {enrichedFixture.marketOdds.awayImpliedProb !== undefined
+                              ? `${(enrichedFixture.marketOdds.awayImpliedProb * 100).toFixed(1)}%`
+                              : '-'}
+                          </span>
+                        </div>
                       </div>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('DRAW', 'Draw (X)', enrichedFixture.marketOdds?.drawOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isSel('DRAW')
-                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
-                            : 'hover:bg-theme-card-elevated cursor-pointer'
-                        }`}
-                      >
-                        <span className="text-xs font-medium text-theme-sub block">X (Draw)</span>
-                        <span className="text-lg font-bold text-amber-700 dark:text-amber-400 block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.drawOdds ? enrichedFixture.marketOdds.drawOdds.toFixed(2) : '-'}
-                        </span>
-                        <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.drawImpliedProb !== undefined
-                            ? `${(enrichedFixture.marketOdds.drawImpliedProb * 100).toFixed(1)}%`
-                            : '-'}
-                        </span>
-                      </div>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleAddBet('AWAY_WIN', `Away Win (${fixture.awayTeam})`, enrichedFixture.marketOdds?.awayOdds)}
-                        className={`min-h-[58px] py-2 px-2 flex flex-col justify-center transition-colors ${
-                          isSel('AWAY_WIN')
-                            ? 'bg-theme-primary/15 ring-2 ring-theme-primary cursor-pointer'
-                            : 'hover:bg-theme-card-elevated cursor-pointer'
-                        }`}
-                      >
-                        <span className="text-xs font-medium text-theme-sub block">2 (Away)</span>
-                        <span className="text-lg font-bold text-sky-700 dark:text-sky-400 block mt-0.5 tracking-[-0.015em]">
-                          {enrichedFixture.marketOdds.awayOdds ? enrichedFixture.marketOdds.awayOdds.toFixed(2) : '-'}
-                        </span>
-                        <span className="text-xs font-normal text-theme-dim block">
-                          {enrichedFixture.marketOdds.awayImpliedProb !== undefined
-                            ? `${(enrichedFixture.marketOdds.awayImpliedProb * 100).toFixed(1)}%`
-                            : '-'}
-                        </span>
-                      </div>
-                    </div>
-                    {(enrichedFixture.marketOdds.dc1XOdds || enrichedFixture.marketOdds.dc12Odds || enrichedFixture.marketOdds.dcX2Odds) && (
-                      <div className="border-t border-theme-subdued grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center text-xs tabular-nums">
-                        {([
-                          { key: 'DOUBLE_CHANCE_1X', label: '1X', val: enrichedFixture.marketOdds.dc1XOdds, name: `1X (${fixture.homeTeam} or Draw)` },
-                          { key: 'DOUBLE_CHANCE_12', label: '12', val: enrichedFixture.marketOdds.dc12Odds, name: '12 (Home or Away)' },
-                          { key: 'DOUBLE_CHANCE_X2', label: 'X2', val: enrichedFixture.marketOdds.dcX2Odds, name: `X2 (Draw or ${fixture.awayTeam})` },
-                        ]).map((dc) => (
-                          <button
-                            key={dc.key}
-                            type="button"
-                            disabled={!dc.val || dc.val <= 1}
-                            onClick={() => dc.val && handleAddBet(dc.key, dc.name, dc.val)}
-                            className={`min-h-[34px] px-2 py-1.5 flex items-center justify-between gap-1.5 transition-colors ${
-                              !dc.val || dc.val <= 1
-                                ? 'opacity-40 cursor-not-allowed'
-                                : isSel(dc.key)
-                                ? 'bg-theme-primary/15 text-theme-primary cursor-pointer'
-                                : 'hover:bg-theme-card-elevated cursor-pointer'
-                            }`}
-                          >
-                            <span className="text-theme-sub font-medium">{dc.label}</span>
-                            <span className="font-bold text-theme-main">{dc.val ? dc.val.toFixed(2) : '-'}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {(enrichedFixture.marketOdds.over25Odds ||
-                      enrichedFixture.marketOdds.under25Odds ||
-                      enrichedFixture.marketOdds.bttsYesOdds ||
-                      enrichedFixture.marketOdds.bttsNoOdds) && (
-                      <div className="border-t border-theme-subdued grid grid-cols-2 divide-x divide-y divide-[var(--border-subdued)] text-xs tabular-nums">
-                        {([
-                          { key: 'OVER_25', label: 'Over 2.5', val: enrichedFixture.marketOdds.over25Odds, name: 'Over 2.5 Goals' },
-                          { key: 'UNDER_25', label: 'Under 2.5', val: enrichedFixture.marketOdds.under25Odds, name: 'Under 2.5 Goals' },
-                          { key: 'BTTS_YES', label: 'BTTS Yes', val: enrichedFixture.marketOdds.bttsYesOdds, name: 'Both Teams to Score (Yes)' },
-                          { key: 'BTTS_NO', label: 'BTTS No', val: enrichedFixture.marketOdds.bttsNoOdds, name: 'Both Teams to Score (No)' },
-                        ])
-                          .filter((item) => item.val && item.val > 1)
-                          .map((item) => (
+                      {(enrichedFixture.marketOdds.dc1XOdds || enrichedFixture.marketOdds.dc12Odds || enrichedFixture.marketOdds.dcX2Odds) && (
+                        <div className="grid grid-cols-3 gap-1.5 text-center text-xs tabular-nums">
+                          {([
+                            { key: 'DOUBLE_CHANCE_1X', label: '1X', val: enrichedFixture.marketOdds.dc1XOdds, name: `1X (${fixture.homeTeam} or Draw)` },
+                            { key: 'DOUBLE_CHANCE_12', label: '12', val: enrichedFixture.marketOdds.dc12Odds, name: '12 (Home or Away)' },
+                            { key: 'DOUBLE_CHANCE_X2', label: 'X2', val: enrichedFixture.marketOdds.dcX2Odds, name: `X2 (Draw or ${fixture.awayTeam})` },
+                          ]).map((dc) => (
                             <button
-                              key={item.key}
+                              key={dc.key}
                               type="button"
-                              onClick={() => item.val && handleAddBet(item.key, item.name, item.val)}
-                              className={`min-h-[34px] px-2.5 py-1.5 flex items-center justify-between gap-1.5 cursor-pointer transition-colors ${
-                                isSel(item.key)
-                                  ? 'bg-theme-primary/15 text-theme-primary'
-                                  : 'hover:bg-theme-card-elevated'
+                              disabled={!dc.val || dc.val <= 1}
+                              onClick={() => dc.val && handleAddBet(dc.key, dc.name, dc.val)}
+                              className={`min-h-[34px] px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-1.5 transition-colors ${
+                                !dc.val || dc.val <= 1
+                                  ? 'bg-theme-card opacity-40 cursor-not-allowed'
+                                  : isSel(dc.key)
+                                  ? 'bg-theme-primary-subtle text-theme-primary cursor-pointer'
+                                  : 'bg-theme-card hover:bg-theme-subtle cursor-pointer'
                               }`}
                             >
-                              <span className="text-theme-sub font-medium">{item.label}</span>
-                              <span className="font-bold text-theme-main">{item.val!.toFixed(2)}</span>
+                              <span className="text-theme-sub font-medium">{dc.label}</span>
+                              <span className="font-bold text-theme-main">{dc.val ? dc.val.toFixed(2) : '-'}</span>
                             </button>
                           ))}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                      {(enrichedFixture.marketOdds.over25Odds ||
+                        enrichedFixture.marketOdds.under25Odds ||
+                        enrichedFixture.marketOdds.bttsYesOdds ||
+                        enrichedFixture.marketOdds.bttsNoOdds) && (
+                        <div className="grid grid-cols-2 gap-1.5 text-xs tabular-nums">
+                          {([
+                            { key: 'OVER_25', label: 'Over 2.5', val: enrichedFixture.marketOdds.over25Odds, name: 'Over 2.5 Goals' },
+                            { key: 'UNDER_25', label: 'Under 2.5', val: enrichedFixture.marketOdds.under25Odds, name: 'Under 2.5 Goals' },
+                            { key: 'BTTS_YES', label: 'BTTS Yes', val: enrichedFixture.marketOdds.bttsYesOdds, name: 'Both Teams to Score (Yes)' },
+                            { key: 'BTTS_NO', label: 'BTTS No', val: enrichedFixture.marketOdds.bttsNoOdds, name: 'Both Teams to Score (No)' },
+                          ])
+                            .filter((item) => item.val && item.val > 1)
+                            .map((item) => (
+                              <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => item.val && handleAddBet(item.key, item.name, item.val)}
+                                className={`min-h-[34px] px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-1.5 cursor-pointer transition-colors ${
+                                  isSel(item.key)
+                                    ? 'bg-theme-primary-subtle text-theme-primary'
+                                    : 'bg-theme-card hover:bg-theme-subtle'
+                                }`}
+                              >
+                                <span className="text-theme-sub font-medium">{item.label}</span>
+                                <span className="font-bold text-theme-main">{item.val!.toFixed(2)}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </Card>
                 )}
               </>
+            ) : (isLoadingH2H || homeEloTrend.length > 0 || awayEloTrend.length > 0) ? (
+              <EloTrendChartCard
+                homeTeam={fixture.homeTeam}
+                awayTeam={fixture.awayTeam}
+                homeElo={Math.round(resolvedHomeElo)}
+                awayElo={Math.round(resolvedAwayElo)}
+                homeTrend={homeEloTrend}
+                awayTrend={awayEloTrend}
+                isLoading={isLoadingH2H}
+              />
             ) : !homeStandingInfo && !awayStandingInfo ? (
               <EmptyState
                 icon={<Target className="w-5 h-5" />}
-                title="No projections"
+                title="No projections found"
                 minHeight="min-h-[140px]"
                 className="bg-theme-card-elevated"
               />
@@ -1247,7 +1308,7 @@ const MatchDetailDrawerContent: React.FC<{
 
             {(homeStandingInfo || awayStandingInfo) && standingsTable && (
               <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+                <div className="min-h-[34px] px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
                   <SectionHeader
                     title="League Standings"
                     icon={<Trophy className="w-3.5 h-3.5" />}
@@ -1262,7 +1323,7 @@ const MatchDetailDrawerContent: React.FC<{
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subdued)]">
+                <div className="px-2.5 pb-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     {
                       key: 'HOME',
@@ -1275,11 +1336,11 @@ const MatchDetailDrawerContent: React.FC<{
                       key: 'AWAY',
                       teamName: fixture.awayTeam,
                       info: awayStandingInfo,
-                      accentClass: 'text-sky-700 dark:text-sky-400',
-                      winBgClass: 'bg-sky-600 text-white',
+                      accentClass: 'text-theme-info',
+                      winBgClass: 'bg-[var(--status-info)] text-white',
                     },
                   ].map((side) => (
-                    <div key={side.key} className="p-2.5 space-y-1.5 min-w-0">
+                    <div key={side.key} className="p-2.5 rounded-xl bg-theme-card space-y-1.5 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-theme-main truncate">{side.teamName}</span>
                         {side.info ? (
@@ -1322,7 +1383,7 @@ const MatchDetailDrawerContent: React.FC<{
                                         ? side.winBgClass
                                         : r === 'D'
                                         ? 'bg-amber-400 text-slate-950'
-                                        : 'bg-rose-600 text-white'
+                                        : 'bg-theme-live text-white'
                                     }`}
                                   >
                                     {r}
@@ -1345,7 +1406,7 @@ const MatchDetailDrawerContent: React.FC<{
         {activeTab === 'H2H' && (
           <div className="space-y-2.5">
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 pt-2.5 pb-1.5 flex items-center">
                 <SectionHeader
                   title="Head to Head"
                   icon={<History className="w-3.5 h-3.5" />}
@@ -1355,32 +1416,32 @@ const MatchDetailDrawerContent: React.FC<{
               </div>
 
               {isLoadingH2H ? (
-                <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)] text-center tabular-nums">
+                <div className="px-2.5 pb-2 grid grid-cols-3 gap-1.5 text-center tabular-nums">
                   {[0, 1, 2].map((i) => (
-                    <div key={i} className="p-2.5 animate-pulse">
+                    <div key={i} className="p-2.5 rounded-xl bg-theme-card animate-pulse">
                       <div className="h-3 w-12 mx-auto bg-theme-subtle rounded-md" />
                       <div className="h-5 w-6 mx-auto bg-theme-subtle rounded-md mt-1.5" />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 divide-x divide-[var(--border-subdued)]">
-                  <StatTile label={`${fixture.homeTeam}`} value={h2h.homeWins} tone="accent" surface="flat" />
-                  <StatTile label="Draws" value={h2h.draws} tone="warning" surface="flat" />
-                  <StatTile label={`${fixture.awayTeam}`} value={h2h.awayWins} tone="info" surface="flat" />
+                <div className="px-2.5 pb-2 grid grid-cols-3 gap-1.5">
+                  <StatTile label={`${fixture.homeTeam}`} value={h2h.homeWins} tone="accent" surface="card" />
+                  <StatTile label="Draws" value={h2h.draws} tone="warning" surface="card" />
+                  <StatTile label={`${fixture.awayTeam}`} value={h2h.awayWins} tone="info" surface="card" />
                 </div>
               )}
 
               {!isLoadingH2H && (
-                <div className="border-t border-theme-subdued divide-y divide-[var(--border-subdued)] text-sm tabular-nums">
-                  <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
+                <div className="px-3 pb-2.5 pt-0.5 space-y-1 text-sm tabular-nums">
+                  <div className="min-h-[28px] flex items-center justify-between">
                     <span className="text-theme-sub font-normal">Goal Average</span>
                     <span className="font-semibold text-theme-main">
                       {h2h.homeGoalsAvg} vs {h2h.awayGoalsAvg}
                     </span>
                   </div>
 
-                  <div className="min-h-[32px] px-3 py-1.5 flex items-center justify-between">
+                  <div className="min-h-[28px] flex items-center justify-between">
                     <span className="text-theme-sub font-normal">H2H Factor</span>
                     <span className="font-semibold text-theme-primary">
                       x{h2h.h2hMultiplierHome} vs x{h2h.h2hMultiplierAway}
@@ -1391,7 +1452,7 @@ const MatchDetailDrawerContent: React.FC<{
             </Card>
 
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3 pt-2.5 pb-1 flex items-center">
                 <SectionHeader title="Past Meetings" size="sm" className="w-full" />
               </div>
 
@@ -1402,7 +1463,7 @@ const MatchDetailDrawerContent: React.FC<{
                   ))}
                 </div>
               ) : h2h.recentH2H && h2h.recentH2H.length > 0 ? (
-                <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
+                <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm pb-1">
                   {h2h.recentH2H.map((enc, idx) => {
                     const winningTeam =
                       enc.winner === 'HOME' ? enc.homeTeam : enc.winner === 'AWAY' ? enc.awayTeam : null;
@@ -1434,8 +1495,8 @@ const MatchDetailDrawerContent: React.FC<{
                               isHomeWinner
                                 ? 'bg-theme-primary-subtle text-theme-primary'
                                 : isAwayWinner
-                                ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400'
-                                : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'
+                                ? 'bg-sky-500/12 text-theme-info'
+                                : 'bg-amber-500/12 text-theme-warning'
                             }`}
                           >
                             {enc.score}
@@ -1446,7 +1507,7 @@ const MatchDetailDrawerContent: React.FC<{
                   })}
                 </div>
               ) : (
-                <div className="py-5 text-center text-sm text-theme-sub">No H2H records</div>
+                <div className="py-5 text-center text-sm text-theme-sub">No H2H records found</div>
               )}
             </Card>
           </div>
@@ -1480,17 +1541,17 @@ const MatchDetailDrawerContent: React.FC<{
                 goalsConceded: awayGoalsConceded,
                 hasStats: Boolean(awayStats),
                 tone: 'info' as const,
-                winBgClass: 'bg-sky-600 text-white',
+                winBgClass: 'bg-[var(--status-info)] text-white',
               },
             ].map((side) => (
               <Card key={side.sideLabel} surface="elevated" padding="none" radius="2xl" className="overflow-hidden min-w-0">
-                <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+                <div className="min-h-[34px] px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
                   <span className="font-semibold text-base text-theme-main truncate block tracking-[-0.01em]">{side.teamName}</span>
                   <span className="text-2xs text-theme-sub uppercase tracking-[0.06em] font-medium shrink-0">{side.sideLabel}</span>
                 </div>
 
                 {side.recentForm.length > 0 && (
-                  <div className="px-3 py-1.5 border-b border-theme-subdued space-y-1 min-w-0">
+                  <div className="px-3 pb-2 space-y-1 min-w-0">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-theme-sub font-medium">Form Guide</span>
                       <span className="tabular-nums font-normal text-theme-dim">
@@ -1506,7 +1567,7 @@ const MatchDetailDrawerContent: React.FC<{
                               ? side.winBgClass
                               : r === 'D'
                               ? 'bg-amber-400 text-slate-950'
-                              : 'bg-rose-600 text-white'
+                              : 'bg-theme-live text-white'
                           }`}
                         >
                           {r}
@@ -1516,13 +1577,13 @@ const MatchDetailDrawerContent: React.FC<{
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 divide-x divide-[var(--border-subdued)] border-b border-theme-subdued">
-                  <StatTile label="Attack" value={side.attackStrength} tone={side.tone} surface="flat" />
-                  <StatTile label="Defense" value={side.defenseStrength} tone={side.tone} surface="flat" />
+                <div className="px-2.5 pb-2 grid grid-cols-2 gap-1.5">
+                  <StatTile label="Attack" value={side.attackStrength} tone={side.tone} surface="card" />
+                  <StatTile label="Defense" value={side.defenseStrength} tone={side.tone} surface="card" />
                 </div>
 
                 {(side.recentMatches.length > 0 || side.hasStats) && (
-                  <div className="min-h-[32px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between tabular-nums text-sm">
+                  <div className="min-h-[30px] px-3 py-1 flex items-center justify-between tabular-nums text-sm">
                     <span className="text-theme-sub font-normal">Total Goals</span>
                     <span className="font-semibold text-theme-main">
                       {side.goalsScored} scored · {side.goalsConceded} conceded
@@ -1531,8 +1592,8 @@ const MatchDetailDrawerContent: React.FC<{
                 )}
 
                 {side.recentMatches.length > 0 && (
-                  <div>
-                    <div className="min-h-[32px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+                  <div className="pt-1 pb-1">
+                    <div className="min-h-[30px] px-3 py-1 flex items-center">
                       <SectionHeader title="Recent Matches" size="sm" className="w-full" />
                     </div>
                     <div className="divide-y divide-[var(--border-subdued)] tabular-nums text-sm">
@@ -1560,7 +1621,7 @@ const MatchDetailDrawerContent: React.FC<{
                                   ? side.winBgClass
                                   : m.result === 'D'
                                   ? 'bg-amber-400 text-slate-950'
-                                  : 'bg-rose-600 text-white'
+                                  : 'bg-theme-live text-white'
                               }`}
                             >
                               {m.result}
@@ -1688,23 +1749,20 @@ const MatchDetailDrawerContent: React.FC<{
                     onClick={() => handleAddBet(authKey, recommendedPick.label, authOdds)}
                     aria-pressed={isAuthSelected}
                     aria-label={`${recommendedPick.label} — ${recommendedPick.probabilityFormatted}, odds ${authOdds.toFixed(2)}${isAuthSelected ? ' (Selected in Bet Slip)' : ''}`}
-                    className={`w-full rounded-2xl border px-3.5 py-2.5 text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                    className={`w-full rounded-2xl px-3.5 py-2.5 text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                       isAuthSelected
-                        ? 'bg-theme-primary text-theme-primary-text border-theme-primary shadow-theme-glow'
-                        : 'bg-theme-card-elevated hover:bg-theme-subtle border-theme-primary/35 text-theme-main shadow-theme-sm'
+                        ? 'bg-theme-primary text-theme-primary-text'
+                        : 'bg-theme-card-elevated hover:bg-theme-subtle text-theme-main'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        {isAuthSelected && <Check className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />}
-                        <span
-                          className={`text-2xs font-bold uppercase tracking-[0.06em] ${
-                            isAuthSelected ? 'text-theme-primary-text/90' : 'text-theme-primary'
-                          }`}
-                        >
-                          Model Recommendation
-                        </span>
-                      </div>
+                      <span
+                        className={`text-2xs font-bold uppercase tracking-[0.06em] block ${
+                          isAuthSelected ? 'text-theme-primary-text/90' : 'text-theme-primary'
+                        }`}
+                      >
+                        Model Recommendation
+                      </span>
                       <div className="text-base font-bold tracking-[-0.01em] truncate mt-0.5">
                         {recommendedPick.label}
                       </div>
@@ -1737,7 +1795,7 @@ const MatchDetailDrawerContent: React.FC<{
                   <div
                     role="tablist"
                     aria-label="Filter match predictions by market"
-                    className="px-2 border-b border-theme-subdued flex items-center gap-1 overflow-x-auto no-scrollbar bg-theme-card"
+                    className="px-2 flex items-center gap-1 overflow-x-auto no-scrollbar bg-theme-card"
                   >
                     {availableMarketTabs.map((tab) => {
                       const isActive = marketCategoryFilter === tab.id;
@@ -1774,7 +1832,7 @@ const MatchDetailDrawerContent: React.FC<{
 
                 {/* Collapsible Market Sections */}
                 {sections.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-theme-sub">No predictions computed</div>
+                  <div className="py-6 text-center text-sm text-theme-sub">No predictions found</div>
                 ) : (
                   <div className="divide-y divide-[var(--border-subdued)]">
                     {sections.map((section) => {
@@ -1800,11 +1858,6 @@ const MatchDetailDrawerContent: React.FC<{
                                 {section.sectionTitle}
                               </span>
                             </div>
-                            <ChevronDown
-                              className={`w-4 h-4 text-theme-primary shrink-0 transition-transform duration-150 ${
-                                !isCollapsed ? 'rotate-180' : ''
-                              }`}
-                            />
                           </button>
 
                           <AnimatePresence initial={false}>
@@ -1819,7 +1872,7 @@ const MatchDetailDrawerContent: React.FC<{
                               >
                                 {isCombosSection && section.items.length > 0 && (
                                   <div className="px-3.5 pb-2.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
-                                    <div className="flex items-center gap-1 p-0.5 bg-theme-subtle rounded-full border border-theme-subdued">
+                                    <div className="flex items-center gap-1 p-0.5 bg-theme-card rounded-full">
                                       {COMBO_SUBFILTER_META.map((sub) => {
                                         const subCount =
                                           sub.id === 'ALL'
@@ -1834,7 +1887,7 @@ const MatchDetailDrawerContent: React.FC<{
                                             onClick={() => setComboSubFilter(sub.id)}
                                             className={`h-[26px] px-2.5 rounded-full text-2xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                                               isSubActive
-                                                ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                                                ? 'bg-theme-primary text-theme-primary-text'
                                                 : 'text-theme-sub hover:text-theme-main'
                                             }`}
                                           >
@@ -1846,7 +1899,7 @@ const MatchDetailDrawerContent: React.FC<{
                                   </div>
                                 )}
 
-                                <div className={`px-3.5 pb-3.5 pt-0.5 grid gap-2 ${section.columnsClass}`}>
+                                <div className={`px-3.5 pb-3.5 pt-0.5 grid gap-1.5 ${section.columnsClass}`}>
                                   {visibleItems.map((item) => {
                                     const probPct = (item.probability * 100).toFixed(1);
                                     const isHighProb = item.probability >= 0.65;
@@ -1858,16 +1911,13 @@ const MatchDetailDrawerContent: React.FC<{
                                         aria-pressed={item.isSelected}
                                         title={item.fullName}
                                         aria-label={`${item.fullName} — ${probPct}% probability, odds ${item.odds.toFixed(2)}${item.isSelected ? ' (Selected)' : ''}`}
-                                        className={`min-h-[44px] px-3 py-2 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 text-left active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                                        className={`min-h-[44px] px-3 py-2 rounded-xl transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 text-left active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                                           item.isSelected
-                                            ? 'bg-theme-primary text-theme-primary-text border-theme-primary shadow-theme-sm'
-                                            : 'bg-theme-subtle/75 hover:bg-theme-card-elevated border-theme-subdued text-theme-main'
+                                            ? 'bg-theme-primary text-theme-primary-text'
+                                            : 'bg-theme-card hover:bg-theme-subtle text-theme-main'
                                         }`}
                                       >
-                                        <div className="min-w-0 flex items-center gap-1.5">
-                                          {item.isSelected && (
-                                            <Check className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
-                                          )}
+                                        <div className="min-w-0 flex items-center">
                                           <span className="text-sm font-semibold truncate">
                                             {item.shortLabel}
                                           </span>

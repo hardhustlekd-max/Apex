@@ -134,29 +134,29 @@
     --bg-card: #0e1612;
     --bg-card-elevated: #14201a;
     --bg-subtle: #1a2922;
-    --bg-overlay: rgba(3, 6, 5, 0.82);
-    --surface-glass: rgba(12, 19, 16, 0.90);
+    --bg-overlay: rgba(3, 6, 5, 0.72);
+    --surface-glass: #0b110e;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(16, 217, 130, 0.10), transparent 70%);
-    --gradient-card: linear-gradient(180deg, rgba(16, 26, 21, 0.98) 0%, rgba(10, 16, 13, 0.99) 100%);
-    --gradient-card-elevated: linear-gradient(180deg, rgba(22, 35, 29, 0.98) 0%, rgba(14, 22, 18, 0.99) 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(16, 217, 130, 0.15) 0%, rgba(16, 217, 130, 0.03) 100%);
-    --gradient-accent: linear-gradient(135deg, #2bffad 0%, #00dc82 55%, #06b66f 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(0, 220, 130, 0.20) 0%, rgba(5, 150, 105, 0.05) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #f7faf8;
     --text-secondary: #c9d6cf;
     --text-muted: #98aba2;
     --text-inverse: #050a07;
 
-    --border-default: rgba(16, 217, 130, 0.12);
+    --border-default: rgba(255, 255, 255, 0.09);
     --border-subdued: rgba(255, 255, 255, 0.05);
-    --border-accent: rgba(43, 255, 173, 0.36);
-    --border-neon: rgba(43, 255, 173, 0.24);
+    --border-accent: rgba(0, 220, 130, 0.42);
+    --border-neon: rgba(0, 220, 130, 0.28);
 
-    --shadow-card: 0 6px 22px -6px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 18px 42px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    --shadow-glow: 0 4px 18px -4px rgba(0, 220, 130, 0.38), 0 0 10px rgba(43, 255, 173, 0.18);
+    --shadow-card: none;
+    --shadow-elevated: 0 12px 28px -8px rgba(0, 0, 0, 0.48);
+    --shadow-glow: none;
 
     --accent-default: #00dc82;
     --accent-hover: #2bffad;
@@ -203,29 +203,29 @@
     --bg-card: #ffffff;
     --bg-card-elevated: #f6faf8;
     --bg-subtle: #e7efe9;
-    --bg-overlay: rgba(10, 20, 15, 0.46);
-    --surface-glass: rgba(255, 255, 255, 0.90);
+    --bg-overlay: rgba(10, 20, 15, 0.42);
+    --surface-glass: #ffffff;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(0, 168, 98, 0.08), transparent 70%);
-    --gradient-card: linear-gradient(180deg, #ffffff 0%, #f8fcfa 100%);
-    --gradient-card-elevated: linear-gradient(180deg, #f9fdfb 0%, #eff7f3 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(0, 168, 98, 0.11) 0%, rgba(0, 168, 98, 0.025) 100%);
-    --gradient-accent: linear-gradient(135deg, #047857 0%, #046c4e 55%, #065f46 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(4, 108, 78, 0.13) 0%, rgba(4, 108, 78, 0.03) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #091510;
     --text-secondary: #273830;
     --text-muted: #475e52;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(4, 108, 78, 0.12);
+    --border-default: rgba(9, 21, 16, 0.10);
     --border-subdued: rgba(9, 21, 16, 0.06);
     --border-accent: rgba(4, 108, 78, 0.36);
     --border-neon: rgba(4, 108, 78, 0.24);
 
-    --shadow-card: 0 4px 14px -4px rgba(10, 30, 20, 0.06), 0 1px 2px rgba(10, 30, 20, 0.025);
-    --shadow-elevated: 0 12px 30px -8px rgba(10, 30, 20, 0.11), 0 2px 8px rgba(10, 30, 20, 0.04);
-    --shadow-glow: 0 4px 16px -4px rgba(4, 108, 78, 0.26);
+    --shadow-card: none;
+    --shadow-elevated: 0 8px 24px -8px rgba(10, 30, 20, 0.12);
+    --shadow-glow: none;
 
     --accent-default: #046c4e;
     --accent-hover: #065f46;
@@ -272,29 +272,29 @@
     --bg-card: #ffffff;
     --bg-card-elevated: #f8f9fc;
     --bg-subtle: #eaedf5;
-    --bg-overlay: rgba(15, 23, 42, 0.48);
-    --surface-glass: rgba(255, 255, 255, 0.90);
+    --bg-overlay: rgba(15, 23, 42, 0.42);
+    --surface-glass: #ffffff;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(225, 29, 72, 0.08), transparent 70%);
-    --gradient-card: linear-gradient(180deg, #ffffff 0%, #fcf8f9 100%);
-    --gradient-card-elevated: linear-gradient(180deg, #fdf9fa 0%, #f4f1f6 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(225, 29, 72, 0.10) 0%, rgba(225, 29, 72, 0.025) 100%);
-    --gradient-accent: linear-gradient(135deg, #e11d48 0%, #be123c 55%, #9f1239 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(190, 18, 60, 0.13) 0%, rgba(190, 18, 60, 0.03) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #0f172a;
     --text-secondary: #2b384c;
     --text-muted: #4b5b70;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(190, 18, 60, 0.11);
+    --border-default: rgba(15, 23, 42, 0.10);
     --border-subdued: rgba(15, 23, 42, 0.05);
     --border-accent: rgba(190, 18, 60, 0.34);
     --border-neon: rgba(190, 18, 60, 0.22);
 
-    --shadow-card: 0 4px 14px -4px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.025);
-    --shadow-elevated: 0 12px 30px -8px rgba(15, 23, 42, 0.11), 0 2px 8px rgba(15, 23, 42, 0.04);
-    --shadow-glow: 0 4px 16px -4px rgba(190, 18, 60, 0.26);
+    --shadow-card: none;
+    --shadow-elevated: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+    --shadow-glow: none;
 
     --accent-default: #be123c;
     --accent-hover: #9f1239;
@@ -337,29 +337,29 @@
     --bg-card: #121528;
     --bg-card-elevated: #191d36;
     --bg-subtle: #212645;
-    --bg-overlay: rgba(2, 4, 12, 0.84);
-    --surface-glass: rgba(15, 18, 34, 0.90);
+    --bg-overlay: rgba(2, 4, 12, 0.72);
+    --surface-glass: #0f1120;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 45, 85, 0.11), transparent 70%);
-    --gradient-card: linear-gradient(180deg, rgba(20, 24, 44, 0.98) 0%, rgba(12, 15, 28, 0.99) 100%);
-    --gradient-card-elevated: linear-gradient(180deg, rgba(28, 33, 59, 0.98) 0%, rgba(18, 22, 40, 0.99) 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(255, 45, 85, 0.15) 0%, rgba(255, 45, 85, 0.03) 100%);
-    --gradient-accent: linear-gradient(135deg, #e11d48 0%, #be123c 55%, #9f1239 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(255, 92, 119, 0.20) 0%, rgba(217, 4, 41, 0.05) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #f8fafc;
     --text-secondary: #d1dbe7;
     --text-muted: #a0aec4;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(255, 92, 119, 0.14);
+    --border-default: rgba(255, 255, 255, 0.09);
     --border-subdued: rgba(255, 255, 255, 0.05);
     --border-accent: rgba(255, 107, 131, 0.40);
     --border-neon: rgba(255, 92, 119, 0.28);
 
-    --shadow-card: 0 6px 22px -6px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 18px 42px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    --shadow-glow: 0 4px 18px -4px rgba(225, 29, 72, 0.42), 0 0 10px rgba(255, 92, 119, 0.20);
+    --shadow-card: none;
+    --shadow-elevated: 0 12px 28px -8px rgba(0, 0, 0, 0.48);
+    --shadow-glow: none;
 
     --accent-default: #ff5c77;
     --accent-hover: #ff7a90;
@@ -406,33 +406,33 @@
     --bg-card: #ffffff;
     --bg-card-elevated: #fbf9f2;
     --bg-subtle: #eee9dc;
-    --bg-overlay: rgba(20, 18, 12, 0.46);
-    --surface-glass: rgba(255, 253, 248, 0.92);
+    --bg-overlay: rgba(20, 18, 12, 0.42);
+    --surface-glass: #ffffff;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(217, 119, 6, 0.09), transparent 70%);
-    --gradient-card: linear-gradient(180deg, #ffffff 0%, #fcfaf3 100%);
-    --gradient-card-elevated: linear-gradient(180deg, #fdfbf5 0%, #f5f0e2 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(217, 119, 6, 0.03) 100%);
-    --gradient-accent: linear-gradient(135deg, #facc15 0%, #eab308 55%, #d97706 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(217, 119, 6, 0.15) 0%, rgba(146, 64, 14, 0.05) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #14120c;
     --text-secondary: #3b372a;
     --text-muted: #554f3e;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(146, 64, 14, 0.13);
+    --border-default: rgba(20, 18, 12, 0.10);
     --border-subdued: rgba(20, 18, 12, 0.06);
     --border-accent: rgba(180, 83, 9, 0.36);
     --border-neon: rgba(180, 83, 9, 0.25);
 
-    --shadow-card: 0 4px 14px -4px rgba(24, 18, 8, 0.06), 0 1px 2px rgba(24, 18, 8, 0.025);
-    --shadow-elevated: 0 12px 30px -8px rgba(24, 18, 8, 0.11), 0 2px 8px rgba(24, 18, 8, 0.04);
-    --shadow-glow: 0 4px 16px -4px rgba(217, 119, 6, 0.28);
+    --shadow-card: none;
+    --shadow-elevated: 0 8px 24px -8px rgba(24, 18, 8, 0.12);
+    --shadow-glow: none;
 
     --accent-default: #92400e;
     --accent-hover: #78350f;
-    --accent-text: #141004;
+    --accent-text: #ffffff;
     --accent-subtle: rgba(217, 119, 6, 0.14);
     --accent-glow: rgba(217, 119, 6, 0.24);
 
@@ -471,29 +471,29 @@
     --bg-card: #101611;
     --bg-card-elevated: #171e17;
     --bg-subtle: #1f281f;
-    --bg-overlay: rgba(4, 6, 5, 0.84);
-    --surface-glass: rgba(14, 19, 15, 0.90);
+    --bg-overlay: rgba(4, 6, 5, 0.72);
+    --surface-glass: #0c100d;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(250, 204, 21, 0.09), transparent 70%);
-    --gradient-card: linear-gradient(180deg, rgba(19, 24, 18, 0.98) 0%, rgba(11, 14, 11, 0.99) 100%);
-    --gradient-card-elevated: linear-gradient(180deg, rgba(26, 33, 24, 0.98) 0%, rgba(16, 20, 15, 0.99) 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(250, 204, 21, 0.15) 0%, rgba(245, 158, 11, 0.03) 100%);
-    --gradient-accent: linear-gradient(135deg, #fde047 0%, #facc15 50%, #f59e0b 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(250, 204, 21, 0.20) 0%, rgba(245, 158, 11, 0.05) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #fafaf9;
     --text-secondary: #dcdcd6;
     --text-muted: #9fa89f;
     --text-inverse: #070a06;
 
-    --border-default: rgba(250, 204, 21, 0.13);
+    --border-default: rgba(255, 255, 255, 0.09);
     --border-subdued: rgba(255, 255, 255, 0.05);
     --border-accent: rgba(253, 224, 71, 0.38);
     --border-neon: rgba(250, 204, 21, 0.26);
 
-    --shadow-card: 0 6px 22px -6px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 18px 42px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    --shadow-glow: 0 4px 20px -4px rgba(250, 204, 21, 0.38), 0 0 12px rgba(245, 158, 11, 0.20);
+    --shadow-card: none;
+    --shadow-elevated: 0 12px 28px -8px rgba(0, 0, 0, 0.48);
+    --shadow-glow: none;
 
     --accent-default: #facc15;
     --accent-hover: #fde047;
@@ -540,33 +540,33 @@
     --bg-card: #ffffff;
     --bg-card-elevated: #f6faef;
     --bg-subtle: #e7ede0;
-    --bg-overlay: rgba(20, 24, 15, 0.46);
-    --surface-glass: rgba(255, 255, 255, 0.90);
+    --bg-overlay: rgba(20, 24, 15, 0.42);
+    --surface-glass: #ffffff;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(101, 163, 13, 0.08), transparent 70%);
-    --gradient-card: linear-gradient(180deg, #ffffff 0%, #f8fcf2 100%);
-    --gradient-card-elevated: linear-gradient(180deg, #f9fdf4 0%, #eff6e4 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(101, 163, 13, 0.11) 0%, rgba(101, 163, 13, 0.025) 100%);
-    --gradient-accent: linear-gradient(135deg, #bef264 0%, #a3e635 55%, #84cc16 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(101, 163, 13, 0.14) 0%, rgba(63, 98, 18, 0.04) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #141710;
     --text-secondary: #323b28;
     --text-muted: #4e5a41;
     --text-inverse: #ffffff;
 
-    --border-default: rgba(63, 98, 18, 0.13);
+    --border-default: rgba(20, 23, 16, 0.10);
     --border-subdued: rgba(20, 23, 16, 0.06);
     --border-accent: rgba(77, 124, 15, 0.36);
     --border-neon: rgba(77, 124, 15, 0.25);
 
-    --shadow-card: 0 4px 14px -4px rgba(20, 28, 12, 0.06), 0 1px 2px rgba(20, 28, 12, 0.025);
-    --shadow-elevated: 0 12px 30px -8px rgba(20, 28, 12, 0.11), 0 2px 8px rgba(20, 28, 12, 0.04);
-    --shadow-glow: 0 4px 16px -4px rgba(101, 163, 13, 0.28);
+    --shadow-card: none;
+    --shadow-elevated: 0 8px 24px -8px rgba(20, 28, 12, 0.12);
+    --shadow-glow: none;
 
     --accent-default: #3f6212;
     --accent-hover: #365314;
-    --accent-text: #0e1704;
+    --accent-text: #ffffff;
     --accent-subtle: rgba(132, 204, 22, 0.18);
     --accent-glow: rgba(101, 163, 13, 0.24);
 
@@ -605,29 +605,29 @@
     --bg-card: #121710;
     --bg-card-elevated: #1a2117;
     --bg-subtle: #222b1e;
-    --bg-overlay: rgba(2, 4, 2, 0.84);
-    --surface-glass: rgba(16, 20, 14, 0.90);
+    --bg-overlay: rgba(2, 4, 2, 0.72);
+    --surface-glass: #0f120e;
 
-    --gradient-canvas: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(204, 255, 0, 0.09), transparent 70%);
-    --gradient-card: linear-gradient(180deg, rgba(20, 26, 17, 0.98) 0%, rgba(12, 16, 10, 0.99) 100%);
-    --gradient-card-elevated: linear-gradient(180deg, rgba(27, 35, 23, 0.98) 0%, rgba(17, 22, 14, 0.99) 100%);
-    --gradient-header-band: linear-gradient(135deg, rgba(204, 255, 0, 0.14) 0%, rgba(163, 230, 53, 0.03) 100%);
-    --gradient-accent: linear-gradient(135deg, #e5ff4f 0%, #ccff00 50%, #9ae600 100%);
-    --gradient-accent-soft: linear-gradient(135deg, rgba(204, 255, 0, 0.18) 0%, rgba(154, 230, 0, 0.04) 100%);
+    --gradient-canvas: none;
+    --gradient-card: none;
+    --gradient-card-elevated: none;
+    --gradient-header-band: none;
+    --gradient-accent: none;
+    --gradient-accent-soft: none;
 
     --text-primary: #f9faf8;
     --text-secondary: #d5ded0;
     --text-muted: #9ea997;
     --text-inverse: #070a05;
 
-    --border-default: rgba(204, 255, 0, 0.13);
+    --border-default: rgba(255, 255, 255, 0.09);
     --border-subdued: rgba(255, 255, 255, 0.05);
     --border-accent: rgba(204, 255, 0, 0.38);
     --border-neon: rgba(204, 255, 0, 0.25);
 
-    --shadow-card: 0 6px 22px -6px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    --shadow-elevated: 0 18px 42px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    --shadow-glow: 0 4px 18px -4px rgba(204, 255, 0, 0.32), 0 0 10px rgba(204, 255, 0, 0.16);
+    --shadow-card: none;
+    --shadow-elevated: 0 12px 28px -8px rgba(0, 0, 0, 0.48);
+    --shadow-glow: none;
 
     --accent-default: #ccff00;
     --accent-hover: #e5ff4f;
@@ -689,8 +689,6 @@
     font-variant-numeric: tabular-nums;
     color: var(--text-primary);
     background-color: var(--bg-primary);
-    background-image: var(--gradient-canvas);
-    background-attachment: fixed;
     transition:
       background-color var(--duration-normal) var(--ease-out-expo),
       color var(--duration-normal) var(--ease-out-expo);
@@ -776,26 +774,24 @@
   .divide-y > :not(:last-child) { border-bottom-width: var(--hairline); }
   .divide-x > :not(:last-child) { border-right-width: var(--hairline); }
 
-  /* Base & Gradient Surfaces */
+  /* Flat Clean Surfaces */
   .bg-theme-bg { background-color: var(--bg-primary); }
-  .bg-theme-card { background: var(--gradient-card); background-color: var(--bg-card); }
-  .bg-theme-card-elevated { background: var(--gradient-card-elevated); background-color: var(--bg-card-elevated); }
+  .bg-theme-card { background-color: var(--bg-card); }
+  .bg-theme-card-elevated { background-color: var(--bg-card-elevated); }
   .bg-theme-subtle { background-color: var(--bg-subtle); }
   .bg-theme-overlay { background-color: var(--bg-overlay); }
-  .bg-theme-header-grad { background: var(--gradient-header-band); }
-  .bg-theme-accent-grad { background: var(--gradient-accent); }
-  .bg-theme-accent-soft { background: var(--gradient-accent-soft); }
+  .bg-theme-header-grad { background-color: var(--bg-card-elevated); }
+  .bg-theme-accent-grad { background-color: var(--accent-default); }
+  .bg-theme-accent-soft { background-color: var(--accent-subtle); }
 
   .bg-theme-glass {
-    background-color: var(--surface-glass);
-    backdrop-filter: blur(20px) saturate(175%);
-    -webkit-backdrop-filter: blur(20px) saturate(175%);
+    background-color: var(--bg-secondary);
   }
 
   /* Accents & Status Fills */
-  .bg-theme-primary { background: var(--gradient-accent); background-color: var(--accent-default); }
-  .bg-theme-primary-hover:hover { filter: brightness(1.06); }
-  .bg-theme-primary-subtle { background: var(--gradient-accent-soft); background-color: var(--accent-subtle); }
+  .bg-theme-primary { background-color: var(--accent-default); }
+  .bg-theme-primary-hover:hover { background-color: var(--accent-hover); }
+  .bg-theme-primary-subtle { background-color: var(--accent-subtle); }
   .bg-theme-live { background-color: var(--status-live); }
   .bg-theme-model-pick { background-color: var(--model-pick); }
   .bg-theme-success { background-color: var(--status-success); }
@@ -816,7 +812,7 @@
   .text-theme-danger { color: var(--status-danger); }
   .text-theme-info { color: var(--status-info); }
 
-  /* Crisp Hairline Borders, Rings & Glow Shadows */
+  /* Crisp Hairline Borders & Flat Elevation */
   .border-theme { border-color: var(--border-default); }
   .border-theme-subdued { border-color: var(--border-subdued); }
   .border-theme-primary { border-color: var(--accent-default); }
@@ -824,7 +820,7 @@
   .border-theme-neon { border-color: var(--border-neon); }
   .border-theme-model-pick { border-color: var(--model-pick); }
   .ring-theme-accent { --tw-ring-color: var(--accent-default); }
-  .shadow-theme-sm { box-shadow: var(--shadow-card); }
+  .shadow-theme-sm { box-shadow: none; }
   .shadow-theme-md { box-shadow: var(--shadow-elevated); }
-  .shadow-theme-glow { box-shadow: var(--shadow-glow); }
+  .shadow-theme-glow { box-shadow: none; }
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, Copy, Check, RefreshCw, Terminal, Trash2, Database } from 'lucide-react';
+import { AlertCircle, Copy, Check, RefreshCw, Database } from 'lucide-react';
 import { TerminalLogEntry } from '../services/loggerService.js';
 import { Badge, Button, Card, Modal } from './ui/index.js';
 
@@ -57,7 +57,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Error Log"
-      icon={<AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 stroke-[2.25]" />}
+      icon={<AlertCircle className="w-4 h-4 text-theme-danger stroke-[2.25]" />}
       maxWidth="max-w-2xl"
       closeLabel="Close error log"
       bodyClassName="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto flex-1 min-h-0"
@@ -85,7 +85,7 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
             title="Copy error log"
             aria-label="Copy error log"
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-700 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-theme-success" /> : <Copy className="w-4 h-4" />}
           </button>
         </>
       }
@@ -94,13 +94,11 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
           <div className="flex items-center gap-2">
             {onOpenTerminal && (
               <Button variant="secondary" size="sm" onClick={onOpenTerminal}>
-                <Terminal className="w-3.5 h-3.5" />
                 <span>Full Terminal</span>
               </Button>
             )}
             {onClearErrors && errors.length > 0 && (
               <Button variant="subtle" size="sm" onClick={onClearErrors}>
-                <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                 <span>Clear Logs</span>
               </Button>
             )}
@@ -112,20 +110,17 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
       }
     >
       {hasDatabaseError && (
-        <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-rose-700 dark:text-rose-400">
+        <div className="px-3 py-2 rounded-xl bg-rose-500/10">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-theme-danger">
             <Database className="w-3.5 h-3.5 shrink-0" />
-            <span>Database / SQLite Error Detected</span>
+            <span>Database / SQLite Error</span>
           </div>
-          <p className="text-sm font-normal text-theme-sub leading-relaxed">
-            A database read/write issue occurred. Automatic recovery runs if a malformed disk image is detected.
-          </p>
         </div>
       )}
 
       {errors.length === 0 ? (
         <div className="py-8 text-center text-sm text-theme-sub">
-          No active error entries recorded.
+          No errors
         </div>
       ) : (
         <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden divide-y divide-[var(--border-subdued)] max-h-[52vh] overflow-y-auto select-text">
@@ -155,12 +150,12 @@ export const ErrorLogModal: React.FC<ErrorLogModalProps> = ({
                   )}
                 </div>
 
-                <p className="text-sm font-medium text-rose-700 dark:text-rose-400 break-words leading-relaxed">
+                <p className="text-sm font-medium text-theme-danger break-words leading-relaxed">
                   {err.message}
                 </p>
 
                 {detailsText && (
-                  <pre className="p-2.5 rounded-lg bg-theme-card border border-theme-subdued text-xs font-normal text-theme-sub overflow-x-auto max-h-32 whitespace-pre-wrap break-words tabular-nums">
+                  <pre className="p-2.5 rounded-lg bg-theme-card text-xs font-normal text-theme-sub overflow-x-auto max-h-32 whitespace-pre-wrap break-words tabular-nums">
                     {detailsText}
                   </pre>
                 )}

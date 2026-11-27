@@ -20,7 +20,7 @@ export const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   const heightCls = inputSize === 'sm' ? 'h-[30px] min-h-[30px] text-sm' : 'h-[34px] min-h-[34px] text-base';
-  const bgCls = surface === 'card' ? 'bg-theme-card border border-theme' : 'bg-theme-subtle border border-theme-subdued';
+  const bgCls = surface === 'card' ? 'bg-theme-card border border-theme-subdued' : 'bg-theme-subtle border border-transparent';
   const padLeft = leftIcon ? (inputSize === 'sm' ? 'pl-7' : 'pl-8') : 'pl-2.5';
   const padRight = onClear && value ? 'pr-7' : 'pr-2.5';
 

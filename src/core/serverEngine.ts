@@ -9,14 +9,14 @@ import {
   TeamFormMatch,
   LeagueStandingTable,
 } from './types.js';
-import { ApexEngine } from './poisson.js';
+import { ApexEngine, StandingsStrengthIndex } from './poisson.js';
 import { loggerService } from '../services/loggerService.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { matchesLeague, getLeagueAliases, cleanStr, isSimulationLeague } from './leagueMapper.js';
 import { getRelativeDateStr, getCurrentSeason, normalizeDateStr, normalizeTimeStr, parseDateMsNoon } from './dateUtils.js';
 import { OnDemandParser } from './onDemandParser.js';
 import { parseHeadToHeadFeedText, getTeamHistoricalMatches, teamMatchScore } from './feedParser.js';
-import { checkpointSqliteWal, sqliteDb } from './sqliteClient.js';
+import { checkpointSqliteWal, isSqliteEnabled, sqliteDb } from './sqliteClient.js';
 import {
   buildLeagueVolatilityLookup,
   computeLeagueVolatilities,
@@ -279,7 +279,8 @@ export class ServerEngine {
     historicalContextOverride?: HistoricalMatch[],
     eloRatingsMap?: Map<string, number>,
     standingsOverride?: LeagueStandingTable | null,
-    volatilityLookup?: LeagueVolatilityLookup | null
+    volatilityLookup?: LeagueVolatilityLookup | null,
+    standingsStrengthIndexOverride?: StandingsStrengthIndex | null
   ): Fixture {
     // Standardize date/time for the incoming fixture
     const f = {
@@ -360,6 +361,15 @@ export class ServerEngine {
           };
     }
 
+    const resolvedStandingsStrengthIndex =
+      standingsStrengthIndexOverride !== undefined
+        ? standingsStrengthIndexOverride
+        : ApexEngine.buildStandingsStrengthIndex(
+            isSqliteEnabled()
+              ? db.getAllLeagueStandingsTables()
+              : (resolvedStandings ? [resolvedStandings] : [])
+          );
+
     const { prediction, homeStats, awayStats } = ApexEngine.predictMatch(
       f.homeTeam,
       f.awayTeam,
@@ -371,7 +381,8 @@ export class ServerEngine {
       resolvedStandings,
       eloRatingsMap,
       f.marketOdds,
-      volCfg
+      volCfg,
+      resolvedStandingsStrengthIndex
     );
 
     const { markets, mostLikelyOutcome, bestValueBet } = ApexEngine.calculateMarkets(
@@ -600,6 +611,7 @@ export class ServerEngine {
     const rawFeedPaths = db.getRawFeedPathsSet();
     const allStandingsTables = db.getAllLeagueStandingsTables();
     const standingsLookup = this.buildStandingsLookup(allStandingsTables);
+    const standingsStrengthIndex = ApexEngine.buildStandingsStrengthIndex(allStandingsTables);
 
     // Load persisted League Volatility Coefficients (or calibrate & persist on first run)
     let volatilityRecords = db.getAllLeagueVolatilities();
@@ -739,7 +751,8 @@ export class ServerEngine {
               leagueHistoricalContext,
               eloRatingsMap,
               fixtureStandings,
-              volatilityLookup
+              volatilityLookup,
+              standingsStrengthIndex
             );
             if (cachedOdds) {
               enriched.marketOdds = cachedOdds;

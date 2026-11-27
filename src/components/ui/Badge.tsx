@@ -19,14 +19,14 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 const VARIANT_STYLES: Record<BadgeVariant, string> = {
-  default: 'bg-theme-subtle text-theme-main border border-theme-subdued font-medium',
-  accent: 'bg-theme-primary-subtle text-theme-primary border border-theme-neon font-semibold',
-  solid: 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow',
-  success: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 font-semibold',
-  warning: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 font-semibold',
-  danger: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/25 font-semibold',
-  info: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border border-sky-500/25 font-semibold',
-  live: 'bg-theme-live text-white border border-rose-400/40 font-bold',
+  default: 'bg-theme-subtle text-theme-main font-medium',
+  accent: 'bg-theme-primary-subtle text-theme-primary font-semibold',
+  solid: 'bg-theme-primary text-theme-primary-text font-semibold',
+  success: 'bg-emerald-500/12 text-theme-success font-semibold',
+  warning: 'bg-amber-500/12 text-theme-warning font-semibold',
+  danger: 'bg-rose-500/12 text-theme-danger font-semibold',
+  info: 'bg-sky-500/12 text-theme-info font-semibold',
+  live: 'bg-theme-live text-white font-bold',
 };
 
 const SIZE_STYLES: Record<'xs' | 'sm', string> = {

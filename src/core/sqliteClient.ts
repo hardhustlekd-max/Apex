@@ -4,6 +4,13 @@ import fs from 'fs';
 import zlib from 'zlib';
 import { loggerService } from '../services/loggerService.js';
 import { DEFAULT_ENGINE_SETTINGS } from './types.js';
+import {
+  disableScrapingManually,
+  enableScrapingManually,
+  getScrapingGateState,
+  isScrapingEnabled,
+  type ScrapingGateState,
+} from './scrapingGate.js';
 
 const dbMutationListeners: Array<() => void> = [];
 
@@ -76,8 +83,29 @@ export function getSqliteGateState(): SqliteGateState {
   };
 }
 
+export function isLoadDataEnabled(): boolean {
+  return sqliteManualEnabled && isScrapingEnabled();
+}
+
+export interface LoadDataGateState {
+  enabled: boolean;
+  sqliteGate: SqliteGateState;
+  scrapingGate: ScrapingGateState;
+}
+
+export function getLoadDataGateState(): LoadDataGateState {
+  const sqliteGate = getSqliteGateState();
+  const scrapingGate = getScrapingGateState();
+  return {
+    enabled: sqliteGate.enabled && scrapingGate.enabled,
+    sqliteGate,
+    scrapingGate,
+  };
+}
+
 export function enableSqliteManually(): SqliteGateState {
   sqliteManualEnabled = true;
+  enableScrapingManually();
   initSqliteSchema();
   notifyDbMutation();
   return getSqliteGateState();
@@ -85,17 +113,28 @@ export function enableSqliteManually(): SqliteGateState {
 
 export function disableSqliteManually(): SqliteGateState {
   sqliteManualEnabled = false;
+  disableScrapingManually();
   closeSqliteDb();
   isSchemaInitialized = false;
   notifyDbMutation();
   return getSqliteGateState();
 }
 
+export function enableLoadDataManually(): LoadDataGateState {
+  enableSqliteManually();
+  return getLoadDataGateState();
+}
+
+export function disableLoadDataManually(): LoadDataGateState {
+  disableSqliteManually();
+  return getLoadDataGateState();
+}
+
 function assertSqliteAllowed(): void {
   if (!sqliteManualEnabled) {
     const reason = !fs.existsSync(DB_PATH)
-      ? 'SQLite database does not exist on preview and auto-initialization is blocked until switched on manually.'
-      : 'SQLite database initialization is blocked on app startup until switched on manually.';
+      ? 'Load Data is off and no local SQLite database exists on preview until switched on manually.'
+      : 'Load Data (SQLite & Scraping) is off on app startup until switched on manually.';
     throw new SqliteBlockedError(reason);
   }
 }
@@ -1024,6 +1063,7 @@ export async function replaceSqliteDbFromFile(
 
     fs.copyFileSync(sourcePath, DB_PATH);
     sqliteManualEnabled = true;
+    enableScrapingManually();
     initSqliteSchema();
 
     // Remove temporary pre-restore copy after verified init
@@ -1043,6 +1083,9 @@ export async function replaceSqliteDbFromFile(
     // Rollback to previous DB file if swap failed
     closeSqliteDb();
     sqliteManualEnabled = prevManualEnabled;
+    if (!prevManualEnabled) {
+      disableScrapingManually();
+    }
     isSchemaInitialized = false;
     if (movedOldDb && fs.existsSync(backupPrevPath)) {
       try {

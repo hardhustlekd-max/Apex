@@ -195,6 +195,9 @@ export interface TeamFormMatch {
   shotsAgainst?: number;
   shotsOnTargetFor?: number;
   shotsOnTargetAgainst?: number;
+  opponentStrength?: number;
+  opponentElo?: number;
+  opponentRank?: number;
 }
 
 export interface TeamStatsSummary {
@@ -232,6 +235,27 @@ export interface TeamStrengthBreakdown {
   homeWinExpectancy: number;
   drawExpectancy: number;
   awayWinExpectancy: number;
+  avgRecentOpponentStrengthHome?: number;
+  avgRecentOpponentStrengthAway?: number;
+  relativeScheduleDifficultyHome?: number;
+  relativeScheduleDifficultyAway?: number;
+  scheduleAdjustmentFactorHome?: number;
+  scheduleAdjustmentFactorAway?: number;
+}
+
+export interface TeamEloTrendPoint {
+  matchIndex: number; // 1 (oldest in window) to N (most recent)
+  date: string;
+  opponent: string;
+  isHome: boolean;
+  goalsFor: number;
+  goalsAgainst: number;
+  result: 'W' | 'D' | 'L';
+  eloBefore: number;
+  eloAfter: number;
+  eloDelta: number;
+  opponentElo: number;
+  opponentRank?: number;
 }
 
 export interface EloRatingBreakdown {
@@ -242,6 +266,8 @@ export interface EloRatingBreakdown {
   homeWinProbElo: number;
   drawProbElo: number;
   awayWinProbElo: number;
+  homeEloTrend?: TeamEloTrendPoint[];
+  awayEloTrend?: TeamEloTrendPoint[];
 }
 
 export interface XGBreakdown {
@@ -253,6 +279,14 @@ export interface XGBreakdown {
   opponentAdjustmentFactorAway: number;
   homeRollingMatchesEvaluated: number;
   awayRollingMatchesEvaluated: number;
+  avgRecentOpponentStrengthHome?: number;
+  avgRecentOpponentStrengthAway?: number;
+  currentOpponentStrengthHome?: number;
+  currentOpponentStrengthAway?: number;
+  relativeScheduleDifficultyHome?: number;
+  relativeScheduleDifficultyAway?: number;
+  scheduleAdjustmentFactorHome?: number;
+  scheduleAdjustmentFactorAway?: number;
 }
 
 export interface TacticalContextBreakdown {

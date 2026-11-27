@@ -109,12 +109,12 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
             </span>
             <span aria-hidden="true" className="text-theme-dim shrink-0">·</span>
             {fixture.status === 'LIVE' ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/12 text-theme-danger whitespace-nowrap shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-theme-live animate-pulse" />
                 <span>{fixture.minute ? `${fixture.minute}'` : 'LIVE'}</span>
               </span>
             ) : fixture.status === 'FINISHED' ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap shrink-0">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/12 text-theme-success whitespace-nowrap shrink-0">
                 FT
               </span>
             ) : (
@@ -260,8 +260,8 @@ export const FixtureCard: React.FC<FixtureCardProps> = ({
         )}
       </div>
 
-      {/* Hairline Footer: Pick & Action */}
-      <div className="mt-2 pt-2 border-t border-theme-subdued flex items-center justify-between gap-2 text-xs min-w-0">
+      {/* Pick & Action Footer */}
+      <div className="mt-2 pt-1.5 flex items-center justify-between gap-2 text-xs min-w-0">
         {hasPred && topPredictionLabel ? (
           <div className="flex items-center gap-1.5 min-w-0 truncate text-sm">
             <span className="text-theme-sub font-normal shrink-0">Pick:</span>

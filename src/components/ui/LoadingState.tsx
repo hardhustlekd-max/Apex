@@ -17,7 +17,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 }) => {
   if (variant === 'skeleton') {
     return (
-      <div className={`bg-theme-card border border-theme rounded-2xl p-3 shadow-theme-sm space-y-1.5 animate-pulse font-sans ${className}`}>
+      <div className={`bg-theme-card rounded-2xl p-3 space-y-1.5 animate-pulse font-sans ${className}`}>
         <div className="h-3 bg-theme-subtle rounded-lg w-1/3 mb-2" />
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="h-[24px] bg-theme-subtle rounded-lg" />
@@ -28,7 +28,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 
   return (
     <div
-      className={`bg-theme-card border border-theme rounded-2xl p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center shadow-theme-sm font-sans ${className}`}
+      className={`bg-theme-card rounded-2xl p-5 flex-1 ${minHeight} flex flex-col items-center justify-center text-center font-sans ${className}`}
       role="status"
       aria-live="polite"
     >

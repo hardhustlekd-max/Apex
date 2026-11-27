@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Database, Sparkles, XCircle } from 'lucide-react';
+import { RefreshCw, Database, Sparkles } from 'lucide-react';
 import { SyncJobState } from '../services/syncJobService.js';
 import { Button, Card, ProgressBar } from './ui/index.js';
 
@@ -26,14 +26,14 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
       surface="default"
       padding="none"
       radius="2xl"
-      className="relative w-full overflow-hidden shadow-theme-md backdrop-blur-xl animate-in fade-in duration-200 z-30 my-1"
+      className="relative w-full overflow-hidden animate-in fade-in duration-200 z-30 my-1"
     >
       <div className="p-4 sm:p-5 flex flex-col items-center text-center max-w-lg mx-auto space-y-3">
-        <div className="w-9 h-9 rounded-xl bg-theme-primary text-theme-primary-text flex items-center justify-center shadow-theme-glow">
+        <div className="w-8 h-8 rounded-full bg-theme-primary-subtle text-theme-primary flex items-center justify-center">
           {isPredictionJob ? (
-            <Sparkles className="w-5 h-5 animate-pulse text-theme-primary-text" />
+            <Sparkles className="w-4 h-4 animate-pulse text-theme-primary" />
           ) : (
-            <Database className="w-5 h-5 text-theme-primary-text" />
+            <Database className="w-4 h-4 text-theme-primary" />
           )}
         </div>
 
@@ -48,16 +48,16 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
           )}
         </div>
 
-        {/* Inline Progress Band (no nested card) */}
-        <div className="w-full pt-2.5 border-t border-theme-subdued space-y-2 text-left">
+        {/* Inline Progress Band */}
+        <div className="w-full pt-2 space-y-2 text-left">
           <div className="flex items-center justify-between text-sm gap-2">
             <span className="font-medium text-theme-main flex items-center gap-1.5 truncate">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-theme-primary shrink-0" />
               <span className="truncate">
                 {job?.currentStep ||
                   (isPredictionJob
-                    ? 'Recalculating 5-Pillar Poisson predictions...'
-                    : 'Fetching historical archives, upcoming feeds & H2H...')}
+                    ? 'Calculating predictions...'
+                    : 'Syncing match data...')}
               </span>
             </span>
             <span className="text-sm tabular-nums font-bold text-theme-primary shrink-0">
@@ -79,7 +79,7 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
               </span>
               <span>
                 Skipped (&lt;90% data):{' '}
-                <strong className="text-amber-700 dark:text-amber-400 font-semibold">{job?.skippedCount ?? 0}</strong>
+                <strong className="text-theme-warning font-semibold">{job?.skippedCount ?? 0}</strong>
               </span>
             </div>
           )}
@@ -91,9 +91,8 @@ export const SyncLockOverlay: React.FC<SyncLockOverlayProps> = ({
               variant="secondary"
               size="sm"
               onClick={() => onCancel(job?.id || '')}
-              className="hover:border-rose-500/40 hover:text-rose-700 dark:hover:text-rose-400"
+              className="hover:text-theme-danger"
             >
-              <XCircle className="w-3.5 h-3.5" />
               <span>Cancel Job</span>
             </Button>
           </div>

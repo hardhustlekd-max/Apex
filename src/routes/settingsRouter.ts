@@ -5,18 +5,15 @@ import { DEFAULT_ENGINE_SETTINGS, EngineSettings } from '../core/types.js';
 import { scraperCircuitBreaker } from '../services/flashscoreScraperService.js';
 import {
   DB_PATH,
-  disableSqliteManually,
-  enableSqliteManually,
+  disableLoadDataManually,
+  enableLoadDataManually,
+  getLoadDataGateState,
   getSqliteDbStats,
   getSqliteGateState,
+  isLoadDataEnabled,
   isSqliteEnabled,
 } from '../core/sqliteClient.js';
-import {
-  disableScrapingManually,
-  enableScrapingManually,
-  getScrapingGateState,
-  isScrapingEnabled,
-} from '../core/scrapingGate.js';
+import { getScrapingGateState } from '../core/scrapingGate.js';
 import { flashscoreScraperService } from '../services/flashscoreScraperService.js';
 import { syncJobService } from '../services/syncJobService.js';
 import { fixturesWorkerService } from '../services/fixturesWorkerService.js';
@@ -42,8 +39,10 @@ const getStorageStatusHandler = (_req: any, res: any) => {
   const stats = getSqliteDbStats();
   const gate = getSqliteGateState();
   const scrapingGate = getScrapingGateState();
+  const loadDataEnabled = gate.enabled && scrapingGate.enabled;
   res.json({
     success: true,
+    loadDataEnabled,
     sqliteGate: gate,
     scrapingGate,
     storageEngine: {
@@ -66,7 +65,7 @@ const getStorageStatusHandler = (_req: any, res: any) => {
       url: gate.enabled
         ? `Local SQLite (${stats.sizeMB} MB, WAL Mode)`
         : gate.dbExists
-        ? `Blocked (${stats.sizeMB} MB on disk — switch on manually)`
+        ? `Blocked (${stats.sizeMB} MB on disk — Load Data Off)`
         : 'Not initialized (No DB file on preview)',
       latencyMs: gate.enabled ? 1 : 0,
       sizeMB: stats.sizeMB,
@@ -76,7 +75,7 @@ const getStorageStatusHandler = (_req: any, res: any) => {
       status: gate.enabled ? 'CONNECTED' : 'BLOCKED',
       url: gate.enabled
         ? `${DB_PATH} (${stats.tableCounts['predictions'] || 0} predictions)`
-        : 'SQLite initialization blocked until switched on manually',
+        : 'Load Data switched off',
       latencyMs: gate.enabled ? 1 : 0,
     },
   });
@@ -84,81 +83,98 @@ const getStorageStatusHandler = (_req: any, res: any) => {
 
 settingsRouter.get('/storage-status', getStorageStatusHandler);
 
-settingsRouter.post('/sqlite-toggle', async (req, res) => {
+const toggleLoadDataHandler = async (req: any, res: any) => {
   try {
     const requestedEnabled = Boolean(req.body?.enabled);
 
     if (requestedEnabled) {
       const gateBefore = getSqliteGateState();
-      const gate = enableSqliteManually();
+      enableLoadDataManually();
       await db.init();
       await predictionsDb.init().catch(() => {});
       await fixturesWorkerService.ensureIndexReady(true).catch(() => {});
-      const finalGate = getSqliteGateState();
+      flashscoreScraperService.clearCaches();
+      fixturesWorkerService.clearLiveCache();
+
+      const merged = getLoadDataGateState();
       const stats = getSqliteDbStats();
 
       loggerService.addLog({
         level: 'SUCCESS',
         category: 'DATABASE',
-        source: 'SQLiteGate',
+        source: 'LoadDataGate',
         message: gateBefore.dbExists
-          ? `SQLite DB manually switched ON (${stats.sizeMB} MB loaded from ${DB_PATH})`
-          : `SQLite DB manually switched ON and initialized at ${DB_PATH}`,
+          ? `Load Data switched ON (${stats.sizeMB} MB loaded from ${DB_PATH}; live scraping enabled)`
+          : `Load Data switched ON and SQLite initialized at ${DB_PATH}`,
       });
 
       return res.json({
         success: true,
-        sqliteGate: finalGate,
+        loadDataEnabled: merged.enabled,
+        sqliteGate: merged.sqliteGate,
+        scrapingGate: merged.scrapingGate,
         stats,
-        message: gate.dbExists
-          ? 'SQLite database switched ON and initialized.'
-          : 'SQLite database created and initialized manually.',
+        message: merged.sqliteGate.dbExists
+          ? 'Load Data switched ON.'
+          : 'Load Data switched ON and SQLite initialized.',
       });
     } else {
       const activeJob = syncJobService.getActiveJob();
       if (activeJob && (activeJob.status === 'RUNNING' || activeJob.status === 'PENDING')) {
         return res.status(409).json({
           success: false,
-          error: 'Cannot switch off SQLite while a background sync or prediction job is running.',
+          error: 'Cannot switch off Load Data while a sync or prediction job is running.',
         });
       }
 
-      const gate = disableSqliteManually();
+      const merged = disableLoadDataManually();
       await db.init();
       await predictionsDb.init();
       fixturesWorkerService.invalidate();
+      flashscoreScraperService.clearCaches();
+      fixturesWorkerService.clearLiveCache();
 
       loggerService.addLog({
         level: 'INFO',
         category: 'DATABASE',
-        source: 'SQLiteGate',
-        message: 'SQLite DB manually switched OFF (connections closed and auto-init blocked).',
+        source: 'LoadDataGate',
+        message: 'Load Data switched OFF (SQLite closed & scraping blocked).',
       });
 
       return res.json({
         success: true,
-        sqliteGate: gate,
+        loadDataEnabled: merged.enabled,
+        sqliteGate: merged.sqliteGate,
+        scrapingGate: merged.scrapingGate,
         stats: getSqliteDbStats(),
-        message: 'SQLite database switched OFF and auto-initialization blocked.',
+        message: 'Load Data switched OFF.',
       });
     }
   } catch (err: any) {
     res.status(500).json({
       success: false,
-      error: err?.message || 'Failed to toggle SQLite database state',
+      error: err?.message || 'Failed to toggle Load Data state',
     });
   }
-});
+};
+
+settingsRouter.post('/load-data-toggle', toggleLoadDataHandler);
+settingsRouter.post('/sqlite-toggle', toggleLoadDataHandler);
+settingsRouter.post('/scraping-toggle', toggleLoadDataHandler);
 
 settingsRouter.get('/scraper-status', (req, res) => {
   try {
     const circuitStatus = scraperCircuitBreaker ? scraperCircuitBreaker.getStatus() : { state: 'CLOSED', failureCount: 0 };
     const rawFeedsCount = db.getRawFeedsCount();
     const scrapingGate = getScrapingGateState();
+    const sqliteGate = getSqliteGateState();
+    const loadDataEnabled = isLoadDataEnabled();
     const mirrorStatus = scrapingGate.enabled ? 'ONLINE' : 'BLOCKED · OFF';
     res.json({
       success: true,
-      enabled: scrapingGate.enabled,
+      enabled: loadDataEnabled,
+      loadDataEnabled,
+      sqliteGate,
       scrapingGate,
       circuit: circuitStatus,
       rawFeedsCount,
@@ -172,61 +188,6 @@ settingsRouter.get('/scraper-status', (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to get scraper status' });
-  }
-});
-
-settingsRouter.post('/scraping-toggle', (req, res) => {
-  try {
-    const requestedEnabled = Boolean(req.body?.enabled);
-
-    if (requestedEnabled) {
-      const gate = enableScrapingManually();
-      flashscoreScraperService.clearCaches();
-      fixturesWorkerService.clearLiveCache();
-
-      loggerService.addLog({
-        level: 'SUCCESS',
-        category: 'SCRAPER',
-        source: 'ScrapingGate',
-        message: 'Data scraping manually switched ON.',
-      });
-
-      return res.json({
-        success: true,
-        scrapingGate: gate,
-        message: 'Data scraping switched ON manually.',
-      });
-    } else {
-      const activeJob = syncJobService.getActiveJob();
-      if (activeJob && activeJob.jobType === 'FULL' && (activeJob.status === 'RUNNING' || activeJob.status === 'PENDING')) {
-        return res.status(409).json({
-          success: false,
-          error: 'Cannot switch off data scraping while Full Data Sync is running.',
-        });
-      }
-
-      const gate = disableScrapingManually();
-      flashscoreScraperService.clearCaches();
-      fixturesWorkerService.clearLiveCache();
-
-      loggerService.addLog({
-        level: 'INFO',
-        category: 'SCRAPER',
-        source: 'ScrapingGate',
-        message: 'Data scraping manually switched OFF (all remote scraping blocked).',
-      });
-
-      return res.json({
-        success: true,
-        scrapingGate: gate,
-        message: 'Data scraping switched OFF and blocked.',
-      });
-    }
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      error: err?.message || 'Failed to toggle data scraping state',
-    });
   }
 });
 
@@ -259,7 +220,7 @@ settingsRouter.post('/update-predictions', async (req, res) => {
       return res.status(409).json({
         success: false,
         sqliteBlocked: true,
-        error: 'SQLite database is switched off. Enable SQLite DB manually before calculating predictions.',
+        error: 'Load Data is switched off. Enable Load Data before calculating predictions.',
       });
     }
     const resetData = Boolean(req.body?.resetData);

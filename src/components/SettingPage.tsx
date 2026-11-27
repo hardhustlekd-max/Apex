@@ -1,23 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
+  ArrowLeft,
   Settings,
   Cpu,
   Check,
-  Sun,
-  Moon,
-  Terminal,
   Database,
   RefreshCw,
   Server,
   Sparkles,
   TrendingUp,
   Download,
-  Upload,
   Cloud,
-  Trash2,
-  LogOut,
   AlertTriangle,
-  Power,
   Search,
   ShieldAlert,
 } from 'lucide-react';
@@ -49,7 +43,6 @@ import {
   Button,
   Card,
   Input,
-  Modal,
   SectionHeader,
   SegmentedTabs,
   Select,
@@ -60,12 +53,12 @@ type SettingsTab = 'DATA' | 'PREDICTIONS' | 'UI';
 
 const isViteDev = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
 
-interface SettingsModalProps {
+interface SettingPageProps {
   isOpen: boolean;
   onClose: () => void;
   settings: EngineSettings | null;
   providers: ProviderStatus[];
-  onSaveSettings: (newSettings: Partial<EngineSettings>) => void;
+  onSaveSettings: (newSettings: Partial<EngineSettings>, options?: { skipOverlay?: boolean }) => void;
   onResetAndSync?: (resetData?: boolean) => void | Promise<void>;
   isResettingAndSyncing?: boolean;
   isSyncingData?: boolean;
@@ -83,14 +76,15 @@ interface SettingsModalProps {
   onOpenTerminal?: () => void;
   onRefreshMetrics?: () => void | Promise<void>;
   sqliteGate?: SqliteGateState | null;
-  isTogglingSqlite?: boolean;
-  onToggleSqlite?: (enabled: boolean) => Promise<void> | void;
   scrapingGate?: ScrapingGateState | null;
-  isTogglingScraping?: boolean;
-  onToggleScraping?: (enabled: boolean) => Promise<void> | void;
+  loadDataEnabled?: boolean;
+  isTogglingLoadData?: boolean;
+  onToggleLoadData?: (enabled: boolean) => Promise<void> | void;
+  onTriggerSavedOverlay?: (message?: string) => void;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'danger') => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
+export const SettingPage: React.FC<SettingPageProps> = ({
   isOpen,
   onClose,
   settings,
@@ -105,11 +99,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenTerminal,
   onRefreshMetrics,
   sqliteGate,
-  isTogglingSqlite = false,
-  onToggleSqlite,
   scrapingGate,
-  isTogglingScraping = false,
-  onToggleScraping,
+  loadDataEnabled,
+  isTogglingLoadData = false,
+  onToggleLoadData,
+  onTriggerSavedOverlay,
+  onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('DATA');
   const [activeThemeId, setActiveThemeId] = useState<string>(
@@ -129,7 +124,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onSaveSettings({ colorTheme: themeId as any });
   };
 
-  const [showSavedToast, setShowSavedToast] = useState(false);
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [resetFullSyncData, setResetFullSyncData] = useState<boolean>(false);
   const [isConfirmingCalc, setIsConfirmingCalc] = useState(false);
@@ -140,7 +134,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isCheckingStorage, setIsCheckingStorage] = useState<boolean>(false);
   const [isRefreshingMetrics, setIsRefreshingMetrics] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [exportToast, setExportToast] = useState<string | null>(null);
 
   const [exportSort, setExportSort] = useState<'default' | 'desc' | 'asc'>('default');
   const [leagueVolatilities, setLeagueVolatilities] = useState<LeagueVolatilityRecord[]>([]);
@@ -296,6 +289,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             type: 'success',
             text: `${res.action === 'UPDATED' ? 'Updated' : 'Uploaded'} '${res.driveFile.name}' (${mb} MB) in Google Drive.`,
           });
+          onTriggerSavedOverlay?.('Settings Saved');
         } else {
           setDriveNotice({ type: 'error', text: res.error || 'Failed to save database to Google Drive.' });
         }
@@ -347,20 +341,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleExportPredictions = async () => {
     setIsExporting(true);
-    setExportToast(null);
     try {
       const sortParam = exportSort === 'default' ? undefined : exportSort;
       const res = await EngineService.downloadPredictionsJson(sortParam);
       if (res.success) {
-        setExportToast(`Exported ${res.count ?? 0} predictions to ${res.filename}`);
+        onShowToast?.(`Exported ${res.count ?? 0} predictions to ${res.filename}`, 'success');
       } else {
-        setExportToast(res.error || 'Failed to export predictions.');
+        onShowToast?.(res.error || 'Failed to export predictions.', 'danger');
       }
     } catch (err: any) {
-      setExportToast(err?.message || 'Error exporting predictions.');
+      onShowToast?.(err?.message || 'Error exporting predictions.', 'danger');
     } finally {
       setIsExporting(false);
-      setTimeout(() => setExportToast(null), 4500);
     }
   };
 
@@ -428,37 +420,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const [internalTogglingSqlite, setInternalTogglingSqlite] = useState<boolean>(false);
-  const [internalTogglingScraping, setInternalTogglingScraping] = useState<boolean>(false);
+  const [internalTogglingLoadData, setInternalTogglingLoadData] = useState<boolean>(false);
 
-  const handleManualSqliteToggle = async (nextEnabled: boolean) => {
-    setInternalTogglingSqlite(true);
+  const handleManualLoadDataToggle = async (nextEnabled: boolean) => {
+    setInternalTogglingLoadData(true);
     try {
-      if (onToggleSqlite) {
-        await onToggleSqlite(nextEnabled);
+      if (onToggleLoadData) {
+        await onToggleLoadData(nextEnabled);
       } else {
-        await EngineService.toggleSqliteDb(nextEnabled);
+        await EngineService.toggleLoadData(nextEnabled);
       }
       await Promise.all([fetchStorageStatus(), fetchScraperStatus(), fetchFreshStats()]);
       if (isViteDev && getDriveAccessToken()) {
         await checkDriveBackupStatus(getDriveAccessToken());
       }
     } finally {
-      setInternalTogglingSqlite(false);
-    }
-  };
-
-  const handleManualScrapingToggle = async (nextEnabled: boolean) => {
-    setInternalTogglingScraping(true);
-    try {
-      if (onToggleScraping) {
-        await onToggleScraping(nextEnabled);
-      } else {
-        await EngineService.toggleScraping(nextEnabled);
-      }
-      await Promise.all([fetchStorageStatus(), fetchScraperStatus()]);
-    } finally {
-      setInternalTogglingScraping(false);
+      setInternalTogglingLoadData(false);
     }
   };
 
@@ -476,14 +453,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const isSqliteTogglingNow = Boolean(isTogglingSqlite || internalTogglingSqlite);
-  const isScrapingTogglingNow = Boolean(isTogglingScraping || internalTogglingScraping);
+  const isLoadDataTogglingNow = Boolean(isTogglingLoadData || internalTogglingLoadData);
   const effectiveGate: SqliteGateState | null = storageStatus?.sqliteGate || sqliteGate || null;
   const effectiveScrapingGate: ScrapingGateState | null =
     storageStatus?.scrapingGate || scraperStatus?.scrapingGate || scrapingGate || null;
   const isSqliteActive = effectiveGate ? effectiveGate.enabled : storageStatus?.storageEngine?.enabled !== false;
   const isScrapingActive = effectiveScrapingGate ? effectiveScrapingGate.enabled : false;
-  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isSqliteTogglingNow || isScrapingTogglingNow);
+  const isLoadDataActive =
+    typeof loadDataEnabled === 'boolean' && storageStatus == null
+      ? loadDataEnabled
+      : Boolean(isSqliteActive && isScrapingActive);
+  const isOperating = Boolean(isResettingAndSyncing || isSyncingData || isLoadDataTogglingNow);
 
   useEffect(() => {
     if (!isOpen) {
@@ -492,8 +472,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsConfirmingCalc(false);
       setResetCalcData(false);
       setPendingDriveConfirm(null);
+      return;
     }
-  }, [isOpen]);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen && (activeTab === 'DATA' || activeTab === 'PREDICTIONS')) {
@@ -531,7 +520,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleToggleExcludeVolatile = (enabled: boolean) => {
     setExcludeVolatileLeaguesLocal(enabled);
-    onSaveSettings({ excludeVolatileLeagues: enabled });
+    onSaveSettings({ excludeVolatileLeagues: enabled }, { skipOverlay: true });
   };
 
   const handleSave = () => {
@@ -542,8 +531,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       formDecayRate: 0.85,
       excludeVolatileLeagues: excludeVolatileLeaguesLocal,
     });
-    setShowSavedToast(true);
-    setTimeout(() => setShowSavedToast(false), 2000);
   };
 
   const storedPredictionsCount =
@@ -553,75 +540,106 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     '—';
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Settings"
-      icon={<Settings className="w-4 h-4" />}
-      maxWidth="max-w-xl"
-      closeLabel="Close settings"
-      bodyClassName="p-0 flex flex-col min-h-0 flex-1 overflow-hidden"
-      headerActions={
-        onOpenTerminal ? (
-          <Button
-            id="settings-open-terminal-btn"
-            variant="subtle"
-            size="sm"
-            onClick={onOpenTerminal}
-            title="Terminal Logs"
-          >
-            <Terminal className="w-3.5 h-3.5 text-theme-primary" />
-            <span className="hidden sm:inline">Terminal</span>
-          </Button>
-        ) : undefined
-      }
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="subtle" size="sm" onClick={onClose}>
-            Close
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleSave}>
-            Save Settings
-          </Button>
-        </div>
-      }
+    <div
+      role="region"
+      aria-label="Settings Page"
+      className="fixed inset-0 z-50 bg-theme-bg text-theme-main flex flex-col overflow-hidden font-sans animate-in fade-in duration-150"
     >
-      {/* Modal Navigation Tabs */}
-      <div className="px-3.5 sm:px-4 pt-2.5 pb-1 shrink-0">
-        <SegmentedTabs<SettingsTab>
-          items={[
-            {
-              id: 'DATA',
-              label: 'Data Management',
-              icon: <Database className="w-3.5 h-3.5" />,
-            },
-            {
-              id: 'PREDICTIONS',
-              label: 'Predictions',
-              icon: <Sparkles className="w-3.5 h-3.5" />,
-            },
-            {
-              id: 'UI',
-              label: 'UI Themes',
-              icon: <Sun className="w-3.5 h-3.5" />,
-            },
-          ]}
-          value={activeTab}
-          onChange={(val) => setActiveTab(val)}
-          variant="subtle"
-          size="xs"
-          fullWidth
-          ariaLabel="Settings categories"
-        />
-      </div>
+      {/* Full-Page Top Bar */}
+      <header className="bg-theme-card border-b border-theme-subdued shrink-0 pt-[env(safe-area-inset-top)]">
+        <div className="max-w-4xl mx-auto w-full px-3 sm:px-5">
+          <div className="min-h-[48px] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 -ml-1.5 rounded-full hover:bg-theme-subtle text-theme-main transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+                aria-label="Back"
+                title="Back"
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[2.25]" />
+              </button>
+              <Settings className="w-4 h-4 text-theme-primary shrink-0" />
+              <h1 className="text-lg font-bold text-theme-main tracking-[-0.015em] truncate">
+                Settings
+              </h1>
+            </div>
 
-      {/* Tab Body */}
-      <div className="p-3 space-y-2.5 overflow-y-auto flex-1">
+            {onOpenTerminal && (
+              <Button
+                id="settings-open-terminal-btn"
+                variant="subtle"
+                size="sm"
+                onClick={onOpenTerminal}
+                title="Terminal Logs"
+              >
+                <span>Terminal</span>
+              </Button>
+            )}
+          </div>
+
+          <div className="pb-2.5">
+            <SegmentedTabs<SettingsTab>
+              items={[
+                { id: 'DATA', label: 'Data Management' },
+                { id: 'PREDICTIONS', label: 'Predictions' },
+                { id: 'UI', label: 'UI Themes' },
+              ]}
+              value={activeTab}
+              onChange={(val) => setActiveTab(val)}
+              variant="subtle"
+              size="xs"
+              fullWidth
+              ariaLabel="Settings categories"
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Full-Page Scrollable Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="max-w-4xl mx-auto w-full p-3 sm:p-5 space-y-3">
         {activeTab === 'DATA' && (
           <div className="space-y-2.5">
+            {/* Unified Load Data Switch (SQLite DB + Live Scraping) */}
+            <Card surface="elevated" padding="sm" radius="2xl" className="sm:p-3.5">
+              <div className="flex items-center justify-between gap-2.5 flex-wrap">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-theme-main">Load Data</span>
+                    <Badge variant={isLoadDataActive ? 'accent' : 'warning'} size="xs">
+                      {isLoadDataActive ? 'ON' : 'OFF'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-theme-sub mt-0.5 tabular-nums">
+                    SQLite: {isSqliteActive ? 'Active' : 'Off'} · Scraping: {isScrapingActive ? 'Online' : 'Off'} ·{' '}
+                    {effectiveGate?.dbExists ? 'Local DB present' : 'No local DB'}
+                  </div>
+                </div>
+                <Button
+                  id="manual-load-data-toggle-btn"
+                  variant={isLoadDataActive ? 'secondary' : 'primary'}
+                  size="sm"
+                  onClick={() => void handleManualLoadDataToggle(!isLoadDataActive)}
+                  disabled={isLoadDataTogglingNow || Boolean(isResettingAndSyncing || isSyncingData)}
+                  title={isLoadDataActive ? 'Switch Load Data OFF' : 'Switch Load Data ON'}
+                >
+                  <span>
+                    {isLoadDataTogglingNow
+                      ? isLoadDataActive
+                        ? 'Switching Off...'
+                        : 'Switching On...'
+                      : isLoadDataActive
+                      ? 'Load Data OFF'
+                      : 'Load Data ON'}
+                  </span>
+                </Button>
+              </div>
+            </Card>
+
             {/* Live Database Metrics Overview */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3.5 pt-2.5 pb-1.5 flex items-center">
                 <SectionHeader
                   title="Database Metrics"
                   icon={<Database className="w-3.5 h-3.5" />}
@@ -635,46 +653,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       disabled={isRefreshingMetrics}
                       title="Refresh live metrics & feed stats"
                     >
-                      <RefreshCw
-                        className={`w-3.5 h-3.5 ${isRefreshingMetrics ? 'animate-spin text-theme-primary' : ''}`}
-                      />
-                      <span>Refresh</span>
+                      <span>{isRefreshingMetrics ? 'Refreshing...' : 'Refresh'}</span>
                     </Button>
                   }
                 />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-[var(--border-subdued)]">
+              <div className="p-3 pt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <StatTile
                   label="Upcoming"
                   value={localStats?.upcomingCount ?? stats?.upcomingCount ?? '—'}
                   tone="accent"
-                  surface="flat"
+                  surface="card"
                 />
                 <StatTile
                   label="Predictions"
                   value={storedPredictionsCount}
                   tone="accent"
-                  surface="flat"
+                  surface="card"
                 />
                 <StatTile
                   label="Raw Feeds"
                   value={localStats?.rawFeedsCount ?? stats?.rawFeedsCount ?? '—'}
                   tone="accent"
-                  surface="flat"
+                  surface="card"
                 />
                 <StatTile
                   label="Historical"
                   value={localStats?.totalMatches ?? stats?.totalMatches ?? '—'}
                   tone="accent"
-                  surface="flat"
+                  surface="card"
                 />
               </div>
             </Card>
 
             {/* Scraper Engine & Circuit Breaker Diagnostics Card */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+              <div className="min-h-[34px] px-3.5 pt-2.5 pb-1.5 flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="Scraper Health"
                   icon={<Cpu className="w-3.5 h-3.5" />}
@@ -682,7 +697,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
                 <div className="flex items-center gap-2">
                   <Badge variant={isScrapingActive ? 'accent' : 'warning'} size="xs">
-                    {isScrapingActive ? 'ONLINE' : 'BLOCKED · OFF'}
+                    {isScrapingActive ? 'ONLINE' : 'OFF'}
                   </Badge>
                   <span className="text-xs font-normal tabular-nums text-theme-sub">
                     Circuit Failures:{' '}
@@ -691,57 +706,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              <div className="px-3.5 py-2.5 border-b border-theme-subdued space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <span className="font-semibold text-theme-main">Flashscore Data Scraping</span>
-                    <div className="text-xs text-theme-sub mt-0.5">
-                      {isScrapingActive
-                        ? 'Manually switched ON (live polling & sync active)'
-                        : 'Turned off on app initialization until switched ON manually'}
-                    </div>
-                  </div>
-                  <Button
-                    id="manual-scraping-toggle-btn"
-                    variant={isScrapingActive ? 'secondary' : 'primary'}
-                    size="xs"
-                    onClick={() => void handleManualScrapingToggle(!isScrapingActive)}
-                    disabled={isScrapingTogglingNow || Boolean(isResettingAndSyncing || isSyncingData)}
-                    title={
-                      isScrapingActive
-                        ? 'Switch data scraping OFF (blocks all Flashscore HTTP requests)'
-                        : 'Switch data scraping ON manually'
-                    }
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                    <span>
-                      {isScrapingTogglingNow
-                        ? isScrapingActive
-                          ? 'Switching Off...'
-                          : 'Switching On...'
-                        : isScrapingActive
-                        ? 'Switch Scraping OFF'
-                        : 'Switch Scraping ON'}
-                    </span>
-                  </Button>
-                </div>
-
-                {!isScrapingActive && (
-                  <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                    <span>
-                      Remote data scraping is completely turned off on startup. Switch Scraping ON manually above to enable live scores and sync feeds.
-                    </span>
-                  </div>
-                )}
-              </div>
-
               {scraperStatus?.mirrors && scraperStatus.mirrors.length > 0 && (
                 <div className="divide-y divide-[var(--border-subdued)] text-sm">
                   {scraperStatus.mirrors.map((m: any, idx: number) => (
-                    <div key={idx} className="min-h-[32px] px-3 py-1.5 flex items-center justify-between gap-2">
+                    <div key={idx} className="min-h-[32px] px-3.5 py-1.5 flex items-center justify-between gap-2">
                       <span className="truncate text-theme-main font-medium">{m.name}</span>
-                      <span className={`text-xs font-semibold shrink-0 ${isScrapingActive ? 'text-theme-primary' : 'text-amber-700 dark:text-amber-400'}`}>
+                      <span className={`text-xs font-semibold shrink-0 ${isScrapingActive ? 'text-theme-primary' : 'text-theme-warning'}`}>
                         {m.status}
                       </span>
                     </div>
@@ -752,7 +722,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Storage Status Section (flattened - single card) */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
+              <div className="min-h-[34px] px-3.5 pt-2.5 pb-1.5 flex items-center">
                 <SectionHeader
                   title="Storage Status"
                   icon={<Server className="w-3.5 h-3.5" />}
@@ -761,7 +731,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   action={
                     <div className="flex items-center gap-1.5">
                       <Badge variant={isSqliteActive ? 'accent' : 'warning'} size="xs">
-                        {isSqliteActive ? 'ONLINE' : 'BLOCKED · OFF'}
+                        {isSqliteActive ? 'ONLINE' : 'OFF'}
                       </Badge>
                       <Button
                         variant="secondary"
@@ -769,63 +739,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={fetchStorageStatus}
                         disabled={isCheckingStorage}
                       >
-                        <RefreshCw
-                          className={`w-3.5 h-3.5 ${isCheckingStorage ? 'animate-spin text-theme-primary' : ''}`}
-                        />
-                        <span>Test</span>
+                        <span>{isCheckingStorage ? 'Testing...' : 'Test'}</span>
                       </Button>
                     </div>
                   }
                 />
               </div>
 
-              <div className="px-3.5 py-2.5 space-y-2 text-sm tabular-nums">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <span className="font-semibold text-theme-main">SQLite Storage Engine</span>
-                    <div className="text-xs text-theme-sub mt-0.5">
-                      {effectiveGate?.dbExists
-                        ? 'football_engine.db present on disk'
-                        : 'No football_engine.db file on preview'}
-                      {' · '}
-                      {isSqliteActive ? 'Manually Switched ON' : 'Auto-init blocked until switched ON'}
-                    </div>
-                  </div>
-                  <Button
-                    id="manual-sqlite-toggle-btn"
-                    variant={isSqliteActive ? 'secondary' : 'primary'}
-                    size="xs"
-                    onClick={() => void handleManualSqliteToggle(!isSqliteActive)}
-                    disabled={isSqliteTogglingNow || Boolean(isResettingAndSyncing || isSyncingData)}
-                    title={
-                      isSqliteActive
-                        ? 'Switch SQLite DB OFF (closes connection and blocks auto-init)'
-                        : 'Switch SQLite DB ON manually'
-                    }
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                    <span>
-                      {isSqliteTogglingNow
-                        ? isSqliteActive
-                          ? 'Switching Off...'
-                          : 'Switching On...'
-                        : isSqliteActive
-                        ? 'Switch SQLite OFF'
-                        : 'Switch SQLite ON'}
-                    </span>
-                  </Button>
-                </div>
-
-                {!isSqliteActive && (
-                  <div className="px-2.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-theme-main flex items-start gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                    <span>
-                      SQLite initialization is blocked on app startup and when{' '}
-                      <span className="font-mono">football_engine.db</span> is missing on preview. Switch ON manually above or restore a backup from Google Drive below.
-                    </span>
-                  </div>
-                )}
-
+              <div className="px-3.5 pb-3 pt-1 space-y-2 text-sm tabular-nums">
                 <div className="truncate text-theme-sub text-xs font-normal">
                   Path:{' '}
                   <span className="text-theme-main font-medium">
@@ -838,11 +759,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <strong className="text-theme-primary font-semibold">{storageStatus?.storageEngine?.sizeMB ?? 0} MB</strong>
                   </span>
                   <span className="text-theme-primary font-medium">
-                    {storageStatus?.storageEngine?.journalMode || (isSqliteActive ? 'WAL Mode' : 'BLOCKED')}
+                    {storageStatus?.storageEngine?.journalMode || (isSqliteActive ? 'WAL Mode' : 'OFF')}
                   </span>
                 </div>
                 {(storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error) && (
-                  <p className="text-xs text-rose-700 dark:text-rose-400 truncate font-medium">
+                  <p className="text-xs text-theme-danger truncate font-medium">
                     Err: {storageStatus?.footballDb?.error || storageStatus?.predictionsDb?.error}
                   </p>
                 )}
@@ -852,7 +773,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Dev Preview Only: Google Drive SQLite Storage Card */}
             {isDevPreviewClient && (
               <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-                <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center justify-between gap-2">
+                <div className="min-h-[34px] px-3.5 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
                   <SectionHeader
                     title="Google Drive DB Backup"
                     icon={<Cloud className="w-3.5 h-3.5" />}
@@ -863,17 +784,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </Badge>
                 </div>
 
-                <div className="p-3.5 space-y-2.5 text-sm">
-                  <p className="text-xs text-theme-sub leading-relaxed">
-                    Store or restore <span className="font-mono text-theme-main">football_engine.db</span> ({storageStatus?.storageEngine?.sizeMB ?? 0} MB) in your Google Drive strictly for dev server preview sessions.
-                  </p>
-
+                <div className="px-3.5 pb-3.5 pt-1.5 space-y-2.5 text-sm">
                   {driveNotice && (
                     <div
-                      className={`px-2.5 py-2 rounded-xl text-xs font-medium flex items-start gap-2 border ${
+                      className={`px-2.5 py-2 rounded-xl text-xs font-medium flex items-start gap-2 ${
                         driveNotice.type === 'success'
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-                          : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
+                          ? 'bg-emerald-500/12 text-theme-success'
+                          : 'bg-rose-500/12 text-theme-danger'
                       }`}
                     >
                       {driveNotice.type === 'success' ? (
@@ -888,21 +805,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {driveNeedsAuth || !driveToken ? (
                     <div className="pt-0.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <span className="text-xs text-theme-dim">
-                        Sign in to connect Google Drive for dev preview database sync.
+                        Connect Google Drive
                       </span>
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => void handleDriveSignIn('FIREBASE')}
                           disabled={isDriveLoggingIn}
-                          className="inline-flex items-center justify-center gap-2.5 h-[38px] px-4 rounded-full bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm shadow-xs transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                          className="inline-flex items-center justify-center h-[38px] px-4 rounded-full bg-white text-[#1f1f1f] border border-[#747775]/40 hover:bg-[#f8f9fa] active:bg-[#f1f3f4] font-medium text-sm transition-colors cursor-pointer disabled:opacity-60 shrink-0"
                         >
-                          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                          </svg>
                           <span>{isDriveLoggingIn ? 'Signing in...' : 'Sign in with Google'}</span>
                         </button>
                         {showDirectOAuthFallback && (
@@ -920,7 +831,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-2.5">
-                      <div className="px-2.5 py-2 rounded-xl bg-theme-subtle border border-theme-subdued flex items-center justify-between gap-2 flex-wrap text-xs">
+                      <div className="px-2.5 py-2 rounded-xl bg-theme-card flex items-center justify-between gap-2 flex-wrap text-xs">
                         <div className="min-w-0">
                           <div className="font-semibold text-theme-main truncate">
                             {driveUser?.email || driveUser?.displayName || 'Google Drive Connected'}
@@ -943,8 +854,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             disabled={isCheckingDrive || isDriveMutating}
                             title="Refresh Google Drive backup status"
                           >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingDrive ? 'animate-spin text-theme-primary' : ''}`} />
-                            <span>Check</span>
+                            <span>{isCheckingDrive ? 'Checking...' : 'Check'}</span>
                           </Button>
                           <Button
                             variant="subtle"
@@ -953,24 +863,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             disabled={isDriveMutating}
                             title="Sign out of Google Drive"
                           >
-                            <LogOut className="w-3.5 h-3.5" />
                             <span>Sign out</span>
                           </Button>
                         </div>
                       </div>
 
                       {pendingDriveConfirm ? (
-                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                          <p className="text-xs font-semibold text-theme-main flex items-start gap-1.5">
-                            <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 space-y-2">
+                          <p className="text-xs font-semibold text-theme-main flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-theme-warning shrink-0" />
                             <span>
                               {pendingDriveConfirm === 'UPLOAD'
                                 ? driveFileMeta
-                                  ? `Overwrite '${driveFileMeta.name}' in your Google Drive with the current local SQLite database (${storageStatus?.storageEngine?.sizeMB ?? 0} MB)?`
-                                  : `Upload and create 'football_engine.db' (${storageStatus?.storageEngine?.sizeMB ?? 0} MB) in your Google Drive?`
+                                  ? `Overwrite '${driveFileMeta.name}' (${storageStatus?.storageEngine?.sizeMB ?? 0} MB)?`
+                                  : `Upload 'football_engine.db' (${storageStatus?.storageEngine?.sizeMB ?? 0} MB)?`
                                 : pendingDriveConfirm === 'RESTORE'
-                                ? `Replace the local dev preview SQLite database with '${driveFileMeta?.name}' (${(Number(driveFileMeta?.size || 0) / (1024 * 1024)).toFixed(2)} MB) from Google Drive?`
-                                : `Permanently delete '${driveFileMeta?.name}' (${(Number(driveFileMeta?.size || 0) / (1024 * 1024)).toFixed(2)} MB) from your Google Drive? This action cannot be undone.`}
+                                ? `Restore '${driveFileMeta?.name}' (${(Number(driveFileMeta?.size || 0) / (1024 * 1024)).toFixed(2)} MB)?`
+                                : `Delete '${driveFileMeta?.name}' from Google Drive?`}
                             </span>
                           </p>
                           <div className="flex items-center gap-2">
@@ -1006,10 +915,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             variant="primary"
                             size="sm"
                             onClick={() => setPendingDriveConfirm('UPLOAD')}
-                            disabled={!isSqliteActive || isDriveMutating || isOperating}
-                            title={!isSqliteActive ? 'Switch SQLite DB ON manually before backing up to Drive' : undefined}
+                            disabled={!isLoadDataActive || isDriveMutating || isOperating}
+                            title={!isLoadDataActive ? 'Switch Load Data ON before backing up to Drive' : undefined}
                           >
-                            <Upload className="w-3.5 h-3.5" />
                             <span>
                               {isDriveMutating
                                 ? 'Syncing Drive...'
@@ -1024,7 +932,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onClick={() => setPendingDriveConfirm('RESTORE')}
                             disabled={!driveFileMeta || isDriveMutating || Boolean(isResettingAndSyncing || isSyncingData)}
                           >
-                            <Download className="w-3.5 h-3.5" />
                             <span>Restore from Drive</span>
                           </Button>
                           {driveFileMeta && (
@@ -1035,8 +942,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               disabled={isDriveMutating || isOperating}
                               title="Delete backup file from Google Drive"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                              <span className="text-rose-700 dark:text-rose-400">Delete</span>
+                              <span className="text-theme-danger">Delete</span>
                             </Button>
                           )}
                         </div>
@@ -1060,49 +966,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </Badge>
               </div>
 
-              {(!isSqliteActive || !isScrapingActive) && (
+              {!isLoadDataActive && (
                 <p className="text-xs text-theme-sub">
-                  {!isSqliteActive && !isScrapingActive
-                    ? 'Switch both SQLite DB and Data Scraping ON manually above before running Full Data Sync.'
-                    : !isSqliteActive
-                    ? 'Switch SQLite DB ON manually in Storage Status above before running Full Data Sync.'
-                    : 'Switch Data Scraping ON manually in Scraper Health above before running Full Data Sync.'}
+                  Requires Load Data ON
                 </p>
               )}
 
               <label
                 htmlFor="full-sync-reset-data-checkbox"
-                className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer select-none ${
+                className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-colors cursor-pointer select-none ${
                   resetFullSyncData
-                    ? 'bg-amber-500/10 border-amber-500/35'
-                    : 'bg-theme-card border-theme-subdued hover:border-theme'
-                } ${!isSqliteActive || !isScrapingActive || isOperating ? 'opacity-60 pointer-events-none' : ''}`}
+                    ? 'bg-amber-500/12'
+                    : 'bg-theme-card hover:bg-theme-subtle'
+                } ${!isLoadDataActive || isOperating ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <input
                   id="full-sync-reset-data-checkbox"
                   type="checkbox"
                   checked={resetFullSyncData}
                   onChange={(e) => setResetFullSyncData(e.target.checked)}
-                  disabled={!isSqliteActive || !isScrapingActive || isOperating}
-                  className="mt-0.5 h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
+                  disabled={!isLoadDataActive || isOperating}
+                  className="h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
                 />
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-theme-main">
-                      Reset existing data before sync
+                <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-theme-main">
+                    Reset existing data before sync
+                  </span>
+                  {resetFullSyncData && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-theme-warning">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      Wipes DB &amp; cache
                     </span>
-                    {resetFullSyncData && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                        <AlertTriangle className="w-3 h-3" />
-                        Wipes DB &amp; cache
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-2xs text-theme-sub leading-relaxed">
-                    {resetFullSyncData
-                      ? 'Clears all synced matches, upcoming fixtures, standings, raw feeds, stored predictions, and browser cache before fetching fresh data.'
-                      : 'Retains existing historical matches, completed predictions, and cached feeds while merging newly scraped fixtures and results.'}
-                  </p>
+                  )}
                 </div>
               </label>
 
@@ -1113,16 +1008,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="md"
                   fullWidth
                   onClick={() => setIsConfirmingReset(true)}
-                  disabled={!isSqliteActive || !isScrapingActive || isOperating}
+                  disabled={!isLoadDataActive || isOperating}
                 >
-                  <RefreshCw className="w-4 h-4" />
                   <span>{resetFullSyncData ? 'Reset & Full Data Sync' : 'Full Data Sync'}</span>
                 </Button>
               ) : (
                 <div className="pt-1 space-y-2">
                   <p className="text-sm font-semibold text-theme-main flex items-center gap-1.5">
                     {resetFullSyncData ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <AlertTriangle className="w-3.5 h-3.5 text-theme-warning shrink-0" />
                     ) : (
                       <RefreshCw className="w-3.5 h-3.5 text-theme-primary shrink-0" />
                     )}
@@ -1139,7 +1033,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClick={handleExecuteResetAndSync}
                       disabled={isOperating}
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
                       <span>{resetFullSyncData ? 'Reset & Start Sync' : 'Confirm & Start Sync'}</span>
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => setIsConfirmingReset(false)}>
@@ -1174,10 +1067,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <label
                 htmlFor="calc-predictions-reset-data-checkbox"
-                className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer select-none ${
+                className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-colors cursor-pointer select-none ${
                   resetCalcData
-                    ? 'bg-amber-500/10 border-amber-500/35'
-                    : 'bg-theme-card border-theme-subdued hover:border-theme'
+                    ? 'bg-amber-500/12'
+                    : 'bg-theme-card hover:bg-theme-subtle'
                 } ${!isSqliteActive || isOperating ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <input
@@ -1186,25 +1079,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   checked={resetCalcData}
                   onChange={(e) => setResetCalcData(e.target.checked)}
                   disabled={!isSqliteActive || isOperating}
-                  className="mt-0.5 h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
+                  className="h-4 w-4 rounded border-theme text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
                 />
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-theme-main">
-                      Reset existing prediction data
+                <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-theme-main">
+                    Reset existing prediction data
+                  </span>
+                  {resetCalcData && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-theme-warning">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      Clears stored predictions
                     </span>
-                    {resetCalcData && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                        <AlertTriangle className="w-3 h-3" />
-                        Clears stored predictions
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-2xs text-theme-sub leading-relaxed">
-                    {resetCalcData
-                      ? 'Wipes all stored upcoming and historical predictions, fixture market/stats caches, and H2H measurement matrices before recalculating all markets & combo bet markets.'
-                      : 'Preserves evaluated historical predictions (and refreshes their combo markets) while recalculating all markets including combo bet markets for upcoming fixtures.'}
-                  </p>
+                  )}
                 </div>
               </label>
 
@@ -1215,16 +1101,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="md"
                   fullWidth
                   onClick={() => setIsConfirmingCalc(true)}
-                  disabled={!isSqliteActive || isOperating}
+                  disabled={!isLoadDataActive || isOperating}
                 >
-                  <RefreshCw className="w-4 h-4" />
                   <span>{resetCalcData ? 'Reset & Calculate Predictions' : 'Calculate Predictions'}</span>
                 </Button>
               ) : (
                 <div className="pt-1 space-y-2">
                   <p className="text-sm font-semibold text-theme-main flex items-center gap-1.5">
                     {resetCalcData ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <AlertTriangle className="w-3.5 h-3.5 text-theme-warning shrink-0" />
                     ) : (
                       <TrendingUp className="w-3.5 h-3.5 text-theme-primary shrink-0" />
                     )}
@@ -1241,9 +1126,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       size="sm"
                       className="flex-1"
                       onClick={handleCalculatePredictions}
-                      disabled={!isSqliteActive || isOperating}
+                      disabled={!isLoadDataActive || isOperating}
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
                       <span>{resetCalcData ? 'Reset & Calculate' : 'Confirm & Calculate'}</span>
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => setIsConfirmingCalc(false)}>
@@ -1256,11 +1140,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Dedicated Card: Volatile Competitions & High Parity Exclusions */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+              <div className="min-h-[38px] px-3.5 pt-2.5 pb-1.5 flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="Volatile Leagues Filter & Exclusions"
                   size="sm"
-                  icon={<ShieldAlert className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />}
+                  icon={<ShieldAlert className="w-3.5 h-3.5 text-theme-warning" />}
                 />
                 <div className="flex items-center gap-2">
                   <Badge variant={excludeVolatileLeaguesLocal ? 'accent' : 'warning'} size="xs">
@@ -1273,20 +1157,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onClick={() => handleToggleExcludeVolatile(!excludeVolatileLeaguesLocal)}
                     title="Toggle whether high-volatility/parity leagues are excluded from default feeds and predictions"
                   >
-                    <Power className="w-3.5 h-3.5" />
                     <span>{excludeVolatileLeaguesLocal ? 'Turn Off Filter' : 'Exclude Volatile Leagues'}</span>
                   </Button>
                 </div>
               </div>
 
-              <div className="p-3.5 space-y-2.5 text-xs text-theme-sub">
-                <p className="leading-relaxed">
-                  Competitions with elevated upset variance (<span className="font-mono">V_L &gt; 1.10</span>), high draw skew (~30%+), or compressed squad parity (EFL Championship, 2. Bundesliga, Serie B, MLS, Süper Lig, etc.) are automatically excluded from the main prediction feed and accumulator selections when enabled.
-                </p>
-
-                <div className="pt-1">
+              <div className="px-3.5 pb-3.5 pt-1.5 space-y-2.5 text-xs text-theme-sub">
+                <div>
                   <Input
-                    placeholder="Search 10 known volatile leagues by name, country, or code..."
+                    placeholder="Search volatile leagues..."
                     value={volatileLeaguesSearch}
                     onChange={(e) => setVolatileLeaguesSearch(e.target.value)}
                     leftIcon={<Search className="w-3.5 h-3.5" />}
@@ -1303,35 +1182,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     return (
                       l.name.toLowerCase().includes(q) ||
                       l.country.toLowerCase().includes(q) ||
-                      l.code.toLowerCase().includes(q) ||
-                      l.reason.toLowerCase().includes(q)
+                      l.code.toLowerCase().includes(q)
                     );
                   }).map((l) => (
                     <div key={l.id} className="pt-1.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-theme-main text-sm">{l.name}</span>
-                          <span className="text-2xs font-normal text-theme-sub">({l.country})</span>
-                          <Badge variant="default" size="xs">
-                            {l.code}
-                          </Badge>
-                          <Badge variant="warning" size="xs">
-                            V_L ~ {l.typicalVl.toFixed(2)}x
-                          </Badge>
-                        </div>
-                        <p className="text-2xs text-theme-dim mt-0.5 line-clamp-2 leading-relaxed">
-                          {l.reason}
-                        </p>
+                      <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-theme-main text-sm">{l.name}</span>
+                        <span className="text-2xs font-normal text-theme-sub">({l.country})</span>
+                        <Badge variant="default" size="xs">
+                          {l.code}
+                        </Badge>
+                        <Badge variant="warning" size="xs">
+                          V_L ~ {l.typicalVl.toFixed(2)}x
+                        </Badge>
                       </div>
                       <div className="shrink-0">
                         <span
                           className={`text-2xs font-semibold px-2.5 py-0.5 rounded-full ${
                             excludeVolatileLeaguesLocal
-                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25'
+                              ? 'bg-emerald-500/12 text-theme-success'
+                              : 'bg-amber-500/12 text-theme-warning'
                           }`}
                         >
-                          {excludeVolatileLeaguesLocal ? 'EXCLUDED FROM FEED' : 'INCLUDED'}
+                          {excludeVolatileLeaguesLocal ? 'EXCLUDED' : 'INCLUDED'}
                         </span>
                       </div>
                     </div>
@@ -1342,7 +1215,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Calibration Card: League Volatility Coefficient (V_L) - ALL LEAGUES LISTED */}
             <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-              <div className="min-h-[38px] px-3.5 py-2 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+              <div className="min-h-[38px] px-3.5 pt-2.5 pb-1.5 flex items-center justify-between gap-2 flex-wrap">
                 <SectionHeader
                   title="League Volatility Calibration (V_L)"
                   size="sm"
@@ -1353,19 +1226,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   variant="secondary"
                   size="xs"
                   onClick={() => void handleCalibrateVolatility()}
-                  disabled={!isSqliteActive || isCalibratingVolatility || isOperating}
+                  disabled={!isLoadDataActive || isCalibratingVolatility || isOperating}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isCalibratingVolatility ? 'animate-spin text-theme-primary' : ''}`} />
                   <span>{isCalibratingVolatility ? 'Calibrating...' : 'Calibrate V_L'}</span>
                 </Button>
               </div>
 
               <div className="px-3.5 py-2 text-xs text-theme-sub space-y-2">
-                <p className="leading-relaxed">
-                  Scales Elo K-rate (<span className="font-mono">K/V_L</span>), Bayesian prior shrinkage (<span className="font-mono">W·V_L</span>), temperature (<span className="font-mono">T=V_L^α</span>), and Monte Carlo variance.
-                </p>
                 {volatilityMessage && (
-                  <div className="px-2.5 py-1.5 rounded-lg bg-theme-primary-subtle border border-theme-neon text-theme-primary font-medium">
+                  <div className="px-2.5 py-1.5 rounded-lg bg-theme-primary-subtle text-theme-primary font-medium">
                     {volatilityMessage}
                   </div>
                 )}
@@ -1410,7 +1279,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {isLoadingVolatility ? (
-                <div className="px-3.5 py-3 text-xs text-theme-dim border-t border-theme-subdued">
+                <div className="px-3.5 py-3 text-xs text-theme-dim">
                   Loading volatility calibration table...
                 </div>
               ) : leagueVolatilities.length > 0 ? (
@@ -1426,10 +1295,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   });
 
                   return (
-                    <div className="border-t border-theme-subdued">
+                    <div>
                       <div className="max-h-72 overflow-y-auto">
                         <table className="w-full text-left text-xs tabular-nums">
-                          <thead className="sticky top-0 bg-theme-subtle/95 backdrop-blur-xs text-2xs uppercase tracking-[0.06em] text-theme-sub z-10 border-b border-theme-subdued">
+                          <thead className="sticky top-0 bg-theme-card text-2xs uppercase tracking-[0.06em] text-theme-sub z-10">
                             <tr>
                               <th className="px-3 py-1.5 font-semibold">League</th>
                               <th className="px-2 py-1.5 font-semibold text-right">Matches</th>
@@ -1442,12 +1311,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {filtered.length === 0 ? (
                               <tr>
                                 <td colSpan={5} className="px-3 py-4 text-center text-xs text-theme-dim">
-                                  No leagues matched search &quot;{volatilitySearch}&quot;
+                                  No leagues found
                                 </td>
                               </tr>
                             ) : (
                               filtered.map((row) => (
-                                <tr key={row.league_id} className="hover:bg-theme-card-elevated">
+                                <tr key={row.league_id} className="hover:bg-theme-card">
                                   <td className="px-3 py-1.5 font-medium text-theme-main max-w-[190px] truncate">
                                     {row.league_name}
                                   </td>
@@ -1464,7 +1333,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                         row.is_fallback
                                           ? 'text-theme-dim'
                                           : row.volatility_coefficient > 1.05
-                                          ? 'text-amber-700 dark:text-amber-400'
+                                          ? 'text-theme-warning'
                                           : 'text-theme-primary'
                                       }
                                     >
@@ -1478,7 +1347,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </tbody>
                         </table>
                       </div>
-                      <div className="px-3 py-1.5 bg-theme-subtle/50 border-t border-theme-subdued text-2xs text-theme-dim flex items-center justify-between">
+                      <div className="px-3 py-1.5 bg-theme-card/60 text-2xs text-theme-dim flex items-center justify-between">
                         <span>Showing {filtered.length} of {leagueVolatilities.length} leagues in database</span>
                         <span>* Fallback (N &lt; 100)</span>
                       </div>
@@ -1486,10 +1355,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   );
                 })()
               ) : (
-                <div className="px-3.5 py-2.5 text-xs text-theme-dim border-t border-theme-subdued">
-                  {isSqliteActive
-                    ? 'No volatility records stored yet. Run Calibrate V_L to analyze historical leagues.'
-                    : 'Enable SQLite DB manually in Data Management to view or calibrate league volatility.'}
+                <div className="px-3.5 py-2.5 text-xs text-theme-dim">
+                  No volatility data found
                 </div>
               )}
             </Card>
@@ -1501,17 +1368,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 size="sm"
                 icon={<Download className="w-3.5 h-3.5" />}
               />
-
-              <p className="text-sm font-normal text-theme-sub leading-relaxed font-sans">
-                Export all calculated market predictions (1X2, Over/Under, Combo Bet Markets, Double Chance, BTTS, Team Goals &amp; Specials) to JSON.
-              </p>
-
-              {exportToast && (
-                <div className="p-2.5 rounded-xl bg-theme-primary-subtle border border-theme-neon text-theme-primary text-sm font-medium flex items-center gap-2">
-                  <Check className="w-4 h-4 text-theme-primary shrink-0" />
-                  <span>{exportToast}</span>
-                </div>
-              )}
 
               <div className="space-y-1 pt-0.5">
                 <label className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] block">
@@ -1537,9 +1393,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 size="md"
                 fullWidth
                 onClick={handleExportPredictions}
-                disabled={!isSqliteActive || isExporting || isOperating}
+                disabled={!isLoadDataActive || isExporting || isOperating}
               >
-                <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
                 <span>{isExporting ? 'Exporting Predictions...' : 'Export All-Market Predictions (JSON)'}</span>
               </Button>
             </Card>
@@ -1592,33 +1447,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={() => theme !== 'light' && onToggleTheme()}
-                  className={`h-[34px] px-3.5 rounded-full border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3.5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'light'
-                      ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
-                      : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
+                      ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                      : 'bg-theme-card text-theme-sub font-medium hover:bg-theme-subtle hover:text-theme-main'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
-                    <span className="text-base text-theme-main">Light</span>
-                  </div>
-                  {theme === 'light' && <Check className="w-4 h-4 text-theme-primary stroke-[2.5]" />}
+                  <span className="text-base">Light</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => theme !== 'dark' && onToggleTheme()}
-                  className={`h-[34px] px-3.5 rounded-full border flex items-center justify-between transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[34px] px-3.5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     theme === 'dark'
-                      ? 'bg-theme-card text-theme-main font-semibold border-theme-accent shadow-theme-glow'
-                      : 'bg-theme-card/60 border-theme-subdued text-theme-sub font-medium hover:bg-theme-card hover:text-theme-main'
+                      ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                      : 'bg-theme-card text-theme-sub font-medium hover:bg-theme-subtle hover:text-theme-main'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Moon className="w-4 h-4 text-theme-primary shrink-0" />
-                    <span className="text-base text-theme-main">Dark</span>
-                  </div>
-                  {theme === 'dark' && <Check className="w-4 h-4 text-theme-primary stroke-[2.5]" />}
+                  <span className="text-base">Dark</span>
                 </button>
               </div>
             </Card>
@@ -1646,16 +1493,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           handleSelectColorTheme(t.id);
                         }
                       }}
-                      className={`group relative rounded-2xl border overflow-hidden transition-all duration-150 cursor-pointer flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                      className={`group relative rounded-2xl overflow-hidden transition-all duration-150 cursor-pointer flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                         isSelected
-                          ? 'bg-theme-card border-theme-accent shadow-theme-glow'
-                          : 'bg-theme-card border-theme hover:border-theme-accent hover:shadow-theme-sm'
+                          ? 'bg-theme-card ring-2 ring-theme-accent'
+                          : 'bg-theme-card hover:bg-theme-subtle/50'
                       }`}
                     >
-                      {/* Theme Accent Gradient Strip Header */}
+                      {/* Flat Theme Accent Strip Header */}
                       <div
                         className="h-1.5 w-full"
-                        style={{ background: t.previewColors.gradient }}
+                        style={{ backgroundColor: t.previewColors.primary }}
                       />
 
                       <div className="p-2.5 space-y-1.5">
@@ -1674,7 +1521,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </div>
                           {isSelected ? (
                             <Badge variant="solid" size="xs" className="shrink-0">
-                              <Check className="w-3 h-3 stroke-[3]" />
+                              <Check className="w-3.5 h-3.5 stroke-[2.75]" />
                               <span>Active</span>
                             </Badge>
                           ) : null}
@@ -1686,11 +1533,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           </p>
                         )}
 
-                        <div className="pt-1.5 border-t border-theme-subdued flex items-center justify-between gap-2">
+                        <div className="pt-1.5 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
                             <span
-                              className="w-4 h-4 rounded-md shrink-0 shadow-sm"
-                              style={{ background: t.previewColors.gradient }}
+                              className="w-4 h-4 rounded-md shrink-0"
+                              style={{ backgroundColor: t.previewColors.primary }}
                               title={`Primary Accent: ${t.accentName}`}
                             />
                             <span
@@ -1739,10 +1586,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   return (
                     <div
                       key={t.id}
-                      className={`rounded-xl border p-2 space-y-1.5 transition-colors ${
+                      className={`rounded-xl p-2 space-y-1.5 transition-all ${
                         isCurrentPalette
-                          ? 'border-theme-accent bg-theme-primary-subtle'
-                          : 'border-theme-subdued bg-theme-card'
+                          ? 'bg-theme-primary-subtle ring-2 ring-theme-accent'
+                          : 'bg-theme-card'
                       }`}
                     >
                       <div className="text-2xs font-semibold text-theme-main truncate text-center">
@@ -1755,10 +1602,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             if (theme !== 'light') onToggleTheme();
                             handleSelectColorTheme(t.id);
                           }}
-                          className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                          className={`p-1.5 rounded-lg flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                             isCurrentPalette && theme === 'light'
-                              ? 'border-theme-accent ring-1 ring-theme-accent'
-                              : 'border-slate-300/70 hover:border-theme-accent'
+                              ? 'ring-2 ring-theme-accent'
+                              : 'hover:ring-1 hover:ring-theme-accent'
                           }`}
                           style={{ backgroundColor: t.previewColors.surfaceLight }}
                           title={`Apply ${t.name} in Light mode`}
@@ -1772,10 +1619,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             if (theme !== 'dark') onToggleTheme();
                             handleSelectColorTheme(t.id);
                           }}
-                          className={`p-1.5 rounded-lg border flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                          className={`p-1.5 rounded-lg flex flex-col items-center gap-1 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                             isCurrentPalette && theme === 'dark'
-                              ? 'border-theme-accent ring-1 ring-theme-accent'
-                              : 'border-white/10 hover:border-theme-accent'
+                              ? 'ring-2 ring-theme-accent'
+                              : 'hover:ring-1 hover:ring-theme-accent'
                           }`}
                           style={{ backgroundColor: t.previewColors.surfaceDark }}
                           title={`Apply ${t.name} in Dark mode`}
@@ -1792,14 +1639,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         )}
 
-        {/* Toast Notification */}
-        {showSavedToast && (
-          <div className="p-2.5 rounded-xl bg-theme-primary-subtle border border-theme-neon text-theme-primary text-sm font-medium flex items-center gap-2 shadow-theme-glow">
-            <Check className="w-4 h-4 text-theme-primary" />
-            <span>Settings saved successfully</span>
-          </div>
-        )}
+        </div>
       </div>
-    </Modal>
+
+      {/* Full-Page Footer Action Bar */}
+      <footer className="bg-theme-card border-t border-theme-subdued shrink-0 px-3 sm:px-5 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+10px)]">
+        <div className="max-w-4xl mx-auto w-full flex items-center justify-end gap-2">
+          <Button variant="subtle" size="sm" onClick={onClose}>
+            Close
+          </Button>
+          <Button id="save-settings-btn" variant="primary" size="sm" onClick={handleSave}>
+            Save Settings
+          </Button>
+        </div>
+      </footer>
+    </div>
   );
 };

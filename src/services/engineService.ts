@@ -147,7 +147,12 @@ export class EngineService {
     search?: string;
     sortBy?: string;
     marketFilter?: string;
+    popularMarkets?: string[];
   }): string {
+    const popularKey =
+      params?.marketFilter === 'POPULAR' && params?.popularMarkets?.length
+        ? params.popularMarkets.slice(0, 3).join(',')
+        : '';
     return [
       'query',
       params?.league || 'ALL',
@@ -157,6 +162,7 @@ export class EngineService {
       (params?.search || '').trim().toLowerCase(),
       params?.sortBy || 'DEFAULT',
       params?.marketFilter || 'MOST_LIKELY',
+      popularKey,
     ].join('_');
   }
 
@@ -169,6 +175,7 @@ export class EngineService {
       search?: string;
       sortBy?: string;
       marketFilter?: string;
+      popularMarkets?: string[];
     },
     options?: { forceRefresh?: boolean; signal?: AbortSignal }
   ): Promise<FixturesQueryResponse> {
@@ -184,6 +191,9 @@ export class EngineService {
     if (params?.sortBy && params.sortBy !== 'DEFAULT') urlParams.set('sortBy', params.sortBy);
     if (params?.marketFilter && params.marketFilter !== 'MOST_LIKELY') {
       urlParams.set('marketFilter', params.marketFilter);
+    }
+    if (params?.marketFilter === 'POPULAR' && params?.popularMarkets?.length) {
+      urlParams.set('popularMarkets', params.popularMarkets.slice(0, 3).join(','));
     }
     if (options?.forceRefresh) urlParams.set('force', '1');
 
@@ -376,6 +386,7 @@ export class EngineService {
   }
 
   public static async getStorageStatus(): Promise<{
+    loadDataEnabled?: boolean;
     sqliteGate?: SqliteGateState;
     scrapingGate?: ScrapingGateState;
     footballDb: {
@@ -415,47 +426,39 @@ export class EngineService {
     return null;
   }
 
-  public static async toggleSqliteDb(enabled: boolean): Promise<{
+  public static async toggleLoadData(enabled: boolean): Promise<{
     success: boolean;
+    loadDataEnabled?: boolean;
     sqliteGate?: SqliteGateState;
+    scrapingGate?: ScrapingGateState;
     stats?: any;
     message?: string;
     error?: string;
   }> {
-    const serverData = await this.safeJsonFetch('/api/settings/sqlite-toggle', {
+    const serverData = await this.safeJsonFetch('/api/settings/load-data-toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     });
     if (serverData && serverData.success) {
-      await ClientCache.clearDynamicData();
+      await Promise.all([
+        ClientCache.clearDynamicData(),
+        ClientCache.setCachedLiveScores([]),
+      ]);
       return serverData;
     }
     return {
       success: false,
-      error: serverData?.error || `Failed to switch SQLite DB ${enabled ? 'ON' : 'OFF'}.`,
+      error: serverData?.error || `Failed to switch Load Data ${enabled ? 'ON' : 'OFF'}.`,
     };
   }
 
-  public static async toggleScraping(enabled: boolean): Promise<{
-    success: boolean;
-    scrapingGate?: ScrapingGateState;
-    message?: string;
-    error?: string;
-  }> {
-    const serverData = await this.safeJsonFetch('/api/settings/scraping-toggle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled }),
-    });
-    if (serverData && serverData.success) {
-      await ClientCache.setCachedLiveScores([]);
-      return serverData;
-    }
-    return {
-      success: false,
-      error: serverData?.error || `Failed to switch data scraping ${enabled ? 'ON' : 'OFF'}.`,
-    };
+  public static async toggleSqliteDb(enabled: boolean) {
+    return this.toggleLoadData(enabled);
+  }
+
+  public static async toggleScraping(enabled: boolean) {
+    return this.toggleLoadData(enabled);
   }
 
   public static async getDriveDbStatus(accessToken?: string | null): Promise<{
@@ -1024,15 +1027,18 @@ export class EngineService {
     search?: string;
     sortBy?: string;
     marketFilter?: string;
+    popularMarkets?: string[];
     limit?: number;
   }): Promise<LiveFixturesResponse> {
     const league = params?.league || 'ALL';
     const search = (params?.search || '').trim();
     const sortBy = params?.sortBy || 'DEFAULT';
     const marketFilter = params?.marketFilter || 'MOST_LIKELY';
+    const popularMarkets = params?.popularMarkets;
+    const popularKey = marketFilter === 'POPULAR' && popularMarkets?.length ? popularMarkets.slice(0, 3).join(',') : '';
     const limit = params?.limit ?? 200;
 
-    const cacheKey = `live_${league}_${search.toLowerCase()}_${sortBy}_${marketFilter}`;
+    const cacheKey = `live_${league}_${search.toLowerCase()}_${sortBy}_${marketFilter}_${popularKey}`;
     const cached = await ClientCache.getCachedLiveFixtures(cacheKey);
 
     const urlParams = new URLSearchParams();
@@ -1040,6 +1046,7 @@ export class EngineService {
     if (search) urlParams.set('search', search);
     if (sortBy !== 'DEFAULT') urlParams.set('sortBy', sortBy);
     if (marketFilter !== 'MOST_LIKELY') urlParams.set('marketFilter', marketFilter);
+    if (popularKey) urlParams.set('popularMarkets', popularKey);
     urlParams.set('limit', String(limit));
 
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -1106,6 +1113,7 @@ export class EngineService {
       search?: string;
       sortBy?: string;
       marketFilter?: string;
+      popularMarkets?: string[];
     }
   ): Promise<{
     matches: Fixture[];
@@ -1124,7 +1132,11 @@ export class EngineService {
     const search = (options?.search || '').trim();
     const sortBy = options?.sortBy || 'DEFAULT';
     const marketFilter = options?.marketFilter || 'MOST_LIKELY';
-    const cacheKey = `history_${league}_${limit}_${search.toLowerCase()}_${sortBy}_${marketFilter}`;
+    const popularKey =
+      marketFilter === 'POPULAR' && options?.popularMarkets?.length
+        ? options.popularMarkets.slice(0, 3).join(',')
+        : '';
+    const cacheKey = `history_${league}_${limit}_${search.toLowerCase()}_${sortBy}_${marketFilter}_${popularKey}`;
     const cached = refresh
       ? null
       : await ClientCache.getEntry<{ matches: Fixture[]; groups: LeagueGroupDTO[]; summary: any }>(cacheKey);
@@ -1135,6 +1147,7 @@ export class EngineService {
     if (search) params.set('search', search);
     if (sortBy !== 'DEFAULT') params.set('sortBy', sortBy);
     if (marketFilter !== 'MOST_LIKELY') params.set('marketFilter', marketFilter);
+    if (popularKey) params.set('popularMarkets', popularKey);
     if (refresh) params.set('refresh', 'true');
 
     const headers: Record<string, string> = { Accept: 'application/json' };

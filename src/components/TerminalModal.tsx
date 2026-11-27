@@ -142,7 +142,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
           <button
             type="button"
             onClick={handleClear}
-            className="w-[30px] h-[30px] rounded-full hover:bg-rose-500/15 hover:text-rose-600 dark:hover:text-rose-400 text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[30px] h-[30px] rounded-full hover:bg-rose-500/15 hover:text-theme-danger text-theme-sub transition-colors duration-150 cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             title="Clear Terminal"
             aria-label="Clear terminal logs"
           >
@@ -160,12 +160,12 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       }
     >
       {/* Filter bar */}
-      <div className="px-3 py-1.5 bg-theme-subtle border-b border-theme flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div className="px-3 py-1.5 bg-theme-subtle flex flex-wrap items-center justify-between gap-2 shrink-0">
         {/* Category Tabs */}
         <div
           role="tablist"
           aria-label="Log category filter"
-          className="flex items-center gap-0.5 h-[30px] min-h-[30px] p-[3px] rounded-full bg-theme-card border border-theme overflow-x-auto no-scrollbar max-w-full"
+          className="flex items-center gap-0.5 h-[30px] min-h-[30px] p-[3px] rounded-full bg-theme-card overflow-x-auto no-scrollbar max-w-full"
         >
           {['ALL', 'DATABASE', 'DATA_FETCH', 'PREDICTION', 'SCRAPER', 'ENGINE'].map((cat) => (
             <button
@@ -176,7 +176,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
               onClick={() => setSelectedCategory(cat)}
               className={`h-full px-3 rounded-full text-sm transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                 selectedCategory === cat
-                  ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-sm'
+                  ? 'bg-theme-primary text-theme-primary-text font-semibold'
                   : 'text-theme-sub font-medium hover:text-theme-main hover:bg-theme-subtle'
               }`}
             >
@@ -228,7 +228,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       </div>
 
       {/* Quick summary stats banner */}
-      <div className="min-h-[30px] px-3 py-1 bg-theme-header-grad border-b border-theme-subdued text-xs flex items-center justify-between text-theme-sub shrink-0">
+      <div className="min-h-[30px] px-3 py-1 bg-theme-card-elevated text-xs flex items-center justify-between text-theme-sub shrink-0">
         <div className="flex items-center gap-2.5 tabular-nums flex-wrap font-normal">
           <span>
             Total <strong className="text-theme-main font-semibold">{stats.total}</strong>
@@ -262,7 +262,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
       >
         {filteredLogs.length === 0 ? (
           <div className="py-10 text-center text-zinc-500 text-sm">
-            No log entries match the selected filters.
+            No matching logs
           </div>
         ) : (
           filteredLogs.map((log) => {
@@ -281,10 +281,10 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                 }`}
               >
                 <div className="shrink-0 mt-0.5">
-                  {log.level === 'ERROR' && <AlertCircle className="w-3.5 h-3.5 text-rose-400" />}
-                  {log.level === 'WARN' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
-                  {log.level === 'SUCCESS' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                  {log.level === 'INFO' && <Info className="w-3.5 h-3.5 text-sky-400" />}
+                  {log.level === 'ERROR' && <AlertCircle className="w-3.5 h-3.5 text-theme-danger" />}
+                  {log.level === 'WARN' && <AlertTriangle className="w-3.5 h-3.5 text-theme-warning" />}
+                  {log.level === 'SUCCESS' && <CheckCircle2 className="w-3.5 h-3.5 text-theme-success" />}
+                  {log.level === 'INFO' && <Info className="w-3.5 h-3.5 text-theme-info" />}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -312,7 +312,7 @@ export const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose })
                   <p className="text-sm font-normal leading-snug break-words text-zinc-100">{log.message}</p>
 
                   {log.details && (
-                    <div className="mt-1.5 p-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-xs text-zinc-300 overflow-x-auto space-y-0.5">
+                    <div className="mt-1.5 p-2.5 rounded-lg bg-white/[0.04] text-xs text-zinc-300 overflow-x-auto space-y-0.5">
                       {(() => {
                         const stack = typeof log.details === 'object' ? log.details?.stack : null;
                         const frames = parseStackFrames(stack || log.details);

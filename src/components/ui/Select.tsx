@@ -30,8 +30,8 @@ export const Select: React.FC<SelectProps> = ({
       : 'h-[34px] min-h-[34px] px-3 text-base pr-7';
   const bgCls =
     surface === 'card'
-      ? 'bg-theme-card border border-theme'
-      : 'bg-theme-subtle border border-theme-subdued';
+      ? 'bg-theme-card border border-theme-subdued'
+      : 'bg-theme-subtle border border-transparent';
 
   return (
     <div className={`relative inline-flex items-center font-sans ${containerClassName}`}>

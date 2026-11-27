@@ -15,23 +15,23 @@ export interface StatTileProps {
 const TONE_MAP = {
   default: 'text-theme-main',
   accent: 'text-theme-primary',
-  info: 'text-sky-700 dark:text-sky-400',
-  warning: 'text-amber-700 dark:text-amber-400',
-  danger: 'text-rose-700 dark:text-rose-400',
+  info: 'text-theme-info',
+  warning: 'text-theme-warning',
+  danger: 'text-theme-danger',
 };
 
 const ICON_TONE_MAP = {
   default: 'text-theme-primary',
   accent: 'text-theme-primary',
-  info: 'text-sky-700 dark:text-sky-400',
-  warning: 'text-amber-700 dark:text-amber-400',
-  danger: 'text-rose-700 dark:text-rose-400',
+  info: 'text-theme-info',
+  warning: 'text-theme-warning',
+  danger: 'text-theme-danger',
 };
 
 const SURFACE_MAP = {
-  card: 'bg-theme-card border border-theme shadow-theme-sm rounded-xl',
-  elevated: 'bg-theme-card-elevated border border-theme shadow-theme-sm rounded-xl',
-  subtle: 'bg-theme-subtle/75 rounded-xl',
+  card: 'bg-theme-card rounded-xl',
+  elevated: 'bg-theme-card-elevated rounded-xl',
+  subtle: 'bg-theme-subtle/80 rounded-xl',
   flat: 'bg-transparent',
 };
 

@@ -28,15 +28,45 @@ import {
 } from './types.js';
 import { getCurrentSeason, normalizeDateStr } from './dateUtils.js';
 import { resolveTeamSide, resolveFixtureAlignment, teamMatchScore, getTeamHistoricalMatches } from './feedParser.js';
+import { computeTeamEloTrend } from './eloTrend.js';
+
+export interface StandingsStrengthEntry {
+  teamName: string;
+  normalizedKey: string;
+  tableScore: number;
+  played: number;
+  rank: number;
+  totalTeams: number;
+  ppg: number;
+  gdPerGame: number;
+  leagueCode: string;
+  leagueName: string;
+}
+
+export interface StandingsStrengthIndex {
+  byExactKey: Map<string, StandingsStrengthEntry>;
+  entries: StandingsStrengthEntry[];
+  fuzzyCache: Map<string, StandingsStrengthEntry | null>;
+}
+
+export interface HybridStrengthResolution {
+  hybridStrength: number;
+  effectiveElo: number;
+  elo: number;
+  tableScore?: number;
+  rank?: number;
+  standingsWeight: number;
+}
 
 /**
  * Evidence-Based Prediction Engine
  * Implements:
  * 1. Composite Team Strength & Form Momentum (CSF) Index (Replaces Elo)
  * 2. Augmented Elo Rating Model in Football + Home Advantage
- * 3. Tactical Context & Team News (rest days, fatigue, absences, motivation)
- * 4. Bivariate Dixon-Coles Goal Model with low-scoring correlation correction
- * 5. Value Betting: distinguishing most likely outcome from profitable (+EV) bet
+ * 3. Hybrid Elo + Standings Recent Opponent Strength & Relative Schedule Difficulty
+ * 4. Tactical Context & Team News (rest days, fatigue, absences, motivation)
+ * 5. Bivariate Dixon-Coles Goal Model with low-scoring correlation correction
+ * 6. Value Betting: distinguishing most likely outcome from profitable (+EV) bet
  */
 export class ApexEngine {
   private static universeGoalAvgCache = new WeakMap<HistoricalMatch[], { homeAvg: number; awayAvg: number }>();
@@ -369,6 +399,167 @@ export class ApexEngine {
     return Math.max(0, Math.min(100, (weightedPts / maxWeightedPts) * 100));
   }
 
+  private static computeStandingsEntryScore(
+    entry: LeagueStandingEntry,
+    totalTeamsInput: number
+  ): number {
+    const played = Math.max(1, entry.played);
+    const totalTeams = Math.max(entry.rank || 1, totalTeamsInput || 1);
+    const rankScore =
+      totalTeams > 1
+        ? Math.max(0, Math.min(100, ((totalTeams - entry.rank) / (totalTeams - 1)) * 100))
+        : 50.0;
+    const ppg = entry.points / played;
+    const ppgScore = Math.max(0, Math.min(100, (ppg / 3.0) * 100));
+    const gdPerGame = entry.goalDifference / played;
+    const gdScore = Math.max(0, Math.min(100, 50 + gdPerGame * 20));
+    return Number(Math.max(10, Math.min(95, 0.40 * ppgScore + 0.35 * rankScore + 0.25 * gdScore)).toFixed(2));
+  }
+
+  public static buildStandingsStrengthIndex(tables: LeagueStandingTable[]): StandingsStrengthIndex {
+    const byExactKey = new Map<string, StandingsStrengthEntry>();
+
+    for (const table of tables || []) {
+      const groups = this.getStandingsGroups(table);
+      for (const group of groups) {
+        const totalTeams = group.table.length;
+        for (const entry of group.table) {
+          if (!entry.teamName || entry.played <= 0) continue;
+          const normalizedKey = entry.teamName.toLowerCase().trim();
+          if (!normalizedKey) continue;
+          const played = entry.played;
+          const tableScore = this.computeStandingsEntryScore(entry, totalTeams);
+          const candidate: StandingsStrengthEntry = {
+            teamName: entry.teamName,
+            normalizedKey,
+            tableScore,
+            played,
+            rank: entry.rank,
+            totalTeams: Math.max(entry.rank || 1, totalTeams),
+            ppg: Number((entry.points / played).toFixed(2)),
+            gdPerGame: Number((entry.goalDifference / played).toFixed(2)),
+            leagueCode: table.leagueCode,
+            leagueName: table.leagueName,
+          };
+
+          const existing = byExactKey.get(normalizedKey);
+          if (
+            !existing ||
+            candidate.played > existing.played ||
+            (candidate.played === existing.played && candidate.totalTeams > existing.totalTeams)
+          ) {
+            byExactKey.set(normalizedKey, candidate);
+          }
+        }
+      }
+    }
+
+    return {
+      byExactKey,
+      entries: Array.from(byExactKey.values()),
+      fuzzyCache: new Map<string, StandingsStrengthEntry | null>(),
+    };
+  }
+
+  private static lookupStandingsStrengthEntry(
+    teamName: string,
+    primaryStandings?: LeagueStandingTable | null,
+    standingsIndex?: StandingsStrengthIndex | null
+  ): { tableScore: number; played: number; rank: number } | null {
+    if (!teamName) return null;
+
+    if (primaryStandings) {
+      const primaryMatch = this.findTeamStandingsEntry(teamName, this.getStandingsGroups(primaryStandings));
+      if (primaryMatch && primaryMatch.entry.played > 0) {
+        return {
+          tableScore: this.computeStandingsEntryScore(primaryMatch.entry, primaryMatch.group.table.length),
+          played: primaryMatch.entry.played,
+          rank: primaryMatch.entry.rank,
+        };
+      }
+    }
+
+    if (!standingsIndex || standingsIndex.entries.length === 0) return null;
+
+    const clean = teamName.toLowerCase().trim();
+    const exact = standingsIndex.byExactKey.get(clean);
+    if (exact) {
+      return { tableScore: exact.tableScore, played: exact.played, rank: exact.rank };
+    }
+
+    if (standingsIndex.fuzzyCache.has(clean)) {
+      const cached = standingsIndex.fuzzyCache.get(clean);
+      return cached ? { tableScore: cached.tableScore, played: cached.played, rank: cached.rank } : null;
+    }
+
+    let bestScore = 0;
+    let bestEntry: StandingsStrengthEntry | null = null;
+    for (const candidate of standingsIndex.entries) {
+      const s = teamMatchScore(teamName, candidate.teamName);
+      if (s > bestScore || (s > 0 && s === bestScore && bestEntry && candidate.played > bestEntry.played)) {
+        bestScore = s;
+        bestEntry = candidate;
+      }
+    }
+
+    const resolved = bestScore > 0 ? bestEntry : null;
+    if (standingsIndex.fuzzyCache.size > 5000) {
+      standingsIndex.fuzzyCache.clear();
+    }
+    standingsIndex.fuzzyCache.set(clean, resolved);
+
+    return resolved ? { tableScore: resolved.tableScore, played: resolved.played, rank: resolved.rank } : null;
+  }
+
+  public static resolveOpponentHybridStrength(
+    teamName: string,
+    options?: {
+      eloRatings?: Map<string, number>;
+      primaryStandings?: LeagueStandingTable | null;
+      standingsIndex?: StandingsStrengthIndex | null;
+      volatilityCoefficient?: number;
+    }
+  ): HybridStrengthResolution {
+    const vL = Math.max(0.75, Math.min(1.35, options?.volatilityCoefficient ?? 1.0));
+    const elo =
+      options?.eloRatings && options.eloRatings.size > 0
+        ? this.getTeamElo(teamName, options.eloRatings)
+        : 1500;
+    const eloNorm = Math.max(15, Math.min(95, 50 + 35 * Math.tanh((elo - 1500) / 260)));
+
+    const standingsHit = this.lookupStandingsStrengthEntry(
+      teamName,
+      options?.primaryStandings,
+      options?.standingsIndex
+    );
+
+    if (standingsHit && standingsHit.played > 0) {
+      const standingsWeight = 0.50 * (standingsHit.played / (standingsHit.played + 6 * vL));
+      const hybridStrength = Number(
+        ((1 - standingsWeight) * eloNorm + standingsWeight * standingsHit.tableScore).toFixed(1)
+      );
+      const tableEquivalentElo = 1500 + (standingsHit.tableScore - 50) * 8;
+      const effectiveElo = Number(
+        ((1 - standingsWeight) * elo + standingsWeight * tableEquivalentElo).toFixed(1)
+      );
+      return {
+        hybridStrength,
+        effectiveElo,
+        elo,
+        tableScore: standingsHit.tableScore,
+        rank: standingsHit.rank,
+        standingsWeight: Number(standingsWeight.toFixed(3)),
+      };
+    }
+
+    return {
+      hybridStrength: Number(eloNorm.toFixed(1)),
+      effectiveElo: elo,
+      elo,
+      standingsWeight: 0,
+    };
+  }
+
   private static classifyZoneStakes(
     snap?: TeamStandingsSnapshot
   ): 'TITLE_OR_QUALIFICATION' | 'PLAYOFF' | 'RELEGATION' | 'NONE' {
@@ -468,7 +659,11 @@ export class ApexEngine {
     scrapedRecent?: TeamFormMatch[],
     eloRatings?: Map<string, number>,
     preResolvedRecent?: TeamFormMatch[],
-    volatilityCoefficient = 1.0
+    volatilityCoefficient = 1.0,
+    scheduleContext?: {
+      currentOpponentStrength?: number;
+      standingsIndex?: StandingsStrengthIndex | null;
+    }
   ): {
     strengthRating: number;
     formDominance: number;
@@ -476,21 +671,28 @@ export class ApexEngine {
     shotEfficiency: number;
     venueModifier: number;
     recentMatches: TeamFormMatch[];
+    avgRecentOpponentStrength: number;
+    relativeScheduleDifficulty: number;
+    scheduleAdjustmentFactor: number;
   } {
     const vL = Math.max(0.75, Math.min(1.35, volatilityCoefficient || 1.0));
     const recentMatchesList =
       preResolvedRecent ??
       this.resolveSeasonRecentMatches(teamName, allMatches, windowSize, scrapedRecent);
 
-    // 1. Decayed Opponent-Adjusted Form & Goal Dominance
+    // 1. Decayed Hybrid Opponent-Adjusted Form & Goal Dominance
     let weightedFormSum = 0;
     let formWeightTotal = 0;
+    let oppStrengthSum = 0;
+    let oppWeightTotal = 0;
     let venueMatchesCount = 0;
     let venueSuccessCount = 0;
+    const enrichedRecentMatches: TeamFormMatch[] = [];
 
     for (let i = 0; i < recentMatchesList.length; i++) {
       const m = recentMatchesList[i];
-      let baseWeight = Math.pow(decayRate, i);
+      const recencyWeight = Math.pow(decayRate, i);
+      let baseWeight = recencyWeight;
 
       if (m.isHome === isHomeVenue) {
         baseWeight *= 1.10;
@@ -505,12 +707,37 @@ export class ApexEngine {
       const gd = Math.max(-4, Math.min(4, m.goalsFor - m.goalsAgainst));
       const marginFactor = Math.max(0, Math.min(100, 50 + (gd * 11.5)));
 
-      const oppElo = eloRatings && eloRatings.size > 0 ? this.getTeamElo(m.opponent, eloRatings) : 1500;
-      const oppPerfBonus = Math.max(-18, Math.min(18, (oppElo - 1500) / 14));
+      const oppResolved = this.resolveOpponentHybridStrength(m.opponent, {
+        eloRatings,
+        primaryStandings: standings,
+        standingsIndex: scheduleContext?.standingsIndex,
+        volatilityCoefficient: vL,
+      });
+      const oppStrength = oppResolved.hybridStrength;
+
+      oppStrengthSum += oppStrength * recencyWeight;
+      oppWeightTotal += recencyWeight;
+
+      let oppQualityBonus = (oppStrength - 50) * 0.55;
+      if (m.result === 'W' && oppStrength > 52) {
+        oppQualityBonus += Math.min(5, (oppStrength - 52) * 0.18);
+      } else if (m.result === 'D' && oppStrength > 56) {
+        oppQualityBonus += Math.min(3.5, (oppStrength - 56) * 0.14);
+      } else if (m.result === 'L' && oppStrength < 48) {
+        oppQualityBonus -= Math.min(5, (48 - oppStrength) * 0.18);
+      }
+      const oppPerfBonus = Math.max(-18, Math.min(18, oppQualityBonus));
 
       const matchDominance = Math.max(0, Math.min(100, (0.62 * resultFactor) + (0.38 * marginFactor) + oppPerfBonus));
       weightedFormSum += matchDominance * baseWeight;
       formWeightTotal += baseWeight;
+
+      enrichedRecentMatches.push({
+        ...m,
+        opponentStrength: oppResolved.hybridStrength,
+        opponentElo: Math.round(oppResolved.effectiveElo),
+        ...(oppResolved.rank !== undefined ? { opponentRank: oppResolved.rank } : {}),
+      });
     }
 
     // Point B: Early-Season Prior Shrinkage — scale Bayesian prior weight by V_L:
@@ -518,8 +745,28 @@ export class ApexEngine {
     const n = recentMatchesList.length;
     const effectiveFormPrior = 5 * vL;
     const rawFormDominance = formWeightTotal > 0 ? (weightedFormSum / formWeightTotal) : 50.0;
+    const avgRecentOpponentStrength = Number(
+      (oppWeightTotal > 0 ? (oppStrengthSum / oppWeightTotal) : 50.0).toFixed(1)
+    );
+    const currentOppStrength = scheduleContext?.currentOpponentStrength;
+    const relativeScheduleDifficulty = Number(
+      (currentOppStrength !== undefined
+        ? avgRecentOpponentStrength - currentOppStrength
+        : avgRecentOpponentStrength - 50.0
+      ).toFixed(1)
+    );
+
+    const scheduleSampleShrink = n / (n + effectiveFormPrior);
+    const rawScheduleShift = Math.tanh(relativeScheduleDifficulty / 28) * 0.15 * scheduleSampleShrink;
+    const scheduleAdjustmentFactor = Number(
+      Math.max(0.85, Math.min(1.15, 1.0 + rawScheduleShift)).toFixed(3)
+    );
+    const scheduleFormNudge = Math.max(-8, Math.min(8, relativeScheduleDifficulty * 0.18 * scheduleSampleShrink));
+
+    const shrunkFormDominance =
+      ((n * rawFormDominance) + (effectiveFormPrior * 50.0)) / (n + effectiveFormPrior);
     const formDominance = Number(
-      (((n * rawFormDominance) + (effectiveFormPrior * 50.0)) / (n + effectiveFormPrior)).toFixed(1)
+      Math.max(0, Math.min(100, shrunkFormDominance + scheduleFormNudge)).toFixed(1)
     );
     const sampleShrink = n / (n + effectiveFormPrior);
 
@@ -610,7 +857,10 @@ export class ApexEngine {
       tableMomentum,
       shotEfficiency,
       venueModifier,
-      recentMatches: recentMatchesList,
+      recentMatches: enrichedRecentMatches,
+      avgRecentOpponentStrength,
+      relativeScheduleDifficulty,
+      scheduleAdjustmentFactor,
     };
   }
 
@@ -872,16 +1122,26 @@ export class ApexEngine {
     windowSize = 15,
     decayRate = 0.92,
     scrapedRecent?: TeamFormMatch[],
-    preResolvedRecent?: TeamFormMatch[]
+    preResolvedRecent?: TeamFormMatch[],
+    scheduleContext?: {
+      currentOpponentStrength?: number;
+      primaryStandings?: LeagueStandingTable | null;
+      standingsIndex?: StandingsStrengthIndex | null;
+      volatilityCoefficient?: number;
+    }
   ): {
     rawXG: number;
     rawXGA: number;
     adjustedXG: number;
     adjustedXGA: number;
     opponentAdjustmentFactor: number;
+    avgRecentOpponentStrength: number;
+    relativeScheduleDifficulty: number;
+    scheduleAdjustmentFactor: number;
     rollingMatchesCount: number;
     formattedRecent: TeamFormMatch[];
   } {
+    const vL = Math.max(0.75, Math.min(1.35, scheduleContext?.volatilityCoefficient ?? 1.0));
     const recentMatchesList =
       preResolvedRecent ??
       this.resolveSeasonRecentMatches(teamName, allMatches, windowSize, scrapedRecent);
@@ -893,6 +1153,9 @@ export class ApexEngine {
         adjustedXG: 0.0,
         adjustedXGA: 0.0,
         opponentAdjustmentFactor: 1.0,
+        avgRecentOpponentStrength: 50.0,
+        relativeScheduleDifficulty: 0.0,
+        scheduleAdjustmentFactor: 1.0,
         rollingMatchesCount: 0,
         formattedRecent: [],
       };
@@ -903,8 +1166,10 @@ export class ApexEngine {
     let weightedRawXG = 0;
     let weightedRawXGA = 0;
     let totalWeight = 0;
-    let opponentStrengthSum = 0;
+    let weightedOppEloSum = 0;
+    let weightedOppStrengthSum = 0;
     const effectiveDecay = Math.max(0.88, Math.min(0.95, decayRate));
+    const formattedRecent: TeamFormMatch[] = [];
 
     for (let i = 0; i < recentMatchesList.length; i++) {
       const m = recentMatchesList[i];
@@ -932,11 +1197,18 @@ export class ApexEngine {
       matchXG = Math.max(0.12, Math.min(4.2, matchXG));
       matchXGA = Math.max(0.12, Math.min(4.2, matchXGA));
 
-      // 2. Meaningful opponent strength adjustment based on opponent Elo
-      const oppElo = this.getTeamElo(m.opponent, eloRatings);
-      opponentStrengthSum += oppElo;
+      // 2. Hybrid opponent strength adjustment (Elo + League Standings)
+      const oppResolved = this.resolveOpponentHybridStrength(m.opponent, {
+        eloRatings,
+        primaryStandings: scheduleContext?.primaryStandings,
+        standingsIndex: scheduleContext?.standingsIndex,
+        volatilityCoefficient: vL,
+      });
+      const oppEffectiveElo = oppResolved.effectiveElo;
+      weightedOppEloSum += oppEffectiveElo * weight;
+      weightedOppStrengthSum += oppResolved.hybridStrength * weight;
 
-      const oppFactor = Math.max(0.55, Math.min(1.80, Math.pow(10, (oppElo - 1500) / 700)));
+      const oppFactor = Math.max(0.55, Math.min(1.80, Math.pow(10, (oppEffectiveElo - 1500) / 700)));
 
       const matchAdjustedXG = matchXG * oppFactor;
       const matchAdjustedXGA = matchXGA * (1 / oppFactor);
@@ -946,10 +1218,33 @@ export class ApexEngine {
       weightedXGCreated += matchAdjustedXG * weight;
       weightedXGConceded += matchAdjustedXGA * weight;
       totalWeight += weight;
+
+      formattedRecent.push({
+        ...m,
+        opponentStrength: oppResolved.hybridStrength,
+        opponentElo: Math.round(oppEffectiveElo),
+        ...(oppResolved.rank !== undefined ? { opponentRank: oppResolved.rank } : {}),
+      });
     }
 
-    const avgOppElo = opponentStrengthSum / (recentMatchesList.length || 1);
+    const avgOppElo = totalWeight > 0 ? weightedOppEloSum / totalWeight : 1500;
     const opponentAdjustmentFactor = Number((avgOppElo / 1500).toFixed(3));
+    const avgRecentOpponentStrength = Number(
+      (totalWeight > 0 ? weightedOppStrengthSum / totalWeight : 50.0).toFixed(1)
+    );
+    const currentOppStrength = scheduleContext?.currentOpponentStrength;
+    const relativeScheduleDifficulty = Number(
+      (currentOppStrength !== undefined
+        ? avgRecentOpponentStrength - currentOppStrength
+        : avgRecentOpponentStrength - 50.0
+      ).toFixed(1)
+    );
+    const n = recentMatchesList.length;
+    const sampleShrink = n / (n + 5 * vL);
+    const rawScheduleShift = Math.tanh(relativeScheduleDifficulty / 28) * 0.15 * sampleShrink;
+    const scheduleAdjustmentFactor = Number(
+      Math.max(0.85, Math.min(1.15, 1.0 + rawScheduleShift)).toFixed(3)
+    );
 
     const rawXG = Number((weightedRawXG / totalWeight).toFixed(2));
     const rawXGA = Number((weightedRawXGA / totalWeight).toFixed(2));
@@ -962,8 +1257,11 @@ export class ApexEngine {
       adjustedXG,
       adjustedXGA,
       opponentAdjustmentFactor,
+      avgRecentOpponentStrength,
+      relativeScheduleDifficulty,
+      scheduleAdjustmentFactor,
       rollingMatchesCount: recentMatchesList.length,
-      formattedRecent: recentMatchesList,
+      formattedRecent,
     };
   }
 
@@ -1339,7 +1637,8 @@ export class ApexEngine {
       volatilityCoefficient?: number;
       temperatureAlpha?: number;
       isFallback?: boolean;
-    }
+    },
+    standingsStrengthIndex?: StandingsStrengthIndex | null
   ): { prediction: PoissonPrediction; homeStats: TeamStatsSummary; awayStats: TeamStatsSummary } {
     const historicalUniverse = allHistoricalMatches && allHistoricalMatches.length > 0
       ? allHistoricalMatches
@@ -1386,6 +1685,20 @@ export class ApexEngine {
     const formDecay = settings?.formDecayRate || 0.90;
     const csfUniverse = historicalUniverse.length > 0 ? historicalUniverse : leagueHistoricalMatches;
 
+    // Resolve current matchup opponents' hybrid strength (Elo + Standings)
+    const homeTeamHybrid = this.resolveOpponentHybridStrength(homeTeam, {
+      eloRatings: eloRatingsMap,
+      primaryStandings: standings,
+      standingsIndex: standingsStrengthIndex,
+      volatilityCoefficient: vL,
+    });
+    const awayTeamHybrid = this.resolveOpponentHybridStrength(awayTeam, {
+      eloRatings: eloRatingsMap,
+      primaryStandings: standings,
+      standingsIndex: standingsStrengthIndex,
+      volatilityCoefficient: vL,
+    });
+
     const homeSeasonRecent = this.resolveSeasonRecentMatches(
       homeTeam,
       csfUniverse,
@@ -1409,7 +1722,11 @@ export class ApexEngine {
       realScrapedH2H?.homeRecentMatches,
       eloRatingsMap,
       homeSeasonRecent,
-      vL
+      vL,
+      {
+        currentOpponentStrength: awayTeamHybrid.hybridStrength,
+        standingsIndex: standingsStrengthIndex,
+      }
     );
 
     const awayCSF = this.computeTeamStrengthProfile(
@@ -1422,13 +1739,72 @@ export class ApexEngine {
       realScrapedH2H?.awayRecentMatches,
       eloRatingsMap,
       awaySeasonRecent,
-      vL
+      vL,
+      {
+        currentOpponentStrength: homeTeamHybrid.hybridStrength,
+        standingsIndex: standingsStrengthIndex,
+      }
     );
 
     const csfExpectancy = this.getTeamStrengthExpectancy(
       homeCSF,
       awayCSF,
       settings?.homeAdvantageFactor || 1.12
+    );
+
+    // 2. Hybrid Opponent-Adjusted xG over 8-20 recent matches
+    const homeXGProfile = this.computeOpponentAdjustedXG(
+      homeTeam,
+      historicalUniverse,
+      eloRatingsMap,
+      rollingWindow,
+      0.92,
+      realScrapedH2H?.homeRecentMatches,
+      homeSeasonRecent,
+      {
+        currentOpponentStrength: awayTeamHybrid.hybridStrength,
+        primaryStandings: standings,
+        standingsIndex: standingsStrengthIndex,
+        volatilityCoefficient: vL,
+      }
+    );
+
+    const awayXGProfile = this.computeOpponentAdjustedXG(
+      awayTeam,
+      historicalUniverse,
+      eloRatingsMap,
+      rollingWindow,
+      0.92,
+      realScrapedH2H?.awayRecentMatches,
+      awaySeasonRecent,
+      {
+        currentOpponentStrength: homeTeamHybrid.hybridStrength,
+        primaryStandings: standings,
+        standingsIndex: standingsStrengthIndex,
+        volatilityCoefficient: vL,
+      }
+    );
+
+    // Relative schedule transition multipliers strictly capped at [0.85, 1.15] (±15%)
+    const appliedScheduleMultHome = Number(
+      Math.max(
+        0.85,
+        Math.min(
+          1.15,
+          (1 + 0.65 * (homeXGProfile.scheduleAdjustmentFactor - 1)) *
+            (1 - 0.35 * (awayXGProfile.scheduleAdjustmentFactor - 1))
+        )
+      ).toFixed(3)
+    );
+    const appliedScheduleMultAway = Number(
+      Math.max(
+        0.85,
+        Math.min(
+          1.15,
+          (1 + 0.65 * (awayXGProfile.scheduleAdjustmentFactor - 1)) *
+            (1 - 0.35 * (homeXGProfile.scheduleAdjustmentFactor - 1))
+        )
+      ).toFixed(3)
     );
 
     const teamStrength: TeamStrengthBreakdown = {
@@ -1446,7 +1822,22 @@ export class ApexEngine {
       homeWinExpectancy: csfExpectancy.homeWinExpectancy,
       drawExpectancy: csfExpectancy.drawExpectancy,
       awayWinExpectancy: csfExpectancy.awayWinExpectancy,
+      avgRecentOpponentStrengthHome: homeCSF.avgRecentOpponentStrength,
+      avgRecentOpponentStrengthAway: awayCSF.avgRecentOpponentStrength,
+      relativeScheduleDifficultyHome: homeCSF.relativeScheduleDifficulty,
+      relativeScheduleDifficultyAway: awayCSF.relativeScheduleDifficulty,
+      scheduleAdjustmentFactorHome: appliedScheduleMultHome,
+      scheduleAdjustmentFactorAway: appliedScheduleMultAway,
     };
+
+    const homeEloTrend = computeTeamEloTrend(homeElo, homeCSF.recentMatches, {
+      limit: 5,
+      volatilityCoefficient: vL,
+    });
+    const awayEloTrend = computeTeamEloTrend(awayElo, awayCSF.recentMatches, {
+      limit: 5,
+      volatilityCoefficient: vL,
+    });
 
     const eloBreakdown: EloRatingBreakdown = {
       homeElo,
@@ -1456,28 +1847,9 @@ export class ApexEngine {
       homeWinProbElo: eloExpectancy.homeWinProb,
       drawProbElo: eloExpectancy.drawProb,
       awayWinProbElo: eloExpectancy.awayWinProb,
+      homeEloTrend,
+      awayEloTrend,
     };
-
-    // 2. Opponent-Adjusted xG over 8-20 recent matches
-    const homeXGProfile = this.computeOpponentAdjustedXG(
-      homeTeam,
-      historicalUniverse,
-      eloRatingsMap,
-      rollingWindow,
-      0.92,
-      realScrapedH2H?.homeRecentMatches,
-      homeSeasonRecent
-    );
-
-    const awayXGProfile = this.computeOpponentAdjustedXG(
-      awayTeam,
-      historicalUniverse,
-      eloRatingsMap,
-      rollingWindow,
-      0.92,
-      realScrapedH2H?.awayRecentMatches,
-      awaySeasonRecent
-    );
 
     const xgBreakdown: XGBreakdown = {
       homeRawXG: homeXGProfile.rawXG,
@@ -1488,6 +1860,14 @@ export class ApexEngine {
       opponentAdjustmentFactorAway: awayXGProfile.opponentAdjustmentFactor,
       homeRollingMatchesEvaluated: homeXGProfile.rollingMatchesCount,
       awayRollingMatchesEvaluated: awayXGProfile.rollingMatchesCount,
+      avgRecentOpponentStrengthHome: homeXGProfile.avgRecentOpponentStrength,
+      avgRecentOpponentStrengthAway: awayXGProfile.avgRecentOpponentStrength,
+      currentOpponentStrengthHome: awayTeamHybrid.hybridStrength,
+      currentOpponentStrengthAway: homeTeamHybrid.hybridStrength,
+      relativeScheduleDifficultyHome: homeXGProfile.relativeScheduleDifficulty,
+      relativeScheduleDifficultyAway: awayXGProfile.relativeScheduleDifficulty,
+      scheduleAdjustmentFactorHome: appliedScheduleMultHome,
+      scheduleAdjustmentFactorAway: appliedScheduleMultAway,
     };
 
     // 3. Team News & Tactical Context + Group-Scoped League Standings Context
@@ -1619,6 +1999,7 @@ export class ApexEngine {
       Math.pow(Math.max(0.25, homeAttackPower * awayDefensePower), 0.55) *
       effectiveHomeAdvantage *
       eloMultiplierHome *
+      appliedScheduleMultHome *
       baseTacticalContext.fatigueAdjustmentHome *
       h2hMultiplierHome;
 
@@ -1627,6 +2008,7 @@ export class ApexEngine {
       Math.pow(Math.max(0.25, awayAttackPower * homeDefensePower), 0.55) *
       effectiveAwayBaseline *
       eloMultiplierAway *
+      appliedScheduleMultAway *
       baseTacticalContext.fatigueAdjustmentAway *
       h2hMultiplierAway;
 
@@ -1662,6 +2044,7 @@ export class ApexEngine {
       homeCombinedPower *
       effectiveHomeAdvantage *
       eloMultiplierHome *
+      appliedScheduleMultHome *
       tacticalContext.fatigueAdjustmentHome *
       h2hMultiplierHome;
 
@@ -1670,6 +2053,7 @@ export class ApexEngine {
       awayCombinedPower *
       effectiveAwayBaseline *
       eloMultiplierAway *
+      appliedScheduleMultAway *
       tacticalContext.fatigueAdjustmentAway *
       h2hMultiplierAway;
 
@@ -1907,7 +2291,7 @@ export class ApexEngine {
       historicalUniverse,
       settings?.rollingMatchWindow || 15,
       settings?.formDecayRate || 0.85,
-      realScrapedH2H?.homeRecentMatches
+      homeCSF.recentMatches.length > 0 ? homeCSF.recentMatches : realScrapedH2H?.homeRecentMatches
     );
     homeStats.teamStrengthRating = homeCSF.strengthRating;
     homeStats.eloRating = homeElo;
@@ -1919,7 +2303,7 @@ export class ApexEngine {
       historicalUniverse,
       settings?.rollingMatchWindow || 15,
       settings?.formDecayRate || 0.85,
-      realScrapedH2H?.awayRecentMatches
+      awayCSF.recentMatches.length > 0 ? awayCSF.recentMatches : realScrapedH2H?.awayRecentMatches
     );
     awayStats.teamStrengthRating = awayCSF.strengthRating;
     awayStats.eloRating = awayElo;

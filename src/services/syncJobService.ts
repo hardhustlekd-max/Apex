@@ -231,11 +231,8 @@ export class SyncJobService {
   }
 
   public startJob(options?: { resetDatabase?: boolean; resetRawFeeds?: boolean }): SyncJobState {
-    if (!isSqliteEnabled()) {
-      throw new Error('SQLite database is switched off. Enable SQLite DB manually before starting Full Data Sync.');
-    }
-    if (!isScrapingEnabled()) {
-      throw new Error('Data scraping is switched off. Enable Data Scraping manually before starting Full Data Sync.');
+    if (!isSqliteEnabled() || !isScrapingEnabled()) {
+      throw new Error('Load Data is switched off. Enable Load Data manually before starting Full Data Sync.');
     }
     const opts = { resetDatabase: false, resetRawFeeds: false, ...options };
     const existing = this.getActiveJob();

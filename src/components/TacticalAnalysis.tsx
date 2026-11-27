@@ -167,31 +167,27 @@ function deriveTeamTacticalProfile(params: {
     const formRecord = formatRecentFormRecord(snap.form || recentForm);
     const zoneTier = classifyZoneTier(snap);
 
-    let styleName = 'Pragmatic Mid-Table Balance';
-    let tagline = 'Adaptive mid-block structure calibrated to opponent strength.';
-    let buildUpStyle = 'Mixed Progression & Half-Space Support';
-    let defensiveShape = 'Compact 4-2-3-1 Mid Block';
+    let styleName = 'Mid-Table Balance';
+    const tagline = '';
+    let buildUpStyle = 'Mixed Progression';
+    let defensiveShape = '4-2-3-1 Mid Block';
 
     if (rankPct <= 0.25 && attackRatio >= 1.18 && defenseRatio <= 0.95) {
-      styleName = 'High-Press Territorial Control';
-      tagline = 'Dominant possession share, high defensive line, and sustained box pressure.';
-      buildUpStyle = 'Patient Vertical Overloads & Third-Man Runs';
-      defensiveShape = 'Aggressive 4-3-3 High Press';
+      styleName = 'High-Press Control';
+      buildUpStyle = 'Vertical Overloads';
+      defensiveShape = '4-3-3 High Press';
     } else if (attackRatio >= 1.12 && defenseRatio >= 1.06) {
-      styleName = 'Open Vertical Transition';
-      tagline = 'High-tempo attacking commitment that trades defensive security for shot volume.';
-      buildUpStyle = 'Rapid Vertical Thrusts & Early Wide Switches';
-      defensiveShape = 'High-Risk 4-2-3-1 Transition Block';
+      styleName = 'Vertical Transition';
+      buildUpStyle = 'Rapid Vertical';
+      defensiveShape = '4-2-3-1 Transition';
     } else if (defenseRatio <= 0.85 && attackRatio < 1.12) {
-      styleName = 'Structured Defensive Control';
-      tagline = 'Low-conceding compact block prioritizing central protection and set-piece control.';
-      buildUpStyle = 'Measured Counter-Attacks & Wide Outlets';
-      defensiveShape = 'Disciplined 4-4-2 / 5-3-2 Low-Mid Block';
+      styleName = 'Defensive Control';
+      buildUpStyle = 'Measured Counters';
+      defensiveShape = '4-4-2 / 5-3-2 Block';
     } else if (rankPct >= 0.72 || zoneTier === 'RELEGATION' || (attackRatio < 0.86 && defenseRatio > 1.08)) {
-      styleName = 'Survival Low-Block & Direct Counter';
-      tagline = 'Deep box protection under pressure with direct vertical balls on turnovers.';
-      buildUpStyle = 'Direct Long Distribution & Second-Ball Runs';
-      defensiveShape = 'Deep 5-4-1 Survival Block';
+      styleName = 'Low-Block Counter';
+      buildUpStyle = 'Direct Long';
+      defensiveShape = '5-4-1 Low Block';
     }
 
     const attackDiffPct = Math.round((attackRatio - 1) * 100);
@@ -199,31 +195,23 @@ function deriveTeamTacticalProfile(params: {
 
     const keyStrength =
       attackRatio >= 1.1 && attackRatio - 1 >= 1 - defenseRatio
-        ? `Scoring ${snap.gfPerGame.toFixed(2)} GF/M (${attackDiffPct >= 0 ? `+${attackDiffPct}%` : `${attackDiffPct}%`} vs table avg) at ${snap.ppg.toFixed(2)} PPG.`
+        ? `${snap.gfPerGame.toFixed(2)} GF/M (${attackDiffPct >= 0 ? `+${attackDiffPct}%` : `${attackDiffPct}%`}) · ${snap.ppg.toFixed(2)} PPG`
         : defenseRatio <= 0.9
-        ? `Restricting opponents to ${snap.gaPerGame.toFixed(2)} GA/M (${defenseDiffPct}% tighter than table avg).`
+        ? `${snap.gaPerGame.toFixed(2)} GA/M (${defenseDiffPct}% tighter)`
         : snap.ppg >= 1.5
-        ? `Consistent table output (${snap.points} pts in ${snap.played} MP, ${snap.gdPerGame >= 0 ? '+' : ''}${snap.gdPerGame.toFixed(2)} GD/M).`
-        : `Balanced home/away point accumulation (${snap.won}W-${snap.drawn}D-${snap.lost}L across ${snap.played} MP).`;
+        ? `${snap.points} pts / ${snap.played} MP · ${snap.gdPerGame >= 0 ? '+' : ''}${snap.gdPerGame.toFixed(2)} GD/M`
+        : `${snap.won}W-${snap.drawn}D-${snap.lost}L (${snap.played} MP)`;
 
     const vulnerability =
       defenseRatio >= 1.1
-        ? `Conceding ${snap.gaPerGame.toFixed(2)} GA/M vs ${safeAvg.toFixed(2)} league avg exposes transition lanes.`
+        ? `${snap.gaPerGame.toFixed(2)} GA/M vs ${safeAvg.toFixed(2)} avg`
         : attackRatio <= 0.88
-        ? `Limited scoring output (${snap.gfPerGame.toFixed(2)} GF/M) demands clean sheets to take points.`
+        ? `${snap.gfPerGame.toFixed(2)} GF/M scoring`
         : formRate !== null && formRate < 0.35
-        ? `Recent table slide (${formRecord}) reduces margin for defensive errors.`
-        : `Mid-tier goal margins (${snap.gdPerGame >= 0 ? '+' : ''}${snap.gdPerGame.toFixed(2)} GD/M) invite tight scorelines.`;
+        ? `Recent form: ${formRecord}`
+        : `${snap.gdPerGame >= 0 ? '+' : ''}${snap.gdPerGame.toFixed(2)} GD/M`;
 
-    const zonePhrase = snap.zoneLabel
-      ? ` Currently in ${snap.zoneLabel} contention.`
-      : zoneTier === 'TITLE'
-      ? ' Competing in the upper qualification tier.'
-      : zoneTier === 'RELEGATION'
-      ? ' Facing high-urgency relegation pressure.'
-      : '';
-
-    const summary = `${teamName} sits #${snap.rank} of ${snap.totalTeams} (${snap.points} pts, ${snap.ppg.toFixed(2)} PPG) with ${snap.goalsFor}:${snap.goalsAgainst} goals across ${snap.played} matches.${zonePhrase}`;
+    const summary = '';
 
     return {
       styleName,
@@ -251,18 +239,18 @@ function deriveTeamTacticalProfile(params: {
       : highAttack
       ? 'Attacking Verticality'
       : tightDefense
-      ? 'Compact Defensive Block'
-      : 'Balanced Matchup Posture';
+      ? 'Compact Block'
+      : 'Balanced Posture';
 
   return {
     styleName,
-    tagline: 'Derived from model attack/defense indices and recent match xG.',
+    tagline: '',
     intensityLabel: `Index ${intensityScore}/100`,
-    buildUpStyle: highAttack ? 'Progressive Short & Half-Space Passing' : 'Structured Transition Support',
-    defensiveShape: tightDefense ? 'Compact Mid-Low Defensive Block' : 'Adaptive 4-2-3-1 Shape',
-    keyStrength: `Attack index ${attackPower.toFixed(2)} with projected ${effectiveXG.toFixed(2)} xG.`,
-    vulnerability: `Defense conceding index at ${defensePower.toFixed(2)} relative to match baseline.`,
-    summary: `${teamName} enters unranked in the stored table; tactical outlook reflects model attack (${attackPower.toFixed(2)}) and defense (${defensePower.toFixed(2)}) ratings.`,
+    buildUpStyle: highAttack ? 'Progressive Short' : 'Transition Support',
+    defensiveShape: tightDefense ? 'Compact Low-Mid' : '4-2-3-1 Shape',
+    keyStrength: `${attackPower.toFixed(2)} att · ${effectiveXG.toFixed(2)} xG`,
+    vulnerability: `${defensePower.toFixed(2)} def index`,
+    summary: '',
     formRecord,
   };
 }
@@ -448,44 +436,29 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
 
   const matchupSummary = useMemo(() => {
     if (homeSnap && awaySnap) {
-      const rankDiff = awaySnap.rank - homeSnap.rank;
-      const ppgDiff = homeSnap.ppg - awaySnap.ppg;
       const expectedTempo = (homeSnap.gfPerGame + awaySnap.gaPerGame + awaySnap.gfPerGame + homeSnap.gaPerGame) / 2;
       const tempoTag =
         expectedTempo >= tableAvg * 2 * 1.14
-          ? 'Open High-Tempo'
+          ? 'High-Tempo'
           : expectedTempo <= tableAvg * 2 * 0.88
-          ? 'Compact Low-Margin'
-          : 'Balanced Tempo';
+          ? 'Low-Margin'
+          : 'Balanced';
 
-      let headline = `${fixture.homeTeam} (#${homeSnap.rank}, ${homeSnap.ppg.toFixed(2)} PPG) hosts ${fixture.awayTeam} (#${awaySnap.rank}, ${awaySnap.ppg.toFixed(2)} PPG). `;
-
-      if (ppgDiff >= 0.45) {
-        headline += `${fixture.homeTeam} enters with clear table superiority (+${ppgDiff.toFixed(2)} PPG and ${Math.abs(rankDiff)} places higher), favoring home territorial dominance against ${awayProfile.defensiveShape.toLowerCase()}.`;
-      } else if (ppgDiff <= -0.45) {
-        headline += `${fixture.awayTeam} carries superior table momentum (+${Math.abs(ppgDiff).toFixed(2)} PPG and ${Math.abs(rankDiff)} places higher), forcing ${fixture.homeTeam} to stay disciplined in defensive transitions.`;
-      } else {
-        headline += `Separated by just ${Math.abs(ppgDiff).toFixed(2)} PPG in the standings, both sides match up evenly — expect fine margins around ${homeSnap.gfPerGame.toFixed(2)} vs ${awaySnap.gfPerGame.toFixed(2)} GF/M scoring rates.`;
-      }
-
-      return { tempoTag, headline };
+      return { tempoTag, headline: '' };
     }
 
     if (homeSnap || awaySnap) {
-      const rankedSide = homeSnap
-        ? `${fixture.homeTeam} (#${homeSnap.rank}/${homeSnap.totalTeams}, ${homeSnap.ppg.toFixed(2)} PPG)`
-        : `${fixture.awayTeam} (#${awaySnap!.rank}/${awaySnap!.totalTeams}, ${awaySnap!.ppg.toFixed(2)} PPG)`;
       return {
-        tempoTag: 'Partial Table Data',
-        headline: `${rankedSide} brings verified league-table benchmarks into a matchup projected at ${pred?.homeXG?.toFixed(2) ?? '1.25'} vs ${pred?.awayXG?.toFixed(2) ?? '1.10'} xG.`,
+        tempoTag: 'Partial Table',
+        headline: '',
       };
     }
 
     return {
-      tempoTag: pred ? `${(pred.homeXG + pred.awayXG).toFixed(2)} Projected xG` : 'Match Metrics',
-      headline: `${fixture.homeTeam} (${homeProfile.styleName}) meets ${fixture.awayTeam} (${awayProfile.styleName}) with model projections at ${pred?.homeXG?.toFixed(2) ?? '—'} vs ${pred?.awayXG?.toFixed(2) ?? '—'} xG.`,
+      tempoTag: pred ? `${(pred.homeXG + pred.awayXG).toFixed(2)} xG` : 'Match Metrics',
+      headline: '',
     };
-  }, [homeSnap, awaySnap, tableAvg, fixture.homeTeam, fixture.awayTeam, awayProfile.defensiveShape, homeProfile.styleName, pred]);
+  }, [homeSnap, awaySnap, tableAvg, pred]);
 
   const battlegrounds = useMemo<BattlegroundInsight[]>(() => {
     if (homeSnap && awaySnap) {
@@ -497,52 +470,52 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
 
       const rankMomentumDetail =
         rankGap === 0
-          ? `Level on rank with ${homeSnap.ppg.toFixed(2)} vs ${awaySnap.ppg.toFixed(2)} PPG.`
-          : `${leaderTeam} leads by ${rankGap} places and +${Math.abs(ppgDiff).toFixed(2)} PPG${
+          ? `${homeSnap.ppg.toFixed(2)} vs ${awaySnap.ppg.toFixed(2)} PPG`
+          : `${leaderTeam} +${rankGap} pos · +${Math.abs(ppgDiff).toFixed(2)} PPG${
               homeFormRate !== null && awayFormRate !== null
-                ? ` (${Math.round(homeFormRate * 100)}% vs ${Math.round(awayFormRate * 100)}% recent form).`
-                : '.'
+                ? ` (${Math.round(homeFormRate * 100)}% vs ${Math.round(awayFormRate * 100)}%)`
+                : ''
             }`;
 
       const homeAttVsAwayDef = homeSnap.gfPerGame / Math.max(0.4, tableAvg) + awaySnap.gaPerGame / Math.max(0.4, tableAvg);
       const awayAttVsHomeDef = awaySnap.gfPerGame / Math.max(0.4, tableAvg) + homeSnap.gaPerGame / Math.max(0.4, tableAvg);
       const primaryAttackTitle =
         homeAttVsAwayDef >= awayAttVsHomeDef
-          ? `${fixture.homeTeam} Attack Edge`
-          : `${fixture.awayTeam} Counter Edge`;
+          ? `${fixture.homeTeam} Attack`
+          : `${fixture.awayTeam} Attack`;
       const attackDefenseDetail =
         homeAttVsAwayDef >= awayAttVsHomeDef
-          ? `${fixture.homeTeam} averages ${homeSnap.gfPerGame.toFixed(2)} GF/M against ${fixture.awayTeam}'s ${awaySnap.gaPerGame.toFixed(2)} GA/M defense.`
-          : `${fixture.awayTeam} posts ${awaySnap.gfPerGame.toFixed(2)} GF/M into ${fixture.homeTeam}'s ${homeSnap.gaPerGame.toFixed(2)} GA/M backline.`;
+          ? `${homeSnap.gfPerGame.toFixed(2)} GF/M vs ${awaySnap.gaPerGame.toFixed(2)} GA/M`
+          : `${awaySnap.gfPerGame.toFixed(2)} GF/M vs ${homeSnap.gaPerGame.toFixed(2)} GA/M`;
 
       const homeZone = classifyZoneTier(homeSnap);
       const awayZone = classifyZoneTier(awaySnap);
       const stakesTitle =
         homeZone !== 'MIDTABLE' && awayZone !== 'MIDTABLE'
-          ? 'Dual Zone Pressure'
+          ? 'Dual Zone Stakes'
           : homeZone !== 'MIDTABLE'
           ? `${fixture.homeTeam} Stakes`
           : awayZone !== 'MIDTABLE'
           ? `${fixture.awayTeam} Stakes`
-          : 'Goal Margin Discipline';
+          : 'Goal Margin';
       const stakesDetail =
         homeSnap.zoneLabel || awaySnap.zoneLabel
-          ? `${homeSnap.zoneLabel ? `${fixture.homeTeam}: ${homeSnap.zoneLabel}. ` : ''}${awaySnap.zoneLabel ? `${fixture.awayTeam}: ${awaySnap.zoneLabel}.` : ''}`
-          : `GD/M stands at ${homeSnap.gdPerGame >= 0 ? '+' : ''}${homeSnap.gdPerGame.toFixed(2)} vs ${awaySnap.gdPerGame >= 0 ? '+' : ''}${awaySnap.gdPerGame.toFixed(2)} across ${homeSnap.played} and ${awaySnap.played} matches.`;
+          ? `${homeSnap.zoneLabel ? `${fixture.homeTeam}: ${homeSnap.zoneLabel}` : ''}${homeSnap.zoneLabel && awaySnap.zoneLabel ? ' · ' : ''}${awaySnap.zoneLabel ? `${fixture.awayTeam}: ${awaySnap.zoneLabel}` : ''}`
+          : `${homeSnap.gdPerGame >= 0 ? '+' : ''}${homeSnap.gdPerGame.toFixed(2)} vs ${awaySnap.gdPerGame >= 0 ? '+' : ''}${awaySnap.gdPerGame.toFixed(2)} GD/M`;
 
       return [
         {
-          kicker: 'Table Hierarchy',
-          title: `#${homeSnap.rank} vs #${awaySnap.rank} (${Math.abs(ppgDiff).toFixed(2)} PPG Gap)`,
+          kicker: 'Hierarchy',
+          title: `#${homeSnap.rank} vs #${awaySnap.rank}`,
           detail: rankMomentumDetail,
         },
         {
-          kicker: 'Attack vs Defense',
+          kicker: 'Att vs Def',
           title: primaryAttackTitle,
           detail: attackDefenseDetail,
         },
         {
-          kicker: 'Standings Stakes',
+          kicker: 'Stakes',
           title: stakesTitle,
           detail: stakesDetail,
         },
@@ -551,22 +524,22 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
 
     return [
       {
-        kicker: 'Attack vs Defense',
-        title: 'xG Efficiency Split',
-        detail: `${fixture.homeTeam} (${(pred?.homeAttackStrength ?? 1).toFixed(2)} att) faces ${fixture.awayTeam} (${(pred?.awayDefenseStrength ?? 1).toFixed(2)} def).`,
+        kicker: 'Att vs Def',
+        title: 'Index Split',
+        detail: `${(pred?.homeAttackStrength ?? 1).toFixed(2)} att vs ${(pred?.awayDefenseStrength ?? 1).toFixed(2)} def`,
       },
       {
-        kicker: 'Projected Output',
-        title: `${pred?.homeXG?.toFixed(2) ?? '—'} vs ${pred?.awayXG?.toFixed(2) ?? '—'} xG`,
-        detail: `Model expects ${((pred?.homeXG ?? 1.2) + (pred?.awayXG ?? 1.1)).toFixed(2)} total goals based on match and form metrics.`,
+        kicker: 'Projected xG',
+        title: `${pred?.homeXG?.toFixed(2) ?? '—'} vs ${pred?.awayXG?.toFixed(2) ?? '—'}`,
+        detail: `Total ${((pred?.homeXG ?? 1.2) + (pred?.awayXG ?? 1.1)).toFixed(2)} xG`,
       },
       {
-        kicker: 'Rest & Context',
-        title: 'Turnaround Impact',
+        kicker: 'Rest',
+        title: 'Turnaround',
         detail:
           pred?.tacticalContext?.restDifferential !== undefined && pred.tacticalContext.restDifferential !== 0
-            ? `Rest differential of ${pred.tacticalContext.restDifferential > 0 ? '+' : ''}${pred.tacticalContext.restDifferential} days factors into late-game intensity.`
-            : 'Both squads enter on comparable preparation cadence.',
+            ? `${pred.tacticalContext.restDifferential > 0 ? '+' : ''}${pred.tacticalContext.restDifferential}d rest diff`
+            : 'Equal rest',
       },
     ];
   }, [homeSnap, awaySnap, homeRecentForm, awayRecentForm, fixture.homeTeam, fixture.awayTeam, tableAvg, pred]);
@@ -579,7 +552,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
   return (
     <div className="space-y-2.5 font-sans">
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+        <div className="min-h-[34px] px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
           <SectionHeader
             title="League Standings Influence"
             icon={<Trophy className="w-3.5 h-3.5" />}
@@ -596,7 +569,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
 
         {hasTableData && standingsCtx ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--border-subdued)]">
+            <div className="px-2.5 pb-2.5 grid grid-cols-1 md:grid-cols-2 gap-2">
               {[
                 {
                   key: 'HOME',
@@ -617,11 +590,11 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                   defenseAnchor: standingsCtx.defenseAnchorAway,
                   motivation: standingsCtx.motivationMultiplierAway,
                   xgDelta: standingsCtx.xgDeltaPercentAway,
-                  accentClass: 'text-sky-700 dark:text-sky-400',
-                  winBgClass: 'bg-sky-600 text-white',
+                  accentClass: 'text-theme-info',
+                  winBgClass: 'bg-[var(--status-info)] text-white',
                 },
               ].map((side) => (
-                <div key={side.key} className="p-3 space-y-2 min-w-0">
+                <div key={side.key} className="p-2.5 rounded-xl bg-theme-card space-y-2 min-w-0">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-semibold text-theme-main truncate">{side.teamName}</span>
                     {side.snap ? (
@@ -644,22 +617,22 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-4 divide-x divide-[var(--border-subdued)] border-y border-theme-subdued py-1.5 text-center tabular-nums">
-                        <div>
+                      <div className="grid grid-cols-4 gap-1.5 text-center tabular-nums">
+                        <div className="rounded-lg bg-theme-subtle/60 py-1.5 px-1">
                           <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GF/M</span>
                           <span className="text-xs font-semibold text-theme-main">{side.snap.gfPerGame.toFixed(2)}</span>
                         </div>
-                        <div>
+                        <div className="rounded-lg bg-theme-subtle/60 py-1.5 px-1">
                           <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GA/M</span>
                           <span className="text-xs font-semibold text-theme-main">{side.snap.gaPerGame.toFixed(2)}</span>
                         </div>
-                        <div>
+                        <div className="rounded-lg bg-theme-subtle/60 py-1.5 px-1">
                           <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">GD/M</span>
                           <span className="text-xs font-semibold text-theme-main">
                             {side.snap.gdPerGame > 0 ? `+${side.snap.gdPerGame.toFixed(2)}` : side.snap.gdPerGame.toFixed(2)}
                           </span>
                         </div>
-                        <div>
+                        <div className="rounded-lg bg-theme-subtle/60 py-1.5 px-1">
                           <span className="text-2xs text-theme-sub block uppercase tracking-[0.06em]">
                             {side.xgDelta !== undefined ? 'xG Shift' : 'Att/Def'}
                           </span>
@@ -667,9 +640,9 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                             <span
                               className={`text-xs font-semibold ${
                                 side.xgDelta > 0
-                                  ? 'text-emerald-700 dark:text-emerald-400'
+                                  ? 'text-theme-success'
                                   : side.xgDelta < 0
-                                  ? 'text-rose-700 dark:text-rose-400'
+                                  ? 'text-theme-danger'
                                   : 'text-theme-main'
                               }`}
                             >
@@ -695,7 +668,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
                                     ? side.winBgClass
                                     : r === 'D'
                                     ? 'bg-amber-400 text-slate-950'
-                                    : 'bg-rose-600 text-white'
+                                    : 'bg-theme-live text-white'
                                 }`}
                               >
                                 {r}
@@ -720,7 +693,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
             </div>
 
             {tacticalNotes.length > 0 && (
-              <div className="px-3 py-2 border-t border-theme-subdued space-y-1">
+              <div className="px-3 pb-2.5 space-y-1">
                 {tacticalNotes.map((note, idx) => (
                   <div key={idx} className="text-xs text-theme-sub leading-snug">
                     · {note}
@@ -736,36 +709,34 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
           </div>
         ) : (
           <div className="px-3 py-2.5 text-xs text-theme-sub">
-            League standings are unavailable for this competition; tactical analysis below uses match form and projected xG metrics.
+            No table available.
           </div>
         )}
       </Card>
 
-      {/* Standings-Driven Tactical Matchup Overview */}
+      {/* Matchup Style Summary */}
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+        <div className="min-h-[34px] px-3 pt-2.5 pb-1 flex items-center justify-between gap-2">
           <SectionHeader
-            title="Tactical Matchup Analysis"
+            title="Matchup Profile"
             icon={<Compass className="w-3.5 h-3.5" />}
             size="sm"
           />
-          <span className="text-xs font-medium text-theme-sub hidden sm:inline tabular-nums">
+          <span className="text-xs font-medium text-theme-sub tabular-nums">
             {matchupSummary.tempoTag}
           </span>
         </div>
 
-        <div className="p-3.5">
-          <p className="text-sm font-normal text-theme-main leading-relaxed">
-            {matchupSummary.headline}{' '}
-            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">
-              {fixture.homeTeam}
-            </motion.span>{' '}
-            projects into <span className="font-semibold">{homeProfile.styleName}</span> against{' '}
-            <motion.span whileHover={{ scale: 1.02, color: 'var(--color-primary)' }} className="font-medium underline decoration-dotted">
-              {fixture.awayTeam}
-            </motion.span>
-            &apos;s <span className="font-semibold">{awayProfile.styleName}</span>.
-          </p>
+        <div className="px-3 pb-3 pt-1 flex items-center justify-between gap-2 text-sm tabular-nums flex-wrap">
+          <div className="min-w-0">
+            <span className="text-2xs text-theme-sub uppercase block">{fixture.homeTeam}</span>
+            <span className="font-semibold text-theme-main">{homeProfile.styleName}</span>
+          </div>
+          <span className="text-xs text-theme-dim font-medium">vs</span>
+          <div className="min-w-0 text-right">
+            <span className="text-2xs text-theme-sub uppercase block">{fixture.awayTeam}</span>
+            <span className="font-semibold text-theme-main">{awayProfile.styleName}</span>
+          </div>
         </div>
       </Card>
 
@@ -788,7 +759,7 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
           },
         ].map((side) => (
           <Card key={side.key} surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-            <div className="min-h-[34px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2">
+            <div className="min-h-[34px] px-3 pt-2.5 pb-1 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <TeamAvatar src={side.badge} name={side.teamName} size="sm" />
                 <div className="min-w-0">
@@ -806,43 +777,36 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
               </span>
             </div>
 
-            <div className="p-3.5 space-y-2.5">
-              <div>
-                <span className="text-base font-semibold text-theme-main block tracking-[-0.01em]">
-                  {side.profile.styleName}
-                </span>
-                <span className="text-sm font-normal text-theme-sub block leading-snug mt-0.5">{side.profile.tagline}</span>
-              </div>
+            <div className="px-3 pb-3 pt-1 space-y-2">
+              <span className="text-base font-semibold text-theme-main block tracking-[-0.01em]">
+                {side.profile.styleName}
+              </span>
 
-              <div className="grid grid-cols-2 divide-x divide-[var(--border-subdued)] border-y border-theme-subdued py-2">
-                <div className="pr-2.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="rounded-xl bg-theme-card p-2.5">
                   <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">Build-up</span>
                   <span className="text-sm font-semibold text-theme-main mt-0.5 block">{side.profile.buildUpStyle}</span>
                 </div>
-                <div className="pl-2.5">
+                <div className="rounded-xl bg-theme-card p-2.5">
                   <span className="text-2xs text-theme-sub block uppercase font-medium tracking-[0.06em]">Shape</span>
                   <span className="text-sm font-semibold text-theme-main mt-0.5 block">{side.profile.defensiveShape}</span>
                 </div>
               </div>
 
               <div className="space-y-1.5 text-sm">
-                <div className="flex items-start gap-2 text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <div className="flex items-center gap-2 text-theme-success">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   <span className="text-theme-sub font-normal tabular-nums">
                     <strong className="text-theme-main font-semibold">Strength:</strong> {side.profile.keyStrength}
                   </span>
                 </div>
-                <div className="flex items-start gap-2 text-rose-700 dark:text-rose-400">
-                  <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <div className="flex items-center gap-2 text-theme-danger">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                   <span className="text-theme-sub font-normal tabular-nums">
-                    <strong className="text-theme-main font-semibold">Vulnerability:</strong> {side.profile.vulnerability}
+                    <strong className="text-theme-main font-semibold">Risk:</strong> {side.profile.vulnerability}
                   </span>
                 </div>
               </div>
-
-              <p className="text-sm font-normal text-theme-sub leading-relaxed pt-1 border-t border-theme-subdued tabular-nums">
-                {side.profile.summary}
-              </p>
             </div>
           </Card>
         ))}
@@ -850,15 +814,15 @@ export const TacticalAnalysis: React.FC<TacticalAnalysisProps> = ({
 
       {/* Key Matchup Battlegrounds */}
       <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[34px] px-3 py-1.5 border-b border-theme-subdued flex items-center">
-          <SectionHeader title="Critical Matchup Battlegrounds" size="sm" className="w-full" />
+        <div className="min-h-[34px] px-3 pt-2.5 pb-1 flex items-center">
+          <SectionHeader title="Key Metrics" size="sm" className="w-full" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-subdued)]">
+        <div className="px-2.5 pb-2.5 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
           {battlegrounds.map((bg) => (
-            <div key={bg.kicker} className="p-3 space-y-1 tabular-nums">
+            <div key={bg.kicker} className="p-2.5 rounded-xl bg-theme-card space-y-1 tabular-nums">
               <span className="text-2xs text-theme-sub uppercase font-medium block tracking-[0.06em]">{bg.kicker}</span>
               <span className="font-semibold text-base text-theme-main block tracking-[-0.01em]">{bg.title}</span>
-              <p className="text-sm font-normal text-theme-sub leading-relaxed">{bg.detail}</p>
+              <span className="text-xs font-normal text-theme-sub block">{bg.detail}</span>
             </div>
           ))}
         </div>

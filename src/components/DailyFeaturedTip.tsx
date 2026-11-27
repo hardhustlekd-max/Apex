@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Award, ChevronRight, ChevronDown, Ticket, Check, Layers } from 'lucide-react';
+import { Award, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FeaturedTipDTO,
@@ -217,13 +217,13 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
   }, [uniqueMatchComboTips]);
 
   if (isLoading) {
-    return <LoadingState variant="spinner" minHeight="min-h-[124px]" label="Loading today's high confidence tips..." />;
+    return <LoadingState variant="spinner" minHeight="min-h-[124px]" label="Loading tips..." />;
   }
 
   if (tips.length === 0) {
     return (
       <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center">
+        <div className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center">
           <SectionHeader
             title="Today's Featured Tips (>75%)"
             icon={<Award className="w-4 h-4" />}
@@ -232,7 +232,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
           />
         </div>
         <div className="py-8 px-4 text-center text-sm text-theme-sub">
-          No matches today with high-confidence tips currently available.
+          No featured tips today.
         </div>
       </Card>
     );
@@ -254,7 +254,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
       </div>
 
       <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[40px] px-3.5 py-2 bg-theme-header-grad border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+        <div className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center justify-between gap-2 flex-wrap">
           <SectionHeader
             title="Today's Featured Tips"
             icon={<Award className="w-4 h-4" />}
@@ -296,13 +296,12 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                       }))
                     )
                   }
-                  className={`h-[30px] px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                  className={`h-[30px] px-3 rounded-full text-xs font-semibold flex items-center justify-center transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                     allInSlip
-                      ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
-                      : 'bg-theme-primary/15 text-theme-primary border border-theme-primary/30 hover:bg-theme-primary hover:text-theme-primary-text'
+                      ? 'bg-theme-primary text-theme-primary-text'
+                      : 'bg-theme-primary/15 text-theme-primary hover:bg-theme-primary hover:text-theme-primary-text'
                   }`}
                 >
-                  {allInSlip ? <Check className="w-3.5 h-3.5" /> : <Ticket className="w-3.5 h-3.5" />}
                   <span>{allInSlip ? 'Combo in Slip' : `Add ${uniqueMatchComboTips.length}-Fold Combo`}</span>
                 </button>
               );
@@ -374,20 +373,14 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                         }}
                         aria-expanded={isExpanded}
                         aria-controls={accordionId}
-                        className={`h-[30px] px-2.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                        className={`h-[30px] px-2.5 rounded-full text-xs font-semibold flex items-center justify-center transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                           isExpanded
-                            ? 'bg-theme-primary/15 text-theme-primary border border-theme-primary/40'
-                            : 'bg-theme-subtle text-theme-sub hover:text-theme-main hover:bg-theme-card-elevated border border-theme-subdued'
+                            ? 'bg-theme-primary/15 text-theme-primary'
+                            : 'bg-theme-subtle text-theme-sub hover:text-theme-main hover:bg-theme-card-elevated'
                         }`}
                         title="Expand match combo bet options"
                       >
-                        <Layers className="w-3.5 h-3.5" />
                         <span>Combos{comboOptions.length > 0 ? ` (${comboOptions.length})` : ''}</span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                            isExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
                       </button>
 
                       {onAddSelection && (
@@ -409,7 +402,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                               score: fixture.score,
                             });
                           }}
-                          className={`h-[30px] px-2.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                          className={`h-[30px] px-2.5 rounded-full text-xs font-semibold flex items-center justify-center transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                             isTipSelected
                               ? 'bg-theme-primary text-theme-primary-text'
                               : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/10 hover:text-theme-primary'
@@ -417,17 +410,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                           title="Add to Bet Slip"
                           aria-label="Add to Bet Slip"
                         >
-                          {isTipSelected ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Added</span>
-                            </>
-                          ) : (
-                            <>
-                              <Ticket className="w-3.5 h-3.5" />
-                              <span>+ Slip</span>
-                            </>
-                          )}
+                          <span>{isTipSelected ? 'Added' : '+ Slip'}</span>
                         </button>
                       )}
                     </div>
@@ -453,9 +436,9 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className="overflow-hidden border-t border-theme-subdued bg-theme-subtle/35"
+                      className="overflow-hidden bg-theme-subtle/40"
                     >
-                      <div className="px-3.5 py-2.5 border-b border-theme-subdued flex items-center justify-between gap-2 flex-wrap">
+                      <div className="px-3.5 pt-2.5 pb-2 flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-semibold text-theme-main">
                             Combo Bet Options
@@ -467,7 +450,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                         </div>
 
                         {comboOptions.length > 0 && (
-                          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar p-0.5 bg-theme-card border border-theme-subdued rounded-full">
+                          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar p-0.5 bg-theme-card rounded-full">
                             {COMBO_SUBFILTER_META.map((sub) => {
                               const subCount =
                                 sub.id === 'ALL'
@@ -487,7 +470,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                                   }
                                   className={`h-[24px] px-2.5 rounded-full text-2xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                                     isSubActive
-                                      ? 'bg-theme-primary text-theme-primary-text shadow-theme-sm'
+                                      ? 'bg-theme-primary text-theme-primary-text'
                                       : 'text-theme-sub hover:text-theme-main'
                                   }`}
                                 >
@@ -501,14 +484,14 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
 
                       {isLoadingCombos ? (
                         <div className="py-5 px-4 text-center text-xs text-theme-sub">
-                          Loading combo bet options...
+                          Loading combos...
                         </div>
                       ) : filteredComboOptions.length === 0 ? (
                         <div className="py-5 px-4 text-center text-xs text-theme-sub">
-                          No combo bet options available for this fixture.
+                          No combo options
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:gap-px bg-[var(--border-subdued)] max-h-[360px] overflow-y-auto overscroll-contain">
+                        <div className="px-3 pb-3 pt-1 grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-[360px] overflow-y-auto overscroll-contain">
                           {filteredComboOptions.map((combo) => {
                             const comboProbPct = (combo.market.probability * 100).toFixed(1);
                             const isComboSelected = selectedSelections.some(
@@ -519,7 +502,7 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                             return (
                               <div
                                 key={combo.market.key}
-                                className="bg-theme-card/95 hover:bg-theme-card-elevated px-3.5 py-2 flex items-center justify-between gap-2.5 transition-colors"
+                                className="rounded-xl bg-theme-card hover:bg-theme-card-elevated px-3 py-2 flex items-center justify-between gap-2.5 transition-colors"
                               >
                                 <div className="min-w-0 flex-1">
                                   <div className="text-xs font-semibold text-theme-main truncate" title={combo.market.name}>
@@ -554,24 +537,14 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                                         score: fixture.score,
                                       })
                                     }
-                                    className={`h-[26px] px-2.5 rounded-full text-2xs font-semibold flex items-center gap-1 transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
+                                    className={`h-[26px] px-2.5 rounded-full text-2xs font-semibold flex items-center justify-center transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                                       isComboSelected
                                         ? 'bg-theme-primary text-theme-primary-text'
                                         : 'bg-theme-subtle text-theme-main hover:bg-theme-primary/15 hover:text-theme-primary'
                                     }`}
                                     aria-label={`${isComboSelected ? 'Remove' : 'Add'} ${combo.market.name} to Bet Slip`}
                                   >
-                                    {isComboSelected ? (
-                                      <>
-                                        <Check className="w-3 h-3" />
-                                        <span>Added</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Ticket className="w-3 h-3" />
-                                        <span>+ Slip</span>
-                                      </>
-                                    )}
+                                    <span>{isComboSelected ? 'Added' : '+ Slip'}</span>
                                   </button>
                                 )}
                               </div>

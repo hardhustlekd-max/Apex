@@ -14,17 +14,17 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'bg-theme-primary bg-theme-primary-hover text-theme-primary-text font-semibold border border-theme-neon shadow-theme-glow',
+    'bg-theme-primary bg-theme-primary-hover text-theme-primary-text font-semibold',
   secondary:
-    'bg-theme-card hover:bg-theme-card-elevated text-theme-main font-medium border border-theme hover:border-theme-accent shadow-theme-sm',
+    'bg-theme-card hover:bg-theme-card-elevated text-theme-main font-medium border border-theme-subdued hover:border-theme',
   subtle:
-    'bg-theme-subtle hover:bg-theme-card-elevated text-theme-main font-medium border border-theme-subdued',
+    'bg-theme-subtle hover:bg-theme-card-elevated text-theme-main font-medium',
   ghost:
-    'bg-transparent hover:bg-theme-subtle text-theme-sub hover:text-theme-main font-medium border border-transparent',
+    'bg-transparent hover:bg-theme-subtle text-theme-sub hover:text-theme-main font-medium',
   danger:
-    'bg-theme-live hover:brightness-110 text-white font-semibold border border-rose-400/35',
+    'bg-theme-live hover:brightness-110 text-white font-semibold',
   inverse:
-    'bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 font-semibold border border-theme-accent shadow-theme-sm',
+    'bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 font-semibold',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

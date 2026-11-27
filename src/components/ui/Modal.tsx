@@ -45,7 +45,7 @@ export const Modal: React.FC<ModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className={`fixed inset-0 z-50 flex justify-center bg-theme-overlay backdrop-blur-xl animate-in fade-in duration-150 font-sans ${
+      className={`fixed inset-0 z-50 flex justify-center bg-theme-overlay animate-in fade-in duration-150 font-sans ${
         mobileSheet ? 'items-end sm:items-center p-0 sm:p-3' : 'items-center p-2.5 sm:p-3.5'
       }`}
     >
@@ -55,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-hidden="true"
       />
       <div
-        className={`relative z-10 bg-theme-card border border-theme text-theme-main w-full ${maxWidth} overflow-hidden shadow-theme-md flex flex-col animate-in zoom-in-95 duration-150 ${
+        className={`relative z-10 bg-theme-card border border-theme-subdued text-theme-main w-full ${maxWidth} overflow-hidden shadow-theme-md flex flex-col animate-in zoom-in-95 duration-150 ${
           mobileSheet
             ? 'rounded-t-2xl sm:rounded-2xl max-h-[86vh]'
             : 'rounded-2xl max-h-[86vh]'
@@ -66,7 +66,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Header */}
-        <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme flex items-center justify-between gap-2 shrink-0">
+        <div className="min-h-[38px] px-3 py-1.5 bg-theme-card-elevated flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             {icon && (
               <span className="text-theme-primary shrink-0 flex items-center justify-center">
@@ -98,7 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-3 py-2 bg-theme-card-elevated border-t border-theme shrink-0">
+          <div className="px-3 py-2 bg-theme-card-elevated shrink-0">
             {footer}
           </div>
         )}

@@ -30,6 +30,7 @@ import {
   normalizeMarketKey,
   parseUpcomingMarketFilter,
 } from '../core/marketEvaluator.js';
+import { DEFAULT_POPULAR_MARKET_KEYS } from '../core/marketActivity.js';
 import { flashscoreScraperService } from './flashscoreScraperService.js';
 import { LiveScore } from '../providers/types.js';
 
@@ -45,6 +46,7 @@ export interface WorkerQueryParams {
   search?: string;
   sortBy?: string;
   marketFilter?: string;
+  popularMarkets?: string[];
   forceRefresh?: boolean;
 }
 
@@ -489,7 +491,8 @@ function buildGroupsForFixtures(fixtures: Fixture[]): LeagueGroupDTO[] {
 
 function resolveMarketPickForMarkets(
   markets: MarketOption[] | undefined,
-  marketFilter: string
+  marketFilter: string,
+  popularMarkets?: string[]
 ): Fixture['activeMarketPick'] | null | undefined {
   const { category, specificMarket } = parseUpcomingMarketFilter(marketFilter);
   if (category === 'ALL' && specificMarket === 'AUTO') {
@@ -504,6 +507,45 @@ function resolveMarketPickForMarkets(
 
   if (specificMarket !== 'AUTO') {
     matched = markets.find((m) => normalizeMarketKey(m.key) === specificMarket);
+  } else if (category === 'POPULAR') {
+    const cleanPopular = (
+      Array.isArray(popularMarkets) && popularMarkets.length > 0
+        ? popularMarkets
+        : [...DEFAULT_POPULAR_MARKET_KEYS]
+    )
+      .map((k) => normalizeMarketKey(k))
+      .filter((k) => k && !isZeroFiveGoalsKey(k))
+      .slice(0, 3);
+
+    const priorityPool =
+      cleanPopular.length > 0 ? cleanPopular : [...DEFAULT_POPULAR_MARKET_KEYS];
+
+    const matchingMarkets = markets.filter((m) => {
+      const normKey = normalizeMarketKey(m.key);
+      return !isZeroFiveGoalsKey(normKey) && priorityPool.includes(normKey);
+    });
+
+    if (matchingMarkets.length > 0) {
+      matched = matchingMarkets
+        .slice()
+        .sort((a, b) => {
+          const rankA = priorityPool.indexOf(normalizeMarketKey(a.key));
+          const rankB = priorityPool.indexOf(normalizeMarketKey(b.key));
+          const bonusA = rankA === 0 ? 0.025 : rankA === 1 ? 0.012 : 0;
+          const bonusB = rankB === 0 ? 0.025 : rankB === 1 ? 0.012 : 0;
+          const scoreA = (a.probability || 0) + bonusA;
+          const scoreB = (b.probability || 0) + bonusB;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return rankA - rankB;
+        })[0];
+    } else {
+      const fallbackPool = markets.filter(
+        (m) => !isZeroFiveGoalsKey(m.key) && !WORKER_TRIVIAL_EXTREME_KEYS.has(m.key)
+      );
+      matched = (fallbackPool.length > 0 ? fallbackPool : markets)
+        .slice()
+        .sort((a, b) => b.probability - a.probability)[0];
+    }
   } else if (category === 'DOUBLE_CHANCE') {
     const dcOnly = markets.filter((m) => m.key.startsWith('DOUBLE_CHANCE_'));
     const pool =
@@ -907,6 +949,10 @@ class FixturesWorkerService {
     const search = (params.search || '').trim().toLowerCase();
     const sortBy = (params.sortBy || 'DEFAULT').toUpperCase();
     const marketFilter = (params.marketFilter || 'MOST_LIKELY').toUpperCase();
+    const popularMarkets =
+      marketFilter === 'POPULAR' && Array.isArray(params.popularMarkets)
+        ? params.popularMarkets.slice(0, 3)
+        : undefined;
 
     const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
     const cacheKey = JSON.stringify({
@@ -920,6 +966,7 @@ class FixturesWorkerService {
       search,
       sortBy,
       marketFilter,
+      popularMarkets,
       excludeVolatile,
     });
 
@@ -996,7 +1043,7 @@ class FixturesWorkerService {
         continue;
       }
 
-      const activeMarketPick = resolveMarketPickForMarkets(r.fullMarkets, marketFilter);
+      const activeMarketPick = resolveMarketPickForMarkets(r.fullMarkets, marketFilter, popularMarkets);
       if (activeMarketPick === null) {
         continue;
       }
@@ -1050,6 +1097,7 @@ class FixturesWorkerService {
     search?: string;
     sortBy?: string;
     marketFilter?: string;
+    popularMarkets?: string[];
     limit?: number;
   }): Promise<{ jsonPayload: string; etag: string }> {
     if (!isSqliteEnabled()) {
@@ -1072,6 +1120,10 @@ class FixturesWorkerService {
     const search = (params?.search || '').trim().toLowerCase();
     const sortBy = (params?.sortBy || 'DEFAULT').toUpperCase();
     const marketFilter = (params?.marketFilter || 'MOST_LIKELY').toUpperCase();
+    const popularMarkets =
+      marketFilter === 'POPULAR' && Array.isArray(params?.popularMarkets)
+        ? params.popularMarkets.slice(0, 3)
+        : undefined;
     const limit = params?.limit && params.limit > 0 ? params.limit : 200;
 
     const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
@@ -1082,6 +1134,7 @@ class FixturesWorkerService {
       search,
       sortBy,
       marketFilter,
+      popularMarkets,
       limit,
       excludeVolatile,
     });
@@ -1143,7 +1196,7 @@ class FixturesWorkerService {
       }
       const cleanId = cleanFixtureId(f.id);
       const existingRec = this.byCleanId.get(f.id) || this.byCleanId.get(cleanId);
-      const activeMarketPick = resolveMarketPickForMarkets(existingRec?.fullMarkets, marketFilter);
+      const activeMarketPick = resolveMarketPickForMarkets(existingRec?.fullMarkets, marketFilter, popularMarkets);
       if (activeMarketPick === null) continue;
       filtered.push(activeMarketPick ? { ...f, activeMarketPick } : f);
     }
@@ -1298,6 +1351,7 @@ class FixturesWorkerService {
     search?: string;
     sortBy?: string;
     marketFilter?: string;
+    popularMarkets?: string[];
     dateFilter?: string;
     limit?: number;
     forceRefresh?: boolean;
@@ -1330,6 +1384,10 @@ class FixturesWorkerService {
     const search = (params?.search || '').trim().toLowerCase();
     const sortBy = (params?.sortBy || 'DEFAULT').toUpperCase();
     const marketFilter = (params?.marketFilter || 'MOST_LIKELY').toUpperCase();
+    const popularMarkets =
+      marketFilter === 'POPULAR' && Array.isArray(params?.popularMarkets)
+        ? params.popularMarkets.slice(0, 3)
+        : undefined;
     const resolvedDate = params?.dateFilter && params.dateFilter !== 'ALL' ? resolveDateFilter(params.dateFilter) : null;
 
     const slimmed: Fixture[] = [];
@@ -1361,7 +1419,7 @@ class FixturesWorkerService {
           isBanker: Boolean(mk.isBanker),
         }));
       }
-      const activeMarketPick = resolveMarketPickForMarkets(rawMarkets, marketFilter);
+      const activeMarketPick = resolveMarketPickForMarkets(rawMarkets, marketFilter, popularMarkets);
       if (activeMarketPick === null) continue;
       if (activeMarketPick) {
         slimFixture.activeMarketPick = activeMarketPick;

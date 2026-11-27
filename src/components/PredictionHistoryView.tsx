@@ -4,13 +4,10 @@ import { EngineService } from '../services/engineService.js';
 import {
   CheckCircle2,
   XCircle,
-  RefreshCw,
   BarChart3,
   ShieldCheck,
   Target,
   Layers,
-  Database,
-  Upload,
   FileSpreadsheet,
   Clock,
   X,
@@ -18,10 +15,7 @@ import {
   Calendar,
   Percent,
   Filter,
-  RotateCcw,
   Search,
-  ChevronDown,
-  ChevronUp,
   MinusCircle,
   Trophy,
 } from 'lucide-react';
@@ -63,6 +57,7 @@ interface PredictionHistoryViewProps {
   onTriggerFullSync?: () => void;
   onSelectDetail?: (fixture: Fixture) => void;
   refreshKey?: number;
+  onShowToast?: (message: string, type?: 'success' | 'info' | 'danger') => void;
 }
 
 interface EvaluatedImportItem {
@@ -458,7 +453,7 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
                 </strong>
               </span>
             ) : (
-              <span className="text-amber-700 dark:text-amber-400 font-medium">
+              <span className="text-theme-warning font-medium">
                 Score: {row.status === 'LIVE' ? 'In Play' : 'Awaiting Final Result'}
               </span>
             )}
@@ -497,15 +492,10 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
                 onToggleExpand();
               }}
               aria-expanded={isExpanded}
-              className="h-[28px] min-h-[28px] px-2.5 rounded-full border border-theme-subdued bg-theme-subtle hover:bg-theme-card-elevated hover:border-theme text-xs font-medium text-theme-main inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+              className="h-[28px] min-h-[28px] px-2.5 rounded-full bg-theme-subtle hover:bg-theme-card-elevated text-xs font-medium text-theme-main inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
               title="Inspect all markets and combo predictions for this match"
             >
               <span>Markets ({totalMarketsCount})</span>
-              {isExpanded ? (
-                <ChevronUp className="w-3.5 h-3.5 text-theme-primary" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-theme-sub" />
-              )}
             </button>
           )}
           {statusBadge}
@@ -515,7 +505,7 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
       {isExpanded && totalMarketsCount > 0 && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="px-3 pb-3 pt-2 bg-theme-subtle border-t border-theme-subdued space-y-2"
+          className="px-3 pb-3 pt-2 bg-theme-subtle space-y-2"
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
@@ -528,8 +518,8 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
                     onClick={() => setDrawerCategory(cat.id)}
                     className={`h-[26px] px-2.5 rounded-full text-2xs font-medium whitespace-nowrap cursor-pointer transition-colors flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                       isCatActive
-                        ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
-                        : 'bg-theme-card text-theme-sub hover:text-theme-main border border-theme-subdued'
+                        ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                        : 'bg-theme-card text-theme-sub hover:text-theme-main'
                     }`}
                   >
                     <span>{COMPACT_CATEGORY_LABELS[cat.id]}</span>
@@ -553,20 +543,20 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
               return (
                 <div
                   key={`${row.rowKey}_${m.key}`}
-                  className={`px-2.5 py-1.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                  className={`px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-2 ${
                     isSelectedPick
-                      ? 'bg-theme-card border-theme-neon shadow-theme-sm'
-                      : 'bg-theme-card/85 border-theme-subdued'
+                      ? 'bg-theme-card ring-1 ring-theme-accent'
+                      : 'bg-theme-card/85'
                   }`}
                 >
                   <div className="min-w-0 flex items-center gap-1.5">
                     <span
                       className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                         marketOutcome === 'WON'
-                          ? 'bg-emerald-500'
+                          ? 'bg-theme-success'
                           : marketOutcome === 'LOST'
-                          ? 'bg-rose-500'
-                          : 'bg-amber-500'
+                          ? 'bg-theme-danger'
+                          : 'bg-theme-warning'
                       }`}
                     />
                     <span
@@ -586,10 +576,10 @@ const HistoryMatchRow: React.FC<HistoryMatchRowProps> = ({
                     <span
                       className={`text-2xs font-semibold ${
                         marketOutcome === 'WON'
-                          ? 'text-emerald-600 dark:text-emerald-400'
+                          ? 'text-theme-success'
                           : marketOutcome === 'LOST'
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-amber-600 dark:text-amber-400'
+                          ? 'text-theme-danger'
+                          : 'text-theme-warning'
                       }`}
                     >
                       {marketOutcome === 'WON'
@@ -616,6 +606,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   onTriggerFullSync,
   onSelectDetail,
   refreshKey = 0,
+  onShowToast,
 }) => {
   const [history, setHistory] = useState<Fixture[]>([]);
   const [summary, setSummary] = useState<{
@@ -629,7 +620,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isSyncingHistory, setIsSyncingHistory] = useState<boolean>(false);
-  const [syncToast, setSyncToast] = useState<string | null>(null);
 
   // Redesigned Top Filter States (All Markets + Combos + League + Search + Date + Prob + Outcome + Sort)
   const [marketCategory, setMarketCategory] = useState<HistoryMarketCategory>('ALL');
@@ -706,21 +696,20 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
   const handleSyncHistoryScraper = async () => {
     setIsSyncingHistory(true);
-    setSyncToast('Historical archive scraper running: fetching multi-year league feeds...');
+    onShowToast?.('Historical archive scraper running: fetching multi-year league feeds...', 'info');
     try {
       const res = await EngineService.syncHistoryOnly();
       if (res.success) {
-        setSyncToast(res.message || 'Historical database populated with fresh archive data.');
+        onShowToast?.(res.message || 'Historical database populated with fresh archive data.', 'success');
         await fetchHistory(true);
       } else {
-        setSyncToast(res.message || 'Historical scraper sync encountered an issue.');
+        onShowToast?.(res.message || 'Historical scraper sync encountered an issue.', 'danger');
       }
     } catch (err) {
       console.error('Error syncing historical scraper:', err);
-      setSyncToast('Failed to execute historical archive scraper.');
+      onShowToast?.('Failed to execute historical archive scraper.', 'danger');
     } finally {
       setIsSyncingHistory(false);
-      setTimeout(() => setSyncToast(null), 4500);
     }
   };
 
@@ -751,7 +740,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         });
         setOutcomeFilter('ALL');
         setCurrentPage(1);
-        setSyncToast(`Evaluated ${res.summary.totalImported} predictions from ${file.name}`);
+        onShowToast?.(`Evaluated ${res.summary.totalImported} predictions from ${file.name}`, 'success');
       } else {
         setImportError(res.error || 'Failed to evaluate imported predictions.');
       }
@@ -761,7 +750,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setTimeout(() => setSyncToast(null), 5000);
     }
   };
 
@@ -1063,42 +1051,19 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
         aria-hidden="true"
       />
 
-      {syncToast && (
-        <div
-          role="status"
-          className="p-3 rounded-xl bg-theme-card border border-theme-neon text-theme-primary text-sm font-medium flex items-center justify-between gap-2 shadow-theme-md animate-in fade-in slide-in-from-top-2"
-        >
-          <div className="flex items-center gap-2">
-            <Database
-              className={`w-4 h-4 shrink-0 ${
-                isSyncingHistory || isImporting
-                  ? 'animate-spin text-theme-primary'
-                  : 'text-theme-primary'
-              }`}
-            />
-            <span>{syncToast}</span>
-          </div>
-          {importedEvaluation && (
-            <Badge variant="accent" size="xs">
-              Imported
-            </Badge>
-          )}
-        </div>
-      )}
-
       {importError && (
         <div
           role="alert"
-          className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/35 text-rose-700 dark:text-rose-400 text-sm font-medium flex items-center justify-between gap-2 shadow-theme-sm"
+          className="p-3 rounded-xl bg-rose-500/12 text-theme-danger text-sm font-medium flex items-center justify-between gap-2"
         >
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+            <AlertTriangle className="w-4 h-4 shrink-0 text-theme-danger" />
             <span>{importError}</span>
           </div>
           <button
             type="button"
             onClick={() => setImportError(null)}
-            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
+            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-full text-theme-danger hover:bg-rose-500/15 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
             aria-label="Dismiss error"
           >
             <X className="w-3.5 h-3.5" />
@@ -1130,7 +1095,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 disabled={isImporting}
                 title="Import another prediction JSON file"
               >
-                <Upload className={`w-3.5 h-3.5 ${isImporting ? 'animate-bounce' : ''}`} />
                 <span>{isImporting ? 'Evaluating...' : 'Import Another File'}</span>
               </Button>
 
@@ -1140,7 +1104,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 onClick={() => setImportedEvaluation(null)}
                 title="Exit imported evaluation and return to database history"
               >
-                <X className="w-3.5 h-3.5" />
                 <span>Exit Imported View</span>
               </Button>
             </>
@@ -1153,7 +1116,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 disabled={isImporting || isProcessingActive}
                 title="Import a predictions JSON file exported from the Prediction Engine to evaluate accuracy across all markets"
               >
-                <Upload className={`w-3.5 h-3.5 ${isImporting ? 'animate-bounce' : ''}`} />
                 <span>{isImporting ? 'Evaluating File...' : 'Import & Evaluate'}</span>
               </Button>
 
@@ -1164,11 +1126,6 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 disabled={isSyncingHistory || isRefreshing || isProcessingActive}
                 title="Run historical archive scraper to populate database with multi-year results"
               >
-                <Database
-                  className={`w-3.5 h-3.5 ${
-                    isSyncingHistory ? 'animate-spin text-theme-primary' : 'text-theme-primary'
-                  }`}
-                />
                 <span>{isSyncingHistory ? 'Syncing...' : 'Sync History'}</span>
               </Button>
 
@@ -1178,8 +1135,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                 onClick={() => fetchHistory(true)}
                 disabled={isRefreshing || isSyncingHistory || isProcessingActive}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </Button>
             </>
           )}
@@ -1199,15 +1155,14 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
           </div>
 
           {hasActiveFilters && (
-            <Button
-              variant="subtle"
-              size="xs"
-              onClick={resetAllFilters}
-              title="Reset all market, search, date, confidence, outcome, and sort filters"
-            >
-              <RotateCcw className="w-3 h-3 text-theme-primary" />
-              <span>Reset Filters</span>
-            </Button>
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={resetAllFilters}
+                title="Reset all market, search, date, confidence, outcome, and sort filters"
+              >
+                <span>Reset Filters</span>
+              </Button>
           )}
         </div>
 
@@ -1233,7 +1188,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               htmlFor="history-search-input"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
-              <Search className="w-3 h-3 text-theme-primary" />
+              <Search className="w-3.5 h-3.5 text-theme-primary" />
               <span>Search Match</span>
             </label>
             <Input
@@ -1255,7 +1210,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               htmlFor="history-league-filter"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
-              <Trophy className="w-3 h-3 text-theme-primary" />
+              <Trophy className="w-3.5 h-3.5 text-theme-primary" />
               <span>League</span>
             </label>
             <Select
@@ -1282,7 +1237,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               htmlFor="history-specific-market"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
-              <Layers className="w-3 h-3 text-theme-primary" />
+              <Layers className="w-3.5 h-3.5 text-theme-primary" />
               <span>Specific Market</span>
             </label>
             <Select
@@ -1333,7 +1288,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               htmlFor="history-date-filter"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
-              <Calendar className="w-3 h-3 text-theme-primary" />
+              <Calendar className="w-3.5 h-3.5 text-theme-primary" />
               <span>Date Filter</span>
             </label>
             <Select
@@ -1357,7 +1312,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
               htmlFor="history-prob-filter"
               className="text-2xs font-medium text-theme-sub uppercase tracking-[0.05em] flex items-center gap-1"
             >
-              <Percent className="w-3 h-3 text-theme-primary" />
+              <Percent className="w-3.5 h-3.5 text-theme-primary" />
               <span>Probability %</span>
             </label>
             <Select
@@ -1429,7 +1384,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
       {/* Imported File Info Strip (when evaluating uploaded JSON) */}
       {importedEvaluation && (
         <Card surface="elevated" padding="none" radius="2xl" className="overflow-hidden">
-          <div className="min-h-[38px] px-3 py-1.5 bg-theme-header-grad border-b border-theme-subdued flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="min-h-[38px] px-3 py-1.5 bg-theme-card-elevated flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <FileSpreadsheet className="w-4 h-4 text-theme-primary shrink-0" />
               <div className="min-w-0">
@@ -1546,97 +1501,16 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
 
       {/* Empty States or Paginated History List */}
       {!importedEvaluation && history.length === 0 ? (
-        (() => {
-          const awaitingCount = summary?.completedAwaitingScore ?? 0;
-          const upcomingPredCount = summary?.upcomingPredictions ?? 0;
-          const livePredCount = summary?.livePredictions ?? 0;
-          const activePredCount = upcomingPredCount + livePredCount;
-          const totalPreds = summary?.totalPredictions ?? 0;
-          const fixturesInDb = summary?.upcomingFixturesInDb ?? 0;
-
-          let emptyTitle = 'No Historical Predictions';
-          let showFullSyncCta = true;
-          let refreshCtaLabel = 'Check Results';
-
-          if (awaitingCount > 0) {
-            emptyTitle = `Awaiting Final Scores (${awaitingCount})`;
-            showFullSyncCta = false;
-            refreshCtaLabel = 'Check Results';
-          } else if (activePredCount > 0) {
-            emptyTitle = `Pending Matches (${upcomingPredCount} Upcoming, ${livePredCount} Live)`;
-            showFullSyncCta = false;
-            refreshCtaLabel = 'Check Results';
-          } else if (totalPreds === 0 && fixturesInDb > 0) {
-            emptyTitle = `No Predictions Generated (${fixturesInDb} Fixtures)`;
-            showFullSyncCta = false;
-            refreshCtaLabel = 'Refresh';
-          }
-
-          return (
-            <EmptyState
-              icon={<RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />}
-              title={emptyTitle}
-              actions={
-                <div className="flex items-center gap-2 flex-wrap justify-center">
-                  <Button
-                    variant="inverse"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Import &amp; Evaluate JSON</span>
-                  </Button>
-
-                  {showFullSyncCta && onTriggerFullSync ? (
-                    <>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={onTriggerFullSync}
-                        disabled={isProcessingActive || isRefreshing}
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Start Full Sync</span>
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => fetchHistory(true)}
-                        disabled={isRefreshing || isProcessingActive}
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        <span>{isRefreshing ? 'Checking...' : refreshCtaLabel}</span>
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => fetchHistory(true)}
-                      disabled={isRefreshing || isProcessingActive}
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      <span>{isRefreshing ? 'Checking Results...' : refreshCtaLabel}</span>
-                    </Button>
-                  )}
-                </div>
-              }
-            />
-          );
-        })()
+        <EmptyState
+          icon={<BarChart3 className="w-5 h-5" />}
+          title="No prediction history found"
+          minHeight="min-h-[156px]"
+        />
       ) : filteredRows.length === 0 ? (
         <EmptyState
-          icon={<Filter className="w-6 h-6 text-theme-primary" />}
-          title="No Predictions Match Selected Filters"
-          description={`0 of ${totalRawCount} evaluated matches matched "${activeCategoryLabel}"${
-            selectedLeagueLabel ? ` · ${selectedLeagueLabel}` : ''
-          }${specificMarket !== 'AUTO' ? ` · ${getGenericMarketLabel(specificMarket)}` : ''} with your active filters.`}
-          actions={
-            <Button variant="primary" size="sm" onClick={resetAllFilters}>
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Filters</span>
-            </Button>
-          }
+          icon={<Filter className="w-5 h-5" />}
+          title="No matching predictions found"
+          minHeight="min-h-[156px]"
         />
       ) : (
         <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">

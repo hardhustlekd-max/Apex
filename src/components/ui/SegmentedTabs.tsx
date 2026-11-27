@@ -33,8 +33,8 @@ export function SegmentedTabs<T extends string = string>({
 
   const containerBg =
     variant === 'card'
-      ? 'bg-theme-card border border-theme shadow-theme-sm p-[3px] rounded-full'
-      : 'bg-theme-subtle border border-theme-subdued p-[3px] rounded-full';
+      ? 'bg-theme-card border border-theme-subdued p-[3px] rounded-full'
+      : 'bg-theme-subtle p-[3px] rounded-full';
 
   const containerSize =
     size === 'xs'
@@ -74,11 +74,10 @@ export function SegmentedTabs<T extends string = string>({
               fullWidth ? 'flex-1 min-w-0' : 'shrink-0'
             } ${btnHeight} ${tabRadiusCls} transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
               isActive
-                ? 'bg-theme-primary text-theme-primary-text border border-theme-neon font-semibold shadow-theme-glow'
-                : 'text-theme-sub hover:text-theme-main border border-transparent font-medium'
+                ? 'bg-theme-primary text-theme-primary-text font-semibold'
+                : 'text-theme-sub hover:text-theme-main font-medium'
             }`}
           >
-            {item.icon}
             <span className="whitespace-nowrap">{item.label}</span>
             {item.count !== undefined && (
               <span

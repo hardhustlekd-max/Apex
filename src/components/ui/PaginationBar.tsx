@@ -1,7 +1,5 @@
 import React from 'react';
 import {
-  ChevronLeft,
-  ChevronRight,
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
@@ -54,8 +52,8 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
     <div
       className={
         embedded
-          ? 'px-3 py-2 bg-theme-card-elevated border-t border-theme-subdued flex flex-wrap items-center justify-between gap-2 text-xs font-sans'
-          : 'px-3 py-2 bg-theme-card border border-theme flex flex-wrap items-center justify-between gap-2 text-xs rounded-2xl shadow-theme-sm font-sans'
+          ? 'px-3 py-2 bg-theme-card-elevated/60 flex flex-wrap items-center justify-between gap-2 text-xs font-sans'
+          : 'px-3 py-2 bg-theme-card border border-theme-subdued flex flex-wrap items-center justify-between gap-2 text-xs rounded-2xl font-sans'
       }
     >
       <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -97,12 +95,11 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          className="h-[26px] flex items-center justify-center gap-0.5 px-2 rounded-full text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
+          className="h-[26px] flex items-center justify-center px-2.5 rounded-full text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Previous Page"
           aria-label="Previous Page"
         >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Prev</span>
+          <span>Prev</span>
         </button>
 
         <div className="flex items-center gap-0.5">
@@ -121,7 +118,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
                 onClick={() => onPageChange(item)}
                 className={`w-[26px] h-[26px] flex items-center justify-center rounded-full text-xs transition-all cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                   item === currentPage
-                    ? 'bg-theme-primary text-theme-primary-text font-semibold shadow-theme-glow'
+                    ? 'bg-theme-primary text-theme-primary-text font-semibold'
                     : 'text-theme-sub hover:bg-theme-subtle hover:text-theme-main font-medium'
                 }`}
               >
@@ -135,12 +132,11 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
           type="button"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          className="h-[26px] flex items-center justify-center gap-0.5 px-2 rounded-full text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
+          className="h-[26px] flex items-center justify-center px-2.5 rounded-full text-theme-sub hover:bg-theme-subtle hover:text-theme-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs font-medium cursor-pointer whitespace-nowrap"
           title="Next Page"
           aria-label="Next Page"
         >
-          <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="w-3.5 h-3.5" />
+          <span>Next</span>
         </button>
         <button
           type="button"

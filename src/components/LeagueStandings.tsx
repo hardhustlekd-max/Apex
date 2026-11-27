@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Trophy, AlertCircle, RefreshCw, Search } from 'lucide-react';
+import { Trophy, Search } from 'lucide-react';
 import { LeagueStandingGroup, LeagueStandingTable, StandingsCatalogItem } from '../core/types.js';
 import { teamMatchScore } from '../core/feedParser.js';
 import { EngineService } from '../services/engineService.js';
@@ -114,10 +114,10 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
         return;
       }
 
-      setError('No standings table synced for this league yet');
+      setError('No standings data found');
       setFetchedStandingsData(data);
-    } catch (err: any) {
-      setError(err?.message || 'Error loading standings');
+    } catch {
+      setError('No standings data found');
       setFetchedStandingsData(null);
     } finally {
       setIsFetchingStandings(false);
@@ -134,7 +134,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
         if (preloadedStandings && Array.isArray(preloadedStandings.table) && preloadedStandings.table.length > 0) {
           setError(null);
         } else {
-          setError('No standings table synced for this league yet');
+          setError('No standings data found');
         }
       } else {
         setError(null);
@@ -209,17 +209,17 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const getRankBadgeClass = (zoneCode: string | undefined, rank: number, totalRows: number): string => {
     const z = (zoneCode || '').toLowerCase();
     if (z.startsWith('q')) {
-      return 'bg-theme-primary text-theme-primary-text shadow-theme-glow';
+      return 'bg-theme-primary text-theme-primary-text';
     }
     if (z.startsWith('p')) {
-      return 'bg-amber-500/15 text-amber-800 dark:text-amber-300';
+      return 'bg-amber-500/15 text-theme-warning';
     }
     if (z.startsWith('r')) {
-      return 'bg-rose-500/15 text-rose-700 dark:text-rose-400';
+      return 'bg-rose-500/15 text-theme-danger';
     }
     if (!zoneCode && totalRows >= 10) {
-      if (rank <= 4) return 'bg-theme-primary text-theme-primary-text shadow-theme-glow';
-      if (rank > totalRows - 3) return 'bg-rose-500/15 text-rose-700 dark:text-rose-400';
+      if (rank <= 4) return 'bg-theme-primary text-theme-primary-text';
+      if (rank > totalRows - 3) return 'bg-rose-500/15 text-theme-danger';
     }
     return 'text-theme-sub font-medium';
   };
@@ -227,7 +227,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
   const renderGroupTable = (group: LeagueStandingGroup, showGroupHeader: boolean, groupIdx: number) => (
     <Card key={`${group.name}-${groupIdx}`} surface="default" padding="none" radius="2xl" className="overflow-hidden">
       {showGroupHeader && (
-        <div className="min-h-[32px] px-3 py-1.5 bg-theme-header-grad border-b border-theme flex items-center justify-between gap-2">
+        <div className="min-h-[32px] px-3 py-1.5 bg-theme-card-elevated flex items-center justify-between gap-2">
           <span className="text-sm font-semibold text-theme-main truncate">{group.name}</span>
           <span className="text-xs font-normal text-theme-sub tabular-nums shrink-0">
             {group.table.length} teams
@@ -237,7 +237,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
       <div className="overflow-x-auto no-scrollbar">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
-            <tr className="h-[32px] bg-theme-header-grad border-b border-theme text-2xs uppercase tracking-[0.06em] font-medium text-theme-sub">
+            <tr className="h-[32px] bg-theme-card-elevated text-2xs uppercase tracking-[0.06em] font-medium text-theme-sub">
               <th className="py-1.5 pl-2.5 pr-1 text-center w-8 tabular-nums">#</th>
               <th className="py-1.5 px-2">Team</th>
               <th className="py-1.5 px-1 text-center w-7 tabular-nums" title="Matches Played">MP</th>
@@ -263,7 +263,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                     highlightRole === 'HOME'
                       ? 'bg-theme-primary-subtle text-theme-main font-semibold'
                       : highlightRole === 'AWAY'
-                      ? 'bg-sky-500/10 text-theme-main font-semibold'
+                      ? 'bg-[var(--status-info)]/10 text-theme-main font-semibold'
                       : ''
                   }`}
                 >
@@ -287,7 +287,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                           className={`text-2xs font-bold shrink-0 ${
                             highlightRole === 'HOME'
                               ? 'text-theme-primary'
-                              : 'text-sky-700 dark:text-sky-400'
+                              : 'text-theme-info'
                           }`}
                         >
                           {highlightRole === 'HOME' ? 'H' : 'A'}
@@ -321,7 +321,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                                 ? 'bg-theme-primary text-theme-primary-text'
                                 : res === 'D'
                                 ? 'bg-amber-400 text-slate-950'
-                                : 'bg-rose-600 text-white'
+                                : 'bg-theme-live text-white'
                             }`}
                           >
                             {res}
@@ -361,8 +361,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
             onClick={() => fetchStandings(currentLeague)}
             disabled={isLoading}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
           </Button>
         </div>
       )}
@@ -385,21 +384,8 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
 
       {!isLoading && error && (
         <EmptyState
-          icon={<AlertCircle className="w-5 h-5" />}
+          icon={<Trophy className="w-5 h-5" />}
           title={error}
-          actions={
-            <>
-              <Button variant="secondary" size="sm" onClick={() => fetchStandings(currentLeague)}>
-                Retry
-              </Button>
-              {onTriggerFullSync && (
-                <Button variant="primary" size="sm" onClick={onTriggerFullSync}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Start Full Sync</span>
-                </Button>
-              )}
-            </>
-          }
         />
       )}
 
@@ -441,7 +427,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
           radius="2xl"
           className="lg:col-span-4 overflow-hidden lg:sticky lg:top-[56px]"
         >
-          <div className="p-2.5 border-b border-theme space-y-2 bg-theme-header-grad">
+          <div className="p-2.5 space-y-2 bg-theme-card-elevated">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -487,19 +473,8 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                 ))}
               </div>
             ) : filteredCatalog.length === 0 ? (
-              <div className="py-6 px-3 text-center space-y-2">
-                <p className="text-sm text-theme-sub">No matching leagues</p>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCountry('ALL');
-                    setAvailabilityFilter('ALL');
-                  }}
-                >
-                  Clear Filters
-                </Button>
+              <div className="py-6 px-3 text-center text-sm text-theme-sub">
+                No leagues found
               </div>
             ) : (
               filteredCatalog.map((item) => {
@@ -513,7 +488,7 @@ export const LeagueStandings: React.FC<LeagueStandingsProps> = ({
                     onClick={() => handleLeagueChange(item.code)}
                     className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
                       isSelected
-                        ? 'bg-theme-primary-subtle border-l-2 border-l-theme-primary'
+                        ? 'bg-theme-primary-subtle'
                         : 'hover:bg-theme-subtle/75'
                     }`}
                   >

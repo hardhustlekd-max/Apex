@@ -14,13 +14,13 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const SURFACE_CLASSES: Record<CardSurface, string> = {
-  default: 'bg-theme-card border border-theme shadow-theme-sm',
-  elevated: 'bg-theme-card-elevated border border-theme shadow-theme-sm',
-  subtle: 'bg-theme-subtle border border-theme-subdued',
+  default: 'bg-theme-card border border-theme-subdued',
+  elevated: 'bg-theme-card-elevated',
+  subtle: 'bg-theme-subtle',
   interactive:
-    'bg-theme-card border border-theme shadow-theme-sm hover:-translate-y-0.5 hover:bg-theme-card-elevated hover:border-theme-accent hover:shadow-theme-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent active:translate-y-0 transition-all duration-200 ease-out',
+    'bg-theme-card border border-theme-subdued hover:bg-theme-card-elevated hover:border-theme cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-colors duration-150',
   selected:
-    'bg-theme-card-elevated border border-theme-accent shadow-theme-glow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-all duration-200 ease-out',
+    'bg-theme-card-elevated border border-theme-accent cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent transition-colors duration-150',
 };
 
 const PADDING_CLASSES: Record<CardPadding, string> = {

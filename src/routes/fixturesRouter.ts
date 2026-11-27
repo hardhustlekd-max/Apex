@@ -27,6 +27,10 @@ fixturesRouter.get('/', async (req, res) => {
     const search = req.query.search as string | undefined;
     const sortBy = req.query.sortBy as string | undefined;
     const marketFilter = req.query.marketFilter as string | undefined;
+    const popularMarketsRaw = typeof req.query.popularMarkets === 'string' ? req.query.popularMarkets : undefined;
+    const popularMarkets = popularMarketsRaw
+      ? popularMarketsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+      : undefined;
     const forceRefresh = req.query.force === '1' || req.query.force === 'true';
 
     const result = await fixturesWorkerService.queryUpcomingFixtures({
@@ -38,6 +42,7 @@ fixturesRouter.get('/', async (req, res) => {
       search,
       sortBy,
       marketFilter,
+      popularMarkets,
       forceRefresh,
     });
 
@@ -103,6 +108,10 @@ fixturesRouter.get('/live', async (req, res) => {
     const search = req.query.search as string | undefined;
     const sortBy = req.query.sortBy as string | undefined;
     const marketFilter = req.query.marketFilter as string | undefined;
+    const popularMarketsRaw = typeof req.query.popularMarkets === 'string' ? req.query.popularMarkets : undefined;
+    const popularMarkets = popularMarketsRaw
+      ? popularMarketsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+      : undefined;
     const limit = parseInt((req.query.limit as string) || '200', 10);
 
     const result = await fixturesWorkerService.queryLiveFixtures({
@@ -110,6 +119,7 @@ fixturesRouter.get('/live', async (req, res) => {
       search,
       sortBy,
       marketFilter,
+      popularMarkets,
       limit,
     });
 
@@ -134,6 +144,10 @@ fixturesRouter.get('/history', async (req, res) => {
     const search = req.query.search as string | undefined;
     const sortBy = req.query.sortBy as string | undefined;
     const marketFilter = req.query.marketFilter as string | undefined;
+    const popularMarketsRaw = typeof req.query.popularMarkets === 'string' ? req.query.popularMarkets : undefined;
+    const popularMarkets = popularMarketsRaw
+      ? popularMarketsRaw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+      : undefined;
     const dateFilter = req.query.dateFilter as string | undefined;
     const rawLimit = req.query.limit;
     const parsedLimit = rawLimit !== undefined ? parseInt(String(rawLimit), 10) : 300;
@@ -145,6 +159,7 @@ fixturesRouter.get('/history', async (req, res) => {
       search,
       sortBy,
       marketFilter,
+      popularMarkets,
       dateFilter,
       limit,
       forceRefresh,
