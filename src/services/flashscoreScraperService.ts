@@ -1196,7 +1196,6 @@ export class FlashscoreScraperService {
       { path: '/football/argentina/liga-profesional/results/', code: 'argentina_liga_profesional' },
       { path: '/football/japan/j1-league/results/', code: 'japan_j1_league' },
       { path: '/football/south-korea/k-league-1/results/', code: 'south_korea_k_league_1' },
-      { path: '/football/saudi-arabia/saudi-professional-league/results/', code: 'saudi_arabia_saudi_professional_league' },
     ];
 
     const archiveBatchSize = 5;
@@ -1839,8 +1838,6 @@ export class FlashscoreScraperService {
       'argentina_liga_profesional': { path: '/football/argentina/torneo-betano/', name: 'Torneo Betano', country: 'Argentina' },
       'japan_j1_league': { path: '/football/japan/j1-league/', name: 'J1 League', country: 'Japan' },
       'south_korea_k_league_1': { path: '/football/south-korea/k-league-1/', name: 'K League 1', country: 'South Korea' },
-      'saudi_arabia_saudi_professional_league': { path: '/football/saudi-arabia/saudi-professional-league/', name: 'Saudi Pro League', country: 'Saudi Arabia' },
-      'sa1': { path: '/football/saudi-arabia/saudi-professional-league/', name: 'Saudi Pro League', country: 'Saudi Arabia' },
     };
   }
 
@@ -2172,7 +2169,6 @@ export class FlashscoreScraperService {
       { code: 'argentina_liga_profesional', name: 'Torneo Betano', country: 'Argentina', url: '/football/argentina/torneo-betano/' },
       { code: 'japan_j1_league', name: 'J1 League', country: 'Japan', url: '/football/japan/j1-league/' },
       { code: 'south_korea_k_league_1', name: 'K League 1', country: 'South Korea', url: '/football/south-korea/k-league-1/' },
-      { code: 'saudi_arabia_saudi_professional_league', name: 'Saudi Pro League', country: 'Saudi Arabia', url: '/football/saudi-arabia/saudi-professional-league/' },
     ];
 
     for (const m of marqueeLeagues) {

@@ -91,6 +91,7 @@ const toggleLoadDataHandler = async (req: any, res: any) => {
       const gateBefore = getSqliteGateState();
       enableLoadDataManually();
       await db.init();
+      db.purgeSimulationLeagues();
       await predictionsDb.init().catch(() => {});
       await fixturesWorkerService.ensureIndexReady(true).catch(() => {});
       flashscoreScraperService.clearCaches();

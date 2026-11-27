@@ -131,6 +131,14 @@ const BLOCKED_LEAGUE_PATTERNS: RegExp[] = [
   /\bzambia\b/,
   /\bkenya\b/,
   /\bangola\b/,
+  /\bsaudi(?:\s+arabia)?\b/,
+  /\bsaudi\s+pro(?:fessional)?\s+league\b/,
+  /\broshn\s+saudi\b/,
+  /\bsa1\b/,
+  /\bsyria(?:n)?\b/,
+  /\bindonesia(?:n)?\b/,
+  /\bbri\s+(?:liga\s*1|super\s+league)\b/,
+  /\bpegadaian\s+(?:liga\s*2|championship)\b/,
 ];
 
 export function isBlockedLeague(

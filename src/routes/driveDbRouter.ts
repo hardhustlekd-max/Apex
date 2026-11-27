@@ -343,6 +343,7 @@ driveDbRouter.post('/restore', async (req: Request, res: ExpressResponse) => {
 
     const restoreResult = await replaceSqliteDbFromFile(tmpRestorePath);
     await db.init();
+    db.purgeSimulationLeagues();
     await predictionsDb.init().catch(() => {});
     await fixturesWorkerService.ensureIndexReady(true).catch(() => {});
 

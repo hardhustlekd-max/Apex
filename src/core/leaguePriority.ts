@@ -325,17 +325,6 @@ function computeLeaguePopularityScore(
     return 750;
   }
 
-  const isSaudi = stageCountry === '' || stageCountry === 'saudi arabia';
-  if (
-    isSaudi &&
-    (code === 'SPL' ||
-      full.includes('saudi pro league') ||
-      full.includes('saudi professional league')) &&
-    !full.includes('division 2')
-  ) {
-    return 735;
-  }
-
   const isTurkish = stageCountry === '' || stageCountry === 'turkey';
   if (
     isTurkish &&

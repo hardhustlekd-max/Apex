@@ -1711,7 +1711,6 @@ export class FootballDB {
       'portugal_primeira_liga': ['p1', 'po1'],
       'bra': ['brazil_serie_a'],
       'brazil_serie_a': ['bra'],
-      'sa1': ['saudi_arabia_saudi_professional_league', 'saudi_arabia_saudi_pro_league'],
       'ucl': ['europe_champions_league_league_phase', 'europe_champions_league', 'europe_uefa_champions_league'],
       'europe_champions_league': ['europe_champions_league_league_phase', 'ucl'],
       'europe_champions_league_league_phase': ['europe_champions_league', 'ucl'],
