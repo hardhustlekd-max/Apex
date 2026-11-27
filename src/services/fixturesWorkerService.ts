@@ -1346,8 +1346,11 @@ class FixturesWorkerService {
         if (isZeroFiveGoalsKey(market.key)) continue;
         if (market.probability >= 0.75) {
           const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
-          const hasScrapedOdds = fsOdd !== null;
-          const odds = fsOdd ?? (market.probability > 0 ? Number(Math.max(1.02, Math.min(50, 1 / market.probability)).toFixed(2)) : 1.5);
+          if (fsOdd === null || fsOdd <= 1.0) {
+            continue;
+          }
+          const odds = fsOdd;
+          const hasScrapedOdds = true;
 
           candidateEntries.push({
             record: rec,

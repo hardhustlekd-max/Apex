@@ -315,6 +315,13 @@ export const BetSlipDrawer: React.FC<BetSlipDrawerProps> = ({
                 ))}
               </div>
 
+              <div className="flex items-center justify-between text-xs tabular-nums pt-1 border-t border-[var(--border-subdued)]">
+                <span className="text-theme-sub font-medium">Total Odds:</span>
+                <span className="font-bold text-sm text-theme-primary">
+                  {totalOdds.toFixed(2)}x
+                </span>
+              </div>
+
               <div className="flex items-center justify-between text-xs tabular-nums">
                 <span className="text-theme-sub font-medium">Potential Payout:</span>
                 <span className="font-bold text-base text-theme-success">
