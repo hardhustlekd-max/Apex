@@ -91,9 +91,13 @@ export const FixturesList: React.FC<FixturesListProps> = ({
 }) => {
   const [internalScope, setInternalScope] = useState<'UPCOMING' | 'LIVE' | 'HISTORY'>('UPCOMING');
   const activeScope = propActiveScope ?? internalScope;
-  const setActiveScope = (next: 'UPCOMING' | 'LIVE' | 'HISTORY') => {
-    if (onSelectScope) onSelectScope(next);
-    else setInternalScope(next);
+  const setActiveScope = (next: 'UPCOMING' | 'LIVE' | 'HISTORY' | 'FILTERS') => {
+    if (next === 'FILTERS') {
+      setIsFilterOpen(true);
+      return;
+    }
+    if (onSelectScope) onSelectScope(next as 'UPCOMING' | 'LIVE' | 'HISTORY');
+    else setInternalScope(next as 'UPCOMING' | 'LIVE' | 'HISTORY');
   };
 
   const [historyFixtures, setHistoryFixtures] = useState<Fixture[]>([]);
@@ -427,8 +431,14 @@ export const FixturesList: React.FC<FixturesListProps> = ({
         label: 'History',
         buttonId: 'subtab-history-btn',
       },
+      {
+        id: 'FILTERS' as const,
+        label: activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters',
+        buttonId: 'subtab-filters-btn',
+        count: activeFilterCount > 0 ? activeFilterCount : undefined,
+      },
     ],
-    [liveScores]
+    [liveScores, activeFilterCount]
   );
 
   const emptyTitle =
@@ -483,36 +493,16 @@ export const FixturesList: React.FC<FixturesListProps> = ({
       </div>
 
       {/* Scope Sub-Tabs & Filters Bar */}
-      <div className="flex items-center justify-between gap-2 flex-nowrap">
+      <div>
         <SegmentedTabs
           items={scopeTabs}
           value={activeScope}
-          onChange={(val) => setActiveScope(val as 'UPCOMING' | 'LIVE' | 'HISTORY')}
+          onChange={(val) => setActiveScope(val)}
           variant="card"
           size="sm"
-          className="min-w-0"
-          ariaLabel="Match scope"
+          className="min-w-0 w-full"
+          ariaLabel="Match scope and filters"
         />
-
-        {/* Filter Trigger */}
-        <div className="shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsFilterOpen(true)}
-            className={`h-[34px] min-h-[34px] flex items-center justify-center gap-1.5 px-3.5 rounded-full text-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent ${
-              activeFilterCount > 0
-                ? 'bg-theme-primary text-theme-primary-text font-semibold'
-                : 'bg-theme-card text-theme-main font-medium hover:bg-theme-card-elevated'
-            }`}
-          >
-            <span>Filters</span>
-            {activeFilterCount > 0 && (
-              <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-black/20 text-theme-primary-text text-2xs leading-none font-semibold tabular-nums inline-flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-        </div>
 
         {/* Filter Modal */}
         <FixturesFilterModal

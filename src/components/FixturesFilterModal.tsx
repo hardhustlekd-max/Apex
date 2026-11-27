@@ -115,34 +115,26 @@ export const FixturesFilterModal: React.FC<FixturesFilterModalProps> = ({
       <div className="w-full relative min-w-0">
         <div className="flex items-center justify-between mb-1.5">
           <label
-            htmlFor="upcoming-league-filter"
             className="text-2xs font-medium text-theme-sub uppercase tracking-[0.06em] truncate"
           >
             League Filter
           </label>
-          <button
-            type="button"
-            onClick={() => {
-              setIsLeagueModalOpen(true);
-              onClose();
-            }}
-            className="text-xs font-medium text-theme-primary hover:underline cursor-pointer rounded-full px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
-          >
-            Browse All Leagues...
-          </button>
         </div>
-        <Select
-          id="upcoming-league-filter"
-          value={selectedLeague}
-          onChange={(e) => onSelectLeague(e.target.value)}
-          containerClassName="w-full"
+        <button
+          type="button"
+          onClick={() => {
+            setIsLeagueModalOpen(true);
+            onClose();
+          }}
+          className="w-full min-h-[40px] px-3.5 py-2 rounded-xl bg-theme-subtle hover:bg-theme-card-elevated text-theme-main text-sm font-medium flex items-center justify-between transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
         >
-          {leagueOptions.map((opt, idx) => (
-            <option key={`${opt.code}-${idx}`} value={opt.code} className="bg-theme-card text-theme-main">
-              {opt.name}
-            </option>
-          ))}
-        </Select>
+          <span className="truncate">
+            {selectedLeague === 'ALL' ? 'All Leagues & Competitions' : leagueOptions.find((l) => l.code === selectedLeague)?.name || selectedLeague}
+          </span>
+          <span className="text-xs font-semibold text-theme-primary px-2.5 py-1 rounded-full bg-theme-primary/15 shrink-0">
+            Browse All Leagues
+          </span>
+        </button>
       </div>
 
       {/* Date Range & Market Category */}
