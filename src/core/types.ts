@@ -616,6 +616,10 @@ export interface FeaturedTipDTO {
   odds: number;
   hasScrapedOdds: boolean;
   comboMarkets?: FeaturedTipComboOptionDTO[];
+  leagueAccuracy?: number;
+  leagueSettledMatches?: number;
+  leagueWonMatches?: number;
+  isHighestAccuracyLeague?: boolean;
 }
 
 export interface FeaturedTipsResponse {
@@ -626,6 +630,9 @@ export interface FeaturedTipsResponse {
   totalOdds: number;
   tips: FeaturedTipDTO[];
   comboMarketsByFixture?: Record<string, FeaturedTipComboOptionDTO[]>;
+  highestAccuracyThreshold?: number;
+  maxLeagueAccuracy?: number;
+  qualifyingLeagues?: Array<{ league: string; leagueName: string; accuracy: number; settled: number; won: number }>;
 }
 
 export interface LeagueOptionDTO {

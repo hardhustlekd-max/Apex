@@ -1,12 +1,22 @@
 import { cleanFixtureId, DEFAULT_ENGINE_SETTINGS, Fixture, MarketOption } from './types.js';
 import { sortFixturesByPopularityInPlace } from './leaguePriority.js';
-import { isSimulationLeague } from './leagueMapper.js';
+import { cleanStr, isSimulationLeague } from './leagueMapper.js';
 import { getRelativeDateStr, isMatchStarted, normalizeDateStr, normalizeTimeStr, resolveDateFilter } from './dateUtils.js';
 import { sqliteDb, notifyDbMutation, isSqliteEnabled } from './sqliteClient.js';
 import { isScrapingEnabled } from './scrapingGate.js';
 import { loggerService } from '../services/loggerService.js';
-import { evaluateMarketOutcome, normalizeMarketKey } from './marketEvaluator.js';
+import { evaluateFixtureForMarketFilter, evaluateMarketOutcome, normalizeMarketKey } from './marketEvaluator.js';
 import { ApexEngine } from './poisson.js';
+
+export interface LeagueModelAccuracyRecord {
+  league: string;
+  leagueName: string;
+  settled: number;
+  won: number;
+  lost: number;
+  void: number;
+  accuracy: number;
+}
 
 export interface PredictionEvaluationSummary {
   upcomingFixturesInDb: number;
@@ -706,6 +716,85 @@ export class PredictionsDB {
         completedAwaitingScore: 0,
       };
     }
+  }
+
+  /**
+   * Computes authoritative model accuracy by league based on all completed, settled historical predictions in SQLite.
+   * Matches evaluateFixtureForMarketFilter(f, 'ALL', 'AUTO') used in Prediction History.
+   */
+  getLeagueModelAccuracies(): Map<string, LeagueModelAccuracyRecord> {
+    const accMap = new Map<string, LeagueModelAccuracyRecord>();
+    if (!isSqliteEnabled()) return accMap;
+
+    try {
+      const rows = sqliteDb
+        .prepare(`
+          SELECT full_fixture_json, status, match_state, league, league_name, home_score, away_score
+          FROM predictions
+          WHERE (match_state = 'completed' OR UPPER(status) = 'FINISHED' OR (home_score IS NOT NULL AND away_score IS NOT NULL))
+        `)
+        .all() as any[];
+
+      for (const r of rows) {
+        if (!r.full_fixture_json) continue;
+        let f: Fixture;
+        try {
+          f = JSON.parse(r.full_fixture_json);
+        } catch {
+          continue;
+        }
+        if (r.status) f.status = r.status;
+        if (r.home_score !== null && r.away_score !== null && r.home_score !== undefined && r.away_score !== undefined) {
+          f.score = { home: Number(r.home_score), away: Number(r.away_score) };
+        }
+
+        if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) {
+          continue;
+        }
+
+        const res = evaluateFixtureForMarketFilter(f, 'ALL', 'AUTO');
+        if (res.outcome !== 'WON' && res.outcome !== 'LOST' && res.outcome !== 'VOID') {
+          continue;
+        }
+
+        const cleanLeagueKey = cleanStr(f.leagueName || f.league || '');
+        const rawLeagueCode = cleanStr(f.league || '');
+
+        let rec = accMap.get(cleanLeagueKey);
+        if (!rec && rawLeagueCode) {
+          rec = accMap.get(rawLeagueCode);
+        }
+
+        if (!rec) {
+          rec = {
+            league: f.league || '',
+            leagueName: f.leagueName || f.league || 'Unknown League',
+            settled: 0,
+            won: 0,
+            lost: 0,
+            void: 0,
+            accuracy: 0,
+          };
+          if (cleanLeagueKey) accMap.set(cleanLeagueKey, rec);
+          if (rawLeagueCode) accMap.set(rawLeagueCode, rec);
+          const lowerName = (f.leagueName || '').trim().toLowerCase();
+          if (lowerName) accMap.set(lowerName, rec);
+          const lowerCode = (f.league || '').trim().toLowerCase();
+          if (lowerCode) accMap.set(lowerCode, rec);
+        }
+
+        if (res.outcome === 'WON') rec.won++;
+        else if (res.outcome === 'LOST') rec.lost++;
+        else if (res.outcome === 'VOID') rec.void++;
+
+        rec.settled = rec.won + rec.lost;
+        rec.accuracy = rec.settled > 0 ? Number(((rec.won / rec.settled) * 100).toFixed(1)) : 0;
+      }
+    } catch (err: any) {
+      console.warn('[PredictionsDB] Error computing league model accuracies:', err?.message);
+    }
+
+    return accMap;
   }
 
   private applyMatchOutcomeToDb(

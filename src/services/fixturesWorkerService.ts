@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { db } from '../core/db.js';
-import { predictionsDb } from '../core/predictionsDb.js';
+import { predictionsDb, LeagueModelAccuracyRecord } from '../core/predictionsDb.js';
 import { getSqliteGateState, isSqliteEnabled, registerDbMutationListener } from '../core/sqliteClient.js';
 import { getScrapingGateState, isScrapingEnabled } from '../core/scrapingGate.js';
 import {
@@ -8,6 +8,7 @@ import {
   DEFAULT_ENGINE_SETTINGS,
   Fixture,
   FeaturedTipDTO,
+  FeaturedTipsResponse,
   LeagueGroupDTO,
   LeagueOptionDTO,
   MarketOption,
@@ -1230,8 +1231,8 @@ class FixturesWorkerService {
   }
 
   /**
-   * Computes today's >85% high-confidence featured tips and odds purely on the server,
-   * eliminating client-side scanning of all DB fixtures and N parallel getMatchDetail requests.
+   * Computes today's >75% high-confidence featured tips and odds purely on the server,
+   * strictly restricted to the highest leagues by Prediction history Model Accuracy.
    */
   public async getFeaturedHighConfidenceTips(forceRefresh = false): Promise<{ jsonPayload: string; etag: string }> {
     if (!isSqliteEnabled()) {
@@ -1259,11 +1260,71 @@ class FixturesWorkerService {
       };
     }
 
-    const tips: FeaturedTipDTO[] = [];
-    const comboMarketsByFixture: Record<string, Array<{ market: MarketOption; odds: number; hasScrapedOdds: boolean }>> = {};
-    const todayResolved = resolveDateFilter('TODAY');
+    // Retrieve authoritative league model accuracy statistics from historical prediction results
+    const leagueAccMap = predictionsDb.getLeagueModelAccuracies();
+
+    const lookupLeagueAccuracy = (league?: string, leagueName?: string): LeagueModelAccuracyRecord | null => {
+      const keys = [
+        cleanStr(leagueName || ''),
+        cleanStr(league || ''),
+        (leagueName || '').trim().toLowerCase(),
+        (league || '').trim().toLowerCase(),
+      ];
+      for (const k of keys) {
+        if (k && leagueAccMap.has(k)) {
+          return leagueAccMap.get(k)!;
+        }
+      }
+      return null;
+    };
 
     const excludeVolatile = db.getSettings()?.excludeVolatileLeagues !== false;
+
+    // Resolve target date: prioritize calendar TODAY, fallback to closest date with active predictions
+    const todayResolved = resolveDateFilter('TODAY');
+    const hasTodayMatches = this.records.some(
+      (r) =>
+        r.slimFixture.hasPrediction &&
+        matchesResolvedDateFilter(r.slimFixture, todayResolved) &&
+        r.slimFixture.status !== 'FINISHED' &&
+        r.slimFixture.status !== 'CANCELLED' &&
+        r.slimFixture.status !== 'POSTPONED'
+    );
+
+    let targetDateFilter = todayResolved;
+    if (!hasTodayMatches) {
+      const availableDates = Array.from(
+        new Set(
+          this.records
+            .filter(
+              (r) =>
+                r.slimFixture.hasPrediction &&
+                r.slimFixture.status !== 'FINISHED' &&
+                r.slimFixture.status !== 'CANCELLED' &&
+                r.slimFixture.status !== 'POSTPONED'
+            )
+            .map((r) => r.slimFixture.matchDate)
+            .filter(Boolean)
+        )
+      ).sort();
+
+      if (availableDates.length > 0) {
+        targetDateFilter = resolveDateFilter(availableDates[0]);
+      }
+    }
+
+    // Pass 1: Collect high-confidence candidate tips (>= 75% probability, excluding trivial 0.5 lines)
+    interface CandidateTipEntry {
+      record: WorkerIndexedRecord;
+      market: MarketOption;
+      odds: number;
+      hasScrapedOdds: boolean;
+      leagueAccuracy: number;
+      leagueSettledMatches: number;
+      leagueWonMatches: number;
+    }
+
+    const candidateEntries: CandidateTipEntry[] = [];
 
     for (const rec of this.records) {
       const f = rec.slimFixture;
@@ -1271,32 +1332,89 @@ class FixturesWorkerService {
       if (isSimulationLeague(f.league, f.leagueName, undefined, f.leagueUrl, f.stage, f.homeTeam, f.awayTeam)) continue;
       if (excludeVolatile && (isKnownVolatileLeague(f.league) || isKnownVolatileLeague(f.leagueName))) continue;
 
-      if (!matchesResolvedDateFilter(f, todayResolved)) continue;
+      if (!matchesResolvedDateFilter(f, targetDateFilter)) continue;
       if (f.status === 'FINISHED' || f.status === 'CANCELLED' || f.status === 'POSTPONED') continue;
 
-      let fixtureHasTip = false;
+      // STRICT REQUIREMENT: League must have settled prediction history
+      const accStat = lookupLeagueAccuracy(f.league, f.leagueName);
+      if (!accStat || accStat.settled === 0) {
+        // Exclude leagues with no prediction history
+        continue;
+      }
+
       for (const market of rec.fullMarkets) {
         if (isZeroFiveGoalsKey(market.key)) continue;
         if (market.probability >= 0.75) {
-          fixtureHasTip = true;
           const fsOdd = extractFlashscoreOddsServer(market.key, rec.marketOdds);
           const hasScrapedOdds = fsOdd !== null;
           const odds = fsOdd ?? (market.probability > 0 ? Number(Math.max(1.02, Math.min(50, 1 / market.probability)).toFixed(2)) : 1.5);
 
-          tips.push({
-            fixture: f,
+          candidateEntries.push({
+            record: rec,
             market,
             odds,
             hasScrapedOdds,
+            leagueAccuracy: accStat.accuracy,
+            leagueSettledMatches: accStat.settled,
+            leagueWonMatches: accStat.won,
           });
         }
       }
+    }
 
-      if (fixtureHasTip && !comboMarketsByFixture[f.id]) {
-        comboMarketsByFixture[f.id] = rec.fullMarkets
+    // Determine the highest league accuracy among available candidate leagues
+    let maxLeagueAccuracy = 0;
+    for (const entry of candidateEntries) {
+      if (entry.leagueAccuracy > maxLeagueAccuracy) {
+        maxLeagueAccuracy = entry.leagueAccuracy;
+      }
+    }
+
+    // Highest leagues tier threshold:
+    // If top accuracy is >= 75%, threshold is within 15% (or 75%, whichever is higher).
+    // If top accuracy is < 75%, threshold is strictly the top accuracy (with a minimum floor of 50%).
+    const accuracyThreshold = maxLeagueAccuracy >= 75 ? Math.max(75, maxLeagueAccuracy - 15) : maxLeagueAccuracy;
+
+    // Filter strictly to highest leagues by model accuracy (minimum 50% floor)
+    const qualifyingEntries = candidateEntries.filter(
+      (entry) => entry.leagueAccuracy >= accuracyThreshold && entry.leagueAccuracy >= 50
+    );
+
+    // Build final tips array
+    const tips: FeaturedTipDTO[] = qualifyingEntries.map((entry) => ({
+      fixture: entry.record.slimFixture,
+      market: entry.market,
+      odds: entry.odds,
+      hasScrapedOdds: entry.hasScrapedOdds,
+      leagueAccuracy: entry.leagueAccuracy,
+      leagueSettledMatches: entry.leagueSettledMatches,
+      leagueWonMatches: entry.leagueWonMatches,
+      isHighestAccuracyLeague: entry.leagueAccuracy === maxLeagueAccuracy,
+    }));
+
+    // Sort tips strictly by:
+    // 1. Highest league accuracy descending
+    // 2. Highest settled matches descending
+    // 3. Highest tip probability descending
+    tips.sort((a, b) => {
+      const accDiff = (b.leagueAccuracy ?? 0) - (a.leagueAccuracy ?? 0);
+      if (accDiff !== 0) return accDiff;
+      const settledDiff = (b.leagueSettledMatches ?? 0) - (a.leagueSettledMatches ?? 0);
+      if (settledDiff !== 0) return settledDiff;
+      return b.market.probability - a.market.probability;
+    });
+
+    // Populate combos exclusively for qualifying fixtures
+    const qualifyingFixtureIds = new Set(tips.map((t) => t.fixture.id));
+    const comboMarketsByFixture: Record<string, Array<{ market: MarketOption; odds: number; hasScrapedOdds: boolean }>> = {};
+
+    for (const entry of qualifyingEntries) {
+      const f = entry.record.slimFixture;
+      if (qualifyingFixtureIds.has(f.id) && !comboMarketsByFixture[f.id]) {
+        comboMarketsByFixture[f.id] = (entry.record.fullMarkets || [])
           .filter((m) => m.key.startsWith('COMBO_') && !isZeroFiveGoalsKey(m.key))
           .map((m) => {
-            const fsOdd = extractFlashscoreOddsServer(m.key, rec.marketOdds);
+            const fsOdd = extractFlashscoreOddsServer(m.key, entry.record.marketOdds);
             const hasScrapedOdds = fsOdd !== null;
             const odds = fsOdd ?? (m.probability > 0 ? Number(Math.max(1.02, Math.min(50, 1 / m.probability)).toFixed(2)) : 1.5);
             return {
@@ -1308,8 +1426,6 @@ class FixturesWorkerService {
           .sort((a, b) => b.market.probability - a.market.probability);
       }
     }
-
-    tips.sort((a, b) => b.market.probability - a.market.probability);
 
     const seenComboFixtures = new Set<string>();
     const uniqueMatchTips = tips.filter((t) => {
@@ -1323,12 +1439,14 @@ class FixturesWorkerService {
         ? 1.0
         : Number(uniqueMatchTips.reduce((acc, tip) => acc * tip.odds, 1.0).toFixed(2));
 
-    const payloadObj = {
+    const payloadObj: FeaturedTipsResponse = {
       success: true,
       count: tips.length,
       totalOdds,
       tips,
       comboMarketsByFixture,
+      highestAccuracyThreshold: accuracyThreshold,
+      maxLeagueAccuracy,
     };
 
     const jsonPayload = JSON.stringify(payloadObj);

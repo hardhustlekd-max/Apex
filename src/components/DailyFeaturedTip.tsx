@@ -223,16 +223,18 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
   if (tips.length === 0) {
     return (
       <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
-        <div className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center">
+        <div className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center justify-between gap-2">
           <SectionHeader
-            title="Today's Featured Tips (>75%)"
+            title="Today's Featured Tips"
             icon={<Award className="w-4 h-4" />}
             size="md"
-            className="w-full"
           />
+          <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-theme-primary/15 text-theme-primary">
+            Highest Model Accuracy
+          </span>
         </div>
         <div className="py-8 px-4 text-center text-sm text-theme-sub">
-          No featured tips today.
+          No featured tips available from the highest model accuracy leagues today.
         </div>
       </Card>
     );
@@ -255,11 +257,16 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
 
       <Card surface="default" padding="none" radius="2xl" className="overflow-hidden">
         <div className="min-h-[40px] px-3.5 py-2 bg-theme-card-elevated flex items-center justify-between gap-2 flex-wrap">
-          <SectionHeader
-            title="Today's Featured Tips"
-            icon={<Award className="w-4 h-4" />}
-            size="md"
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <SectionHeader
+              title="Today's Featured Tips"
+              icon={<Award className="w-4 h-4" />}
+              size="md"
+            />
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-theme-primary/15 text-theme-primary">
+              Highest Model Accuracy Leagues
+            </span>
+          </div>
           <div className="flex items-center gap-2.5 text-sm tabular-nums flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="text-theme-sub font-medium">Total Odds:</span>
@@ -344,10 +351,25 @@ export const DailyFeaturedTip: React.FC<DailyFeaturedTipProps> = ({
                     }}
                     className="flex-1 min-w-0 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-accent"
                   >
-                    <div className="flex items-center gap-1.5 text-xs text-theme-sub">
+                    <div className="flex items-center gap-1.5 text-xs text-theme-sub flex-wrap">
                       <span className="truncate font-medium">{fixture.leagueName}</span>
                       <span aria-hidden="true">·</span>
                       <span className="tabular-nums shrink-0 font-normal">{timeStr}</span>
+                      {tipItem.leagueAccuracy !== undefined && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold tabular-nums ${
+                              tipItem.isHighestAccuracyLeague
+                                ? 'bg-theme-primary/15 text-theme-primary'
+                                : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            }`}
+                            title={`Historical prediction model accuracy for ${fixture.leagueName}: ${tipItem.leagueAccuracy}% (${tipItem.leagueWonMatches ?? 0} won / ${tipItem.leagueSettledMatches ?? 0} settled)`}
+                          >
+                            {tipItem.leagueAccuracy.toFixed(0)}% Model Acc{tipItem.leagueSettledMatches ? ` (${tipItem.leagueSettledMatches})` : ''}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <div className="text-base font-semibold text-theme-main truncate mt-0.5 tracking-[-0.01em] group-hover:text-theme-primary transition-colors">
                       {fixture.homeTeam} <span className="text-theme-sub font-normal">vs</span> {fixture.awayTeam}
